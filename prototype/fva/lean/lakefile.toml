@@ -1,5 +1,5 @@
 name = "fva"
-defaultTargets = ["FVA", "fva-trust", "fva-eval"]
+defaultTargets = ["FVA", "fva-trust"]
 
 [[lean_lib]]
 name = "FVA"
@@ -9,7 +9,3 @@ name = "fva-trust"
 root = "TrustMain"
 supportInterpreter = true
 
-[[lean_exe]]
-name = "fva-eval"
-root = "EvalMain"
-supportInterpreter = true

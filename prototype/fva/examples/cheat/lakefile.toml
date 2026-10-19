@@ -1,0 +1,9 @@
+name = "cheat"
+defaultTargets = ["Cheat"]
+
+[[require]]
+name = "fva"
+path = "../../lean"
+
+[[lean_lib]]
+name = "Cheat"

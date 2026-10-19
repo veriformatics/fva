@@ -71,6 +71,7 @@ class Func:
     results: int
     locals: list[str] = field(default_factory=list)
     body: str = ""
+    result_types: list[str] = field(default_factory=list)
 
 
 def block_arity(r: Reader) -> int:
@@ -129,7 +130,7 @@ def decode(wasm: bytes) -> list[Func]:
                     raise LiftError("malformed func type")
                 params = [VALTYPE[s.byte()] for _ in range(s.uleb())]
                 results = [VALTYPE[s.byte()] for _ in range(s.uleb())]
-                types.append((params, len(results)))
+                types.append((params, results))
         elif sid == 2 and s.uleb():
             raise LiftError("imports unsupported (index space would shift)")
         elif sid == 3:
@@ -154,7 +155,7 @@ def decode(wasm: bytes) -> list[Func]:
             n, t = c.uleb(), c.byte()
             locs += [VALTYPE[t]] * n
         body, _ = instrs(c, 1)
-        funcs.append(Func(name, params, results, locs, body))
+        funcs.append(Func(name, params, len(results), locs, body, results))
     return funcs
 
 
