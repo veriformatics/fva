@@ -49,7 +49,7 @@ Proof writing alone is not what FVA adds: a capable agent can already write and 
 - [ ] Round 3: users skip spec review → 5 parallel variants (review-ledger, predict-quiz, review-page, spot-the-mutant, pattern-catalog) → finalists for user pick; + `wt/attest` (signed review badge, user request).
 - [x] 24511d2 Round 4: moat question → benchmark bare agent vs agent + FVA (`prototype/bench/rubric.md`), 3 tasks incl. planted bug.
 - [x] 9d674c3 Round 5: direction → `Decisions` Direction (generalized), D21–D24 generalized.
-- [ ] Round 6: `Intent` states what FVA adds over an agent alone (general, from `Decisions` Direction).
+- [x] 37aed59 Round 6: `Intent` states what FVA adds over an agent alone (general, from `Decisions` Direction).
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
