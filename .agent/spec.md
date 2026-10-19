@@ -10,6 +10,12 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
   - Run: `cd prototype/fva && uv run fva demo` = rebuild toy C → wasm vs pinned sha, difftest Lean semantics vs wasmtime, trust report `examples/toy` (PASS) + `examples/cheat` (FAIL); rc 0 = all as expected.
   - Subcommands: `uv run fva lift <wasm> <out.lean> --ns <Ns>`, `uv run fva trust <lake-dir> [theorem…] [--spec-module M] [--paranoid] [--json]`, `uv run fva difftest <lake-dir>`, `uv run fva explain <lake-dir> [--model M] [--effort E] [--force] [--json]`.
   - Review aid run: `cd prototype/fva && uv run fva explain examples/toy` (rc 0: trust PASS + every intent check `matches`) + `uv run fva explain examples/cheat` (rc 1: all 7 cheats ✗ on proof status, vacuous/different intent on clamp/sum_to*/gcd_terminates/sumBelow_ten); both read the committed `examples/*/fva-explain.json` (no LLM call); `--force` regenerates, and LLM output varies run to run.
+  - Round 3 finalists (review-skipping problem), one branch each, run from `.scratch/worktrees/<n>/prototype/fva` (`git worktree add .scratch/worktrees/<n> wt/<n>` if absent), notes = `.scratch/worktrees/<n>/variant-<n>.md` (committed on the branch):
+    - `wt/review-ledger`: `uv run fva review examples/toy`; `fva trust` → FAIL / PROVEN, UNREVIEWED (rc 2) / VERIFIED (rc 0); approvals keyed to elaborated-statement + wasm hash, typed claim+fingerprint phrase + reason.
+    - `wt/predict-quiz`: `uv run fva quiz examples/toy [--answers F|-] [--json]`; predict outputs → reveal Lean value → mismatch = `spec disputed` | `reviewer corrected`.
+    - `wt/review-page`: `uv run fva review-page examples/toy --out <html>` + `--status --decisions <json>`; static HTML, per-claim Accept/Reject + note, export receipt; screenshots `qa/*.png`.
+    - `wt/spot-the-mutant`: `uv run fva spot examples/toy [--answers F]`; real claim shuffled among Lean-elaborated mutants with computed examples; reviewer picks intended behavior.
+    - `wt/pattern-catalog`: `uv run fva catalog examples/toy-catalog`; claims that are literal catalog-pattern instances (`FVA.Spec.Catalog`) → one fixed sentence each (toy 7 code lines → 3 mapping lines); rc 2 = mappings pending.
   - Needs: uv, Lean 4.35 + lake (bundles `leanexport`, `lake check`, nanoda/con-leche/con-ron for `--paranoid`), clang wasm32 target; `fva explain` + signed-in `codex` CLI.
 
 ## Decisions
@@ -32,6 +38,7 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 
 - [x] b5d1ef2 Round 1: non-expert review of the spec → `fva explain` (Claimcheck-style round trip + computed examples + per-claim proof status).
 - [x] 2296593 Round 2: explanation persisted → `fva-explain.json` reused, `--force` regenerates, STALE on input change.
+- [ ] Round 3: users skip spec review → 5 parallel variants (review-ledger, predict-quiz, review-page, spot-the-mutant, pattern-catalog) → finalists for user pick.
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
