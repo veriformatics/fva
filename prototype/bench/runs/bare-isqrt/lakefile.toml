@@ -1,0 +1,9 @@
+name = "isqrt-verification"
+version = "1.0.0"
+defaultTargets = ["Isqrt", "Machine"]
+
+[[lean_lib]]
+name = "Isqrt"
+
+[[lean_lib]]
+name = "Machine"
