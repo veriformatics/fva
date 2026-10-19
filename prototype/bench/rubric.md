@@ -58,3 +58,25 @@ there."
 
 Moat evidence = fva arm better on M2, M4 or M6 without a large loss on M7. Parity on M2–M6
 = no moat from this prototype. Bare better = FVA adds cost without assurance.
+
+## Addendum v1.1 (fixed before the prompted-arm runs)
+
+Question: does a bare agent with a prompt carrying `Intent`'s principles close the gap?
+
+- Arm `prompted`: isolated dir like `bare`; prompt = P-bare + P-principles. P-principles
+  states `Intent`-level principles only (no FVA code, no cheat list): "Follow these principles.
+  (1) Keep the part that a human must review — the formal statements and every definition they
+  depend on — as small as possible, and report its size. (2) Link the proofs to the real
+  implementation: prove properties of the shipped artifact, not of a hand-written model, and do
+  not rewrite the source. (3) Do not trust a single checker: replay the proofs through
+  independent proof kernels, and test your checking setup against known false proofs so that it
+  demonstrably rejects them. (4) Provide one check command that a third party can run to
+  confirm all of this." Scored on M1–M7 as before (M3/M6 judge = a fresh reviewer, same brief).
+- M8 Independence (all 9 runs: bare, prompted, fva): MAIN injects each cheat into a copy of the
+  finished project, one at a time, then runs that arm's own documented check command(s) from
+  VERIFICATION.md (fva: `fva trust`). Target = the theorem the run names for R1 (avg_floor: its
+  R1 refutation). Cheats: C1 the target's proof → `sorry`; C2 `axiom` of `False` + target proved
+  from it; C3 kernel bypass: `debug.skipKernelTC` + `addDecl` of `1 = 2` + target proved from it
+  (adds `import Lean` where absent); C4 one byte of the shipped `.wasm` changed (a code byte
+  inside the function body). Caught = the check command exits nonzero or prints an explicit
+  failure naming the problem. Score = caught / 4 per run.
