@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 from . import difftest as dt
+from . import explain as ex
 from . import trust as tr
 from .lift import LiftError, to_lean
 from .project import FVA_ROOT, Project
@@ -48,6 +49,12 @@ def cmd_difftest(a) -> int:
     r = dt.difftest(Project(Path(a.project)), n=a.cases, seed=a.seed)
     print(json.dumps(r, indent=1) if a.json else dt.render(r))
     return 0 if r["ok"] else 1
+
+
+def cmd_explain(a) -> int:
+    r = ex.explain(Project(Path(a.project)), a.model, a.effort)
+    print(json.dumps(r, indent=1) if a.json else ex.render(r))
+    return 0 if r["trustVerdict"] == "PASS" and all(c["verdict"] == "matches" for c in r["claims"]) else 1
 
 
 def _rebuild_toy(toy: Path) -> dict:
@@ -110,6 +117,10 @@ def main() -> None:
     s = sub.add_parser("difftest", help="Lean semantics vs wasmtime on the lifted binaries")
     s.add_argument("project"); s.add_argument("--cases", type=int, default=200); s.add_argument("--seed", type=int, default=0)
     s.set_defaults(f=cmd_difftest)
+    s = sub.add_parser("explain", help="the spec in plain English + computed examples + intent check (LLM, advisory)")
+    s.add_argument("project"); s.add_argument("--model", default=ex.llm.MODEL)
+    s.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh"])
+    s.set_defaults(f=cmd_explain)
     s = sub.add_parser("demo", help="end-to-end run on examples/toy + examples/cheat")
     s.add_argument("--cases", type=int, default=200)
     s.set_defaults(f=cmd_demo)

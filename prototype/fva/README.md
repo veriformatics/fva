@@ -16,6 +16,7 @@ compiles to WebAssembly:
 ## Run the demo
 
 You need `uv`, Lean 4 with `lake` (version 4.35), and `clang` with the `wasm32` target.
+`fva explain` also needs the `codex` CLI, signed in.
 Run this command:
 
 ```sh
@@ -30,6 +31,35 @@ The demo does these steps:
 - It prints the trust report for `examples/toy`. The expected verdict is PASS.
 - It prints the trust report for `examples/cheat`, which contains seven planted cheats. The
   expected verdict is FAIL.
+
+## Read a specification without Lean
+
+You can use `fva explain` if you cannot read Lean. Run this command:
+
+```sh
+uv run fva explain examples/toy
+```
+
+For each claim, the report shows these items:
+
+- The proof status from `fva trust`.
+- An explanation of the claim in plain English, and the points that a reader can misread.
+- A table of examples. Lean computes the value that the claim requires for each input, and
+  wasmtime runs the real binary on the same input. A language model proposes the inputs, but
+  it does not compute the values.
+- An intent check. A second model call compares the explanation with the intent of the
+  author. The intent is the docstring of the claim, or the name of the claim if there is no
+  docstring.
+
+The explanation reads the claim as Lean elaborates it, after all macros and notations. Thus a
+macro that changes the meaning of a claim also changes the explanation. If a claim does not
+have the form `∀ inputs, Returns …`, the report shows the elaborated claim instead of
+examples.
+
+The explanation and the intent check come from a language model (`gpt-6-luna` through
+`codex app-server`). They can be wrong. Use them to read the specification, and use
+`fva trust` for the verdict. The command returns 0 only if `fva trust` passes and every
+intent check matches.
 
 ## Read the example
 
@@ -59,5 +89,6 @@ specification, and the specification never imports the proofs.
 | `uv run fva lift <wasm> <out.lean> --ns <Namespace>` | Turn a `.wasm` file into a Lean module. |
 | `uv run fva trust <project> [theorem ...]` | Build the project, audit it, and print the review surface. |
 | `uv run fva difftest <project>` | Compare the Lean semantics with wasmtime. |
+| `uv run fva explain <project>` | Explain each claim in plain English, with computed examples and an intent check. |
 
 Add `--json` to any command to get machine-readable output for agents.
