@@ -9,8 +9,9 @@ compiles to WebAssembly:
    WebAssembly semantics (`lean/FVA/Wasm/Semantics.lean`).
 3. An agent writes the specification theorems and their proofs. The Lean kernel checks the
    proofs.
-4. `fva trust` audits the result. It finds the specification lines that a person must read and
-   rejects proofs that cheat.
+4. `fva trust` audits the result. It replays the proofs through the Lean kernel, finds the
+   specification lines that a person must read, and rejects proofs that cheat. Add
+   `--paranoid` to also replay the proofs through the independent kernels that ship with Lean.
 
 ## Run the demo
 
@@ -27,7 +28,7 @@ The demo does these steps:
 - It runs the lifted code in Lean and the real binary in wasmtime on the same inputs, and
   compares the results.
 - It prints the trust report for `examples/toy`. The expected verdict is PASS.
-- It prints the trust report for `examples/cheat`, which contains five planted cheats. The
+- It prints the trust report for `examples/cheat`, which contains six planted cheats. The
   expected verdict is FAIL.
 
 ## Read the example

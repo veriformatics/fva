@@ -6,27 +6,30 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 
 ## Artifacts
 
-- `prototype/fva/` = PROTOTYPE: Python (uv) CLI `fva` + Lean 4 core package `prototype/fva/lean` (WASM semantics + trust-audit metaprogram) + worked examples `prototype/fva/examples/`.
-  - Run: `cd prototype/fva && uv run fva demo` = compile toy C → wasm, lift → Lean, check proofs, differential-test semantics vs wasmtime, print trust report for `examples/toy` (green) + `examples/cheat` (red).
-  - Subcommands: `uv run fva lift <wasm> <out.lean> --ns <Ns>`, `uv run fva trust <lake-dir> <theorem>… [--json]`, `uv run fva difftest <lake-dir> <wasm>`.
+- `prototype/fva/` = PROTOTYPE: Python (uv) CLI `fva` + Lean 4.35 core package `prototype/fva/lean` (WASM semantics, proof support, `fva-trust` metaprogram) + worked examples `prototype/fva/examples/{toy,cheat}`; human entry = `prototype/fva/README.md`.
+  - Run: `cd prototype/fva && uv run fva demo` = rebuild toy C → wasm vs pinned sha, difftest Lean semantics vs wasmtime, trust report `examples/toy` (PASS) + `examples/cheat` (FAIL); rc 0 = all as expected.
+  - Subcommands: `uv run fva lift <wasm> <out.lean> --ns <Ns>`, `uv run fva trust <lake-dir> [theorem…] [--spec-module M] [--paranoid] [--json]`, `uv run fva difftest <lake-dir>`.
+  - Needs: uv, Lean 4.35 + lake (bundles `leanexport`, `lake check`, nanoda/con-leche/con-ron for `--paranoid`), clang wasm32 target.
 
 ## Decisions
 
-- Link path = WASM lift: any source language → wasm (compiler + source untrusted) → `fva lift` → Lean AST value over FVA's WASM semantics; theorems quantify over that lifted value; the `.wasm` = the verified artifact, committed + sha256-pinned inside the lifted file.
-- Trusted base = Lean kernel + axioms {propext, Classical.choice, Quot.sound} + FVA WASM semantics (shared across every project/language, reviewed once) + lifter.
-- Human-review surface = statement closure of the target theorems: constants their types mention, transitively through definition bodies, excluding subject (lifted code), FVA base + Lean core; `fva trust` computes it + counts lines.
-- Trust audit fails on: non-standard axiom (incl. `sorryAx`, `Lean.ofReduceBool`), `implemented_by`/`extern`/`unsafe`/`partial`/`opaque` in theorem closure, theorem statement not mentioning a subject, lifted file ≠ re-lift of pinned wasm.
+- Link path = WASM lift: any source language → wasm (compiler + source untrusted) → `fva lift` → Lean `Module` value over FVA's WASM semantics; theorems quantify over that value via `Returns`; the `.wasm` = the verified artifact, committed + sha256-pinned in the lifted file; `fva trust` re-lifts + byte-compares.
+- Trusted base = Lean kernel + axioms {propext, Classical.choice, Quot.sound} + `FVA/Wasm/Semantics.lean` (shared across every project/language, reviewed once) + `src/fva/lift.py`; difftest vs wasmtime = evidence for semantics + lifter, not proof.
+- Human-review surface = statement closure of the spec theorems: constants their types mention, transitively through definition bodies, stopping at subject (lifted code), FVA base + Lean core; `fva trust` computes it + counts code lines.
+- Spec layout per project (mesh-repo pattern): `<Lib>/Def.lean` vocabulary + `<Lib>/Spec.lean` theorem statements (review surface), `<Lib>/Proof.lean` (never read), `<Lib>/Lifted.lean` (generated).
+- `fva trust` FAIL on: non-standard axiom (incl. `sorryAx`, native_decide aux axioms), `implemented_by`/`extern`/`unsafe`/`partial`/`opaque` in the non-core closure, a theorem statement not mentioning a subject, lifted file ≠ re-lift of pinned wasm, kernel replay rejection (`leanexport` → `lake check --from-export`; `--paranoid` adds every bundled kernel). `lake build` success alone proves nothing (accepts sorry, axioms, kernel bypass).
 - Prototype stack = Python via uv + Lean 4.35 core, no Mathlib.
-- Prototype scope = trust audit + one worked example; survey/plan, claimcheck-style informalization, MCP/skill packaging = later phases.
+- Prototype scope = trust audit + one worked example; repo survey/plan, claimcheck-style informalization, MCP/skill packaging, other link paths = later phases.
 
 ## Tasks
 
-- [ ] Lean package: WASM subset semantics (i32/i64, locals, select, block/loop/if/br/br_if/return, fuel interpreter, `Returns`)
-- [ ] Python lifter: wasm binary → Lean `Module` value + sha256 pin
-- [ ] Toy example: clamp/gcd/sum_to C → wasm → spec + proofs
-- [ ] Trust metaprogram + `fva trust` report (text + JSON)
-- [ ] Differential test vs wasmtime + `fva demo`; cheat example (red path)
-- [ ] Run artifacts, review, deferred rows, Phase → ITERATE
+- [x] da4117c Lean package: WASM subset semantics (i32/i64, locals, select, block/loop/if/br/br_if/return, fuel interpreter, `Returns`)
+- [x] da4117c Python lifter: wasm binary → Lean `Module` value + sha256 pin
+- [x] da4117c Toy example: clamp/gcd/sum_to C → wasm → spec + proofs
+- [x] bbc7825 Trust metaprogram + `fva trust` report (text + JSON)
+- [x] bbc7825 Differential test vs wasmtime + `fva demo`; cheat example (red path)
+- [ ] Kernel replay in `fva trust` (cheat 6: kernel-bypass `addDecl`)
+- [ ] Review (closing diff), deferred rows, rules, Phase → ITERATE
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
