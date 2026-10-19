@@ -1,0 +1,11 @@
+# stack caches + build output
+.lake/
+__pycache__/
+*.pyc
+.venv/
+*.wasm
+!prototype/fva/examples/**/*.wasm
+# local state
+.scratch/
+.claude/settings.local.json
+CLAUDE.local.md
