@@ -77,62 +77,60 @@ def trust(project: Project, theorems: list[str], spec_module: str | None, build:
         if not (l["shaMatch"] and l["reliftIdentical"]):
             issues.append({"kind": "link", "detail": f"{l['file']} ≠ fva lift of {l['wasm']}"
                            f" (sha match: {l['shaMatch']}, re-lift identical: {l['reliftIdentical']})"})
-    cmd = ["lake", "env", str(TRUST_BIN)]
+    spec = spec_module or f"{project.lib}.Spec"
+    cmd = ["lake", "env", str(TRUST_BIN), "--spec-module", spec]
     for l in links:
         cmd += ["--subject", l["module"]]
-    if theorems:
-        cmd += ["--import", spec_module or f"{project.lib}.Spec", *theorems]
-    else:
-        cmd += ["--spec-module", spec_module or f"{project.lib}.Spec"]
     r = subprocess.run(cmd, cwd=project.root, capture_output=True, text=True)
     if r.returncode != 0:
         raise SystemExit(f"fva: fva-trust failed (rc={r.returncode}): {r.stderr.strip()}")
     rep = json.loads(r.stdout)
 
-    for t in rep["theorems"]:
-        bad = sorted(set(t["axioms"]) - STANDARD_AXIOMS)
-        if bad:
-            issues.append({"kind": "axiom", "detail": f"{t['name']} depends on {', '.join(bad)}"})
-        if not t["mentionsSubject"]:
-            issues.append({"kind": "vacuous", "detail": f"{t['name']} statement never mentions the implementation"})
+    claims = [c for c in rep["claims"] if not theorems or c["name"] in theorems]
+    if not claims:
+        issues.append({"kind": "claims", "detail": f"no claims in {spec} (Prop-valued defs or theorems)"})
+    for c in claims:
+        if not c["proofs"]:
+            issues.append({"kind": "unproven", "detail": f"{c['name']} has no theorem proving it"})
+        if not c["subjects"]:
+            issues.append({"kind": "vacuous", "detail": f"{c['name']} never mentions the implementation"})
+        if c["kind"] == "theorem":
+            issues.append({"kind": "layout", "detail": f"{c['name']} is proven inside the spec module;"
+                           " its proof text joins the review surface"})
+        for p in c["proofs"]:
+            bad = sorted(set(p["axioms"]) - STANDARD_AXIOMS)
+            if bad:
+                issues.append({"kind": "axiom", "detail": f"{p['name']} (proof of {c['name']}) depends on {', '.join(bad)}"})
     for f in rep["flags"]:
         issues.append({"kind": "override", "detail": f"{f['name']} ({f['module']}) is {f['issue']}"})
-    replay = _replay(project, spec_module or f"{project.lib}.Spec", [t["name"] for t in rep["theorems"]], paranoid)
+    for m in rep["reviewModules"]:
+        if m["syntaxExtensions"]:
+            issues.append({"kind": "syntax", "detail": f"{m['module']} extends syntax ({len(m['syntaxExtensions'])} "
+                           "macro/notation/elaborator decls); the spec text no longer means what it reads"})
+    proofs = [p["name"] for c in claims for p in c["proofs"]]
+    replay = _replay(project, project.lib, proofs, paranoid) if proofs else {"ok": False, "accepted": [], "rejected": [], "seconds": 0, "detail": "no proofs"}
     if not replay["ok"]:
-        issues.append({"kind": "replay", "detail": "kernel replay of the exported theorems failed: "
+        issues.append({"kind": "replay", "detail": "kernel replay of the exported proofs failed: "
                        + (", ".join(replay.get("rejected", [])) or replay["detail"][-300:])})
 
-    # review surface = theorem statements + spec-category declarations, by source range
-    by_file: dict[str, dict] = {}
-    for d in rep["theorems"] + [d for d in rep["statementClosure"] if d["category"] == "spec"]:
-        if d["start"] is None:  # compiler-generated auxiliary
-            continue
-        path = project.module_path(d["module"])
-        e = by_file.setdefault(d["module"], {"path": path, "names": [], "ranges": []})
-        e["names"].append(d["name"].rsplit(".", 1)[-1])
-        e["ranges"].append((d["start"], d["end"]))
+    # review surface = every review module, read whole (spec text parses under all of it)
     surface = []
-    for e in by_file.values():
-        code, total = _ranges_lines(e["path"], e["ranges"])
-        surface.append({"file": _rel(project, e["path"]), "decls": e["names"], "codeLines": code, "lines": total})
-
-    base_used = sorted(d["name"] for d in rep["statementClosure"] if d["category"] == "base")
-    core_used = sorted(d["name"] for d in rep["statementClosure"] if d["category"] == "core"
-                       and not d["name"].startswith(CORE_NOISE) and "match_" not in d["name"])
+    for m in rep["reviewModules"]:
+        path = project.module_path(m["module"])
+        lines = path.read_text().splitlines()
+        surface.append({"file": _rel(project, path), "codeLines": code_lines(lines), "lines": len(lines),
+                        "decls": [d.removeprefix(project.lib + ".") for d in m["decls"] if ".match_" not in d]})
+    review_files = {s["file"] for s in surface}
+    lifted_files = {l["file"] for l in links}
     sem = FVA_LEAN / "FVA/Wasm/Semantics.lean"
     lift_py = FVA_ROOT / "src/fva/lift.py"
-    spec_files = {s["file"] for s in surface}
-    lifted_files = {l["file"] for l in links}
-    unreviewed = [{"file": _rel(project, p), "codeLines": code_lines(p.read_text().splitlines())}
-                  for p in project.sources()
-                  if _rel(project, p) not in spec_files | lifted_files]
     return {
         "project": str(project.root),
         "verdict": "PASS" if not issues else "FAIL",
         "issues": issues,
         "build": {"ok": build_ok, "seconds": round(build_s, 1)} if build else None,
         "kernelReplay": replay,
-        "theorems": sorted(rep["theorems"], key=lambda t: (t["module"], t["start"] or 0)),
+        "claims": claims,
         "axioms": rep["allAxioms"],
         "implementation": links,
         "reviewSurface": surface,
@@ -140,12 +138,14 @@ def trust(project: Project, theorems: list[str], spec_module: str | None, build:
         "trustedBase": {
             "axioms": sorted(STANDARD_AXIOMS),
             "semantics": {"file": str(sem.relative_to(FVA_ROOT)), "codeLines": code_lines(sem.read_text().splitlines()),
-                          "usedBySpec": base_used},
+                          "usedBySpec": rep["baseUsed"]},
             "lifter": {"file": str(lift_py.relative_to(FVA_ROOT)), "codeLines": _py_lines(lift_py)},
-            "coreDefinitionsUsed": core_used,
+            "coreDefinitionsUsed": sorted(n for n in rep["coreUsed"] if not n.startswith(CORE_NOISE)
+                                          and not n.rsplit(".", 1)[-1].startswith("inst")),
         },
         "unreviewed": {
-            "proofs": unreviewed,
+            "proofs": [{"file": _rel(project, p), "codeLines": code_lines(p.read_text().splitlines())}
+                       for p in project.sources() if _rel(project, p) not in review_files | lifted_files],
             "implementation": [{"file": l["file"], "codeLines": code_lines((project.root / l["file"]).read_text().splitlines()),
                                 "from": l["wasm"]} for l in links],
         },
@@ -185,20 +185,22 @@ def render(r: dict) -> str:
         out.append(f"  lake build: {'passed' if r['build']['ok'] else 'FAILED'} ({r['build']['seconds']} s; "
                    "accepts sorry + axioms, so the verdict rests on the audit below)")
     k = r["kernelReplay"]
-    out.append(f"  kernel replay of exported theorems: "
+    out.append(f"  kernel replay of exported proofs: "
                + (f"accepted by {', '.join(k['accepted'])} ({k['seconds']} s)" if k["ok"]
                   else f"REJECTED by {', '.join(k.get('rejected', [])) or 'export step'}"))
-    out += ["", "Theorems"]
-    for t in r["theorems"]:
-        std = set(t["axioms"]) <= STANDARD_AXIOMS
-        out.append(f"  {ok(std and t['mentionsSubject'])} {t['name']}  "
-                   f"axioms: {', '.join(t['axioms']) or 'none'}"
-                   + ("" if t["mentionsSubject"] else "  — does not mention the implementation"))
-    out += ["", "Implementation link (theorems quantify over these exact bytes)"]
+    out += ["", "Claims (✓ = proof uses standard axioms + claim mentions the implementation;"
+            " link, syntax + replay checks above cover all claims)"]
+    for c in r["claims"]:
+        prf = c["proofs"]
+        good = c["subjects"] and prf and all(set(p["axioms"]) <= STANDARD_AXIOMS for p in prf)
+        about = ", ".join(c["subjects"]) or "nothing — does not mention the implementation"
+        how = "; ".join(f"proved by {p['name']} (axioms: {', '.join(p['axioms']) or 'none'})" for p in prf) or "UNPROVEN"
+        out.append(f"  {ok(good)} {c['name']}  about {about}\n      {how}")
+    out += ["", "Implementation link (claims quantify over these exact bytes)"]
     for l in r["implementation"]:
         out.append(f"  {ok(l['shaMatch'] and l['reliftIdentical'])} {l['file']} ← {l['wasm']}"
                    f"  sha256 {l['pinnedSha'][:12]}…  pinned {ok(l['shaMatch'])}  re-lift identical {ok(l['reliftIdentical'])}")
-    out += ["", f"Read these: {r['reviewSurfaceCodeLines']} lines of spec"]
+    out += ["", f"Read these: {r['reviewSurfaceCodeLines']} lines of spec (whole files; comments excluded)"]
     for s in r["reviewSurface"]:
         out.append(f"  {s['file']:<24} {s['codeLines']:>3} lines  {', '.join(s['decls'])}")
     tb = r["trustedBase"]
@@ -207,7 +209,7 @@ def render(r: dict) -> str:
             f"  WASM semantics   {tb['semantics']['file']} ({tb['semantics']['codeLines']} lines;"
             f" spec uses {', '.join(n.removeprefix('FVA.Wasm.') for n in tb['semantics']['usedBySpec'])})",
             f"  wasm → Lean lifter  {tb['lifter']['file']} ({tb['lifter']['codeLines']} lines)",
-            f"  Lean core definitions in the spec: {', '.join(tb['coreDefinitionsUsed'])}"]
+            f"  Lean core definitions in the spec (instances + plumbing omitted): {', '.join(tb['coreDefinitionsUsed'])}"]
     u = r["unreviewed"]
     out += ["", "Never read (checked by the Lean kernel)"]
     for p in u["proofs"]:
