@@ -2,7 +2,9 @@
 
 FVA (Formally Verify Anything) aims to follow a software development tooling trend brought on by REA (Reverse Engineer Anything): https://github.com/morluto/rea. Our goal is to allow a user to apply FVA to any pre-existing or new project and find a path towards formal verification of it. It is important that the formal verification is directly linked to the code of the software's actual implementation, for instance Verus is tightly integrated with Rust, and Lean allows for metaprogramming. For other languages, we may have to develop our own solutions and it is best if we can find a unified approach to avoid an excess of language-specific handling, which is likely to be brittle and inelegant in approach.
 
-Like REA, FVA should be readibly usable by an AI agent that requests it, and that is the primary target. FVA uses extensive AI-generated proofs to achieve its verification claims. At the same time FVA should aim to minimize the surface of human-reviewable spec. This is treated as an optimization problem: provided a minimally sufficient spec, and a trusted kernel like that of Lean's, we can assume that an unbounded amount of proofs can be used to verify correctness of a program. See https://github.com/schildep/verified-3d-mesh-intersection, for an excellent example of this approach. Spec review may be further simplified by informalization back into natural language (https://github.com/metareflection/claimcheck); we must be open to considering alternative and supplementary approaches at all times.
+Like REA, FVA should be readily usable by an AI agent that requests it, and that is the primary target. FVA uses extensive AI-generated proofs to achieve its verification claims. At the same time FVA should aim to minimize the surface of human-reviewable spec. This is treated as an optimization problem: provided a minimally sufficient spec, and a trusted kernel like that of Lean's, we can assume that an unbounded amount of proofs can be used to verify correctness of a program. See https://github.com/schildep/verified-3d-mesh-intersection, for an excellent example of this approach. Spec review may be further simplified by informalization back into natural language (https://github.com/metareflection/claimcheck); we must be open to considering alternative and supplementary approaches at all times.
+
+Proof writing alone is not what FVA adds: a capable agent can already write and check proofs when it is asked to verify a project. FVA adds what such an agent does not supply on its own. It keeps the human-reviewable spec small, and it measures that spec as its main result. It does not trust a single checker: it replays proofs through independent kernels and tests each checker against known false proofs. It links the proofs to the real implementation without a rewrite of the source. It verifies the compiled artifact, or, for components that are not practical to verify as programs (compilers, interpreters, code generators, AI pipelines), it certifies each output that they produce.
 
 ## Artifacts
 
@@ -47,6 +49,7 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 - [ ] Round 3: users skip spec review → 5 parallel variants (review-ledger, predict-quiz, review-page, spot-the-mutant, pattern-catalog) → finalists for user pick; + `wt/attest` (signed review badge, user request).
 - [x] 24511d2 Round 4: moat question → benchmark bare agent vs agent + FVA (`prototype/bench/rubric.md`), 3 tasks incl. planted bug.
 - [x] 9d674c3 Round 5: direction → `Decisions` Direction (generalized), D21–D24 generalized.
+- [ ] Round 6: `Intent` states what FVA adds over an agent alone (general, from `Decisions` Direction).
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
