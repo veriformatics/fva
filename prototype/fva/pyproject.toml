@@ -1,0 +1,13 @@
+[project]
+name = "fva"
+version = "0.0.0"
+description = "Formally Verify Anything — prototype"
+requires-python = ">=3.12"
+dependencies = ["wasmtime"]
+
+[project.scripts]
+fva = "fva.cli:main"
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
