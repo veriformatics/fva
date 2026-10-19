@@ -39,7 +39,7 @@ def cmd_lift(a) -> int:
 
 
 def cmd_trust(a) -> int:
-    r = tr.trust(Project(Path(a.project)), a.theorems, a.spec_module, build=not a.no_build)
+    r = tr.trust(Project(Path(a.project)), a.theorems, a.spec_module, build=not a.no_build, paranoid=a.paranoid)
     print(json.dumps(r, indent=1) if a.json else tr.render(r))
     return 0 if r["verdict"] == "PASS" else 1
 
@@ -103,7 +103,9 @@ def main() -> None:
     s = sub.add_parser("trust", help="check proofs, audit axioms + overrides, compute the review surface")
     s.add_argument("project"); s.add_argument("theorems", nargs="*")
     s.add_argument("--spec-module", help="audit every theorem in this module (default <Lib>.Spec)")
-    s.add_argument("--no-build", action="store_true", help="skip `lake build` (kernel check)")
+    s.add_argument("--no-build", action="store_true", help="skip `lake build`")
+    s.add_argument("--paranoid", action="store_true",
+                   help="replay through every kernel bundled with Lean (nanoda, con-leche, con-ron, …)")
     s.set_defaults(f=cmd_trust)
     s = sub.add_parser("difftest", help="Lean semantics vs wasmtime on the lifted binaries")
     s.add_argument("project"); s.add_argument("--cases", type=int, default=200); s.add_argument("--seed", type=int, default=0)

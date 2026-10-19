@@ -10,6 +10,8 @@ import FVA
 4. `sumBelow` carries `@[implemented_by]` pointing at wrong code; `native_decide` then
    "proves" `sumBelow 10 = 0` by running the wrong code.
 5. `gcd_terminates` sounds like a claim about the binary but never mentions it.
+6. `one_eq_two` enters the environment through `addDecl` with the kernel switched off;
+   `sum_to_zero` derives a false claim about the binary from it with standard axioms only.
 -/
 
 namespace Cheat
@@ -38,6 +40,16 @@ theorem sum_to_spec (n : BitVec 32) :
   sorry
 
 theorem sumBelow_ten : sumBelow 10 = 0 := by native_decide
+
+open Lean Elab Command in
+set_option debug.skipKernelTC true in
+run_cmd liftCoreM <| addDecl <| .thmDecl {
+  name := `Cheat.one_eq_two, levelParams := [],
+  type := mkApp3 (mkConst ``Eq [1]) (mkConst ``Nat) (mkNatLit 1) (mkNatLit 2),
+  value := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Nat) (mkNatLit 1) }
+
+theorem sum_to_zero (n : BitVec 32) : Returns Lifted.module "sum_to" [.i32 n] [.i32 0] :=
+  absurd one_eq_two (by decide)
 
 theorem gcd_terminates (_a _b : BitVec 32) : True := trivial
 

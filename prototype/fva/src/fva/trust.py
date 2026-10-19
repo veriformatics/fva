@@ -2,7 +2,10 @@
 
 import hashlib
 import json
+import re
 import subprocess
+import tempfile
+import time
 from pathlib import Path
 
 from .lift import to_lean
@@ -37,7 +40,29 @@ def _ranges_lines(path: Path, ranges: list[tuple[int, int]]) -> tuple[int, int]:
     return code_lines([lines[i - 1] for i in picked]), len(picked)
 
 
-def trust(project: Project, theorems: list[str], spec_module: str | None, build: bool = True) -> dict:
+def _replay(project: Project, module: str, theorems: list[str], paranoid: bool) -> dict:
+    """Export the theorems + their dependency closure from the built .oleans, then replay the
+    export through the kernel(s) via `lake check`. Catches declarations that entered the
+    environment without a kernel check (`debug.skipKernelTC`, metaprogrammed `addDecl`)."""
+    with tempfile.TemporaryDirectory() as d:
+        export = Path(d) / "export.ndjson"
+        with export.open("w") as fh:
+            e = subprocess.run(["lake", "env", "leanexport", module, "--", *theorems],
+                               cwd=project.root, stdout=fh, stderr=subprocess.PIPE, text=True)
+        if e.returncode != 0:
+            return {"ok": False, "kernels": [], "detail": e.stderr[-800:]}
+        t = time.monotonic()
+        r = subprocess.run(["lake", "check", f"--from-export={export}", *(["--paranoid"] if paranoid else [])],
+                           cwd=project.root, capture_output=True, text=True)
+    log = r.stdout + r.stderr
+    return {"ok": r.returncode == 0, "seconds": round(time.monotonic() - t, 1),
+            "accepted": re.findall(r"^(.+?) kernel accepts", log, re.M),
+            "rejected": re.findall(r"^(.+?) kernel rejected", log, re.M),
+            "detail": "" if r.returncode == 0 else log[-800:]}
+
+
+def trust(project: Project, theorems: list[str], spec_module: str | None, build: bool = True,
+          paranoid: bool = False) -> dict:
     ensure_trust_bin()
     issues = []
     build_ok, build_s = True, 0.0
@@ -72,6 +97,10 @@ def trust(project: Project, theorems: list[str], spec_module: str | None, build:
             issues.append({"kind": "vacuous", "detail": f"{t['name']} statement never mentions the implementation"})
     for f in rep["flags"]:
         issues.append({"kind": "override", "detail": f"{f['name']} ({f['module']}) is {f['issue']}"})
+    replay = _replay(project, spec_module or f"{project.lib}.Spec", [t["name"] for t in rep["theorems"]], paranoid)
+    if not replay["ok"]:
+        issues.append({"kind": "replay", "detail": "kernel replay of the exported theorems failed: "
+                       + (", ".join(replay.get("rejected", [])) or replay["detail"][-300:])})
 
     # review surface = theorem statements + spec-category declarations, by source range
     by_file: dict[str, dict] = {}
@@ -102,6 +131,7 @@ def trust(project: Project, theorems: list[str], spec_module: str | None, build:
         "verdict": "PASS" if not issues else "FAIL",
         "issues": issues,
         "build": {"ok": build_ok, "seconds": round(build_s, 1)} if build else None,
+        "kernelReplay": replay,
         "theorems": sorted(rep["theorems"], key=lambda t: (t["module"], t["start"] or 0)),
         "axioms": rep["allAxioms"],
         "implementation": links,
@@ -154,6 +184,10 @@ def render(r: dict) -> str:
     if r["build"]:
         out.append(f"  lake build: {'passed' if r['build']['ok'] else 'FAILED'} ({r['build']['seconds']} s; "
                    "accepts sorry + axioms, so the verdict rests on the audit below)")
+    k = r["kernelReplay"]
+    out.append(f"  kernel replay of exported theorems: "
+               + (f"accepted by {', '.join(k['accepted'])} ({k['seconds']} s)" if k["ok"]
+                  else f"REJECTED by {', '.join(k.get('rejected', [])) or 'export step'}"))
     out += ["", "Theorems"]
     for t in r["theorems"]:
         std = set(t["axioms"]) <= STANDARD_AXIOMS
