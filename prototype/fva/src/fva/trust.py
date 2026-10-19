@@ -78,7 +78,9 @@ def trust(project: Project, theorems: list[str], spec_module: str | None, build:
             issues.append({"kind": "link", "detail": f"{l['file']} ≠ fva lift of {l['wasm']}"
                            f" (sha match: {l['shaMatch']}, re-lift identical: {l['reliftIdentical']})"})
     spec = spec_module or f"{project.lib}.Spec"
-    cmd = ["lake", "env", str(TRUST_BIN), "--spec-module", spec]
+    if not build_ok:
+        return {"project": str(project.root), "verdict": "FAIL", "issues": issues, "build": {"ok": False, "seconds": round(build_s, 1)}}
+    cmd = ["lake", "env", str(TRUST_BIN), "--spec-module", spec, "--base-dir", str(FVA_LEAN / ".lake/build/lib/lean")]
     for l in links:
         cmd += ["--subject", l["module"]]
     r = subprocess.run(cmd, cwd=project.root, capture_output=True, text=True)
@@ -181,6 +183,8 @@ def render(r: dict) -> str:
            f"  Verdict: {r['verdict']}" + ("" if r["verdict"] == "PASS" else f" ({len(r['issues'])} issue(s))")]
     for i in r["issues"]:
         out.append(f"    ✗ [{i['kind']}] {i['detail']}")
+    if "claims" not in r:  # build failed: nothing further was checked
+        return "\n".join(out)
     if r["build"]:
         out.append(f"  lake build: {'passed' if r['build']['ok'] else 'FAILED'} ({r['build']['seconds']} s; "
                    "accepts sorry + axioms, so the verdict rests on the audit below)")
