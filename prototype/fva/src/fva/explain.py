@@ -5,11 +5,13 @@ that explanation with the intent (docstring, else name). Examples = inputs pass 
 outputs computed by Lean from the spec + by wasmtime from the real binary. Advisory: the
 verdict stays with `fva trust`."""
 
+import hashlib
 import json
 import re
 import subprocess
 import tempfile
 import textwrap
+from datetime import datetime, timezone
 from pathlib import Path
 
 import wasmtime
@@ -18,8 +20,9 @@ from . import llm
 from . import trust as tr
 from .difftest import BITS, _signed
 from .lift import decode
-from .project import FVA_LEAN, Project
+from .project import FVA_LEAN, FVA_ROOT, Project
 
+SAVED = "fva-explain.json"
 CASE_TIMEOUT = 10  # s; a too-costly case (deep recursion) aborts Lean only after ~25 s
 MAX_EXAMPLES = 8
 FIXED_INPUTS = [0, 1]  # every claim gets these per argument, whatever the model proposes
@@ -192,11 +195,48 @@ def _proof_status(t: dict, c: dict) -> dict:
     return {"ok": not mine and not shared, "issues": mine, "projectIssues": shared}
 
 
-def explain(project: Project, model: str = llm.MODEL, effort: str = "medium") -> dict:
+def _inputs_sha(project: Project, t: dict, model: str, effort: str) -> str:
+    """Everything the LLM text + examples derive from: spec files, binaries, semantics, prompts."""
+    h = hashlib.sha256(json.dumps([model, effort, EXPLAIN_PROMPT, COMPARE_PROMPT, EXPLAIN_SCHEMA,
+                                   COMPARE_SCHEMA, FIXED_INPUTS, MAX_EXAMPLES]).encode())
+    files = sorted({*(s["file"] for s in t["reviewSurface"]), *(l["wasm"] for l in t["implementation"])})
+    for rel in files:
+        p = project.root / rel if (project.root / rel).exists() else FVA_ROOT / rel
+        h.update(rel.encode() + b"\0" + p.read_bytes())
+    for p in (FVA_LEAN / "FVA/Wasm/Semantics.lean", FVA_LEAN / "FVA/Explain.lean"):
+        h.update(p.read_bytes())
+    return h.hexdigest()
+
+
+def explain(project: Project, model: str = llm.MODEL, effort: str = "medium", force: bool = False) -> dict:
+    """Saved explanation (`SAVED` in the project) reused unless `force`: LLM output varies run to
+    run, so a reader rereads one fixed text. Proof status = fresh `fva trust` on every call."""
     t = tr.trust(project, [], None)
     base = {"project": str(project.root), "model": model, "trustVerdict": t["verdict"], "trustIssues": t["issues"]}
     if "claims" not in t:
         return base | {"claims": []}
+    path = project.root / SAVED
+    sha = _inputs_sha(project, t, model, effort)
+    if path.exists() and not force:
+        saved = json.loads(path.read_text())
+        by_name = {c["name"]: c for c in t["claims"]}
+        rows = [r | {"proof": _proof_status(t, by_name[r["name"]]) if r["name"] in by_name else
+                     {"ok": False, "issues": [f"{r['name']} is no longer in the spec"], "projectIssues": []}}
+                for r in saved["claims"]]
+        stale = saved["inputsSha"] != sha or set(by_name) != {r["name"] for r in rows}
+        return base | {"model": saved["model"], "claims": rows,
+                       "saved": {"file": SAVED, "generated": saved["generated"], "reused": True, "stale": stale}}
+    rows = _generate(project, t, model, effort)
+    rec = {"inputsSha": sha, "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+           "model": model, "effort": effort, "claims": [{k: v for k, v in r.items() if k != "proof"} for r in rows]}
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(rec, indent=1, ensure_ascii=False) + "\n")
+    tmp.replace(path)
+    return base | {"claims": rows,
+                   "saved": {"file": SAVED, "generated": rec["generated"], "reused": False, "stale": False}}
+
+
+def _generate(project: Project, t: dict, model: str, effort: str) -> list[dict]:
     r = subprocess.run(["lake", "build", "FVA.Explain"], cwd=FVA_LEAN, capture_output=True, text=True)
     if r.returncode != 0:
         raise SystemExit(f"fva explain: building FVA.Explain failed:\n{r.stdout[-2000:]}")
@@ -240,7 +280,7 @@ def explain(project: Project, model: str = llm.MODEL, effort: str = "medium") ->
     for r in rows:
         v = p2.get(r["name"]) or p2.get(r["name"].rsplit(".", 1)[-1]) or {"verdict": "unknown", "reason": "no reply"}
         r |= {"verdict": v["verdict"], "reason": v["reason"]}
-    return base | {"claims": rows}
+    return rows
 
 
 def _wrap(text: str, first: str, rest: str) -> list[str]:
@@ -257,6 +297,15 @@ def render(r: dict) -> str:
            + ("" if r["trustVerdict"] == "PASS" else " — the claims below are not all proven; run `fva trust` for the reasons"),
            f"  The text below was written by {r['model']} and can be wrong. It helps you read the spec;",
            "  it does not replace the proof check. The examples are computed, not written by the model."]
+    if sv := r.get("saved"):
+        if sv["stale"]:
+            out += ["", f"  STALE: the spec, the binary, or the prompts changed after {sv['generated']}.",
+                    "  The text below describes the old version. Run again with --force to regenerate it."]
+        elif sv["reused"]:
+            out += ["", f"  Saved text from {sv['generated']} ({sv['file']}). The proof status is current.",
+                    "  Run again with --force to regenerate the text."]
+        else:
+            out += ["", f"  Saved to {sv['file']}. Later runs show this text; use --force to regenerate it."]
     for c in r["claims"]:
         mark = "✓" if c["verdict"] == "matches" else "✗"
         pr = c["proof"]

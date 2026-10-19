@@ -56,6 +56,12 @@ macro that changes the meaning of a claim also changes the explanation. If a cla
 have the form `∀ inputs, Returns …`, the report shows the elaborated claim instead of
 examples.
 
+The command saves the explanation in `fva-explain.json` in the project. Later runs show the
+saved text and make no new model calls, so the text stays the same each time you read it.
+The proof status is computed again on each run. If the specification, the binary, or the
+prompts change, the report marks the saved text as STALE and the command returns 1. To
+regenerate the text, add `--force`.
+
 The explanation and the intent check come from a language model (`gpt-6-luna` through
 `codex app-server`). They can be wrong. Use them to read the specification, and use
 `fva trust` for the verdict. The command returns 0 only if `fva trust` passes and every
@@ -89,6 +95,6 @@ specification, and the specification never imports the proofs.
 | `uv run fva lift <wasm> <out.lean> --ns <Namespace>` | Turn a `.wasm` file into a Lean module. |
 | `uv run fva trust <project> [theorem ...]` | Build the project, audit it, and print the review surface. |
 | `uv run fva difftest <project>` | Compare the Lean semantics with wasmtime. |
-| `uv run fva explain <project>` | Explain each claim in plain English, with computed examples and an intent check. |
+| `uv run fva explain <project> [--force]` | Explain each claim in plain English, with computed examples and an intent check. Save the result, or show the saved result. |
 
 Add `--json` to any command to get machine-readable output for agents.
