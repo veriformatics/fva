@@ -31,7 +31,7 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 ## Tasks
 
 - [x] b5d1ef2 Round 1: non-expert review of the spec → `fva explain` (Claimcheck-style round trip + computed examples + per-claim proof status).
-- [ ] Round 2: explanation persisted → `fva-explain.json` reused, `--force` regenerates, STALE on input change.
+- [x] 2296593 Round 2: explanation persisted → `fva-explain.json` reused, `--force` regenerates, STALE on input change.
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
