@@ -8,8 +8,8 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 
 - `prototype/fva/` = PROTOTYPE: Python (uv) CLI `fva` + Lean 4.35 core package `prototype/fva/lean` (WASM semantics, proof support, `fva-trust` metaprogram) + worked examples `prototype/fva/examples/{toy,cheat}`; human entry = `prototype/fva/README.md`.
   - Run: `cd prototype/fva && uv run fva demo` = rebuild toy C → wasm vs pinned sha, difftest Lean semantics vs wasmtime, trust report `examples/toy` (PASS) + `examples/cheat` (FAIL); rc 0 = all as expected.
-  - Subcommands: `uv run fva lift <wasm> <out.lean> --ns <Ns>`, `uv run fva trust <lake-dir> [theorem…] [--spec-module M] [--paranoid] [--json]`, `uv run fva difftest <lake-dir>`, `uv run fva explain <lake-dir> [--model M] [--effort E] [--json]`.
-  - Review aid run: `cd prototype/fva && uv run fva explain examples/toy` (rc 0: trust PASS + every intent check `matches`) + `uv run fva explain examples/cheat` (rc 1: all 7 cheats ✗ on proof status, vacuous/different intent on clamp/sum_to*/gcd_terminates/sumBelow_ten); LLM output varies run to run.
+  - Subcommands: `uv run fva lift <wasm> <out.lean> --ns <Ns>`, `uv run fva trust <lake-dir> [theorem…] [--spec-module M] [--paranoid] [--json]`, `uv run fva difftest <lake-dir>`, `uv run fva explain <lake-dir> [--model M] [--effort E] [--force] [--json]`.
+  - Review aid run: `cd prototype/fva && uv run fva explain examples/toy` (rc 0: trust PASS + every intent check `matches`) + `uv run fva explain examples/cheat` (rc 1: all 7 cheats ✗ on proof status, vacuous/different intent on clamp/sum_to*/gcd_terminates/sumBelow_ten); both read the committed `examples/*/fva-explain.json` (no LLM call); `--force` regenerates, and LLM output varies run to run.
   - Needs: uv, Lean 4.35 + lake (bundles `leanexport`, `lake check`, nanoda/con-leche/con-ron for `--paranoid`), clang wasm32 target; `fva explain` + signed-in `codex` CLI.
 
 ## Decisions
@@ -24,12 +24,14 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
   - Method = Claimcheck's two-pass round trip, reimplemented (Claimcheck itself parses Dafny + calls Anthropic/Vertex/Bedrock only): pass 1 explains from comment-stripped spec source + each claim's elaborated statement (post-macro = what the kernel checks; source text alone hid cheat 7's `False →` on 3 claims); pass 2 = separate call comparing pass 1 with intent → `matches|weaker|stronger|different|vacuous`.
   - Intent = claim docstring, else its name. Blinding beyond docstring stripping (names, independent requirements) = out of scope for now (user ruling: this round tests LLM breakdown of a spec).
   - Example values never come from the model: inputs = model-proposed + fixed `0`,`1` per argument; spec value = Lean evaluation of the claim's `Returns` result (claims of shape `∀ (x : BitVec n)…, Returns m "f" args res`; other shapes print their elaborated statement instead); binary value = wasmtime on the pinned `.wasm`.
+  - Persistence: result saved to `<project>/fva-explain.json` (LLM text + examples + verdicts + `inputsSha`); a rerun shows it with no LLM call, `--force` alone regenerates. `inputsSha` = review-surface files + `.wasm` + `Semantics.lean` + `Explain.lean` + prompts/schemas + model + effort; mismatch → STALE banner + rc 1. Proof status = fresh `fva trust` every run, never saved.
   - LLM backend = `gpt-6-luna` via `codex app-server` (JSON-RPC stdio, ephemeral read-only thread, `outputSchema`-constrained reply), both passes.
 - Prototype scope = trust audit + one worked example + `fva explain`; repo survey/plan, MCP/skill packaging, other link paths = later phases.
 
 ## Tasks
 
 - [x] b5d1ef2 Round 1: non-expert review of the spec → `fva explain` (Claimcheck-style round trip + computed examples + per-claim proof status).
+- [ ] Round 2: explanation persisted → `fva-explain.json` reused, `--force` regenerates, STALE on input change.
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase

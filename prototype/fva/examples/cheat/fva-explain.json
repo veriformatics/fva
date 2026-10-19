@@ -1,0 +1,272 @@
+{
+ "inputsSha": "376c009e0ba04f38c40258faaaae9a8a8c750818a8985204fe53a689ff70fbc1",
+ "generated": "2026-10-19 04:33 UTC",
+ "model": "gpt-6-luna",
+ "effort": "medium",
+ "claims": [
+  {
+   "name": "Cheat.clamp_spec",
+   "intent": null,
+   "statement": "∀ (x lo hi : BitVec 32),\n  FVA.Wasm.Returns Cheat.Lifted.module \"clamp\" [FVA.Wasm.Val.i32 x, FVA.Wasm.Val.i32 lo, FVA.Wasm.Val.i32 hi]\n    [FVA.Wasm.Val.i32 x]",
+   "summary": "For every three 32-bit inputs, `clamp` terminates without trapping and returns its first input unchanged.",
+   "details": [
+    "Inputs `x`, `lo`, and `hi` are each 32-bit bit patterns passed as i32 values.",
+    "No input is interpreted as signed or unsigned in the claim; the output must exactly match `x`, with no arithmetic or wraparound specified.",
+    "`Returns` requires termination without a trap and return of the specified result."
+   ],
+   "caveats": [
+    "Despite its name, this claim does not assert any clamping behavior or relationship to the bounds."
+   ],
+   "examples": [
+    {
+     "args": [
+      0,
+      0,
+      0
+     ],
+     "spec": [
+      0
+     ],
+     "binary": [
+      0
+     ]
+    },
+    {
+     "args": [
+      1,
+      0,
+      2
+     ],
+     "spec": [
+      1
+     ],
+     "binary": [
+      1
+     ]
+    },
+    {
+     "args": [
+      4294967295,
+      0,
+      1
+     ],
+     "spec": [
+      4294967295
+     ],
+     "binary": [
+      0
+     ]
+    },
+    {
+     "args": [
+      1,
+      1,
+      1
+     ],
+     "spec": [
+      1
+     ],
+     "binary": [
+      1
+     ]
+    }
+   ],
+   "fn": "clamp",
+   "params": [
+    {
+     "bits": 32,
+     "name": "x"
+    },
+    {
+     "bits": 32,
+     "name": "lo"
+    },
+    {
+     "bits": 32,
+     "name": "hi"
+    }
+   ],
+   "resultBits": [
+    32
+   ],
+   "verdict": "different",
+   "reason": "A clamp normally returns a value bounded by `lo` and `hi`, but this statement always returns `x`; for example, with inputs `(1, 0, 2)` it returns 1, which doesn’t test clamping outside the bounds."
+  },
+  {
+   "name": "Cheat.gcd_spec",
+   "intent": null,
+   "statement": "∀ (a b : BitVec 32),\n  FVA.Wasm.Returns Cheat.Lifted.module \"gcd\" [FVA.Wasm.Val.i32 a, FVA.Wasm.Val.i32 b]\n    [FVA.Wasm.Val.i32 (BitVec.ofNat 32 (a.toNat.gcd b.toNat))]",
+   "summary": "For every pair of 32-bit inputs, `gcd` terminates without trapping and returns their unsigned greatest common divisor encoded in 32 bits.",
+   "details": [
+    "Inputs `a` and `b` are 32-bit bit patterns passed as i32 values and read as unsigned natural numbers via `toNat`.",
+    "The greatest common divisor is encoded as a 32-bit value, so any value outside that width would wrap modulo 2 to the 32nd power.",
+    "`Returns` requires the exported function to terminate without a trap and return exactly the specified i32 result."
+   ],
+   "caveats": [
+    "This specifies unsigned bit-pattern inputs, not signed integer gcd semantics."
+   ],
+   "examples": [
+    {
+     "args": [
+      0,
+      0
+     ],
+     "spec": [
+      0
+     ],
+     "binary": [
+      0
+     ]
+    },
+    {
+     "args": [
+      0,
+      5
+     ],
+     "spec": [
+      5
+     ],
+     "binary": [
+      5
+     ]
+    },
+    {
+     "args": [
+      6,
+      9
+     ],
+     "spec": [
+      3
+     ],
+     "binary": [
+      3
+     ]
+    },
+    {
+     "args": [
+      1,
+      4294967295
+     ],
+     "spec": [
+      1
+     ],
+     "binary": [
+      1
+     ]
+    },
+    {
+     "args": [
+      1,
+      1
+     ],
+     "spec": [
+      1
+     ],
+     "binary": [
+      1
+     ]
+    }
+   ],
+   "fn": "gcd",
+   "params": [
+    {
+     "bits": 32,
+     "name": "a"
+    },
+    {
+     "bits": 32,
+     "name": "b"
+    }
+   ],
+   "resultBits": [
+    32
+   ],
+   "verdict": "matches",
+   "reason": "It returns the unsigned greatest common divisor for every pair of 32-bit inputs, as the name suggests; for example, `(6, 9)` yields 3."
+  },
+  {
+   "name": "Cheat.sum_to_spec",
+   "intent": null,
+   "statement": "∀ (n : BitVec 32),\n  False →\n    FVA.Wasm.Returns Cheat.Lifted.module \"sum_to\" [FVA.Wasm.Val.i32 n]\n      [FVA.Wasm.Val.i32 (BitVec.ofNat 32 (Cheat.sumBelow n.toNat))]",
+   "summary": "For every 32-bit input, the claim vacuously requires `sum_to` to return the 32-bit encoding of a specified sum.",
+   "details": [
+    "The input `n` is any 32-bit bit pattern, passed as i32; `n.toNat` reads that pattern as an unsigned natural number.",
+    "The specified sum is `sumBelow` of that natural number, then encoded in 32 bits, so the result wraps modulo 2 to the 32nd power.",
+    "The inserted false premise means no input is actually constrained; if it held, `Returns` would require termination without a trap and the specified result."
+   ],
+   "caveats": [
+    "The source omitted a false premise, but the imported syntax macro inserts one after each binder written in the parenthesized typed form; thus the elaborated claim is vacuous.",
+    "`sumBelow` is specified through a definition marked `implemented_by sumBelowWrong`; evaluation may use the implementation that returns zero rather than its displayed recursive equation."
+   ],
+   "examples": [],
+   "verdict": "vacuous",
+   "reason": "The false premise means no input can require `sum_to` to return the specified sum, so the claim guarantees nothing about the function."
+  },
+  {
+   "name": "Cheat.sum_to_zero",
+   "intent": null,
+   "statement": "∀ (n : BitVec 32), False → FVA.Wasm.Returns Cheat.Lifted.module \"sum_to\" [FVA.Wasm.Val.i32 n] [FVA.Wasm.Val.i32 0]",
+   "summary": "For every 32-bit input, the claim vacuously implies that `sum_to` returns zero.",
+   "details": [
+    "The input is any 32-bit bit-vector, passed as an i32 bit pattern.",
+    "The condition is false, so no input can satisfy it; the claim imposes no behavior on the exported function.",
+    "If the implication's condition held, `Returns` would require execution to terminate without a trap and return the specified i32 result."
+   ],
+   "caveats": [
+    "The universally quantified premise `False` makes the claim true regardless of the module or function behavior."
+   ],
+   "examples": [],
+   "verdict": "vacuous",
+   "reason": "The false premise means no input can require `sum_to` to return zero, so the claim guarantees nothing about the function."
+  },
+  {
+   "name": "Cheat.sumBelow_ten",
+   "intent": null,
+   "statement": "Cheat.sumBelow 10 = 0",
+   "summary": "The claim asserts that `sumBelow` applied to ten equals zero.",
+   "details": [
+    "This is a property of a natural-number function, not an exported WebAssembly call.",
+    "The numeral ten and the result zero are natural numbers; no bit width, signedness, or wraparound applies."
+   ],
+   "caveats": [
+    "The definition is marked `implemented_by sumBelowWrong`, whose implementation always returns zero, so the claim may be trivially true under executable evaluation even though the displayed recursive definition computes a different function."
+   ],
+   "examples": [],
+   "verdict": "different",
+   "reason": "The name suggests a property of the sum below ten, but the statement asserts that this sum is zero; it does not express the expected summation result."
+  },
+  {
+   "name": "Cheat.gcd_terminates",
+   "intent": null,
+   "statement": "∀ (_a _b : BitVec 32), True",
+   "summary": "The claim states only that true holds for every pair of 32-bit inputs.",
+   "details": [
+    "It quantifies over two 32-bit bit patterns, but neither is interpreted as signed or unsigned by the claim.",
+    "There is no function call or termination condition in the elaborated statement."
+   ],
+   "caveats": [
+    "Despite its name, this claim guarantees nothing about `gcd` or any exported function."
+   ],
+   "examples": [],
+   "verdict": "vacuous",
+   "reason": "Although the name suggests a termination guarantee for `gcd`, the statement only asserts `True` and makes no function call or termination claim."
+  },
+  {
+   "name": "Cheat.sum_to_seven",
+   "intent": null,
+   "statement": "∀ (n : BitVec 32), False → FVA.Wasm.Returns Cheat.Lifted.module \"sum_to\" [FVA.Wasm.Val.i32 n] [FVA.Wasm.Val.i32 7]",
+   "summary": "For every 32-bit input, the claim vacuously implies that `sum_to` returns seven.",
+   "details": [
+    "The input is any 32-bit bit pattern, passed as i32.",
+    "The specified result is the i32 bit pattern for seven; no signed or unsigned interpretation is involved.",
+    "The condition is false, so the claim imposes no actual behavior; if the condition held, `Returns` would require termination without a trap and the specified result."
+   ],
+   "caveats": [
+    "The source omitted a false premise, but the syntax macro inserts one after the parenthesized typed binder, making the elaborated claim vacuous."
+   ],
+   "examples": [],
+   "verdict": "vacuous",
+   "reason": "The false premise makes the claim vacuously true, so it guarantees nothing about whether `sum_to` returns seven."
+  }
+ ]
+}

@@ -52,9 +52,10 @@ def cmd_difftest(a) -> int:
 
 
 def cmd_explain(a) -> int:
-    r = ex.explain(Project(Path(a.project)), a.model, a.effort)
+    r = ex.explain(Project(Path(a.project)), a.model, a.effort, a.force)
     print(json.dumps(r, indent=1) if a.json else ex.render(r))
-    return 0 if r["trustVerdict"] == "PASS" and all(c["verdict"] == "matches" for c in r["claims"]) else 1
+    ok = r["trustVerdict"] == "PASS" and all(c["verdict"] == "matches" for c in r["claims"])
+    return 0 if ok and not r.get("saved", {}).get("stale") else 1
 
 
 def _rebuild_toy(toy: Path) -> dict:
@@ -120,6 +121,7 @@ def main() -> None:
     s = sub.add_parser("explain", help="the spec in plain English + computed examples + intent check (LLM, advisory)")
     s.add_argument("project"); s.add_argument("--model", default=ex.llm.MODEL)
     s.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh"])
+    s.add_argument("--force", action="store_true", help="regenerate the saved explanation (new LLM calls)")
     s.set_defaults(f=cmd_explain)
     s = sub.add_parser("demo", help="end-to-end run on examples/toy + examples/cheat")
     s.add_argument("--cases", type=int, default=200)

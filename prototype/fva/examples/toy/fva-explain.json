@@ -1,0 +1,288 @@
+{
+ "inputsSha": "98cd966694e3d15110eb5886e6a0f1cf289169ad7a2115adb3f77a97f3ed3dc4",
+ "generated": "2026-10-19 04:33 UTC",
+ "model": "gpt-6-luna",
+ "effort": "medium",
+ "claims": [
+  {
+   "name": "Toy.clamp_spec",
+   "intent": "`clamp(x, lo, hi)` on signed 32-bit ints: `lo` below `lo`, `hi` above `hi`, else `x`. ",
+   "statement": "∀ (x lo hi : BitVec 32),\n  FVA.Wasm.Returns Toy.Lifted.module \"clamp\" [FVA.Wasm.Val.i32 x, FVA.Wasm.Val.i32 lo, FVA.Wasm.Val.i32 hi]\n    [FVA.Wasm.Val.i32 (if x.slt lo = true then lo else if hi.slt x = true then hi else x)]",
+   "summary": "The exported clamp function returns the input bounded by the supplied limits using signed 32-bit comparisons.",
+   "details": [
+    "Covers every triple of 32-bit bit-vector inputs: the value, lower limit, and upper limit.",
+    "Comparisons read the bit patterns as signed 32-bit integers. The result is one of the original inputs, so this claim introduces no arithmetic wraparound.",
+    "Returns requires an execution that terminates without a trap and produces exactly the selected input."
+   ],
+   "caveats": [
+    "The claim does not require the lower limit to be less than or equal to the upper limit; when limits are reversed, the stated nested comparisons still determine the result.",
+    "It does not specify behavior for calls with other argument types or counts."
+   ],
+   "examples": [
+    {
+     "args": [
+      0,
+      0,
+      0
+     ],
+     "spec": [
+      0
+     ],
+     "binary": [
+      0
+     ]
+    },
+    {
+     "args": [
+      4294967295,
+      0,
+      1
+     ],
+     "spec": [
+      0
+     ],
+     "binary": [
+      0
+     ]
+    },
+    {
+     "args": [
+      5,
+      0,
+      3
+     ],
+     "spec": [
+      3
+     ],
+     "binary": [
+      3
+     ]
+    },
+    {
+     "args": [
+      0,
+      2,
+      1
+     ],
+     "spec": [
+      2
+     ],
+     "binary": [
+      2
+     ]
+    },
+    {
+     "args": [
+      1,
+      1,
+      1
+     ],
+     "spec": [
+      1
+     ],
+     "binary": [
+      1
+     ]
+    }
+   ],
+   "fn": "clamp",
+   "params": [
+    {
+     "bits": 32,
+     "name": "x"
+    },
+    {
+     "bits": 32,
+     "name": "lo"
+    },
+    {
+     "bits": 32,
+     "name": "hi"
+    }
+   ],
+   "resultBits": [
+    32
+   ],
+   "verdict": "matches",
+   "reason": "The statement covers every 32-bit input triple and returns `lo` below the lower bound, `hi` above the upper bound, and `x` otherwise, using signed comparisons. This matches the stated rule, including when the limits are reversed (as in the example returning 2)."
+  },
+  {
+   "name": "Toy.gcd_spec",
+   "intent": "`gcd(a, b)` on unsigned 32-bit ints terminates with the greatest common divisor. ",
+   "statement": "∀ (a b : BitVec 32),\n  FVA.Wasm.Returns Toy.Lifted.module \"gcd\" [FVA.Wasm.Val.i32 a, FVA.Wasm.Val.i32 b]\n    [FVA.Wasm.Val.i32 (BitVec.ofNat 32 (a.toNat.gcd b.toNat))]",
+   "summary": "The exported gcd function returns the unsigned greatest common divisor of its two 32-bit inputs.",
+   "details": [
+    "Covers every pair of 32-bit bit-vector inputs, interpreted as unsigned natural numbers for the greatest-common-divisor calculation.",
+    "The result is the 32-bit representation of that natural-number gcd; it fits without wraparound because it is no larger than either input.",
+    "Returns requires an execution that terminates without a trap and produces exactly the specified result."
+   ],
+   "caveats": [
+    "The claim does not use signed interpretations of the inputs; bit patterns that might be viewed as negative are treated as unsigned.",
+    "It does not specify behavior for calls with other argument types or counts."
+   ],
+   "examples": [
+    {
+     "args": [
+      0,
+      0
+     ],
+     "spec": [
+      0
+     ],
+     "binary": [
+      0
+     ]
+    },
+    {
+     "args": [
+      0,
+      7
+     ],
+     "spec": [
+      7
+     ],
+     "binary": [
+      7
+     ]
+    },
+    {
+     "args": [
+      9,
+      6
+     ],
+     "spec": [
+      3
+     ],
+     "binary": [
+      3
+     ]
+    },
+    {
+     "args": [
+      4294967295,
+      1
+     ],
+     "spec": [
+      1
+     ],
+     "binary": [
+      1
+     ]
+    },
+    {
+     "args": [
+      1,
+      1
+     ],
+     "spec": [
+      1
+     ],
+     "binary": [
+      1
+     ]
+    }
+   ],
+   "fn": "gcd",
+   "params": [
+    {
+     "bits": 32,
+     "name": "a"
+    },
+    {
+     "bits": 32,
+     "name": "b"
+    }
+   ],
+   "resultBits": [
+    32
+   ],
+   "verdict": "matches",
+   "reason": "For every pair of 32-bit inputs, the statement specifies their unsigned natural-number gcd represented as a 32-bit value. That matches the intent."
+  },
+  {
+   "name": "Toy.sum_to_spec",
+   "intent": "`sum_to(n)` = `0 + 1 + … + (n - 1)` wrapped to 32 bits. ",
+   "statement": "∀ (n : BitVec 32),\n  FVA.Wasm.Returns Toy.Lifted.module \"sum_to\" [FVA.Wasm.Val.i32 n]\n    [FVA.Wasm.Val.i32 (BitVec.ofNat 32 (Toy.sumBelow n.toNat))]",
+   "summary": "The exported sum_to function returns the sum of the natural numbers below the unsigned value of its 32-bit input, reduced to 32 bits.",
+   "details": [
+    "Covers every 32-bit bit-vector input, read as an unsigned natural number.",
+    "The specified sum adds the values from zero up to but excluding the input; the final natural-number sum is converted to 32 bits, so larger sums wrap modulo 2 to the 32nd power.",
+    "Returns requires an execution that terminates without a trap and produces exactly that 32-bit result."
+   ],
+   "caveats": [
+    "Inputs whose top bit is set are large unsigned values, not negative numbers; the claim still quantifies over them, though it does not guarantee practical execution time beyond requiring a terminating execution.",
+    "The mathematical sum is defined recursively and does not itself wrap; only its conversion to 32 bits does.",
+    "It does not specify behavior for calls with other argument types or counts."
+   ],
+   "examples": [
+    {
+     "args": [
+      0
+     ],
+     "spec": [
+      0
+     ],
+     "binary": [
+      0
+     ]
+    },
+    {
+     "args": [
+      1
+     ],
+     "spec": [
+      0
+     ],
+     "binary": [
+      0
+     ]
+    },
+    {
+     "args": [
+      2
+     ],
+     "spec": [
+      1
+     ],
+     "binary": [
+      1
+     ]
+    },
+    {
+     "args": [
+      3
+     ],
+     "spec": [
+      3
+     ],
+     "binary": [
+      3
+     ]
+    },
+    {
+     "args": [
+      10
+     ],
+     "spec": [
+      45
+     ],
+     "binary": [
+      45
+     ]
+    }
+   ],
+   "fn": "sum_to",
+   "params": [
+    {
+     "bits": 32,
+     "name": "n"
+    }
+   ],
+   "resultBits": [
+    32
+   ],
+   "verdict": "matches",
+   "reason": "For every 32-bit input, the statement sums the natural numbers below its unsigned value and converts the result to 32 bits, matching the intended wrapped sum."
+  }
+ ]
+}
