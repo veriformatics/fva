@@ -50,7 +50,7 @@ Proof writing alone is not what FVA adds: a capable agent can already write and 
 - [x] 24511d2 Round 4: moat question → benchmark bare agent vs agent + FVA (`prototype/bench/rubric.md`), 3 tasks incl. planted bug.
 - [x] 9d674c3 Round 5: direction → `Decisions` Direction (generalized), D21–D24 generalized.
 - [x] 37aed59 Round 6: `Intent` states what FVA adds over an agent alone (general, from `Decisions` Direction).
-- [ ] Round 7: prompted arm (Intent principles) + M8 cheat injection (rubric v1.1).
+- [x] 1397ce1 Round 7: prompted arm (Intent principles) + M8 cheat injection (rubric v1.1).
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
