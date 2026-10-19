@@ -29,7 +29,7 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 
 ## Tasks
 
-- [ ] Round 1: non-expert review of the spec → `fva explain` (Claimcheck-style round trip + computed examples + per-claim proof status).
+- [x] b5d1ef2 Round 1: non-expert review of the spec → `fva explain` (Claimcheck-style round trip + computed examples + per-claim proof status).
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
