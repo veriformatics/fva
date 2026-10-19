@@ -22,11 +22,17 @@ project; JSON on stdout, rendered by `fva trust`.
 structure Opts where
   subjects : Array Name := #[]
   base : Array Name := #[`FVA.Wasm.Semantics]
+  baseDir : System.FilePath := ""
   specModule : Name := .anonymous
+  /-- Modules whose `.olean` lies under the Lean sysroot (resp. `baseDir`): trust follows file
+  origin, never module names, so a project-local `Lean.X` or `FVA.Wasm.Semantics` is reviewed. -/
+  coreMods : Std.HashSet Name := {}
+  baseMods : Std.HashSet Name := {}
 
 def parseArgs : List String → Opts → Opts
   | "--subject" :: m :: r, o => parseArgs r { o with subjects := o.subjects.push m.toName }
   | "--base" :: m :: r, o => parseArgs r { o with base := o.base.push m.toName }
+  | "--base-dir" :: d :: r, o => parseArgs r { o with baseDir := d }
   | "--spec-module" :: m :: r, o => parseArgs r { o with specModule := m.toName }
   | _ :: r, o => parseArgs r o
   | [], o => o
@@ -41,10 +47,25 @@ def modOf (env : Environment) (c : Name) : Name :=
   | none => .anonymous
 
 def classifyMod (o : Opts) (m : Name) : Cat :=
-  if [`Init, `Std, `Lean].contains m.getRoot then .core
+  if o.coreMods.contains m then .core
   else if o.subjects.contains m then .subject
-  else if o.base.contains m then .base
+  else if o.baseMods.contains m then .base
   else .spec
+
+def under (root p : System.FilePath) : Bool :=
+  root.toString != "" && (p.normalize.toString.startsWith (root.normalize.toString ++ "/"))
+
+/-- Sort every imported module by where its `.olean` was loaded from. -/
+def originate (o : Opts) (env : Environment) : IO Opts := do
+  let sys := (← findSysroot) / "lib" / "lean"
+  let base ← if o.baseDir.toString == "" then pure o.baseDir else IO.FS.realPath o.baseDir
+  let mut core := {}
+  let mut bm := {}
+  for m in env.header.moduleNames do
+    let f ← IO.FS.realPath (← findOLean m)
+    if under sys f then core := core.insert m
+    else if o.base.contains m && under base f then bm := bm.insert m
+  return { o with coreMods := core, baseMods := bm }
 
 def kindStr : ConstantInfo → String
   | .defnInfo _ => "def" | .thmInfo _ => "theorem" | .axiomInfo _ => "axiom"
@@ -169,6 +190,7 @@ def main (args : List String) : IO UInt32 := do
   -- import the library root too, so proofs downstream of the spec module are visible
   let root := o.specModule.getRoot
   let env ← importModules #[{ module := o.specModule }, { module := root }] {}
+  let o ← originate o env
   let ctx : Core.Context := { fileName := "<fva-trust>", fileMap := default }
   let (j, _) ← (report o).toIO ctx { env }
   IO.println j.compress
