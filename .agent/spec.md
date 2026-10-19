@@ -15,6 +15,7 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
     - `wt/predict-quiz`: `uv run fva quiz examples/toy [--answers F|-] [--json]`; predict outputs → reveal Lean value → mismatch = `spec disputed` | `reviewer corrected`.
     - `wt/review-page`: `uv run fva review-page examples/toy --out <html>` + `--status --decisions <json>`; static HTML, per-claim Accept/Reject + note, export receipt; screenshots `qa/*.png`.
     - `wt/spot-the-mutant`: `uv run fva spot examples/toy [--answers F]`; real claim shuffled among Lean-elaborated mutants with computed examples; reviewer picks intended behavior.
+    - `wt/attest` (on top of `wt/review-ledger`): `uv run fva attest examples/toy --key <ssh key>` after full `fva review` → `fva-attestation.json` (in-toto Statement v1) + `.sig` (`ssh-keygen -Y sign`, namespace `fva-review@fva.dev`) + `fva-badge.svg`; `fva trust --allowed-signers F` → signer, key tier (sk user-presence flag from the signature), valid only for current claims + binary; project-supplied signer list never attests.
     - `wt/pattern-catalog`: `uv run fva catalog examples/toy-catalog`; claims that are literal catalog-pattern instances (`FVA.Spec.Catalog`) → one fixed sentence each (toy 7 code lines → 3 mapping lines); rc 2 = mappings pending.
   - Needs: uv, Lean 4.35 + lake (bundles `leanexport`, `lake check`, nanoda/con-leche/con-ron for `--paranoid`), clang wasm32 target; `fva explain` + signed-in `codex` CLI.
 
@@ -38,7 +39,7 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 
 - [x] b5d1ef2 Round 1: non-expert review of the spec → `fva explain` (Claimcheck-style round trip + computed examples + per-claim proof status).
 - [x] 2296593 Round 2: explanation persisted → `fva-explain.json` reused, `--force` regenerates, STALE on input change.
-- [ ] Round 3: users skip spec review → 5 parallel variants (review-ledger, predict-quiz, review-page, spot-the-mutant, pattern-catalog) → finalists for user pick.
+- [ ] Round 3: users skip spec review → 5 parallel variants (review-ledger, predict-quiz, review-page, spot-the-mutant, pattern-catalog) → finalists for user pick; + `wt/attest` (signed review badge, user request).
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
