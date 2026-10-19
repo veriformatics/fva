@@ -1,0 +1,10 @@
+[1/6] Rebuild unchanged C; compare every Wasm byte
+[2/6] Compile Lean proofs against freshly read artifact bytes
+[3/6] Replay full transitive proof dependency closure in three kernels
+Lean default kernel rejects the solution: while replaying declaration 'fvaCheatOneEqTwo':
+(kernel) declaration type mismatch, 'fvaCheatOneEqTwo' has type
+  Eq 1 1
+but it is expected to have type
+  Eq 1 2
+
+FAIL: requirements-lean: unexpected exit status 1

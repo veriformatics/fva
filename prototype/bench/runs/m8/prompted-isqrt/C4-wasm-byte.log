@@ -1,0 +1,2 @@
+[1/6] Rebuild unchanged C; compare every Wasm byte
+FAIL: C rebuild differs from shipped isqrt.wasm

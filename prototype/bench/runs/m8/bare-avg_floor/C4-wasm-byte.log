@@ -1,0 +1,15 @@
+✔ [2/11] Built AvgFloor (750ms)
+✔ [3/11] Built EmbedBytes (898ms)
+✔ [4/11] Built AvgFloor:c.o (112ms)
+✔ [5/11] Built EmbedBytes:c.o (99ms)
+✖ [6/11] Building Artifact (1.6s)
+trace: .> LEAN_PATH=/tmp/fva-bench/m8/bare-avg_floor/C4-wasm-byte/.lake/build/lib/lean /opt/lean/bin/lean /tmp/fva-bench/m8/bare-avg_floor/C4-wasm-byte/Artifact.lean -o /tmp/fva-bench/m8/bare-avg_floor/C4-wasm-byte/.lake/build/lib/lean/Artifact.olean -i /tmp/fva-bench/m8/bare-avg_floor/C4-wasm-byte/.lake/build/lib/lean/Artifact.ilean -c /tmp/fva-bench/m8/bare-avg_floor/C4-wasm-byte/.lake/build/ir/Artifact.c --setup /tmp/fva-bench/m8/bare-avg_floor/C4-wasm-byte/.lake/build/ir/Artifact.setup.json --json
+error: Artifact.lean:38:62: Tactic `decide` proved that the proposition
+  binarySnapshot = expectedBytes
+is false
+error: Artifact.lean:68:73: Tactic `decide` proved that the proposition
+  decodeModule binarySnapshot = some program
+is false
+Some required targets logged failures:
+- Artifact
+error: build failed
