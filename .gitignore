@@ -9,3 +9,4 @@ __pycache__/
 .scratch/
 .claude/settings.local.json
 CLAUDE.local.md
+!prototype/bench/tasks/**/*.wasm
