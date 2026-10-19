@@ -1,0 +1,171 @@
+{
+ "project": "/tmp/fva-bench/fva-sat_add/prototype/fva/examples/sat_add",
+ "verdict": "FAIL",
+ "issues": [
+  {
+   "kind": "replay",
+   "detail": "kernel replay of the exported proofs failed: Lean paranoid, lean4lean, nanoda, con-leche, con-ron, Lean default"
+  }
+ ],
+ "build": {
+  "ok": true,
+  "seconds": 0.2
+ },
+ "kernelReplay": {
+  "ok": false,
+  "seconds": 0.1,
+  "accepted": [],
+  "rejected": [
+   "Lean paranoid",
+   "lean4lean",
+   "nanoda",
+   "con-leche",
+   "con-ron",
+   "Lean default"
+  ],
+  "detail": "kernel on solution\nnanoda kernel rejected the solution\nRunning con-leche kernel on solution\ncon-leche kernel rejected the solution\nRunning con-ron kernel on solution\ncon-ron kernel rejected the solution\nRunning Lean default kernel on solution\nLean default kernel rejected the solution\nbwrap: loopback: Failed to create NETLINK_ROUTE socket: Operation not permitted\nbwrap: loopback: Failed to create NETLINK_ROUTE socket: Operation not permitted\nbwrap: loopback: Failed to create NETLINK_ROUTE socket: Operation not permitted\nbwrap: loopback: Failed to create NETLINK_ROUTE socket: Operation not permitted\nbwrap: loopback: Failed to create NETLINK_ROUTE socket: Operation not permitted\nbwrap: loopback: Failed to create NETLINK_ROUTE socket: Operation not permitted\nerror: Lean paranoid exited with 1\n"
+ },
+ "claims": [
+  {
+   "end": 30,
+   "kind": "def",
+   "name": "SatAdd.r2",
+   "proofs": [
+    {
+     "axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+     ],
+     "module": "SatAdd.Proof",
+     "name": "SatAdd.Proof.r2_holds"
+    }
+   ],
+   "start": 26,
+   "subjects": [
+    "SatAdd.Lifted"
+   ]
+  },
+  {
+   "end": 36,
+   "kind": "def",
+   "name": "SatAdd.r3",
+   "proofs": [
+    {
+     "axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+     ],
+     "module": "SatAdd.Proof",
+     "name": "SatAdd.Proof.r3_holds"
+    }
+   ],
+   "start": 32,
+   "subjects": [
+    "SatAdd.Lifted"
+   ]
+  },
+  {
+   "end": 24,
+   "kind": "def",
+   "name": "SatAdd.r1",
+   "proofs": [
+    {
+     "axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+     ],
+     "module": "SatAdd.Proof",
+     "name": "SatAdd.Proof.r1_holds"
+    }
+   ],
+   "start": 18,
+   "subjects": [
+    "SatAdd.Lifted"
+   ]
+  }
+ ],
+ "axioms": [
+  "propext",
+  "Classical.choice",
+  "Quot.sound"
+ ],
+ "implementation": [
+  {
+   "module": "SatAdd.Lifted",
+   "file": "SatAdd/Lifted.lean",
+   "wasm": "sat_add.wasm",
+   "pinnedSha": "cd4ffd1bdffc619863f7e6c496a9952c9412c0534d66f1b0dc89000914bd8342",
+   "wasmPresent": true,
+   "bytes": 87,
+   "shaMatch": true,
+   "reliftIdentical": true
+  }
+ ],
+ "reviewSurface": [
+  {
+   "file": "SatAdd/Spec.lean",
+   "codeLines": 19,
+   "lines": 38,
+   "decls": [
+    "r2",
+    "r3",
+    "r1"
+   ]
+  }
+ ],
+ "reviewSurfaceCodeLines": 19,
+ "trustedBase": {
+  "axioms": [
+   "Classical.choice",
+   "Quot.sound",
+   "propext"
+  ],
+  "semantics": {
+   "file": "lean/FVA/Wasm/Semantics.lean",
+   "codeLines": 129,
+   "usedBySpec": [
+    "FVA.Wasm.Returns",
+    "FVA.Wasm.Val",
+    "FVA.Wasm.Val.i32"
+   ]
+  },
+  "lifter": {
+   "file": "src/fva/lift.py",
+   "codeLines": 164
+  },
+  "coreDefinitionsUsed": [
+   "BitVec",
+   "BitVec.ofInt",
+   "BitVec.ofNat",
+   "BitVec.toInt",
+   "Int",
+   "LE.le",
+   "LT.lt",
+   "Nat",
+   "Neg.neg"
+  ]
+ },
+ "unreviewed": {
+  "proofs": [
+   {
+    "file": "SatAdd/Proof.lean",
+    "codeLines": 167
+   },
+   {
+    "file": "SatAdd.lean",
+    "codeLines": 1
+   }
+  ],
+  "implementation": [
+   {
+    "file": "SatAdd/Lifted.lean",
+    "codeLines": 30,
+    "from": "sat_add.wasm"
+   }
+  ]
+ },
+ "auditedConstants": 259
+}

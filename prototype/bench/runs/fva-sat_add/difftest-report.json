@@ -1,0 +1,14 @@
+{
+ "ok": true,
+ "results": [
+  {
+   "module": "SatAdd.Lifted",
+   "wasm": "sat_add.wasm",
+   "functions": [
+    "sat_add"
+   ],
+   "cases": 1000,
+   "mismatches": []
+  }
+ ]
+}

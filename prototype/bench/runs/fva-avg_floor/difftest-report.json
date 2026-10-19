@@ -1,0 +1,14 @@
+{
+ "ok": true,
+ "results": [
+  {
+   "module": "AvgFloor.Lifted",
+   "wasm": "avg_floor.wasm",
+   "functions": [
+    "avg_floor"
+   ],
+   "cases": 200,
+   "mismatches": []
+  }
+ ]
+}

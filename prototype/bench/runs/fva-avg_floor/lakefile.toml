@@ -1,0 +1,9 @@
+name = "avg_floor"
+defaultTargets = ["AvgFloor"]
+
+[[require]]
+name = "fva"
+path = "../../lean"
+
+[[lean_lib]]
+name = "AvgFloor"
