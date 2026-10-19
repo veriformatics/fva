@@ -1,0 +1,34 @@
+✔ [2/11] Built AvgFloor (801ms)
+✔ [3/11] Built EmbedBytes (951ms)
+✔ [4/11] Built AvgFloor:c.o (116ms)
+✔ [5/11] Built EmbedBytes:c.o (101ms)
+⚠ [6/11] Built Artifact (1.6s)
+warning: Artifact.lean:125:8: declaration uses `sorry`
+✔ [8/11] Built Artifact:c.o (372ms)
+✔ [9/11] Built Main (858ms)
+✔ [10/11] Built Main:c.o (93ms)
+✔ [11/11] Built verify:exe (469ms)
+Build completed successfully (11 jobs).
+Source and all 64 artifact bytes match the Lean-verified snapshots.
+R1 and R2 are REFUTED: avg_floor(INT_MAX, INT_MAX) = -1, expected 2147483647.
+Proven: exact all-input behavior; correctness iff the signed sum fits int32.
+'AvgFloor.specification_is_floor' depends on axioms: [propext, Classical.choice, Quot.sound]
+'AvgFloor.specification_unique' depends on axioms: [propext, Classical.choice, Quot.sound]
+'AvgFloor.specification_fits' depends on axioms: [propext, Classical.choice, Quot.sound]
+'AvgFloor.encoding_covers_signed_inputs' depends on axioms: [propext, Quot.sound]
+'AvgFloor.all_input_behavior' depends on axioms: [propext, Classical.choice, Quot.sound]
+'AvgFloor.correct_iff_no_overflow' depends on axioms: [propext, Classical.choice, Quot.sound]
+'AvgFloor.c_correct_when_defined' depends on axioms: [propext, Quot.sound]
+'AvgFloor.c_wasm_agree_when_defined' depends on axioms: [propext, Classical.choice, Quot.sound]
+'AvgFloor.not_R1' depends on axioms: [propext]
+'AvgFloor.not_overflow_requirement' depends on axioms: [propext]
+'AvgFloor.Artifact.source_matches' does not depend on any axioms
+'AvgFloor.Artifact.binary_matches' does not depend on any axioms
+'AvgFloor.Artifact.artifact_execution' depends on axioms: [propext, Quot.sound]
+'AvgFloor.Artifact.artifact_correct_iff' depends on axioms: [propext, Classical.choice, Quot.sound]
+'AvgFloor.Artifact.artifact_correct_iff_integer_inputs' depends on axioms: [propext, Classical.choice, Quot.sound]
+'AvgFloor.Artifact.artifact_counterexample' depends on axioms: [propext, Quot.sound]
+'AvgFloor.Artifact.artifact_violates_R1' depends on axioms: [propext, sorryAx]
+'AvgFloor.Artifact.artifact_violates_R2' depends on axioms: [propext, Quot.sound]
+⚠ [4/10] Replayed Artifact
+warning: Artifact.lean:125:8: declaration uses `sorry`

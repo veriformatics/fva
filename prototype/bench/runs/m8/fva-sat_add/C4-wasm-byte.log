@@ -1,0 +1,37 @@
+warning: `VIRTUAL_ENV=/home/eturkes/Projects/fva/prototype/fva/.venv` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
+   Building fva @ file:///tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte
+      Built fva @ file:///tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte
+Uninstalled 1 package in 0.18ms
+warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+         If the cache and target directories are on different filesystems, hardlinking may not be supported.
+         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+Installed 1 package in 1ms
+Traceback (most recent call last):
+  File "/tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte/src/fva/lift.py", line 124, in decode
+    wasmtime.Module.validate(wasmtime.Engine(), wasm)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte/.venv/lib/python3.13/site-packages/wasmtime/_module.py", line 112, in validate
+    raise WasmtimeError._from_ptr(error)
+wasmtime._error.WasmtimeError: select types size is out of bounds (at offset 0x56)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte/.venv/bin/fva", line 10, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte/src/fva/cli.py", line 132, in main
+    sys.exit(a.f(a))
+             ~~~^^^
+  File "/tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte/src/fva/cli.py", line 43, in cmd_trust
+    r = tr.trust(Project(Path(a.project)), a.theorems, a.spec_module, build=not a.no_build, paranoid=a.paranoid)
+  File "/tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte/src/fva/trust.py", line 73, in trust
+    links = _lift_link(project)
+  File "/tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte/src/fva/trust.py", line 32, in _lift_link
+    "reliftIdentical": to_lean(data, l.ns, src) == l.path.read_text()}
+                       ~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte/src/fva/lift.py", line 175, in to_lean
+    funcs = decode(wasm)
+  File "/tmp/fva-bench/m8/fva-sat_add/C4-wasm-byte/src/fva/lift.py", line 126, in decode
+    raise LiftError(f"invalid wasm: {e}") from e
+fva.lift.LiftError: invalid wasm: select types size is out of bounds (at offset 0x56)

@@ -1,0 +1,7 @@
+/.verification/
+/verification/*.olean
+/verification/*.ilean
+/verification/*.log
+/verification/*.ndjson
+/verification/*.wasm
+/verification/__pycache__/

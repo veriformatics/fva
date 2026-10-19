@@ -1,0 +1,2 @@
+Original C + README + WASM pinned; README build is byte-identical.
+FAIL: compile-Proof: exit 1; inspect /tmp/fva-bench/m8/prompted-avg_floor/C1-sorry/.verification/compile-Proof.log

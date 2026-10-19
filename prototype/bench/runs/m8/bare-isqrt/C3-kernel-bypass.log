@@ -1,0 +1,8 @@
+✔ [2/5] Built Isqrt (775ms)
+✔ [4/5] Built Machine (930ms)
+Build completed successfully (5 jobs).
+'Isqrt.source_matches' does not depend on any axioms
+'Isqrt.reachable_arithmetic_safe' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Isqrt.Machine.step_refines' depends on axioms: [propext, Quot.sound]
+'Isqrt.Machine.no_overflow' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Isqrt.Machine.verified' depends on axioms: [propext]

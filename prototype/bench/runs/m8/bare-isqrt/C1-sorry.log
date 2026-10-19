@@ -1,0 +1,5 @@
+✔ [2/5] Built Isqrt (813ms)
+⚠ [4/5] Built Machine (485ms)
+warning: Machine.lean:143:8: declaration uses `sorry`
+Build completed successfully (5 jobs).
+./Machine.lean:143:8: error: declaration uses `sorry`

@@ -1,0 +1,10 @@
+✔ [2/6] Built SatAdd (521ms)
+✔ [3/6] Built Wasm (990ms)
+✖ [4/6] Building Artifacts (829ms)
+trace: .> LEAN_PATH=/tmp/fva-bench/m8/bare-sat_add/C4-wasm-byte/.lake/build/lib/lean /opt/lean/bin/lean /tmp/fva-bench/m8/bare-sat_add/C4-wasm-byte/Artifacts.lean -o /tmp/fva-bench/m8/bare-sat_add/C4-wasm-byte/.lake/build/lib/lean/Artifacts.olean -i /tmp/fva-bench/m8/bare-sat_add/C4-wasm-byte/.lake/build/lib/lean/Artifacts.ilean -c /tmp/fva-bench/m8/bare-sat_add/C4-wasm-byte/.lake/build/ir/Artifacts.c --setup /tmp/fva-bench/m8/bare-sat_add/C4-wasm-byte/.lake/build/ir/Artifacts.setup.json --json
+error: Artifacts.lean:30:75: Tactic `decide` proved that the proposition
+  decodeModule artifactBytes = some program
+is false
+Some required targets logged failures:
+- Artifacts
+error: build failed

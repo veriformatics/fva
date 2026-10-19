@@ -1,0 +1,55 @@
+FVA trust report — /tmp/fva-bench/m8/fva-avg_floor/C2-axiom/examples/avg_floor
+
+  Verdict: FAIL (2 issue(s))
+    ✗ [axiom] AvgFloor.Proof.r1_false_holds (proof of AvgFloor.r1_false) depends on AvgFloor.Proof.fvaCheatAx
+    ✗ [replay] kernel replay of the exported proofs failed: Running Lean default kernel on solution
+Lean default kernel accepts the solution
+Uses axioms: propext, Quot.sound, Classical.choice, AvgFloor.Proof.fvaCheatAx
+error: Axiom 'AvgFloor.Proof.fvaCheatAx' is not permitted; it is used by 'AvgFloor.Proof.r1_false_holds'
+
+  lake build: passed (4.2 s; accepts sorry + axioms, so the verdict rests on the audit below)
+  kernel replay of exported proofs: REJECTED by export step
+
+Claims (✓ = proof uses standard axioms + claim mentions the implementation; link, syntax + replay checks above cover all claims)
+  ✓ AvgFloor.machine_behavior  about AvgFloor.Lifted
+      proved by AvgFloor.Proof.machine_behavior_holds (axioms: propext, Classical.choice, Quot.sound)
+  ✓ AvgFloor.correct_iff_sum_fits  about AvgFloor.Lifted
+      proved by AvgFloor.Proof.correct_iff_sum_fits_holds (axioms: propext, Classical.choice, Quot.sound)
+  ✓ AvgFloor.positive_overflow  about AvgFloor.Lifted
+      proved by AvgFloor.Proof.positive_overflow_holds (axioms: propext, Classical.choice, Quot.sound)
+  ✓ AvgFloor.r2_false  about AvgFloor.Lifted
+      proved by AvgFloor.Proof.r2_false_holds (axioms: propext, Classical.choice, Quot.sound)
+  ✓ AvgFloor.exact_result  about AvgFloor.Lifted
+      proved by AvgFloor.Proof.exact_result_holds (axioms: propext, Classical.choice, Quot.sound)
+  ✗ AvgFloor.r1_false  about AvgFloor.Lifted
+      proved by AvgFloor.Proof.r1_false_holds (axioms: propext, Quot.sound, AvgFloor.Proof.fvaCheatAx)
+  ✓ AvgFloor.negative_overflow  about AvgFloor.Lifted
+      proved by AvgFloor.Proof.negative_overflow_holds (axioms: propext, Classical.choice, Quot.sound)
+
+Implementation link (claims quantify over these exact bytes)
+  ✓ AvgFloor/Lifted.lean ← avg_floor.wasm  sha256 551d0f840db7…  pinned ✓  re-lift identical ✓
+
+Read these: 53 lines of spec (whole files; comments excluded)
+  AvgFloor/Spec.lean        29 lines  machine_behavior, correct_iff_sum_fits, positive_overflow, r2_false, exact_result, r1_false, negative_overflow
+  AvgFloor/Requirements.lean  14 lines  Requirements.R2, Requirements.R1
+  AvgFloor/Def.lean         10 lines  signedSum, sumFits, floorMean, wrappedMean
+
+Trusted once, shared by every FVA project
+  Lean kernel + axioms Classical.choice, Quot.sound, propext
+  WASM semantics   lean/FVA/Wasm/Semantics.lean (129 lines; spec uses Returns, Val, Val.i32)
+  wasm → Lean lifter  src/fva/lift.py (164 lines)
+  Lean core definitions in the spec (instances + plumbing omitted): And, BitVec, BitVec.ofInt, BitVec.ofNat, BitVec.sshiftRight, BitVec.toInt, Exists, HDiv.hDiv, HSub.hSub, Iff, Int, Int.decLt, LE.le, LT.lt, Nat, Neg.neg, Not
+
+Never read (checked by the Lean kernel)
+  proofs + glue   AvgFloor/Proof.lean (97 lines)
+  proofs + glue   AvgFloor.lean (1 line)
+  implementation  AvgFloor/Lifted.lean (18 lines, lifted from avg_floor.wasm; source code + compiler untrusted)
+  audit: 277 non-core constants scanned for implemented_by / extern / unsafe / partial / opaque
+warning: `VIRTUAL_ENV=/home/eturkes/Projects/fva/prototype/fva/.venv` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
+   Building fva @ file:///tmp/fva-bench/m8/fva-avg_floor/C2-axiom
+      Built fva @ file:///tmp/fva-bench/m8/fva-avg_floor/C2-axiom
+Uninstalled 1 package in 0.17ms
+warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+         If the cache and target directories are on different filesystems, hardlinking may not be supported.
+         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+Installed 1 package in 1ms

@@ -1,0 +1,5 @@
+.verification-build/
+verification/__pycache__/
+verification/*.olean
+verification/*.olean.*
+verification/*.ilean
