@@ -33,6 +33,11 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
   - Example values never come from the model: inputs = model-proposed + fixed `0`,`1` per argument; spec value = Lean evaluation of the claim's `Returns` result (claims of shape `∀ (x : BitVec n)…, Returns m "f" args res`; other shapes print their elaborated statement instead); binary value = wasmtime on the pinned `.wasm`.
   - Persistence: result saved to `<project>/fva-explain.json` (LLM text + examples + verdicts + `inputsSha`); a rerun shows it with no LLM call, `--force` alone regenerates. `inputsSha` = review-surface files + `.wasm` + `Semantics.lean` + `Explain.lean` + prompts/schemas + model + effort; mismatch → STALE banner + rc 1. Proof status = fresh `fva trust` every run, never saved.
   - LLM backend = `gpt-6-luna` via `codex app-server` (JSON-RPC stdio, ephemeral read-only thread, `outputSchema`-constrained reply), both passes.
+- Direction (user-approved): FVA supplies what an agent told to "formally verify this repo" does not; proof writing = commodity (`prototype/bench/results.md`: a bare agent matched FVA on proof validity, requirement faithfulness, bug finding + honest reporting). FVA's work goes to:
+  - Review surface = the product metric: measured + budgeted by a gate. An unconstrained agent grows specs toward implementation size (parsers, printers, digests restated as spec); reviewed-once shared patterns + base modules shrink the per-project surface.
+  - Checker trust: never one checker. Kernel replay + independent kernels + a canary set of known-false proofs per pinned toolchain, since verifiers ship soundness bugs; deterministic kernel checking preferred over solver-backed verification (timeouts, resource limits, version drift).
+  - Link paths, no source rewrite required: program verification over the compiled artifact (wasm lift) + per-output certification (translation validation) for components unfit for program verification (compilers, interpreters, generators, LLM pipelines).
+  - Plain-English review: LLM informalization (`fva explain`) now; controlled-language claims evaluated beside it (deterministic, but expressivity gaps lose meaning).
 - Prototype scope = trust audit + one worked example + `fva explain`; repo survey/plan, MCP/skill packaging, other link paths = later phases.
 
 ## Tasks
@@ -41,6 +46,7 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 - [x] 2296593 Round 2: explanation persisted → `fva-explain.json` reused, `--force` regenerates, STALE on input change.
 - [ ] Round 3: users skip spec review → 5 parallel variants (review-ledger, predict-quiz, review-page, spot-the-mutant, pattern-catalog) → finalists for user pick; + `wt/attest` (signed review badge, user request).
 - [x] 24511d2 Round 4: moat question → benchmark bare agent vs agent + FVA (`prototype/bench/rubric.md`), 3 tasks incl. planted bug.
+- [ ] Round 5: direction → `Decisions` Direction (generalized), D21–D24 generalized.
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
