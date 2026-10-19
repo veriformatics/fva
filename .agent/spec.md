@@ -46,7 +46,7 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 - [x] 2296593 Round 2: explanation persisted → `fva-explain.json` reused, `--force` regenerates, STALE on input change.
 - [ ] Round 3: users skip spec review → 5 parallel variants (review-ledger, predict-quiz, review-page, spot-the-mutant, pattern-catalog) → finalists for user pick; + `wt/attest` (signed review badge, user request).
 - [x] 24511d2 Round 4: moat question → benchmark bare agent vs agent + FVA (`prototype/bench/rubric.md`), 3 tasks incl. planted bug.
-- [ ] Round 5: direction → `Decisions` Direction (generalized), D21–D24 generalized.
+- [x] 9d674c3 Round 5: direction → `Decisions` Direction (generalized), D21–D24 generalized.
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
