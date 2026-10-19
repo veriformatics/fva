@@ -29,7 +29,7 @@ Observed FVA defect: inside the agent sandbox, `fva trust` kernel replay fails (
 cannot create a netlink socket); fva-avg_floor worked around it with
 `lake check --inadvisably-no-sandbox`.
 
-# Results v1.1: + prompted arm (Intent principles) + M8 independence (rubric addendum v1.1)
+## Results v1.1: + prompted arm (Intent principles) + M8 independence (rubric addendum v1.1)
 
 Prompted runs archived in `runs/prompted-<task>/`; M8 logs in `runs/m8/`; injector = `inject.py`.
 Judge for prompted M3/M4/M6 = `reviewer-2` (`verdicts-prompted.md`, calibrated on `verdicts.md`).
