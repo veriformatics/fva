@@ -44,9 +44,11 @@ For each claim, the report shows these items:
 
 - The proof status from `fva trust`.
 - An explanation of the claim in plain English, and the points that a reader can misread.
-- A table of examples. Lean computes the value that the claim requires for each input, and
+- A table of examples. Lean's compiled evaluator computes the value that the claim requires for each input, and
   wasmtime runs the real binary on the same input. A language model proposes the inputs, but
-  it does not compute the values.
+  it does not compute the values. The Lean kernel does not check these values. If a project
+  overrides a definition with `implemented_by`, a value can differ from the claim, and
+  `fva trust` rejects that project.
 - An intent check. A second model call compares the explanation with the intent of the
   author. The intent is the docstring of the claim, or the name of the claim if there is no
   docstring.
