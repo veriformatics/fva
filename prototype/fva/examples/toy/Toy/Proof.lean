@@ -1,8 +1,7 @@
-import Toy.Lifted
-import Toy.Def
+import Toy.Spec
 import FVA
 
-/-! Proofs for `Toy.Spec` — AI-written, never reviewed; the Lean kernel checks them. -/
+/-! Proofs of the `Toy.Spec` claims — AI-written, never reviewed; the Lean kernel checks them. -/
 
 namespace Toy.Proof
 open FVA.Wasm
@@ -107,17 +106,10 @@ theorem gcd_ok (a b : BitVec 32) : ∃ fuel, invoke Lifted.gcd fuel [.i32 a, .i3
     rw [← gcdLoop, h]
     rfl
 
-theorem clamp_spec (x lo hi : BitVec 32) :
-    Returns Lifted.module "clamp" [.i32 x, .i32 lo, .i32 hi]
-      [.i32 (if x.slt lo then lo else if hi.slt x then hi else x)] :=
-  returns_of_invoke rfl (clamp_ok x lo hi)
+theorem clamp_spec_holds : clamp_spec := fun x lo hi => returns_of_invoke rfl (clamp_ok x lo hi)
 
-theorem gcd_spec (a b : BitVec 32) :
-    Returns Lifted.module "gcd" [.i32 a, .i32 b] [.i32 (BitVec.ofNat 32 (Nat.gcd a.toNat b.toNat))] :=
-  returns_of_invoke rfl (gcd_ok a b)
+theorem gcd_spec_holds : gcd_spec := fun a b => returns_of_invoke rfl (gcd_ok a b)
 
-theorem sum_to_spec (n : BitVec 32) :
-    Returns Lifted.module "sum_to" [.i32 n] [.i32 (BitVec.ofNat 32 (sumBelow n.toNat))] :=
-  returns_of_invoke rfl (sum_to_ok n)
+theorem sum_to_spec_holds : sum_to_spec := fun n => returns_of_invoke rfl (sum_to_ok n)
 
 end Toy.Proof

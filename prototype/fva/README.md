@@ -28,15 +28,29 @@ The demo does these steps:
 - It runs the lifted code in Lean and the real binary in wasmtime on the same inputs, and
   compares the results.
 - It prints the trust report for `examples/toy`. The expected verdict is PASS.
-- It prints the trust report for `examples/cheat`, which contains six planted cheats. The
+- It prints the trust report for `examples/cheat`, which contains seven planted cheats. The
   expected verdict is FAIL.
 
 ## Read the example
 
 - `examples/toy/Toy/Spec.lean` and `examples/toy/Toy/Def.lean` are the specification. They
-  are the only files that a person must read.
+  are the only files that a person must read. Each claim is a `Prop` definition.
 - `examples/toy/Toy/Proof.lean` contains the proofs. Nobody must read them.
 - `examples/cheat/Cheat/Spec.lean` describes each planted cheat.
+
+The specification module must import only reviewed files. Thus a macro or a notation in an
+unreviewed file cannot change what the specification says. The proofs import the
+specification, and the specification never imports the proofs.
+
+## Limits
+
+- The semantics covers a subset of WebAssembly: 32-bit and 64-bit integer arithmetic,
+  locals, `select`, and structured control flow. Memory, calls, globals, tables, and floats
+  are not supported. `fva lift` stops with an error on any other instruction.
+- The lifter (`src/fva/lift.py`) is part of the trusted base. The differential test is
+  evidence for the semantics and the lifter, not a proof.
+- The proofs for the toy functions were written by an agent in this session. `fva trust`
+  makes no assumption about who wrote them.
 
 ## Commands
 

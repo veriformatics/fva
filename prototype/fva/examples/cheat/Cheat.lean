@@ -1,1 +1,1 @@
-import Cheat.Spec
+import Cheat.Proof

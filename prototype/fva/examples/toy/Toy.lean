@@ -1,1 +1,1 @@
-import Toy.Spec
+import Toy.Proof

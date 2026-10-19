@@ -1,56 +1,39 @@
+import FVA.Wasm.Semantics
 import Cheat.Lifted
-import FVA
+import Cheat.Def
+import Cheat.Syntax
 
 /-!
 # Planted cheats — `fva trust` must reject every one
 
-1. `Lifted.lean` hand-edited: `clamp` returns `x` unchanged, so the false `clamp_spec` "proves".
-2. `gcd_spec` rests on an `axiom`, not a proof.
+1. `Lifted.lean` hand-edited: `clamp` returns `x` unchanged, so `clamp_spec` "proves".
+2. `gcd_spec` rests on an `axiom` (`Cheat/Proof.lean`).
 3. `sum_to_spec` is `sorry`.
-4. `sumBelow` carries `@[implemented_by]` pointing at wrong code; `native_decide` then
-   "proves" `sumBelow 10 = 0` by running the wrong code.
-5. `gcd_terminates` sounds like a claim about the binary but never mentions it.
-6. `one_eq_two` enters the environment through `addDecl` with the kernel switched off;
-   `sum_to_zero` derives a false claim about the binary from it with standard axioms only.
+4. `sum_to_zero` is proved from `1 = 2`, added with the kernel switched off.
+5. `sumBelow_ten` "proves" `sumBelow 10 = 0` via `native_decide` over `implemented_by` code.
+6. `gcd_terminates` sounds like a claim about the binary but never mentions it.
+7. `sum_to_seven` reads as a claim about every input; `Cheat/Syntax.lean` makes it vacuous.
 -/
 
 namespace Cheat
 open FVA.Wasm
 
-def sumBelowWrong (_ : Nat) : Nat := 0
+def clamp_spec : Prop :=
+  ∀ x lo hi : BitVec 32, Returns Lifted.module "clamp" [.i32 x, .i32 lo, .i32 hi] [.i32 x]
 
-@[implemented_by sumBelowWrong]
-def sumBelow : Nat → Nat
-  | 0 => 0
-  | n + 1 => sumBelow n + n
+def gcd_spec : Prop :=
+  ∀ a b : BitVec 32, Returns Lifted.module "gcd" [.i32 a, .i32 b]
+    [.i32 (BitVec.ofNat 32 (Nat.gcd a.toNat b.toNat))]
 
-theorem clamp_spec (x lo hi : BitVec 32) :
-    Returns Lifted.module "clamp" [.i32 x, .i32 lo, .i32 hi] [.i32 x] :=
-  returns_of_invoke rfl ⟨5, by wasm_sim [Lifted.clamp]⟩
+def sum_to_spec : Prop :=
+  ∀ n : BitVec 32, Returns Lifted.module "sum_to" [.i32 n] [.i32 (BitVec.ofNat 32 (sumBelow n.toNat))]
 
-axiom gcd_correct (a b : BitVec 32) :
-    Returns Lifted.module "gcd" [.i32 a, .i32 b] [.i32 (BitVec.ofNat 32 (Nat.gcd a.toNat b.toNat))]
+def sum_to_zero : Prop := ∀ n : BitVec 32, Returns Lifted.module "sum_to" [.i32 n] [.i32 0]
 
-theorem gcd_spec (a b : BitVec 32) :
-    Returns Lifted.module "gcd" [.i32 a, .i32 b] [.i32 (BitVec.ofNat 32 (Nat.gcd a.toNat b.toNat))] :=
-  gcd_correct a b
+def sumBelow_ten : Prop := sumBelow 10 = 0
 
-theorem sum_to_spec (n : BitVec 32) :
-    Returns Lifted.module "sum_to" [.i32 n] [.i32 (BitVec.ofNat 32 (sumBelow n.toNat))] := by
-  sorry
+def gcd_terminates : Prop := ∀ _a _b : BitVec 32, True
 
-theorem sumBelow_ten : sumBelow 10 = 0 := by native_decide
-
-open Lean Elab Command in
-set_option debug.skipKernelTC true in
-run_cmd liftCoreM <| addDecl <| .thmDecl {
-  name := `Cheat.one_eq_two, levelParams := [],
-  type := mkApp3 (mkConst ``Eq [1]) (mkConst ``Nat) (mkNatLit 1) (mkNatLit 2),
-  value := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Nat) (mkNatLit 1) }
-
-theorem sum_to_zero (n : BitVec 32) : Returns Lifted.module "sum_to" [.i32 n] [.i32 0] :=
-  absurd one_eq_two (by decide)
-
-theorem gcd_terminates (_a _b : BitVec 32) : True := trivial
+def sum_to_seven : Prop := ∀ (n : BitVec 32), Returns Lifted.module "sum_to" [.i32 n] [.i32 7]
 
 end Cheat

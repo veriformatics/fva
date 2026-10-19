@@ -5,6 +5,8 @@ import hashlib
 import re
 from dataclasses import dataclass, field
 
+import wasmtime
+
 VALTYPE = {0x7F: "i32", 0x7E: "i64"}
 SIMPLE = {0x00: ".unreachable", 0x01: ".nop", 0x0F: ".ret", 0x1A: ".drop", 0x1B: ".select",
           0x45: ".i32Eqz", 0x50: ".i64Eqz", 0xA7: ".i32WrapI64",
@@ -118,6 +120,10 @@ def instrs(r: Reader, indent: int) -> tuple[str, int]:
 def decode(wasm: bytes) -> list[Func]:
     if wasm[:8] != b"\0asm\1\0\0\0":
         raise LiftError("not a wasm v1 binary")
+    try:  # FVA's semantics assumes validated code (stack shapes, label arities)
+        wasmtime.Module.validate(wasmtime.Engine(), wasm)
+    except wasmtime.WasmtimeError as e:
+        raise LiftError(f"invalid wasm: {e}") from e
     r = Reader(wasm, 8)
     types, fn_types, exports, bodies = [], [], {}, []
     while not r.done():

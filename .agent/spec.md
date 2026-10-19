@@ -15,9 +15,9 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 
 - Link path = WASM lift: any source language → wasm (compiler + source untrusted) → `fva lift` → Lean `Module` value over FVA's WASM semantics; theorems quantify over that value via `Returns`; the `.wasm` = the verified artifact, committed + sha256-pinned in the lifted file; `fva trust` re-lifts + byte-compares.
 - Trusted base = Lean kernel + axioms {propext, Classical.choice, Quot.sound} + `FVA/Wasm/Semantics.lean` (shared across every project/language, reviewed once) + `src/fva/lift.py`; difftest vs wasmtime = evidence for semantics + lifter, not proof.
-- Human-review surface = statement closure of the spec theorems: constants their types mention, transitively through definition bodies, stopping at subject (lifted code), FVA base + Lean core; `fva trust` computes it + counts code lines.
-- Spec layout per project (mesh-repo pattern): `<Lib>/Def.lean` vocabulary + `<Lib>/Spec.lean` theorem statements (review surface), `<Lib>/Proof.lean` (never read), `<Lib>/Lifted.lean` (generated).
-- `fva trust` FAIL on: non-standard axiom (incl. `sorryAx`, native_decide aux axioms), `implemented_by`/`extern`/`unsafe`/`partial`/`opaque` in the non-core closure, a theorem statement not mentioning a subject, lifted file ≠ re-lift of pinned wasm, kernel replay rejection (`leanexport` → `lake check --from-export`; `--paranoid` adds every bundled kernel). `lake build` success alone proves nothing (accepts sorry, axioms, kernel bypass).
+- Claims = `Prop`-valued defs in `<Lib>/Spec.lean`; proofs = theorems typed by the claim constant, downstream in `<Lib>/Proof.lean` (never read); `<Lib>/Lifted.lean` generated. Spec imports reviewed modules alone; reverse (mesh-repo) layout lets unreviewed macros/notation change spec meaning.
+- Human-review surface = every module in the spec module's import closure minus Lean core, FVA base + subject, read whole (code lines counted); statement closure reports which subject/base/core names the claims use.
+- `fva trust` FAIL on: unproven claim, non-standard axiom (incl. `sorryAx`, native_decide aux axioms), syntax extension in a review module, `implemented_by`/`extern`/`unsafe`/`partial`/`opaque` in the non-core closure, a claim not mentioning a subject, lifted file ≠ re-lift of pinned wasm, kernel replay rejection (`leanexport` → `lake check --from-export`; `--paranoid` adds every bundled kernel). `lake build` success alone proves nothing (accepts sorry, axioms, kernel bypass).
 - Prototype stack = Python via uv + Lean 4.35 core, no Mathlib.
 - Prototype scope = trust audit + one worked example; repo survey/plan, claimcheck-style informalization, MCP/skill packaging, other link paths = later phases.
 
@@ -28,7 +28,8 @@ Like REA, FVA should be readibly usable by an AI agent that requests it, and tha
 - [x] da4117c Toy example: clamp/gcd/sum_to C → wasm → spec + proofs
 - [x] bbc7825 Trust metaprogram + `fva trust` report (text + JSON)
 - [x] bbc7825 Differential test vs wasmtime + `fva demo`; cheat example (red path)
-- [ ] Kernel replay in `fva trust` (cheat 6: kernel-bypass `addDecl`)
+- [x] 0bda49e Kernel replay in `fva trust` (cheat 4: kernel-bypass `addDecl`)
+- [ ] Claims-as-Prop layout + spec import rule (cheat 7: vacuity macro), wasm validation in lifter
 - [ ] Review (closing diff), deferred rows, rules, Phase → ITERATE
 - See `.agent/deferred.md` for the deferral queue.
 
