@@ -12,14 +12,8 @@ Proof writing alone is not what FVA adds: a capable agent can already write and 
   - Run: `cd prototype/fva && uv run fva demo` = rebuild toy C → wasm vs pinned sha, difftest Lean semantics vs wasmtime, trust report `examples/toy` (PASS) + `examples/cheat` (FAIL); rc 0 = all as expected.
   - Subcommands: `uv run fva lift <wasm> <out.lean> --ns <Ns>`, `uv run fva trust <lake-dir> [theorem…] [--spec-module M] [--paranoid] [--json]`, `uv run fva difftest <lake-dir>`, `uv run fva explain <lake-dir> [--model M] [--effort E] [--force] [--json]`.
   - Review aid run: `cd prototype/fva && uv run fva explain examples/toy` (rc 0: trust PASS + every intent check `matches`) + `uv run fva explain examples/cheat` (rc 1: all 7 cheats ✗ on proof status, vacuous/different intent on clamp/sum_to*/gcd_terminates/sumBelow_ten); both read the committed `examples/*/fva-explain.json` (no LLM call); `--force` regenerates, and LLM output varies run to run.
-  - Round 3 finalists (review-skipping problem), one branch each, run from `.scratch/worktrees/<n>/prototype/fva` (`git worktree add .scratch/worktrees/<n> wt/<n>` if absent), notes = `.scratch/worktrees/<n>/variant-<n>.md` (committed on the branch):
-    - `wt/review-ledger`: `uv run fva review examples/toy`; `fva trust` → FAIL / PROVEN, UNREVIEWED (rc 2) / VERIFIED (rc 0); approvals keyed to elaborated-statement + wasm hash, typed claim+fingerprint phrase + reason.
-    - `wt/predict-quiz`: `uv run fva quiz examples/toy [--answers F|-] [--json]`; predict outputs → reveal Lean value → mismatch = `spec disputed` | `reviewer corrected`.
-    - `wt/review-page`: `uv run fva review-page examples/toy --out <html>` + `--status --decisions <json>`; static HTML, per-claim Accept/Reject + note, export receipt; screenshots `qa/*.png`.
-    - `wt/spot-the-mutant`: `uv run fva spot examples/toy [--answers F]`; real claim shuffled among Lean-elaborated mutants with computed examples; reviewer picks intended behavior.
-    - `wt/attest` (on top of `wt/review-ledger`): `uv run fva attest examples/toy --key <ssh key>` after full `fva review` → `fva-attestation.json` (in-toto Statement v1) + `.sig` (`ssh-keygen -Y sign`, namespace `fva-review@fva.dev`) + `fva-badge.svg`; `fva trust --allowed-signers F` → signer, key tier (sk user-presence flag from the signature), valid only for current claims + binary; project-supplied signer list never attests.
-    - `wt/pattern-catalog`: `uv run fva catalog examples/toy-catalog`; claims that are literal catalog-pattern instances (`FVA.Spec.Catalog`) → one fixed sentence each (toy 7 code lines → 3 mapping lines); rc 2 = mappings pending.
   - Needs: uv, Lean 4.35 + lake (bundles `leanexport`, `lake check`, nanoda/con-leche/con-ron for `--paranoid`), clang wasm32 target; `fva explain` + signed-in `codex` CLI.
+- `prototype/bench/` = agent benchmark v1/v1.1: `tasks/` (3 C repos + README requirements + pinned wasm; `avg_floor` planted overflow bug), `rubric.md` (fixed before runs), `runs/<arm>-<task>/` (archived agent outputs), `verdicts*.md` (reviewer judgments), `results.md`, `inject.py` (M8 cheat injection: `uv run python prototype/bench/inject.py <project> <lean-file> <theorem> <wasm> <check-cmd> <out-dir>`, run from `prototype/fva`). Agent runs = `codex exec -C <isolated dir> -s workspace-write --json` with the rubric's prompts; isolated dirs live outside the repo.
 
 ## Decisions
 
@@ -40,19 +34,18 @@ Proof writing alone is not what FVA adds: a capable agent can already write and 
   - Checker trust: never one checker. Kernel replay + independent kernels + a canary set of known-false proofs per pinned toolchain, since verifiers ship soundness bugs; deterministic kernel checking preferred over solver-backed verification (timeouts, resource limits, version drift).
   - Link paths, no source rewrite required: program verification over the compiled artifact (wasm lift) + per-output certification (translation validation) for components unfit for program verification (compilers, interpreters, generators, LLM pipelines).
   - Plain-English review: LLM informalization (`fva explain`) now; controlled-language claims evaluated beside it (deterministic, but expressivity gaps lose meaning).
-- Prototype scope = trust audit + one worked example + `fva explain`; repo survey/plan, MCP/skill packaging, other link paths = later phases.
+- Link framing: per-language links already exist (Verus, Aeneas/hax → Lean/F*, Frama-C, SPARK; recalled, unverified); FVA's claim = one language-agnostic link at the compiled artifact with a small trusted base. Reach gap = semantics subset (D1), lifter in the trusted base (D2), one source language shown (D7).
+- Benchmark v2 (user rulings): purpose = show on a sufficiently large project that FVA gains in time, cost, spec size + readability, plus cases where a naive approach finds no path to verification at all; targets = one functionality as a C + Rust pair first, then Python, R, Java, TypeScript as each gains a link; baselines = bare agent, prompted agent (`Intent` principles), the established per-language tool where installable (e.g. Frama-C for C, Verus for Rust); readability = proxy metrics only (lines + definitions to trust, LLM-judged), no timed human review.
+- Managed-language link (user ruling): research first — a `researcher` survey + `consultant` ruling before code, per language, over: bytecode/IR lifters under one Lean framework (JVM bytecode, CPython bytecode, R AST), ahead-of-time compilable subsets to wasm (AssemblyScript, TeaVM/WasmGC, Python subset compilers), per-output certification (D22). Known obstacle: Python + R reach wasm only as the whole interpreter (Pyodide, webR), TypeScript only via a subset (AssemblyScript) or an embedded JS engine, Java via WasmGC (recalled, unverified).
+- Review flow (user rulings): review-ledger + attest, pattern-catalog, review-page = kept for a later scope (tags `archive/review-ledger`, `archive/attest`, `archive/pattern-catalog`, `archive/review-page`; D25–D27); predict-quiz + spot-the-mutant = retired (tags `archive/predict-quiz`, `archive/spot-the-mutant`).
+- Prototype scope = trust audit + worked examples + `fva explain` + benchmark v1/v1.1; MCP/skill packaging, the review flow, per-output certification = later scopes.
 
 ## Tasks
 
-- [x] b5d1ef2 Round 1: non-expert review of the spec → `fva explain` (Claimcheck-style round trip + computed examples + per-claim proof status).
-- [x] 2296593 Round 2: explanation persisted → `fva-explain.json` reused, `--force` regenerates, STALE on input change.
-- [ ] Round 3: users skip spec review → 5 parallel variants (review-ledger, predict-quiz, review-page, spot-the-mutant, pattern-catalog) → finalists for user pick; + `wt/attest` (signed review badge, user request).
-- [x] 24511d2 Round 4: moat question → benchmark bare agent vs agent + FVA (`prototype/bench/rubric.md`), 3 tasks incl. planted bug.
-- [x] 9d674c3 Round 5: direction → `Decisions` Direction (generalized), D21–D24 generalized.
-- [x] 37aed59 Round 6: `Intent` states what FVA adds over an agent alone (general, from `Decisions` Direction).
-- [x] 1397ce1 Round 7: prompted arm (Intent principles) + M8 cheat injection (rubric v1.1).
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
 
-ITERATE — whole product
+IMPLEMENT — link reach + bench v2
+> I think what we need are benchmarks showing that our approach, on a sufficiently large project, brings gains in time, cost, and minimalization of spec complexity and enhanced human readability. Obviously, if we can also find cases where a naiive approach fails to find a path to formal verification altogether, while ours does, that's a huge plus. Lastly, if we can solve the problem of software implementation lacking direct link to the formal verification, that in itself would be a compelling reason to use our framework, as that is an unsolved problem unless the software is written in something like Lean itself.
+> User rulings (AskUserQuestion): phase = IMPLEMENT in a fresh session; targets = C + Rust pair, plus Python, R, Java, TypeScript; baselines = bare agent, prompted agent, existing per-language tool; readability = proxy metrics only; managed languages = research first; scope = link reach + bench v2 (review flow later; spot-the-mutant + predict-quiz dropped).
