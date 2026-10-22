@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Decoder evidence on the pinned corpus (scripts/fetch-corpus):
+# E1 = the official binary-format tests: every assert_malformed binary module is rejected as
+#      malformed, every valid binary module decodes (counts pinned, so an empty run fails);
+# E2 = whole-module differential: `wasm-tools print` of the original (custom sections stripped)
+#      equals that of the decode → re-encode round trip (FVATest/Encode.lean), for every valid
+#      testsuite module plus uBlock Origin's lz4 codec and R-universe edgeR.so.
+# E2 normalizes the two element-segment spellings the syntax does not record: `(table 0)` and
+# `funcref (ref.func N)…` vs `func N…`.
+# E5 = `fva lift` is deterministic and its `decode_eq` kernel-checks (uBO codec); the same file
+#      with `len` + 1 or one byte changed must fail the kernel check (the link binds both).
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+export PATH="$PWD/.tools/bin:$PATH"
+scripts/fetch-corpus || exit 1
+lake build fva fvatest >/dev/null || exit 1
+fva=.lake/build/bin/fva enc=.lake/build/bin/fvatest corpus=.cache/corpus
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+for w in "$corpus"/testsuite/*.wast; do
+	n=$(basename "$w" .wast)
+	mkdir -p "$work/$n"
+	wasm-tools json-from-wast "$w" -o "$work/$n/$n.json" --wasm-dir "$work/$n/" 2>/dev/null || {
+		echo "test-decoder: json-from-wast failed on $n"
+		exit 1
+	}
+done
+
+# type<TAB>file for every binary module command
+jq -r --arg d "$work" 'input_filename as $f | .commands[]
+	| select((.type == "assert_malformed" or .type == "module") and (.module_type // "binary") == "binary")
+	| [.type, ($f | sub("/[^/]*$"; "")) + "/" + .filename] | @tsv' "$work"/*/*.json >"$work/cases.tsv"
+mapfile -t files < <(cut -f2 "$work/cases.tsv")
+"$fva" decode "${files[@]}" /dev/null >"$work/decoded.txt" 2>&1
+
+bad=0 malformed=0 valid=0
+declare -A result
+while IFS= read -r line; do result[${line%%: *}]=${line#*: }; done <"$work/decoded.txt"
+valid_files=()
+while IFS=$'\t' read -r type file; do
+	r=${result[$file]:-missing}
+	if [[ $type == assert_malformed ]]; then
+		if [[ $r == malformed* ]]; then malformed=$((malformed + 1)); else
+			echo "E1 FAIL accepted malformed $file: $r"
+			bad=1
+		fi
+	elif [[ $r == ok* ]]; then
+		valid=$((valid + 1))
+		valid_files+=("$file")
+	else
+		echo "E1 FAIL rejected valid $file: $r"
+		bad=1
+	fi
+done <"$work/cases.tsv"
+echo "E1 malformed rejected: $malformed (pinned 702); valid decoded: $valid (pinned 56)"
+((malformed == 702 && valid == 56)) || bad=1
+
+norm() {
+	sed -E '/^  \(elem/{ s/ \(table 0\)//; :a; s/funcref(( [0-9]+)*) \(ref\.func ([0-9]+)\)/funcref\1 \3/; ta; s/funcref(( [0-9]+)*)\)$/func\1)/ }'
+}
+same=0
+for f in "${valid_files[@]}" "$corpus/ubo-lz4-block-codec.wasm" "$corpus/edgeR.so"; do
+	if wasm-tools strip --all "$f" -o "$work/a.wasm" && "$enc" reencode "$f" "$work/b.wasm" &&
+		wasm-tools print "$work/a.wasm" | norm >"$work/a.wat" &&
+		wasm-tools print "$work/b.wasm" | norm >"$work/b.wat" && cmp -s "$work/a.wat" "$work/b.wat"; then
+		same=$((same + 1))
+	else
+		echo "E2 FAIL $f"
+		diff "$work/a.wat" "$work/b.wat" 2>/dev/null | head -6
+		bad=1
+	fi
+done
+echo "E2 round trips equal: $same (pinned 58)"
+((same == 58)) || bad=1
+
+ubo=$corpus/ubo-lz4-block-codec.wasm
+"$fva" lift "$ubo" "$work/L1.lean" --ns L && "$fva" lift "$ubo" "$work/L2.lean" --ns L || bad=1
+cmp -s "$work/L1.lean" "$work/L2.lean" || {
+	echo "E5 FAIL lift not deterministic"
+	bad=1
+}
+check() { lake env lean "$1" >"$work/check.out" 2>&1; }
+check "$work/L1.lean" || {
+	echo "E5 FAIL decode_eq rejected"
+	head -5 "$work/check.out"
+	bad=1
+}
+len=$(sed -n 's/^def len : Nat := //p' "$work/L1.lean")
+sed "s/^def len : Nat := $len\$/def len : Nat := $((len + 1))/" "$work/L1.lean" >"$work/L3.lean"
+sed -E 's/^(def bytes : Nat := wasm_bytes% "0061736d01000000[0-9a-f]{40})(.)/\1f/' "$work/L1.lean" >"$work/L4.lean"
+for t in L3 L4; do
+	if cmp -s "$work/L1.lean" "$work/$t.lean"; then
+		echo "E5 FAIL tamper $t did not apply"
+		bad=1
+	elif check "$work/$t.lean"; then
+		echo "E5 FAIL tampered $t accepted"
+		bad=1
+	fi
+done
+echo "E5 lift deterministic + kernel-checked; len + 1 and a changed byte rejected"
+exit "$bad"

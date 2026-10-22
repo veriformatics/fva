@@ -8,6 +8,10 @@ def main (args : List String) : IO UInt32 := do
   | ["decode", path] =>
     IO.println (FVA.Tool.decodeSummary (← IO.FS.readBinFile path))
     return 0
+  | "decode" :: paths@(_ :: _ :: _) =>
+    for path in paths do
+      IO.println s!"{path}: {FVA.Tool.decodeSummary (← IO.FS.readBinFile path)}"
+    return 0
   | ["lift", path, out, "--ns", ns] =>
     let bs ← IO.FS.readBinFile path
     match FVA.Wasm.Decode.decode (FVA.Tool.packBytes bs) bs.size with
