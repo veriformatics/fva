@@ -1,4 +1,5 @@
 import FVA.Spec.Exec.Step
+import FVA.Spec.Claims
 
 /-!
 # Allocation and instantiation (reviewed spec)
@@ -113,5 +114,29 @@ def Instantiated (H : HostSem) (m : Module) (s : Store) (imports : List ExternVa
     List.Forall₂ (fun e rs => List.Forall₂ (fun ex r => Steps H ⟨s₁, ⟨[], inst⟩, ex.map .plain⟩
       ⟨s₁, ⟨[], inst⟩, [(Val.ref r).instr]⟩) e.init rs) m.elems erefs ∧
     Steps H ⟨s₁, ⟨[], inst⟩, (initCode m).map .plain⟩ ⟨s', ⟨[], inst⟩, []⟩
+
+end FVA.Wasm.Exec
+
+namespace FVA.Wasm.Exec
+
+open FVA.Wasm
+
+/-- Calling export `name` (if the instance exports it) with no arguments runs to completion
+with no results, from `s` to `s'`; an absent export leaves the store unchanged. -/
+def RunsExport (H : HostSem) (inst : ModuleInst) (name : String) (s s' : Store) : Prop :=
+  match inst.exportFunc name with
+  | some a => Steps H (invokeConfig s a []) ⟨s', ⟨[], {}⟩, []⟩
+  | none => s' = s
+
+/-- A dylink.0 module is ready (tool-conventions DynamicLinking.md): instantiated, then its
+exported `__wasm_apply_data_relocs` and `__wasm_call_ctors` have run, in that order, before any
+other export is called. The loader's import choices (`env.memory`, `env.__memory_base`,
+`env.__table_base`, `env.__stack_pointer`, `GOT.*`) are whatever `imports` supplies; claims
+quantify over them under their own preconditions. -/
+def LoaderReady (H : HostSem) (m : Module) (s : Store) (imports : List ExternVal) (s' : Store)
+    (inst : ModuleInst) : Prop :=
+  ∃ s₁ s₂, Instantiated H m s imports s₁ inst ∧
+    RunsExport H inst "__wasm_apply_data_relocs" s₁ s₂ ∧
+    RunsExport H inst "__wasm_call_ctors" s₂ s'
 
 end FVA.Wasm.Exec
