@@ -395,9 +395,16 @@ def asRef : Val → Option Ref
   | .ref r => some r
   | _ => none
 
+/-- Constant instructions (§3.3.10 constant expressions): constants, `ref.null`, `ref.func`,
+`global.get`; they never change the store or the frame. -/
+def isConstInstr : Instr → Bool
+  | .iconst .. | .fconst .. | .refNull _ | .refFunc _ | .globalGet _ => true
+  | _ => false
+
 /-- Evaluate a constant expression (a global or element initializer) in store `s` with instance
-`inst`, within `fuel` steps. -/
+`inst`, within `fuel` steps; `none` when it holds a non-constant instruction. -/
 def evalConst (fuel : Nat) (s : Store) (inst : ModuleInst) (e : Expr) : Option Val :=
+  bif !e.all isConstInstr then none else
   match run fuel ⟨s, ⟨[], inst⟩, e.map .plain⟩ with
   | some c => match c.instrs with
     | [v] => toVal v
