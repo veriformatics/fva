@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Fetch the pinned Wasm corpus into .cache/corpus; every download is sha256-checked.
-# Third-party binaries (GPL: uBlock Origin, edgeR) are fetched, never committed.
+# Third-party binaries are fetched, never committed: edgeR (GPL >= 2); the uBO codec = the
+# BSD-2-Clause dist of gorhill/lz4-wasm (byte-identical at 8995cdef), committable with its notice.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 dir=.cache/corpus
