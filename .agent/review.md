@@ -29,3 +29,15 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | X2 | no Lean-core edge semantics leak into a spec definition | pass | accepted |
 | R1 (register) | contract N1 wording forbade all core `BitVec` ops in the spec; the spec uses `BitVec.ofNat/ofInt` + pointwise `&&&`/`|||`/`^^^`, faithful to the text | note | accepted: contract N1 narrowed (arithmetic/shift/division shortcuts stay proof-only; representation constructors + pointwise bitwise ops allowed) |
 
+## U4 reviewed execution spec vs Wasm 2.0 §4.2/§4.4/§4.5.5 (reviewer-3, check set E1–E20 X1–X3, target 17c93e7)
+
+| row | check | verdict | ruling |
+|---|---|---|---|
+| E1–E6 | values/defaults; store + instances + frames; extensional memory (read/write/grow); growtable; administrative instructions + values as constants; block contexts | pass | accepted |
+| E8–E19 | numeric dispatch; reference, parametric, variable, table, load/store, bulk memory, control, br/return, call/call_indirect, invoke + frame exit, host invocation | pass | accepted |
+| E7, X2, X3 | context rules, spurious/missing steps, nondeterminism: one-step collapse of a nested context around `trap` missing (F2, minor: two-step reachability agreed) | finding F2 | accepted → fixed: `EvalCtx` + `Step.trap` for every context with `E[trap] ≠ [trap]`; re-review check: `[label₀{} (label₀{} trap)] ↪ [trap]` derives in one step |
+| E20 | claims: `Call*` lacked §4.5.5 invocation checks (extra or mistyped arguments still invoked) (F1, major) | finding F1 | accepted → fixed: `Val.HasType` + `InvokeOK` (address exists, arguments match parameter types in number and type) required by `CallMust`/`CallMay`; re-review checks: both counterexamples (nullary called with `[i32 7]`, `[i32]` called with `[f64 0]`) now refuted |
+| X1 | coverage of every P instruction | pass | accepted |
+| R1 (register) | §4.4.7 bulk-op prose asserts `d+1 < 2^32` after the range check; false at 65536 pages | note | accepted: the transcription wraps only the next zero-count iteration's pointer; every access stays exact; no change |
+| R2 (register) | validity (`ValidHost`, store typing) not yet stated | note | accepted: contract S4/S5 + U6 interface (slices 2–3) |
+

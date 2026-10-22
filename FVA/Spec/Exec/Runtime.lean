@@ -178,6 +178,18 @@ def BlockCtx.fill : {k : Nat} → BlockCtx k → List AInstr → List AInstr
   | _, .base vs rest, es => vals vs ++ es ++ rest
   | _, .label vs n cont inner rest, es => vals vs ++ [.label n cont (inner.fill es)] ++ rest
 
+/-- Evaluation contexts `E` (§4.2.13): `[_]`, `val* E instr*`, `label_n{instr*} E end`. -/
+inductive EvalCtx where
+  | hole
+  | seq (vs : List Val) (inner : EvalCtx) (rest : List AInstr)
+  | label (n : Nat) (cont : List Instr) (inner : EvalCtx)
+
+/-- `E[es]`. -/
+def EvalCtx.fill : EvalCtx → List AInstr → List AInstr
+  | .hole, es => es
+  | .seq vs inner rest, es => vals vs ++ inner.fill es ++ rest
+  | .label n cont inner, es => [.label n cont (inner.fill es)]
+
 /-- Configurations (§4.2.14): store, current frame, instruction sequence. -/
 structure Config where
   /-- Store. -/
