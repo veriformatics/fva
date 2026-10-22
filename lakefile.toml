@@ -1,0 +1,29 @@
+name = "fva"
+version = "0.1.0"
+defaultTargets = ["FVA", "fva"]
+testDriver = "fvatest"
+lintDriver = "batteries/runLinter"
+
+[leanOptions]
+autoImplicit = false
+relaxedAutoImplicit = false
+linter.missingDocs = true
+
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "v4.35.0"
+
+[[lean_lib]]
+name = "FVA"
+
+[[lean_exe]]
+name = "fva"
+root = "Main"
+
+[[lean_lib]]
+name = "FVATest"
+
+[[lean_exe]]
+name = "fvatest"
+root = "FVATest.Main"

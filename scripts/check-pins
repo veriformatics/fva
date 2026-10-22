@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Toolchain + Mathlib pins agree: lean-toolchain, the installed lean, lakefile rev, lake-manifest rev.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+toolchain=$(<lean-toolchain)
+want_lean=${toolchain##*:v}
+have_lean=$(lean --version | sed -n 's/^Lean (version \([0-9.]*\).*/\1/p')
+rev=$(sed -n '/^name = "mathlib"/,/^\[/s/^rev = "\(.*\)"/\1/p' lakefile.toml)
+manifest_rev=$(jq -r '.packages[] | select(.name == "mathlib") | .inputRev' lake-manifest.json)
+bad=0
+[[ $have_lean == "$want_lean" ]] || {
+	echo "check-pins: lean $have_lean != lean-toolchain $want_lean"
+	bad=1
+}
+[[ $rev == "v$want_lean" ]] || {
+	echo "check-pins: mathlib rev $rev != v$want_lean"
+	bad=1
+}
+[[ $manifest_rev == "$rev" ]] || {
+	echo "check-pins: lake-manifest mathlib inputRev $manifest_rev != $rev"
+	bad=1
+}
+exit "$bad"

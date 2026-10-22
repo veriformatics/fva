@@ -1,0 +1,40 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Lean toolchain",
+      "managerFilePatterns": ["/^lean-toolchain$/"],
+      "matchStrings": ["leanprover/lean4:v(?<currentValue>\\S+)"],
+      "depNameTemplate": "leanprover/lean4",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Mathlib tag; equals the Lean toolchain version (scripts/check-pins)",
+      "managerFilePatterns": ["/^lakefile\\.toml$/"],
+      "matchStrings": ["git = \"https://github\\.com/leanprover-community/mathlib4\"\\nrev = \"v(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "leanprover-community/mathlib4",
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+\\.\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Pinned scanner binaries; a bump fails fetch-tools until its sha256 is refreshed",
+      "managerFilePatterns": ["/^scripts/fetch-tools$/"],
+      "matchStrings": ["\"(?<depName>[a-z-]+) (?<currentValue>\\d+\\.\\d+\\.\\d+) (?<packageName>[\\w.-]+/[\\w.-]+) "],
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v?(?<version>.+)$"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Lean and Mathlib move together and never automerge: the manifest, cache and proofs need a gate run",
+      "matchDepNames": ["leanprover/lean4", "leanprover-community/mathlib4"],
+      "groupName": "lean toolchain + mathlib",
+      "automerge": false
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+# Default rules; ignored build/cache/scratch dirs are not repository content.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "gitignored build output, caches, scratch"
+paths = ['''^\.lake/''', '''^\.tools/''', '''^\.scratch/''', '''(^|/)\.lake/''', '''(^|/)\.venv/''']
