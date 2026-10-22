@@ -591,6 +591,214 @@ def InstrDec (i : Instr) (bs : List UInt8) : Prop :=
     ∀ rest r, instr op.toNat (pack (imm ++ rest)) (imm ++ rest).length r =
       .ok i (pack rest) rest.length
 
+theorem dec_plain {i : Instr} {op : UInt8} (hm : (op, i) ∈ plainOps) :
+    InstrDec i [op] := by
+  refine ⟨_, [], rfl, ?_⟩
+  rw [plainOps_eq, List.mem_append] at hm
+  rcases hm with hm | hm
+  · simp only [List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at hm
+    rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
+      exact ⟨by decide, fun _ _ => rfl⟩
+  · obtain ⟨h₁, h₂, hf⟩ := table_of_mem numOp_table (by decide) (List.mem_of_mem_drop hm)
+    refine ⟨by omega, fun rest r => ?_⟩
+    rw [instr_num h₁ h₂, hf]; rfl
+
+theorem dec_fcPlain {i : Instr} {n : Nat} {b : List UInt8} (hm : (n, i) ∈ fcPlainOps)
+    (hn : ULeb 32 n b) :
+    InstrDec i (0xFC :: b) := by
+  refine ⟨0xFC, _, rfl, by decide, fun rest r => ?_⟩
+  show fcInstr _ _ = _
+  simp only [fcInstr]
+  rw [u32_parses.complete rest hn, Res.bind_ok]
+  simp only [fcPlainOps, List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at hm
+  rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ |
+    ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;> rfl
+
+theorem dec_mem {mk : MemArg → Instr} {op : UInt8} {m : MemArg} {b : List UInt8}
+    (hm : (op, mk) ∈ memOps)
+    (hma : MemArgB m b) :
+    InstrDec (mk m) (op :: b) := by
+  obtain ⟨h₁, h₂, hf⟩ := table_of_mem memOp_table (by decide) hm
+  refine ⟨_, _, rfl, by omega, fun rest r => ?_⟩
+  rw [instr_mem h₁ (by omega), hf]
+  exact (memArg_parses.bind fun m => pure_parses (mk m)).complete rest
+    ⟨_, _, [], hma, ⟨rfl, rfl⟩, by simp⟩
+
+theorem dec_idx {mk : Nat → Instr} {op : UInt8} {x : Nat} {b : List UInt8} (hm : (op, mk) ∈ idxOps)
+    (hx : ULeb 32 x b) :
+    InstrDec (mk x) (op :: b) := by
+  rw [idxOps_eq, List.mem_append] at hm
+  rcases hm with hm | hm
+  · simp only [List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at hm
+    rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
+      exact ⟨_, _, rfl, by decide, fun rest r => (withIdx_parses _).complete rest ⟨_, rfl, hx⟩⟩
+  · obtain ⟨h₁, h₂, hf⟩ := table_of_mem (f := fun x => nth varOps (x - 0x20)) varOp_table
+      (by decide) hm
+    refine ⟨_, _, rfl, by omega, fun rest r => ?_⟩
+    rw [instr_var h₁ (by omega), show nth varOps (op.toNat - 0x20) = some mk from hf]
+    exact (withIdx_parses _).complete rest ⟨_, rfl, hx⟩
+
+theorem dec_fcIdx {mk : Nat → Instr} {n x : Nat} {b₁ b₂ : List UInt8} (hm : (n, mk) ∈ fcIdxOps)
+    (hn : ULeb 32 n b₁) (hx : ULeb 32 x b₂) :
+    InstrDec (mk x) (0xFC :: b₁ ++ b₂) := by
+  refine ⟨0xFC, _, rfl, by decide, fun rest r => ?_⟩
+  show fcInstr _ _ = _
+  simp only [fcInstr, List.append_eq, List.append_assoc]
+  rw [u32_parses.complete _ hn, Res.bind_ok]
+  simp only [fcIdxOps, List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at hm
+  rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
+    exact (withIdx_parses _).complete rest ⟨_, rfl, hx⟩
+
+theorem dec_brTable {ls : List Nat} {l : Nat} {b₁ b₂ : List UInt8} (hs : Vec (ULeb 32) ls b₁)
+    (hl : ULeb 32 l b₂) :
+    InstrDec (.brTable ls l) ([0x0E] ++ b₁ ++ b₂) := by
+  refine ⟨0x0E, b₁ ++ b₂, by simp, by decide, fun rest r => ?_⟩
+  show ((vec u32 _ _).bind fun ls v n =>
+    (u32 v n).bind fun l v n => .ok (Instr.brTable ls l) v n) = _
+  have := ((vec_parses u32_parses fun _ _ h => ULeb.ne_nil h).bind fun ls =>
+    u32_parses.bind fun l => pure_parses (Instr.brTable ls l)).complete rest
+    ⟨ls, b₁, b₂, hs, ⟨l, b₂, [], hl, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
+  simp only [List.append_assoc] at this ⊢
+  exact this
+
+theorem dec_callIndirect {x y : Nat} {b₁ b₂ : List UInt8} (hy : ULeb 32 y b₁) (hx : ULeb 32 x b₂) :
+    InstrDec (.callIndirect x y) ([0x11] ++ b₁ ++ b₂) := by
+  refine ⟨0x11, b₁ ++ b₂, by simp, by decide, fun rest r => ?_⟩
+  show ((u32 _ _).bind fun y v n =>
+    (u32 v n).bind fun x v n => .ok (Instr.callIndirect x y) v n) = _
+  have := (u32_parses.bind fun y => u32_parses.bind fun x =>
+    pure_parses (Instr.callIndirect x y)).complete
+    rest ⟨y, b₁, b₂, hy, ⟨x, b₂, [], hx, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
+  simp only [List.append_assoc] at this ⊢
+  exact this
+
+theorem dec_selectT {ts : List ValType} {b : List UInt8} (h : Vec ValTypeB ts b) :
+    InstrDec (.select (some ts)) (0x1C :: b) := by
+  refine ⟨0x1C, _, rfl, by decide, fun rest r => ?_⟩
+  show ((vec valType _ _).bind fun ts v n => .ok (Instr.select (some ts)) v n) = _
+  exact ((vec_parses valType_parses fun _ _ h => ValTypeB.ne_nil h).bind fun ts =>
+    pure_parses (Instr.select (some ts))).complete rest ⟨_, _, [], h, ⟨rfl, rfl⟩, by simp⟩
+
+theorem dec_refNull {t : RefType} {b : List UInt8} (h : RefTypeB t b) :
+    InstrDec (.refNull t) (0xD0 :: b) := by
+  refine ⟨0xD0, _, rfl, by decide, fun rest r => ?_⟩
+  show ((refType _ _).bind fun t v n => .ok (Instr.refNull t) v n) = _
+  exact (refType_parses.bind fun t => pure_parses (Instr.refNull t)).complete rest
+    ⟨_, _, [], h, ⟨rfl, rfl⟩, by simp⟩
+
+theorem dec_memorySize :
+    InstrDec .memorySize [0x3F, 0x00] := by
+  exact ⟨0x3F, [0x00], rfl, by decide, fun rest r =>
+    (zeroByte_parses.bind fun u => pure_parses Instr.memorySize).complete rest
+      ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩⟩
+
+theorem dec_memoryGrow :
+    InstrDec .memoryGrow [0x40, 0x00] := by
+  exact ⟨0x40, [0x00], rfl, by decide, fun rest r =>
+    (zeroByte_parses.bind fun u => pure_parses Instr.memoryGrow).complete rest
+      ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩⟩
+
+theorem dec_memoryInit {x : Nat} {b₁ b₂ : List UInt8} (hn : ULeb 32 8 b₁) (hx : ULeb 32 x b₂) :
+    InstrDec (.memoryInit x) ([0xFC] ++ b₁ ++ b₂ ++ [0x00]) := by
+  refine ⟨0xFC, b₁ ++ b₂ ++ [0x00], by simp, by decide, fun rest r => ?_⟩
+  show fcInstr _ _ = _
+  simp only [fcInstr, List.append_assoc]
+  rw [u32_parses.complete _ hn, Res.bind_ok]
+  have := (u32_parses.bind fun x => zeroByte_parses.bind fun _ =>
+    pure_parses (Instr.memoryInit x)).complete rest
+    ⟨x, b₂, [0x00], hx, ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩, rfl⟩
+  simp only [List.append_assoc, List.cons_append, List.nil_append] at this ⊢
+  exact this
+
+theorem dec_memoryCopy {b : List UInt8} (hn : ULeb 32 10 b) :
+    InstrDec .memoryCopy ([0xFC] ++ b ++ [0x00, 0x00]) := by
+  refine ⟨0xFC, b ++ [0x00, 0x00], by simp, by decide, fun rest r => ?_⟩
+  show fcInstr _ _ = _
+  simp only [fcInstr, List.append_assoc]
+  rw [u32_parses.complete _ hn, Res.bind_ok]
+  have := (zeroByte_parses.bind fun _ => zeroByte_parses.bind fun _ =>
+    pure_parses Instr.memoryCopy).complete rest
+    ⟨(), [0x00], [0x00], rfl, ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩, rfl⟩
+  simp only [List.cons_append, List.nil_append] at this ⊢
+  exact this
+
+theorem dec_memoryFill {b : List UInt8} (hn : ULeb 32 11 b) :
+    InstrDec .memoryFill ([0xFC] ++ b ++ [0x00]) := by
+  refine ⟨0xFC, b ++ [0x00], by simp, by decide, fun rest r => ?_⟩
+  show fcInstr _ _ = _
+  simp only [fcInstr, List.append_assoc]
+  rw [u32_parses.complete _ hn, Res.bind_ok]
+  have := (zeroByte_parses.bind fun _ => pure_parses Instr.memoryFill).complete rest
+    ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩
+  simp only [List.cons_append, List.nil_append] at this ⊢
+  exact this
+
+theorem dec_tableInit {x y : Nat} {b₁ b₂ b₃ : List UInt8} (hn : ULeb 32 12 b₁) (hy : ULeb 32 y b₂)
+    (hx : ULeb 32 x b₃) :
+    InstrDec (.tableInit x y) ([0xFC] ++ b₁ ++ b₂ ++ b₃) := by
+  refine ⟨0xFC, b₁ ++ b₂ ++ b₃, by simp, by decide, fun rest r => ?_⟩
+  show fcInstr _ _ = _
+  simp only [fcInstr, List.append_assoc]
+  rw [u32_parses.complete _ hn, Res.bind_ok]
+  have := (u32_parses.bind fun y => u32_parses.bind fun x =>
+    pure_parses (Instr.tableInit x y)).complete rest
+    ⟨y, b₂, b₃, hy, ⟨x, b₃, [], hx, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
+  simp only [List.append_assoc] at this ⊢
+  exact this
+
+theorem dec_tableCopy {x y : Nat} {b₁ b₂ b₃ : List UInt8} (hn : ULeb 32 14 b₁) (hx : ULeb 32 x b₂)
+    (hy : ULeb 32 y b₃) :
+    InstrDec (.tableCopy x y) ([0xFC] ++ b₁ ++ b₂ ++ b₃) := by
+  refine ⟨0xFC, b₁ ++ b₂ ++ b₃, by simp, by decide, fun rest r => ?_⟩
+  show fcInstr _ _ = _
+  simp only [fcInstr, List.append_assoc]
+  rw [u32_parses.complete _ hn, Res.bind_ok]
+  have := (u32_parses.bind fun x => u32_parses.bind fun y =>
+    pure_parses (Instr.tableCopy x y)).complete rest
+    ⟨x, b₂, b₃, hx, ⟨y, b₃, [], hy, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
+  simp only [List.append_assoc] at this ⊢
+  exact this
+
+theorem dec_i32Const {n : Int} {b : List UInt8} (h : SLeb 32 n b) :
+    InstrDec (.iconst .w32 (constBits .w32 n)) (0x41 :: b) := by
+  refine ⟨0x41, _, rfl, by decide, fun rest r => ?_⟩
+  show ((sleb 5 32 _ _).bind fun x v n => .ok (Instr.iconst .w32 x) v n) = _
+  exact ((sleb_parses 5 32).bind fun x => pure_parses (Instr.iconst .w32 x)).complete rest
+    ⟨_, _, [], ⟨_, h, rfl, by have := h.length_le; omega⟩, ⟨rfl, rfl⟩, by simp⟩
+
+theorem dec_i64Const {n : Int} {b : List UInt8} (h : SLeb 64 n b) :
+    InstrDec (.iconst .w64 (constBits .w64 n)) (0x42 :: b) := by
+  refine ⟨0x42, _, rfl, by decide, fun rest r => ?_⟩
+  show ((sleb 10 64 _ _).bind fun x v n => .ok (Instr.iconst .w64 x) v n) = _
+  exact ((sleb_parses 10 64).bind fun x => pure_parses (Instr.iconst .w64 x)).complete rest
+    ⟨_, _, [], ⟨_, h, rfl, by have := h.length_le; omega⟩, ⟨rfl, rfl⟩, by simp⟩
+
+theorem dec_f32Const {bits : Nat} {b : List UInt8} (h : FloatBits .w32 bits b) :
+    InstrDec (.fconst .w32 bits) (0x43 :: b) := by
+  obtain ⟨hlt, rfl⟩ := h
+  simp only at hlt ⊢
+  refine ⟨0x43, leBytes _ bits, rfl, by decide, fun rest r => ?_⟩
+  show ((leNat 4 (pack (leBytes 4 bits ++ rest)) (leBytes 4 bits ++ rest).length).bind
+    fun z v n => .ok (Instr.fconst .w32 z) v n) = _
+  have := ((leNat_parses 4).bind fun z => pure_parses (Instr.fconst .w32 z)).complete
+    (pre := leBytes 4 bits) rest ⟨bits, leBytes 4 bits, [], ⟨leBytes_length _ _,
+      (pack_leBytes (by simpa [two_pow_eight_mul] using hlt)).symm⟩,
+      ⟨rfl, rfl⟩, by simp⟩
+  exact this
+
+theorem dec_f64Const {bits : Nat} {b : List UInt8} (h : FloatBits .w64 bits b) :
+    InstrDec (.fconst .w64 bits) (0x44 :: b) := by
+  obtain ⟨hlt, rfl⟩ := h
+  simp only at hlt ⊢
+  refine ⟨0x44, leBytes _ bits, rfl, by decide, fun rest r => ?_⟩
+  show ((leNat 8 (pack (leBytes 8 bits ++ rest)) (leBytes 8 bits ++ rest).length).bind
+    fun z v n => .ok (Instr.fconst .w64 z) v n) = _
+  have := ((leNat_parses 8).bind fun z => pure_parses (Instr.fconst .w64 z)).complete
+    (pre := leBytes 8 bits) rest ⟨bits, leBytes 8 bits, [], ⟨leBytes_length _ _,
+      (pack_leBytes (by simpa [two_pow_eight_mul] using hlt)).symm⟩,
+      ⟨rfl, rfl⟩, by simp⟩
+  exact this
+
 theorem instr_complete {i : Instr} {bs : List UInt8} (h : InstrB i bs) :
     InstrDec i bs ∨ (∃ bt body, i = .block bt body) ∨ (∃ bt body, i = .loop bt body) ∨
       ∃ bt t e, i = .if_ bt t e := by
@@ -599,185 +807,290 @@ theorem instr_complete {i : Instr} {bs : List UInt8} (h : InstrB i bs) :
   | loop => exact .inr (.inr (.inl ⟨_, _, rfl⟩))
   | ifNoElse => exact .inr (.inr (.inr ⟨_, _, _, rfl⟩))
   | ifElse => exact .inr (.inr (.inr ⟨_, _, _, rfl⟩))
-  | plain hm =>
-    left
-    refine ⟨_, [], rfl, ?_⟩
-    rw [plainOps_eq, List.mem_append] at hm
-    rcases hm with hm | hm
-    · simp only [List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at hm
-      rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
-        exact ⟨by decide, fun _ _ => rfl⟩
-    · obtain ⟨h₁, h₂, hf⟩ := table_of_mem numOp_table (by decide) (List.mem_of_mem_drop hm)
-      refine ⟨by omega, fun rest r => ?_⟩
-      rw [instr_num h₁ h₂, hf]; rfl
-  | fcPlain hm hn =>
-    left
-    refine ⟨0xFC, _, rfl, by decide, fun rest r => ?_⟩
-    show fcInstr _ _ = _
-    simp only [fcInstr]
-    rw [u32_parses.complete rest hn, Res.bind_ok]
-    simp only [fcPlainOps, List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at hm
-    rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ |
-      ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;> rfl
-  | @mem mk op m b hm hma =>
-    left
-    obtain ⟨h₁, h₂, hf⟩ := table_of_mem memOp_table (by decide) hm
-    refine ⟨_, _, rfl, by omega, fun rest r => ?_⟩
-    rw [instr_mem h₁ (by omega), hf]
-    exact (memArg_parses.bind fun m => pure_parses (mk m)).complete rest
-      ⟨_, _, [], hma, ⟨rfl, rfl⟩, by simp⟩
-  | @idx mk op x b hm hx =>
-    left
-    rw [idxOps_eq, List.mem_append] at hm
-    rcases hm with hm | hm
-    · simp only [List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at hm
-      rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
-        exact ⟨_, _, rfl, by decide, fun rest r => (withIdx_parses _).complete rest ⟨_, rfl, hx⟩⟩
-    · obtain ⟨h₁, h₂, hf⟩ := table_of_mem (f := fun x => nth varOps (x - 0x20)) varOp_table
-        (by decide) hm
-      refine ⟨_, _, rfl, by omega, fun rest r => ?_⟩
-      rw [instr_var h₁ (by omega), show nth varOps (op.toNat - 0x20) = some mk from hf]
-      exact (withIdx_parses _).complete rest ⟨_, rfl, hx⟩
-  | fcIdx hm hn hx =>
-    left
-    refine ⟨0xFC, _, rfl, by decide, fun rest r => ?_⟩
-    show fcInstr _ _ = _
-    simp only [fcInstr, List.append_eq, List.append_assoc]
-    rw [u32_parses.complete _ hn, Res.bind_ok]
-    simp only [fcIdxOps, List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at hm
-    rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
-      exact (withIdx_parses _).complete rest ⟨_, rfl, hx⟩
-  | @brTable ls l b₁ b₂ hs hl =>
-    left
-    refine ⟨0x0E, b₁ ++ b₂, by simp, by decide, fun rest r => ?_⟩
-    show ((vec u32 _ _).bind fun ls v n =>
-      (u32 v n).bind fun l v n => .ok (Instr.brTable ls l) v n) = _
-    have := ((vec_parses u32_parses fun _ _ h => ULeb.ne_nil h).bind fun ls =>
-      u32_parses.bind fun l => pure_parses (Instr.brTable ls l)).complete rest
-      ⟨ls, b₁, b₂, hs, ⟨l, b₂, [], hl, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
-    simp only [List.append_assoc] at this ⊢
-    exact this
-  | @callIndirect x y b₁ b₂ hy hx =>
-    left
-    refine ⟨0x11, b₁ ++ b₂, by simp, by decide, fun rest r => ?_⟩
-    show ((u32 _ _).bind fun y v n =>
-      (u32 v n).bind fun x v n => .ok (Instr.callIndirect x y) v n) = _
-    have := (u32_parses.bind fun y => u32_parses.bind fun x =>
-      pure_parses (Instr.callIndirect x y)).complete
-      rest ⟨y, b₁, b₂, hy, ⟨x, b₂, [], hx, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
-    simp only [List.append_assoc] at this ⊢
-    exact this
-  | selectT h =>
-    left
-    refine ⟨0x1C, _, rfl, by decide, fun rest r => ?_⟩
-    show ((vec valType _ _).bind fun ts v n => .ok (Instr.select (some ts)) v n) = _
-    exact ((vec_parses valType_parses fun _ _ h => ValTypeB.ne_nil h).bind fun ts =>
-      pure_parses (Instr.select (some ts))).complete rest ⟨_, _, [], h, ⟨rfl, rfl⟩, by simp⟩
-  | refNull h =>
-    left
-    refine ⟨0xD0, _, rfl, by decide, fun rest r => ?_⟩
-    show ((refType _ _).bind fun t v n => .ok (Instr.refNull t) v n) = _
-    exact (refType_parses.bind fun t => pure_parses (Instr.refNull t)).complete rest
-      ⟨_, _, [], h, ⟨rfl, rfl⟩, by simp⟩
-  | memorySize =>
-    left
-    exact ⟨0x3F, [0x00], rfl, by decide, fun rest r =>
-      (zeroByte_parses.bind fun u => pure_parses Instr.memorySize).complete rest
-        ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩⟩
-  | memoryGrow =>
-    left
-    exact ⟨0x40, [0x00], rfl, by decide, fun rest r =>
-      (zeroByte_parses.bind fun u => pure_parses Instr.memoryGrow).complete rest
-        ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩⟩
-  | @memoryInit x b₁ b₂ hn hx =>
-    left
-    refine ⟨0xFC, b₁ ++ b₂ ++ [0x00], by simp, by decide, fun rest r => ?_⟩
-    show fcInstr _ _ = _
-    simp only [fcInstr, List.append_assoc]
-    rw [u32_parses.complete _ hn, Res.bind_ok]
-    have := (u32_parses.bind fun x => zeroByte_parses.bind fun _ =>
-      pure_parses (Instr.memoryInit x)).complete rest
-      ⟨x, b₂, [0x00], hx, ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩, rfl⟩
-    simp only [List.append_assoc, List.cons_append, List.nil_append] at this ⊢
-    exact this
-  | @memoryCopy b hn =>
-    left
-    refine ⟨0xFC, b ++ [0x00, 0x00], by simp, by decide, fun rest r => ?_⟩
-    show fcInstr _ _ = _
-    simp only [fcInstr, List.append_assoc]
-    rw [u32_parses.complete _ hn, Res.bind_ok]
-    have := (zeroByte_parses.bind fun _ => zeroByte_parses.bind fun _ =>
-      pure_parses Instr.memoryCopy).complete rest
-      ⟨(), [0x00], [0x00], rfl, ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩, rfl⟩
-    simp only [List.cons_append, List.nil_append] at this ⊢
-    exact this
-  | @memoryFill b hn =>
-    left
-    refine ⟨0xFC, b ++ [0x00], by simp, by decide, fun rest r => ?_⟩
-    show fcInstr _ _ = _
-    simp only [fcInstr, List.append_assoc]
-    rw [u32_parses.complete _ hn, Res.bind_ok]
-    have := (zeroByte_parses.bind fun _ => pure_parses Instr.memoryFill).complete rest
-      ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩
-    simp only [List.cons_append, List.nil_append] at this ⊢
-    exact this
-  | @tableInit x y b₁ b₂ b₃ hn hy hx =>
-    left
-    refine ⟨0xFC, b₁ ++ b₂ ++ b₃, by simp, by decide, fun rest r => ?_⟩
-    show fcInstr _ _ = _
-    simp only [fcInstr, List.append_assoc]
-    rw [u32_parses.complete _ hn, Res.bind_ok]
-    have := (u32_parses.bind fun y => u32_parses.bind fun x =>
-      pure_parses (Instr.tableInit x y)).complete rest
-      ⟨y, b₂, b₃, hy, ⟨x, b₃, [], hx, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
-    simp only [List.append_assoc] at this ⊢
-    exact this
-  | @tableCopy x y b₁ b₂ b₃ hn hx hy =>
-    left
-    refine ⟨0xFC, b₁ ++ b₂ ++ b₃, by simp, by decide, fun rest r => ?_⟩
-    show fcInstr _ _ = _
-    simp only [fcInstr, List.append_assoc]
-    rw [u32_parses.complete _ hn, Res.bind_ok]
-    have := (u32_parses.bind fun x => u32_parses.bind fun y =>
-      pure_parses (Instr.tableCopy x y)).complete rest
-      ⟨x, b₂, b₃, hx, ⟨y, b₃, [], hy, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
-    simp only [List.append_assoc] at this ⊢
-    exact this
-  | i32Const h =>
-    left
-    refine ⟨0x41, _, rfl, by decide, fun rest r => ?_⟩
-    show ((sleb 5 32 _ _).bind fun x v n => .ok (Instr.iconst .w32 x) v n) = _
-    exact ((sleb_parses 5 32).bind fun x => pure_parses (Instr.iconst .w32 x)).complete rest
-      ⟨_, _, [], ⟨_, h, rfl, by have := h.length_le; omega⟩, ⟨rfl, rfl⟩, by simp⟩
-  | i64Const h =>
-    left
-    refine ⟨0x42, _, rfl, by decide, fun rest r => ?_⟩
-    show ((sleb 10 64 _ _).bind fun x v n => .ok (Instr.iconst .w64 x) v n) = _
-    exact ((sleb_parses 10 64).bind fun x => pure_parses (Instr.iconst .w64 x)).complete rest
-      ⟨_, _, [], ⟨_, h, rfl, by have := h.length_le; omega⟩, ⟨rfl, rfl⟩, by simp⟩
-  | @f32Const bits b h =>
-    left
-    obtain ⟨hlt, rfl⟩ := h
-    simp only at hlt ⊢
-    refine ⟨0x43, leBytes _ bits, rfl, by decide, fun rest r => ?_⟩
-    show ((leNat 4 (pack (leBytes 4 bits ++ rest)) (leBytes 4 bits ++ rest).length).bind
-      fun z v n => .ok (Instr.fconst .w32 z) v n) = _
-    have := ((leNat_parses 4).bind fun z => pure_parses (Instr.fconst .w32 z)).complete
-      (pre := leBytes 4 bits) rest ⟨bits, leBytes 4 bits, [], ⟨leBytes_length _ _,
-        (pack_leBytes (by simpa [two_pow_eight_mul] using hlt)).symm⟩,
-        ⟨rfl, rfl⟩, by simp⟩
-    exact this
-  | @f64Const bits b h =>
-    left
-    obtain ⟨hlt, rfl⟩ := h
-    simp only at hlt ⊢
-    refine ⟨0x44, leBytes _ bits, rfl, by decide, fun rest r => ?_⟩
-    show ((leNat 8 (pack (leBytes 8 bits ++ rest)) (leBytes 8 bits ++ rest).length).bind
-      fun z v n => .ok (Instr.fconst .w64 z) v n) = _
-    have := ((leNat_parses 8).bind fun z => pure_parses (Instr.fconst .w64 z)).complete
-      (pre := leBytes 8 bits) rest ⟨bits, leBytes 8 bits, [], ⟨leBytes_length _ _,
-        (pack_leBytes (by simpa [two_pow_eight_mul] using hlt)).symm⟩,
-        ⟨rfl, rfl⟩, by simp⟩
-    exact this
+  | plain hm => exact .inl (dec_plain hm)
+  | fcPlain hm hn => exact .inl (dec_fcPlain hm hn)
+  | @mem mk op m b hm hma => exact .inl (dec_mem hm hma)
+  | @idx mk op x b hm hx => exact .inl (dec_idx hm hx)
+  | fcIdx hm hn hx => exact .inl (dec_fcIdx hm hn hx)
+  | @brTable ls l b₁ b₂ hs hl => exact .inl (dec_brTable hs hl)
+  | @callIndirect x y b₁ b₂ hy hx => exact .inl (dec_callIndirect hy hx)
+  | selectT h => exact .inl (dec_selectT h)
+  | refNull h => exact .inl (dec_refNull h)
+  | memorySize => exact .inl (dec_memorySize)
+  | memoryGrow => exact .inl (dec_memoryGrow)
+  | @memoryInit x b₁ b₂ hn hx => exact .inl (dec_memoryInit hn hx)
+  | @memoryCopy b hn => exact .inl (dec_memoryCopy hn)
+  | @memoryFill b hn => exact .inl (dec_memoryFill hn)
+  | @tableInit x y b₁ b₂ b₃ hn hy hx => exact .inl (dec_tableInit hn hy hx)
+  | @tableCopy x y b₁ b₂ b₃ hn hx hy => exact .inl (dec_tableCopy hn hx hy)
+  | i32Const h => exact .inl (dec_i32Const h)
+  | i64Const h => exact .inl (dec_i64Const h)
+  | @f32Const bits b h => exact .inl (dec_f32Const h)
+  | @f64Const bits b h => exact .inl (dec_f64Const h)
+
+/-! ## Instruction sequences -/
+
+/-- One `seq` step over the encoding `b` of `i`: push `i`, spend one unit of fuel. -/
+def Step (i : Instr) (b : List UInt8) : Prop :=
+  ∀ F acc r, b.length ≤ F →
+    seq (F + 1) acc (pack (b ++ r)) (b ++ r).length = seq F (i :: acc) (pack r) r.length
+
+theorem seq_succ_cons (F : Nat) (acc : List Instr) (op : UInt8) (bs : List UInt8) :
+    seq (F + 1) acc (pack (op :: bs)) (op :: bs).length =
+      (let plain := (instr op.toNat (pack bs) bs.length (bs.length + 1)).bind
+          fun i v n => seq F (i :: acc) v n
+       bif Nat.blt 0x05 op.toNat then
+         (bif Nat.beq op.toNat 0x0B then .ok (acc, op.toNat) (pack bs) bs.length else plain)
+       else bif Nat.blt op.toNat 0x02 then plain
+       else bif Nat.beq op.toNat 0x05 then .ok (acc, op.toNat) (pack bs) bs.length
+       else (blockType (pack bs) bs.length).bind fun bt v n =>
+         (seq F [] v n).bind fun body v n =>
+         bif Nat.beq op.toNat 0x04 then
+           (bif Nat.beq body.2 0x0B then seq F (.if_ bt body.1.reverse [] :: acc) v n
+            else (seq F [] v n).bind fun els v n =>
+              bif Nat.beq els.2 0x0B then
+                seq F (.if_ bt body.1.reverse els.1.reverse :: acc) v n
+              else .bad n "else without if")
+         else bif Nat.beq body.2 0x0B then
+           seq F ((bif Nat.beq op.toNat 0x02 then Instr.block else Instr.loop) bt body.1.reverse ::
+             acc) v n
+         else .bad n "else without if") := by
+  simp only [List.length_cons, seq, land_pack_cons, shiftRight_pack_cons]
+
+theorem step_of_dec {i : Instr} {b : List UInt8} (d : InstrDec i b) : Step i b := by
+  obtain ⟨op, imm, rfl, hop, hdec⟩ := d
+  intro F acc r _
+  rw [List.cons_append, seq_succ_cons]
+  simp only
+  rcases hop with h | ⟨h₁, h₂⟩
+  · rw [blt_false.2 (by omega : op.toNat ≤ 5), blt_true.2 h, Bool.cond_false, Bool.cond_true,
+      hdec r _, Res.bind_ok]
+  · rw [blt_true.2 h₁, beq_false.2 h₂, Bool.cond_true, Bool.cond_false, hdec r _, Res.bind_ok]
+
+theorem InstrB.ne_nil {i : Instr} {b : List UInt8} (h : InstrB i b) : b ≠ [] := by
+  cases h <;> simp
+
+/-- The terminators `end` (`0x0B`) and `else` (`0x05`). -/
+def Term (t : UInt8) : Prop := t.toNat = 0x0B ∨ t.toNat = 0x05
+
+theorem seq_term {F : Nat} {acc : List Instr} {t : UInt8} (ht : Term t) (rest : List UInt8) :
+    seq (F + 1) acc (pack (t :: rest)) (t :: rest).length =
+      .ok (acc, t.toNat) (pack rest) rest.length := by
+  rw [seq_succ_cons]
+  rcases ht with h | h <;> rw [h] <;> rfl
+
+theorem structured_block {F : Nat} {acc : List Instr} {op : UInt8} {bt : BlockType}
+    {body : List Instr}
+    {b₁ b₂ r : List UInt8} (hop : op.toNat = 0x02 ∨ op.toNat = 0x03) (ht : BlockTypeB bt b₁)
+    (hbody : seq F [] (pack (b₂ ++ 0x0B :: r)) (b₂ ++ 0x0B :: r).length =
+      .ok (body.reverse ++ [], 0x0B) (pack r) r.length) :
+    seq (F + 1) acc (pack (op :: (b₁ ++ (b₂ ++ 0x0B :: r))))
+      (op :: (b₁ ++ (b₂ ++ 0x0B :: r))).length =
+      seq F ((bif Nat.beq op.toNat 0x02 then Instr.block else Instr.loop) bt body :: acc) (pack r)
+        r.length := by
+  rw [seq_succ_cons]
+  have h₁ : Nat.blt 0x05 op.toNat = false := blt_false.2 (by omega)
+  have h₂ : Nat.blt op.toNat 0x02 = false := blt_false.2 (by omega)
+  have h₃ : Nat.beq op.toNat 0x05 = false := beq_false.2 (by omega)
+  have h₄ : Nat.beq op.toNat 0x04 = false := beq_false.2 (by omega)
+  simp only [h₁, h₂, h₃, h₄, Bool.cond_false]
+  rw [blockType_parses.complete _ ht, Res.bind_ok, hbody, Res.bind_ok]
+  simp
+
+theorem structured_if_prefix {F : Nat} {acc : List Instr} {bt : BlockType} {b₁ X : List UInt8}
+    (ht : BlockTypeB bt b₁) :
+    seq (F + 1) acc (pack (0x04 :: (b₁ ++ X))) (0x04 :: (b₁ ++ X)).length =
+      (seq F [] (pack X) X.length).bind fun body v n =>
+        bif Nat.beq body.2 0x0B then seq F (.if_ bt body.1.reverse [] :: acc) v n
+        else (seq F [] v n).bind fun els v n =>
+          bif Nat.beq els.2 0x0B then seq F (.if_ bt body.1.reverse els.1.reverse :: acc) v n
+          else .bad n "else without if" := by
+  rw [seq_succ_cons]
+  simp only [show Nat.blt 0x05 (UInt8.toNat 0x04) = false from rfl,
+    show Nat.blt (UInt8.toNat 0x04) 0x02 = false from rfl,
+    show Nat.beq (UInt8.toNat 0x04) 0x05 = false from rfl,
+    show Nat.beq (UInt8.toNat 0x04) 0x04 = true from rfl, Bool.cond_false, Bool.cond_true]
+  rw [blockType_parses.complete _ ht, Res.bind_ok]
+
+/-- `seq` on the encoding of `is` followed by a terminator returns `is` (reversed onto `acc`). -/
+def SeqOk (is : List Instr) (pre : List UInt8) : Prop :=
+  ∀ (F : Nat) (acc : List Instr) (t : UInt8) (rest : List UInt8), Term t → pre.length < F →
+    seq F acc (pack (pre ++ t :: rest)) (pre ++ t :: rest).length =
+      .ok (is.reverse ++ acc, t.toNat) (pack rest) rest.length
+
+theorem seqOk_nil : SeqOk [] [] := fun F acc t rest ht hF => by
+  obtain ⟨F, rfl⟩ : ∃ F', F = F' + 1 := ⟨F - 1, by simp at hF; omega⟩
+  simpa using seq_term ht rest
+
+theorem seqOk_cons {i : Instr} {is : List Instr} {b₁ b₂ : List UInt8} (hi : InstrB i b₁)
+    (ihi : Step i b₁) (ihs : SeqOk is b₂) : SeqOk (i :: is) (b₁ ++ b₂) :=
+  fun F acc t rest ht hF => by
+    have hne := List.length_pos_iff.2 (InstrB.ne_nil hi)
+    obtain ⟨F, rfl⟩ : ∃ F', F = F' + 1 := ⟨F - 1, by simp at hF; omega⟩
+    simp only [List.length_append] at hF
+    rw [List.append_assoc, ihi F acc (b₂ ++ t :: rest) (by omega),
+      ihs F (i :: acc) t rest ht (by omega)]
+    simp
+
+/-- Completeness of `seq` (by mutual recursion over the derivations). -/
+theorem seqOk_of_instrsB {is : List Instr} {pre : List UInt8} (h : InstrsB is pre) : SeqOk is pre :=
+  InstrsB.rec (motive_1 := fun i b _ => Step i b) (motive_2 := fun is pre _ => SeqOk is pre)
+    (plain := fun hm => step_of_dec (dec_plain hm))
+    (fcPlain := fun hm hn => step_of_dec (dec_fcPlain hm hn))
+    (mem := fun hm hma => step_of_dec (dec_mem hm hma))
+    (idx := fun hm hx => step_of_dec (dec_idx hm hx))
+    (fcIdx := fun hm hn hx => step_of_dec (dec_fcIdx hm hn hx))
+    (brTable := fun hs hl => step_of_dec (dec_brTable hs hl))
+    (callIndirect := fun hy hx => step_of_dec (dec_callIndirect hy hx))
+    (selectT := fun h => step_of_dec (dec_selectT h))
+    (refNull := fun h => step_of_dec (dec_refNull h))
+    (memorySize := step_of_dec dec_memorySize)
+    (memoryGrow := step_of_dec dec_memoryGrow)
+    (memoryInit := fun hn hx => step_of_dec (dec_memoryInit hn hx))
+    (memoryCopy := fun hn => step_of_dec (dec_memoryCopy hn))
+    (memoryFill := fun hn => step_of_dec (dec_memoryFill hn))
+    (tableInit := fun hn hy hx => step_of_dec (dec_tableInit hn hy hx))
+    (tableCopy := fun hn hx hy => step_of_dec (dec_tableCopy hn hx hy))
+    (i32Const := fun h => step_of_dec (dec_i32Const h))
+    (i64Const := fun h => step_of_dec (dec_i64Const h))
+    (f32Const := fun h => step_of_dec (dec_f32Const h))
+    (f64Const := fun h => step_of_dec (dec_f64Const h))
+    (block := fun {bt} {body} {b₁} {b₂} ht _ ih => fun F acc r hF => by
+      have hbody := ih F [] 0x0B r (.inl rfl) (by simp at hF; omega)
+      have := structured_block (F := F) (acc := acc) (op := 0x02) (r := r) (.inl rfl) ht hbody
+      simpa using this)
+    (loop := fun {bt} {body} {b₁} {b₂} ht _ ih => fun F acc r hF => by
+      have hbody := ih F [] 0x0B r (.inl rfl) (by simp at hF; omega)
+      have := structured_block (F := F) (acc := acc) (op := 0x03) (r := r) (.inr rfl) ht hbody
+      simpa using this)
+    (ifNoElse := fun {bt} {thn} {b₁} {b₂} ht _ ih => fun F acc r hF => by
+      have hbody := ih F [] 0x0B r (.inl rfl) (by simp at hF; omega)
+      simp only [List.append_assoc, List.cons_append, List.nil_append]
+      rw [structured_if_prefix ht, hbody, Res.bind_ok]
+      simp)
+    (ifElse := fun {bt} {thn} {els} {b₁} {b₂} {b₃} ht _ _ ih₁ ih₂ => fun F acc r hF => by
+      simp only [List.length_append, List.length_cons] at hF
+      have hthn := ih₁ F [] 0x05 (b₃ ++ 0x0B :: r) (.inr rfl) (by omega)
+      have hels := ih₂ F [] 0x0B r (.inl rfl) (by omega)
+      simp only [List.append_assoc, List.cons_append, List.nil_append]
+      rw [structured_if_prefix ht, hthn, Res.bind_ok]
+      simp only [show Nat.beq (UInt8.toNat 0x05) 0x0B = false from rfl, Bool.cond_false]
+      rw [hels, Res.bind_ok]
+      simp)
+    (nil := seqOk_nil)
+    (cons := fun hi _ ihi ihs => seqOk_cons hi ihi ihs)
+    h
+
+/-- `seq` successes: an instruction sequence, then a terminator. -/
+def SeqRes (acc : List Instr) (bs : List UInt8) (res : List Instr × Nat) (v n : Nat) : Prop :=
+  ∃ (is : List Instr) (pre : List UInt8) (t : UInt8) (rest : List UInt8),
+    bs = pre ++ t :: rest ∧ InstrsB is pre ∧ Term t ∧ res = (is.reverse ++ acc, t.toNat) ∧
+      v = pack rest ∧ n = rest.length
+
+theorem seqRes_cons {acc : List Instr} {i : Instr} {b₁ r : List UInt8} {res : List Instr × Nat}
+    {v n : Nat} (hi : InstrB i b₁) (h : SeqRes (i :: acc) r res v n) :
+    SeqRes acc (b₁ ++ r) res v n := by
+  obtain ⟨is, pre, t, rest, rfl, his, ht, rfl, rfl, rfl⟩ := h
+  exact ⟨i :: is, b₁ ++ pre, t, rest, by simp, .cons hi his, ht, by simp, rfl, rfl⟩
+
+theorem term_of_toNat {t : UInt8} (h : t.toNat = 0x0B) : t = 0x0B := UInt8.toNat_inj.1 h
+
+/-- Soundness of `seq`. -/
+theorem seq_sound (F : Nat) : ∀ {acc : List Instr} {bs : List UInt8} {res : List Instr × Nat}
+    {v n : Nat}, seq F acc (pack bs) bs.length = .ok res v n → SeqRes acc bs res v n := by
+  induction F with
+  | zero => intro acc bs res v n h; simp [seq] at h
+  | succ F ih =>
+    intro acc bs res v n h
+    cases bs with
+    | nil => simp [seq] at h
+    | cons b bs =>
+      rw [seq_succ_cons] at h
+      simp only at h
+      have plain : (instr b.toNat (pack bs) bs.length (bs.length + 1)).bind
+          (fun i v n => seq F (i :: acc) v n) = .ok res v n → SeqRes acc (b :: bs) res v n := by
+        intro h
+        obtain ⟨i, v₁, n₁, h₁, h₂⟩ := Res.bind_eq_ok.1 h
+        obtain ⟨imm, r₁, rfl, hi, rfl, rfl⟩ := instr_sound h₁
+        exact seqRes_cons (b₁ := b :: imm) hi (ih h₂)
+      cases h₁ : Nat.blt 0x05 b.toNat
+      · simp only [h₁, Bool.cond_false] at h
+        cases h₂ : Nat.blt b.toNat 0x02
+        · simp only [h₂, Bool.cond_false] at h
+          cases h₃ : Nat.beq b.toNat 0x05
+          · simp only [h₃, Bool.cond_false] at h
+            have hb₁ := blt_false.1 h₁
+            have hb₂ := blt_false.1 h₂
+            have hb₃ := beq_false.1 h₃
+            obtain ⟨bt, v₂, n₂, hbt, hk₁⟩ := Res.bind_eq_ok.1 h
+            obtain ⟨btb, r₁, rfl, ht, rfl, rfl⟩ := blockType_parses.sound hbt
+            obtain ⟨body, v₃, n₃, hbody, hk₂⟩ := Res.bind_eq_ok.1 hk₁
+            obtain ⟨is₁, pre₁, t₁, r₂, rfl, his₁, ht₁, rfl, rfl, rfl⟩ := ih hbody
+            simp only [List.append_nil, List.reverse_reverse] at hk₂
+            cases h₄ : Nat.beq b.toNat 0x04
+            · simp only [h₄, Bool.cond_false] at hk₂
+              cases h₅ : Nat.beq t₁.toNat 0x0B
+              · simp only [h₅, Bool.cond_false] at hk₂; simp at hk₂
+              · simp only [h₅, Bool.cond_true] at hk₂
+                obtain rfl := term_of_toNat (beq_true.1 h₅)
+                have hb₄ := beq_false.1 h₄
+                rcases (show b.toNat = 2 ∨ b.toNat = 3 by omega) with hb | hb
+                · obtain rfl : b = 0x02 := UInt8.toNat_inj.1 hb
+                  have := seqRes_cons (InstrB.block ht his₁) (ih hk₂)
+                  simpa using this
+                · obtain rfl : b = 0x03 := UInt8.toNat_inj.1 hb
+                  have := seqRes_cons (InstrB.loop ht his₁) (ih hk₂)
+                  simpa using this
+            · simp only [h₄, Bool.cond_true] at hk₂
+              obtain rfl : b = 0x04 := UInt8.toNat_inj.1 (beq_true.1 h₄)
+              cases h₅ : Nat.beq t₁.toNat 0x0B
+              · simp only [h₅, Bool.cond_false] at hk₂
+                obtain rfl : t₁ = 0x05 := by
+                  rcases ht₁ with e | e
+                  · exact absurd e (beq_false.1 h₅)
+                  · exact UInt8.toNat_inj.1 e
+                obtain ⟨els, v₄, n₄, hels, hk₃⟩ := Res.bind_eq_ok.1 hk₂
+                obtain ⟨is₂, pre₂, t₂, r₃, rfl, his₂, -, rfl, rfl, rfl⟩ := ih hels
+                simp only [List.append_nil, List.reverse_reverse] at hk₃
+                cases h₆ : Nat.beq t₂.toNat 0x0B
+                · simp only [h₆, Bool.cond_false] at hk₃; simp at hk₃
+                · simp only [h₆, Bool.cond_true] at hk₃
+                  obtain rfl := term_of_toNat (beq_true.1 h₆)
+                  have := seqRes_cons (InstrB.ifElse ht his₁ his₂) (ih hk₃)
+                  simpa using this
+              · simp only [h₅, Bool.cond_true] at hk₂
+                obtain rfl := term_of_toNat (beq_true.1 h₅)
+                have := seqRes_cons (InstrB.ifNoElse ht his₁) (ih hk₂)
+                simpa using this
+          · simp only [h₃, Bool.cond_true, Res.ok.injEq] at h
+            obtain ⟨rfl, rfl, rfl⟩ := h
+            exact ⟨[], [], b, bs, rfl, .nil, .inr (beq_true.1 h₃), by simp, rfl, rfl⟩
+        · simp only [h₂, Bool.cond_true] at h
+          exact plain h
+      · simp only [h₁, Bool.cond_true] at h
+        cases h₂ : Nat.beq b.toNat 0x0B
+        · simp only [h₂, Bool.cond_false] at h
+          exact plain h
+        · simp only [h₂, Bool.cond_true, Res.ok.injEq] at h
+          obtain ⟨rfl, rfl, rfl⟩ := h
+          exact ⟨[], [], b, bs, rfl, .nil, .inl (beq_true.1 h₂), by simp, rfl, rfl⟩
+
+/-- `expr` decodes exactly `expr` encodings (instructions, then `end`). -/
+theorem expr_parses : Parses expr ExprB := by
+  constructor
+  · intro bs e v n h
+    obtain ⟨res, v₁, n₁, h₁, h₂⟩ := Res.bind_eq_ok.1 h
+    obtain ⟨is, pre, t, rest, rfl, his, -, rfl, rfl, rfl⟩ := seq_sound _ h₁
+    cases h₃ : Nat.beq t.toNat 0x0B
+    · simp only [h₃, Bool.cond_false] at h₂; simp at h₂
+    · simp only [h₃, Bool.cond_true, Res.ok.injEq] at h₂
+      obtain ⟨rfl, rfl, rfl⟩ := h₂
+      obtain rfl := term_of_toNat (beq_true.1 h₃)
+      exact ⟨pre ++ [0x0B], rest, by simp, ⟨pre, by simpa using his, rfl⟩, rfl, rfl⟩
+  · rintro e _ rest ⟨b, hb, rfl⟩
+    have := seqOk_of_instrsB hb ((b ++ [0x0B]) ++ rest).length [] 0x0B rest (.inl rfl) (by simp)
+    simp only [List.append_assoc, List.singleton_append] at this ⊢
+    simp only [expr, this, Res.bind_ok]
+    simp
 
 end FVA.Wasm.Decode
