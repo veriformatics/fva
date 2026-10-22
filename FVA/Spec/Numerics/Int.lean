@@ -32,23 +32,23 @@ def isub (i₁ i₂ : BitVec N) : BitVec N := BitVec.ofNat N (i₁.toNat + 2 ^ N
 def imul (i₁ i₂ : BitVec N) : BitVec N := BitVec.ofNat N (i₁.toNat * i₂.toNat)
 
 /-- `idiv_u_N(i₁, i₂)`: undefined if `i₂ = 0`, else `trunc(i₁ / i₂)`. -/
-def idiv_u (i₁ i₂ : BitVec N) : Option (BitVec N) :=
+def idivU (i₁ i₂ : BitVec N) : Option (BitVec N) :=
   if i₂.toNat = 0 then none else some (BitVec.ofNat N (i₁.toNat / i₂.toNat))
 
 /-- `idiv_s_N(i₁, i₂)`: undefined if `j₂ = 0` or `j₁ / j₂ = 2^(N−1)`, else
 `signed⁻¹(trunc(j₁ / j₂))`, where `j = signed(i)`. -/
-def idiv_s (i₁ i₂ : BitVec N) : Option (BitVec N) :=
+def idivS (i₁ i₂ : BitVec N) : Option (BitVec N) :=
   if signed i₂ = 0 then none
   else if (signed i₁).tdiv (signed i₂) = 2 ^ (N - 1) then none
   else some (ofSigned N ((signed i₁).tdiv (signed i₂)))
 
 /-- `irem_u_N(i₁, i₂)`: undefined if `i₂ = 0`, else `i₁ − i₂ · trunc(i₁ / i₂)`. -/
-def irem_u (i₁ i₂ : BitVec N) : Option (BitVec N) :=
+def iremU (i₁ i₂ : BitVec N) : Option (BitVec N) :=
   if i₂.toNat = 0 then none else some (BitVec.ofNat N (i₁.toNat % i₂.toNat))
 
 /-- `irem_s_N(i₁, i₂)`: undefined if `i₂ = 0`, else `signed⁻¹(j₁ − j₂ · trunc(j₁ / j₂))`
 (the sign of the dividend). -/
-def irem_s (i₁ i₂ : BitVec N) : Option (BitVec N) :=
+def iremS (i₁ i₂ : BitVec N) : Option (BitVec N) :=
   if signed i₂ = 0 then none else some (ofSigned N ((signed i₁).tmod (signed i₂)))
 
 /-- `iand`, `ior`, `ixor`: bitwise. -/
@@ -62,10 +62,10 @@ def ixor (i₁ i₂ : BitVec N) : BitVec N := i₁ ^^^ i₂
 def ishl (i₁ i₂ : BitVec N) : BitVec N := BitVec.ofNat N (i₁.toNat * 2 ^ (i₂.toNat % N))
 
 /-- `ishr_u_N(i₁, i₂) = trunc(i₁ / 2^k)`, `k = i₂ mod N`. -/
-def ishr_u (i₁ i₂ : BitVec N) : BitVec N := BitVec.ofNat N (i₁.toNat / 2 ^ (i₂.toNat % N))
+def ishrU (i₁ i₂ : BitVec N) : BitVec N := BitVec.ofNat N (i₁.toNat / 2 ^ (i₂.toNat % N))
 
 /-- `ishr_s_N(i₁, i₂)`: the sign bit fills the vacated bits, i.e. `signed⁻¹(⌊j₁ / 2^k⌋)`. -/
-def ishr_s (i₁ i₂ : BitVec N) : BitVec N :=
+def ishrS (i₁ i₂ : BitVec N) : BitVec N :=
   ofSigned N ((signed i₁).fdiv (2 ^ (i₂.toNat % N)))
 
 /-- `irotl_N(i₁, i₂)`: rotate left by `k = i₂ mod N`. -/
@@ -108,33 +108,33 @@ def ieq (i₁ i₂ : BitVec N) : BitVec 32 := bool (i₁.toNat == i₂.toNat)
 /-- `ine_N(i₁, i₂) = bool(i₁ ≠ i₂)`. -/
 def ine (i₁ i₂ : BitVec N) : BitVec 32 := bool (i₁.toNat != i₂.toNat)
 /-- `ilt_u_N(i₁, i₂) = bool(i₁ < i₂)`. -/
-def ilt_u (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (i₁.toNat < i₂.toNat))
+def iltU (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (i₁.toNat < i₂.toNat))
 /-- `ilt_s_N(i₁, i₂) = bool(signed(i₁) < signed(i₂))`. -/
-def ilt_s (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (signed i₁ < signed i₂))
+def iltS (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (signed i₁ < signed i₂))
 /-- `igt_u_N(i₁, i₂) = bool(i₁ > i₂)`. -/
-def igt_u (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (i₁.toNat > i₂.toNat))
+def igtU (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (i₁.toNat > i₂.toNat))
 /-- `igt_s_N(i₁, i₂) = bool(signed(i₁) > signed(i₂))`. -/
-def igt_s (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (signed i₁ > signed i₂))
+def igtS (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (signed i₁ > signed i₂))
 /-- `ile_u_N(i₁, i₂) = bool(i₁ ≤ i₂)`. -/
-def ile_u (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (i₁.toNat ≤ i₂.toNat))
+def ileU (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (i₁.toNat ≤ i₂.toNat))
 /-- `ile_s_N(i₁, i₂) = bool(signed(i₁) ≤ signed(i₂))`. -/
-def ile_s (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (signed i₁ ≤ signed i₂))
+def ileS (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (signed i₁ ≤ signed i₂))
 /-- `ige_u_N(i₁, i₂) = bool(i₁ ≥ i₂)`. -/
-def ige_u (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (i₁.toNat ≥ i₂.toNat))
+def igeU (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (i₁.toNat ≥ i₂.toNat))
 /-- `ige_s_N(i₁, i₂) = bool(signed(i₁) ≥ signed(i₂))`. -/
-def ige_s (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (signed i₁ ≥ signed i₂))
+def igeS (i₁ i₂ : BitVec N) : BitVec 32 := bool (decide (signed i₁ ≥ signed i₂))
 
 /-- `iextendM_s_N(i) = signed_N⁻¹(signed_M(i mod 2^M))`. -/
-def iextend_s (M : Nat) (i : BitVec N) : BitVec N :=
+def iextendS (M : Nat) (i : BitVec N) : BitVec N :=
   ofSigned N (signed (BitVec.ofNat M i.toNat))
 
 /-- `wrap_{64,32}(i) = i mod 2^32` (§4.3.4). -/
 def wrap (i : BitVec 64) : BitVec 32 := BitVec.ofNat 32 i.toNat
 
 /-- `extend_u_{32,64}(i) = i`. -/
-def extend_u (i : BitVec 32) : BitVec 64 := BitVec.ofNat 64 i.toNat
+def extendU (i : BitVec 32) : BitVec 64 := BitVec.ofNat 64 i.toNat
 
 /-- `extend_s_{32,64}(i) = signed_64⁻¹(signed_32(i))`. -/
-def extend_s (i : BitVec 32) : BitVec 64 := ofSigned 64 (signed i)
+def extendS (i : BitVec 32) : BitVec 64 := ofSigned 64 (signed i)
 
 end FVA.Wasm.Num
