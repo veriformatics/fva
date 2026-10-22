@@ -6,3 +6,5 @@ import FVA.Lifted
 import FVA.Proof.Decode.Reader
 import FVA.Proof.Decode.Name
 import FVA.Proof.Decode.Instr
+import FVA.Proof.Decode.Items
+import FVA.Proof.Decode.Module
