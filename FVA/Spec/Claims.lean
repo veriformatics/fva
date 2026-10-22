@@ -42,9 +42,24 @@ def PartialCorrect (H : HostSem) (Q : Outcome → Prop) (c : Config) : Prop :=
   ∀ c' o, Steps H c c' → Final c' o → Q o
 
 /-- The configuration invoking function address `a` on `args` from outside (§4.5.5): an empty
-frame, the arguments, `invoke a`. -/
+frame, the arguments, `invoke a`; meaningful when `InvokeOK` holds (the `Call*` forms require
+it). -/
 def invokeConfig (s : Store) (a : Nat) (args : List Val) : Config :=
   ⟨s, ⟨[], {}⟩, vals args ++ [.invoke a]⟩
+
+/-- `S ⊢ val : t` (appendix "Soundness", values): numbers by type, null by its reference type,
+a function reference to an existing function, any external reference. -/
+def Val.HasType (s : Store) : Val → ValType → Prop
+  | .i32 _, .num .i32 | .i64 _, .num .i64 | .f32 _, .num .f32 | .f64 _, .num .f64 => True
+  | .ref (.null t), .ref t' => t = t'
+  | .ref (.func a), .ref .funcref => a < s.funcs.length
+  | .ref (.extern _), .ref .externref => True
+  | _, _ => False
+
+/-- The invocation of `a` on `args` is defined (§4.5.5): `a` is a function address and the
+arguments match its parameter types in number and type. -/
+def InvokeOK (s : Store) (a : Nat) (args : List Val) : Prop :=
+  ∃ fi, s.funcs[a]? = some fi ∧ List.Forall₂ (Val.HasType s) args fi.type.params
 
 /-- The function address exported under `name`. -/
 def ModuleInst.exportFunc (inst : ModuleInst) (name : String) : Option Nat :=
@@ -57,7 +72,7 @@ def ModuleInst.exportFunc (inst : ModuleInst) (name : String) : Option Nat :=
 outcome satisfying `Q`. -/
 def CallMust (H : HostSem) (s : Store) (inst : ModuleInst) (name : String) (args : List Val)
     (Q : Outcome → Prop) : Prop :=
-  ∃ a, inst.exportFunc name = some a ∧ Must H Q (invokeConfig s a args)
+  ∃ a, inst.exportFunc name = some a ∧ InvokeOK s a args ∧ Must H Q (invokeConfig s a args)
 
 /-- The call always returns, with final store and results satisfying `P` (never traps). -/
 def CallReturns (H : HostSem) (s : Store) (inst : ModuleInst) (name : String) (args : List Val)
@@ -76,6 +91,6 @@ def CallTraps (H : HostSem) (s : Store) (inst : ModuleInst) (name : String) (arg
 /-- Some execution of the call finishes with an outcome satisfying `Q`. -/
 def CallMay (H : HostSem) (s : Store) (inst : ModuleInst) (name : String) (args : List Val)
     (Q : Outcome → Prop) : Prop :=
-  ∃ a, inst.exportFunc name = some a ∧ May H Q (invokeConfig s a args)
+  ∃ a, inst.exportFunc name = some a ∧ InvokeOK s a args ∧ May H Q (invokeConfig s a args)
 
 end FVA.Wasm.Exec
