@@ -34,3 +34,6 @@ import FVA.Proof.Numerics.Total
 import FVA.Proof.Numerics.NanClass
 import FVA.Proof.Exec.SoundLemmas
 import FVA.Proof.Exec.Sound
+import FVA.Proof.Exec.DetLemmas
+import FVA.Proof.Exec.Det
+import FVA.Proof.Exec.Spike
