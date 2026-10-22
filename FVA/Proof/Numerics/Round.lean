@@ -69,33 +69,47 @@ theorem log2Frac_spec {n d : ℕ} (hn : 0 < n) (hd : 0 < d) :
     · rw [show (a : ℤ) - b - 1 + 1 = (a : ℤ) - b by ring, two_zpow_eq_div, hsplit.1, hsplit.2,
         div_lt_div_iff₀ hdR (by positivity)]
       linarith
+theorem floor_natDiv {num den : ℕ} (hden : 0 < den) :
+    ⌊(num : ℝ) / den⌋ = ((num / den : ℕ) : ℤ) := by
+  have hdR : (0 : ℝ) < den := by exact_mod_cast hden
+  rw [Int.floor_eq_iff]
+  constructor
+  · rw [le_div_iff₀ hdR]; push_cast; exact_mod_cast Nat.div_mul_le_self num den
+  · rw [div_lt_iff₀ hdR]; push_cast
+    have : num < (num / den + 1) * den := by
+      have := Nat.div_add_mod num den
+      have := Nat.mod_lt num hden
+      rw [Nat.add_mul, one_mul, Nat.mul_comm]; omega
+    exact_mod_cast this
+
+theorem frac_natDiv {num den : ℕ} (hden : 0 < den) :
+    (num : ℝ) / den - ⌊(num : ℝ) / den⌋ = ((num % den : ℕ) : ℝ) / den := by
+  have hdR : (0 : ℝ) < den := by exact_mod_cast hden
+  have : ((num : ℕ) : ℝ) = den * (num / den : ℕ) + (num % den : ℕ) := by
+    exact_mod_cast (Nat.div_add_mod num den).symm
+  rw [floor_natDiv hden, Int.cast_natCast, eq_div_iff hdR.ne', sub_mul,
+    div_mul_cancel₀ _ hdR.ne', this]
+  ring
+
+theorem ceil_natDiv {num den : ℕ} (hden : 0 < den) (hr : 0 < num % den) :
+    ⌈(num : ℝ) / den⌉ = ((num / den : ℕ) : ℤ) + 1 := by
+  have hdR : (0 : ℝ) < den := by exact_mod_cast hden
+  rw [Int.ceil_eq_iff]
+  have h1 : (num : ℝ) / den - ⌊(num : ℝ) / den⌋ > 0 := by
+    rw [frac_natDiv hden]; exact div_pos (by exact_mod_cast hr) hdR
+  have h2 : (num : ℝ) / den - ⌊(num : ℝ) / den⌋ < 1 := by
+    rw [frac_natDiv hden, div_lt_one hdR]; exact_mod_cast Nat.mod_lt num hden
+  rw [floor_natDiv hden] at h1 h2; push_cast at h1 h2 ⊢; constructor <;> linarith
+
 /-- `rneDiv` rounds `num / den` half to even. -/
 theorem roundEven_div {num den : ℕ} (hden : 0 < den) :
     roundEven ((num : ℝ) / den) = (rneDiv num den : ℤ) := by
   have hdR : (0 : ℝ) < den := by exact_mod_cast hden
   have hdiv := Nat.div_add_mod num den
   have hlt := Nat.mod_lt num hden
-  -- num / den = q + r / den with 0 ≤ r < den
-  have hfl : ⌊(num : ℝ) / den⌋ = ((num / den : ℕ) : ℤ) := by
-    rw [Int.floor_eq_iff]
-    constructor
-    · rw [le_div_iff₀ hdR]; push_cast; exact_mod_cast Nat.div_mul_le_self num den
-    · rw [div_lt_iff₀ hdR]; push_cast
-      have : num < (num / den + 1) * den := by
-        rw [Nat.add_mul, one_mul, Nat.mul_comm]; omega
-      exact_mod_cast this
-  have hfrac : (num : ℝ) / den - ⌊(num : ℝ) / den⌋ = ((num % den : ℕ) : ℝ) / den := by
-    have : ((num : ℕ) : ℝ) = den * (num / den : ℕ) + (num % den : ℕ) := by exact_mod_cast hdiv.symm
-    rw [hfl, Int.cast_natCast, eq_div_iff hdR.ne', sub_mul, div_mul_cancel₀ _ hdR.ne', this]
-    ring
-  have hceil : 0 < num % den → ⌈(num : ℝ) / den⌉ = ((num / den : ℕ) : ℤ) + 1 := by
-    intro hr
-    rw [Int.ceil_eq_iff]
-    have h1 : (num : ℝ) / den - ⌊(num : ℝ) / den⌋ > 0 := by
-      rw [hfrac]; exact div_pos (by exact_mod_cast hr) hdR
-    have h2 : (num : ℝ) / den - ⌊(num : ℝ) / den⌋ < 1 := by
-      rw [hfrac, div_lt_one hdR]; exact_mod_cast hlt
-    rw [hfl] at h1 h2; push_cast at h1 h2 ⊢; constructor <;> linarith
+  have hfl := floor_natDiv (num := num) hden
+  have hfrac := frac_natDiv (num := num) hden
+  have hceil := ceil_natDiv (num := num) hden
   unfold roundEven
   dsimp only [rneDiv]
   rw [hfrac]

@@ -16,3 +16,11 @@ import FVA.Proof.Numerics.Grid
 import FVA.Proof.Numerics.Round
 import FVA.Proof.Numerics.Basic
 import FVA.Proof.Numerics.Arith
+import FVA.Proof.Numerics.SqrtLemmas
+import FVA.Proof.Numerics.Sqrt
+import FVA.Proof.Numerics.ConvertLemmas
+import FVA.Proof.Numerics.Convert
+import FVA.Proof.Numerics.AdequacyLemmas
+import FVA.Proof.Numerics.Adequacy
+import FVA.Proof.Numerics.Integral
+import FVA.Proof.Numerics.Total
