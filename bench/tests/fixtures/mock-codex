@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ ${1:-} == --version ]]; then
+	echo 'codex-cli mock-1'
+	exit 0
+fi
+[[ -z ${CLAUDECODE:-}${CLAUDE_CODE_SUBAGENT_MODEL:-}${OPENAI_API_KEY:-}${ANTHROPIC_BASE_URL:-} ]]
+[[ $HOME == */.cache/fva-bench/runs/*/home && $CODEX_HOME == "${HOME%/home}/codex" ]]
+[[ $(find "$CODEX_HOME" -mindepth 1 -maxdepth 1 | wc -l) == 1 && -f $CODEX_HOME/auth.json ]]
+[[ ! -e AGENTS.md && ! -e AGENTS.override.md && ! -e .codex && ! -e .agents ]]
+[[ ! -e CLAUDE.md && ! -e .claude && ! -e .mcp.json ]]
+[[ -f input.txt && -d .git && -z $(cat) ]]
+args=("$@")
+has() {
+	local a
+	for a in "${args[@]}"; do [[ $a != "$1" ]] || return 0; done
+	return 1
+}
+has exec
+has -C
+has "$PWD"
+has workspace-write
+has --json
+has --ignore-user-config
+has --ignore-rules
+has --ephemeral
+has project_doc_max_bytes=0
+has 'approval_policy="never"'
+has 'model_reasoning_effort="low"'
+has fixture-model
+printf '%s\n' 'mock was invoked' >mock-invoked.txt
+fixture=$(dirname -- "$0")/codex-events.jsonl
+case ${args[-1]} in
+success) cat "$fixture" ;;
+agent-error) printf '%s\n' '{"type":"turn.started"}' '{"type":"turn.failed","error":{"message":"fixture failure"}}' ;;
+malformed) echo 'not JSON' ;;
+process-error)
+	echo 'fixture process error' >&2
+	exit 7
+	;;
+timeout)
+	echo '{"type":"turn.started"}'
+	sleep 5
+	;;
+incomplete) echo '{"type":"turn.started"}' ;;
+bad-usage) jq -c 'if .type == "turn.completed" then .usage.output_tokens = "bad" else . end' "$fixture" ;;
+partial-error)
+	cat "$fixture"
+	printf '%s\n' '{"type":"turn.started"}' '{"type":"turn.failed","error":{"message":"fixture failure"}}'
+	;;
+*) exit 9 ;;
+esac

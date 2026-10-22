@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# Fresh Codex config + workspace-write sandbox. MAIN owns real launches.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+usage() {
+	echo 'Usage: bench/harness/run-session [--dry-run] ARM TASK INDEX CPUS PROMPT_FILE INPUT_DIR'
+	echo 'Set FVA_BENCH_MODEL, FVA_BENCH_EFFORT, FVA_BENCH_SECONDS, FVA_BENCH_AUTH_FILE.'
+}
+dry=false
+if [[ ${1:-} == --help ]]; then
+	usage
+	exit 0
+fi
+if [[ ${1:-} == --dry-run ]]; then
+	dry=true
+	shift
+fi
+[[ $# == 6 ]] || {
+	usage >&2
+	exit 2
+}
+arm=$1 task=$2 index=$3 cpus=$4
+case $arm in bare | prompted | tool | fva) ;; *)
+	echo 'Invalid benchmark arm' >&2
+	exit 2
+	;;
+esac
+[[ $task =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ && $index =~ ^[1-9][0-9]*$ ]] || exit 2
+[[ $cpus =~ ^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$ ]] || exit 2
+prompt=$(realpath -e -- "$5")
+inputs=$(realpath -e -- "$6")
+[[ -f $prompt && -d $inputs ]] || exit 2
+: "${FVA_BENCH_MODEL:?Set the protocol model ID}"
+: "${FVA_BENCH_EFFORT:?Set the protocol reasoning effort}"
+: "${FVA_BENCH_SECONDS:?Set the pilot-derived wall-clock cap in seconds}"
+: "${FVA_BENCH_AUTH_FILE:?Select the Codex auth.json file to copy}"
+case $FVA_BENCH_EFFORT in none | minimal | low | medium | high | xhigh) ;; *) exit 2 ;; esac
+[[ $FVA_BENCH_SECONDS =~ ^[1-9][0-9]*$ ]] || exit 2
+auth=$(realpath -e -- "$FVA_BENCH_AUTH_FILE")
+[[ -f $auth ]] || exit 2
+home=$(realpath -e -- "$HOME")
+run=$home/.cache/fva-bench/runs/$arm-$task-$index
+[[ $run != "$inputs" && $run != "$inputs/"* ]] || {
+	echo 'run-session: input directory contains the destination' >&2
+	exit 2
+}
+[[ ! -e $run ]] || {
+	echo "run-session: run already exists: $run" >&2
+	exit 1
+}
+# Symlinks could reattach a task to this repo or to another arm's live output.
+[[ -z $(find "$inputs" -type l -print -quit) ]] || {
+	echo 'run-session: supply task inputs without symlinks' >&2
+	exit 1
+}
+codex=$(command -v codex)
+codex=$(realpath -e -- "$codex")
+effective=$(taskset -c "$cpus" awk "/^Cpus_allowed_list:/ { print \$2 }" /proc/self/status)
+jq -ne --arg requested "$cpus" --arg effective "$effective" '
+  def cpus: split(",") | map(split("-") | map(tonumber) |
+    if length == 1 then . else [range(.[0]; .[1] + 1)] end) | add | unique;
+  ($requested | cpus) == ($effective | cpus)
+' >/dev/null || {
+	echo 'run-session: some requested CPUs are unavailable' >&2
+	exit 1
+}
+public_env=("HOME=$run/home" "CODEX_HOME=$run/codex"
+	"PATH=${FVA_BENCH_PATH:-/usr/local/bin:/usr/bin:/bin}"
+	"XDG_CONFIG_HOME=$run/home/.config" "XDG_CACHE_HOME=$run/home/.cache"
+	"XDG_DATA_HOME=$run/home/.local/share" "TMPDIR=$run/tmp"
+	LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC GIT_CONFIG_NOSYSTEM=1)
+args=(exec -C "$run/work" -s workspace-write --json --color never --ephemeral
+	--ignore-user-config --ignore-rules -m "$FVA_BENCH_MODEL"
+	-c "model_reasoning_effort=\"$FVA_BENCH_EFFORT\""
+	-c approval_policy='"never"' -c project_doc_max_bytes=0)
+command=(timeout --signal=TERM --kill-after=30 "$FVA_BENCH_SECONDS"
+	taskset -c "$cpus" "$codex" "${args[@]}")
+# Secret bytes never enter commands/logs. stdin stays closed even with a prompt arg.
+print_command() {
+	printf 'install -m 600 -- %q %q\n' "$auth" "$run/codex/auth.json"
+	printf 'cd %q\n' "$run/work"
+	printf 'env -i'
+	printf ' %q' "${public_env[@]}" "${command[@]}"
+	printf " \"\$(cat -- %q)\" < /dev/null > %q 2> %q\n" \
+		"$run/prompt.txt" "$run/stdout.jsonl" "$run/stderr.log"
+}
+if $dry; then
+	print_command
+	exit 0
+fi
+umask 077
+mkdir -p "$home/.cache/fva-bench/runs"
+mkdir "$run"
+mkdir "$run/work" "$run/home" "$run/codex" "$run/tmp"
+trap 'rm -f -- "$run/codex/auth.json"' EXIT
+cp -- "$prompt" "$run/prompt.txt"
+install -m 600 -- "$auth" "$run/codex/auth.json"
+rsync -a --exclude=.git --exclude=.codex --exclude=.agents --exclude=.claude \
+	--exclude=.mcp.json --exclude=.claude.json --exclude=AGENTS.md --exclude=AGENTS.override.md \
+	--exclude=CLAUDE.md --exclude=CLAUDE.local.md "$inputs/" "$run/work/"
+(cd "$run/work" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum) >"$run/inputs.sha256"
+env -i HOME="$run/home" PATH="$PATH" GIT_CONFIG_NOSYSTEM=1 \
+	git -C "$run/work" -c init.defaultBranch=main init -q
+print_command >"$run/command.sh"
+prompt_sha=$(sha256sum "$run/prompt.txt")
+prompt_sha=${prompt_sha%% *}
+input_sha=$(sha256sum "$run/inputs.sha256")
+input_sha=${input_sha%% *}
+exe_sha=$(sha256sum "$codex")
+exe_sha=${exe_sha%% *}
+version=$(env -i "${public_env[@]}" "$codex" --version)
+jq -n --arg arm "$arm" --arg task "$task" --argjson index "$index" \
+	--arg cpus "$effective" --arg model "$FVA_BENCH_MODEL" --arg effort "$FVA_BENCH_EFFORT" \
+	--argjson seconds "$FVA_BENCH_SECONDS" --arg prompt_sha "$prompt_sha" \
+	--arg input_sha "$input_sha" --arg codex_sha "$exe_sha" --arg codex "$codex" --arg version "$version" \
+	'{arm:$arm,task:$task,index:$index,cpus:$cpus,model:$model,effort:$effort,
+    limit_seconds:$seconds,prompt_sha256:$prompt_sha,input_manifest_sha256:$input_sha,
+    codex_executable:$codex,codex_executable_sha256:$codex_sha,codex_version:$version}' >"$run/metadata.json"
+prompt_text=$(<"$run/prompt.txt")
+start=$(date +%s%3N)
+set +e
+(cd "$run/work" && env -i "${public_env[@]}" "${command[@]}" "$prompt_text" \
+	</dev/null >"$run/stdout.jsonl" 2>"$run/stderr.log")
+rc=$?
+set -e
+elapsed=$(($(date +%s%3N) - start))
+rm -f -- "$run/codex/auth.json"
+if ! jq -s -f "$root/bench/harness/codex-result.jq" "$run/stdout.jsonl" \
+	>"$run/parsed.json" 2>"$run/parser.log"; then
+	printf '{"status":"invalid_result","usage_complete":false,"usage":null}\n' >"$run/parsed.json"
+fi
+status=$(jq -r .status "$run/parsed.json")
+if [[ $rc == 124 ]]; then
+	status=timeout
+elif [[ $rc == 137 ]]; then
+	status=killed
+elif [[ $rc != 0 ]]; then status=process_error; fi
+agent_rc=$rc
+if [[ $rc == 0 && $status != completed ]]; then rc=1; fi
+jq -n --slurpfile metadata "$run/metadata.json" --slurpfile parsed "$run/parsed.json" \
+	--arg status "$status" --argjson rc "$rc" --argjson agent_rc "$agent_rc" --argjson elapsed "$elapsed" \
+	'$metadata[0] + $parsed[0] + {status:$status,exit_code:$rc,agent_exit_code:$agent_rc,
+    wall_ms:$elapsed,duration_ms:$elapsed,
+    usage_complete:($parsed[0].usage_complete and $status == "completed")}' >"$run/result.json"
+rm "$run/parsed.json"
+printf '%s\n' "$run/result.json"
+exit "$rc"
