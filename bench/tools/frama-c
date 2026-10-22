@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Mount one working directory; arguments name paths relative to that directory.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+if [[ $# == 0 || $1 == --help ]]; then
+	echo 'Usage: bench/tools/frama-c [--check-wp] WORKDIR [FRAMA_C_ARGUMENT ...]'
+	exit 0
+fi
+check=false
+if [[ $1 == --check-wp ]]; then
+	check=true
+	shift
+fi
+[[ $# -gt 0 ]] || exit 2
+work=$(realpath -e -- "$1")
+shift
+[[ -d $work ]] || {
+	echo 'frama-c: WORKDIR must be a directory' >&2
+	exit 2
+}
+image=$("$root/scripts/fetch-bench-tools" --print-frama-image)
+args=("$@")
+if $check; then
+	for arg in "$@"; do
+		[[ $arg != -wp-report-json* ]] || {
+			echo 'frama-c: --check-wp owns its report' >&2
+			exit 2
+		}
+	done
+	report=$(mktemp -d "$work/.fva-wp.XXXXXXXX")
+	trap 'rm -rf -- "$report"' EXIT
+	args+=(-wp -wp-report-json "/work/${report##*/}/report.json")
+fi
+podman run --rm --pull never --network none --userns keep-id \
+	--volume "$work:/work:rw" --workdir /work \
+	--volume "$root/.tools/frama-c:/opt/fva-frama:ro" \
+	"$image" env OCAMLPATH=/opt/fva-frama/lib /opt/fva-frama/bin/frama-c "${args[@]}"
+# Frama-C's raw rc 0 means analysis completed, including unproved goals.
+if $check; then
+	jq -e 'type == "array" and length > 0 and
+    all(.[]; .passed == true and .verdict == "valid" and .smoke == false)' \
+		"$report/report.json" >/dev/null || {
+		echo 'frama-c: WP did not prove every reported goal' >&2
+		exit 1
+	}
+fi

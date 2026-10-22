@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# C ABI adapters use (src, dst, length, capacity) for both generated subjects.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+export PATH=$root/.tools/bin:$PATH
+out=${1:-$root/.cache/bench/wasm}
+mkdir -p "$root/.cache/bench/tests"
+tmp=$(mktemp -d "$root/.cache/bench/tests/wasm.XXXXXXXX")
+trap 'rm -rf -- "$tmp"' EXIT
+for name in lz4-c lz4-flex; do
+	if [[ $name == lz4-c ]]; then
+		compress=LZ4_compress_default decompress=LZ4_decompress_safe
+	else
+		compress=lz4_compress decompress=lz4_decompress
+	fi
+	{
+		printf '(module binary "'
+		od -An -v -tx1 "$out/$name.wasm" | tr -d ' \n' | sed 's/../\\&/g'
+		printf '")\n(register "codec")\n'
+		sed -e "s/\"COMPRESS\"/\"$compress\"/" -e "s/\"DECOMPRESS\"/\"$decompress\"/" \
+			"$root/bench/tests/fixtures/lz4.wast"
+	} >"$tmp/$name.wast"
+	wasmtime wast "$tmp/$name.wast"
+	printf '%s: roundtrip, empty block, short output → pass\n' "$name"
+done
