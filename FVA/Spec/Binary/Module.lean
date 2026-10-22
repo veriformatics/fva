@@ -72,7 +72,7 @@ def ExportB (ex : Export) (bs : List UInt8) : Prop :=
 def ElemKindB (t : RefType) (bs : List UInt8) : Prop := t = .funcref ∧ bs = [0x00]
 
 /-- Function indices as `(ref.func y) end` initializers. -/
-def funcInits (ys : List Nat) : List Expr := ys.map fun y => [Instr.refFunc y]
+def funcInits (ys : List Nat) : List Expr := ys.map fun y => .cons (Instr.refFunc y) .nil
 
 /-- Element segments: the eight encodings selected by a `u32` flag (spec §5.5.12). -/
 inductive ElemB : Elem → List UInt8 → Prop where
@@ -127,18 +127,20 @@ def CodeB (c : List ValType × Expr) (bs : List UInt8) : Prop :=
     c.1 = groups.flatMap (fun g => List.replicate g.1 g.2) ∧
     ULeb 32 (bl ++ be).length bsz ∧ bs = bsz ++ bl ++ be
 
+mutual
 /-- The instruction uses a data index (`memory.init`, `data.drop`), possibly nested. -/
 inductive UsesData : Instr → Prop where
   | init (x : Nat) : UsesData (.memoryInit x)
   | drop (x : Nat) : UsesData (.dataDrop x)
-  | block {bt : BlockType} {body : List Instr} {i : Instr} (hi : i ∈ body) (hu : UsesData i) :
-      UsesData (.block bt body)
-  | loop {bt : BlockType} {body : List Instr} {i : Instr} (hi : i ∈ body) (hu : UsesData i) :
-      UsesData (.loop bt body)
-  | thn {bt : BlockType} {thn els : List Instr} {i : Instr} (hi : i ∈ thn) (hu : UsesData i) :
-      UsesData (.if_ bt thn els)
-  | els {bt : BlockType} {thn els : List Instr} {i : Instr} (hi : i ∈ els) (hu : UsesData i) :
-      UsesData (.if_ bt thn els)
+  | block {bt : BlockType} {body : Instrs} (h : UsesDataS body) : UsesData (.block bt body)
+  | loop {bt : BlockType} {body : Instrs} (h : UsesDataS body) : UsesData (.loop bt body)
+  | thn {bt : BlockType} {thn els : Instrs} (h : UsesDataS thn) : UsesData (.if_ bt thn els)
+  | els {bt : BlockType} {thn els : Instrs} (h : UsesDataS els) : UsesData (.if_ bt thn els)
+/-- Some instruction of the sequence uses a data index. -/
+inductive UsesDataS : Instrs → Prop where
+  | head {i : Instr} {is : Instrs} (h : UsesData i) : UsesDataS (.cons i is)
+  | tail {i : Instr} {is : Instrs} (h : UsesDataS is) : UsesDataS (.cons i is)
+end
 
 /-- The magic number `\0asm` and version 1 (spec §5.5.16). -/
 def preamble : List UInt8 := [0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00]
@@ -165,7 +167,7 @@ def ModuleB (m : Module) (bs : List UInt8) : Prop :=
     typeIdxs.length = codes.length ∧
     m.funcs = List.zipWith (fun t c => { type := t, locals := c.1, body := c.2 }) typeIdxs codes ∧
     (∀ n, dataCount = some n → n = m.datas.length) ∧
-    (dataCount = none → ∀ c ∈ codes, ∀ i ∈ c.2, ¬ UsesData i) ∧
+    (dataCount = none → ∀ c ∈ codes, ¬ UsesDataS c.2) ∧
     bs = preamble ++ c₀ ++ s₁ ++ c₁ ++ s₂ ++ c₂ ++ s₃ ++ c₃ ++ s₄ ++ c₄ ++ s₅ ++ c₅ ++ s₆ ++ c₆ ++
       s₇ ++ c₇ ++ s₈ ++ c₈ ++ s₉ ++ c₉ ++ s₁₂ ++ c₁₂ ++ s₁₀ ++ c₁₀ ++ s₁₁ ++ c₁₁
 
