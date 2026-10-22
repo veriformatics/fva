@@ -19,8 +19,12 @@ fva=.lake/build/bin/fva enc=.lake/build/bin/fvatest corpus=.cache/corpus
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-for w in "$corpus"/testsuite/*.wast; do
-	n=$(basename "$w" .wast)
+# the decoder's own scripts (binary format + numerics); the execution scripts belong to test-spec
+decoder_scripts="binary binary-leb128 custom utf8-custom-section-id utf8-import-field utf8-import-module
+utf8-invalid-encoding i32 i64 int_exprs int_literals f32 f64 f32_cmp f64_cmp f32_bitwise f64_bitwise
+float_exprs float_misc float_literals conversions"
+for n in $decoder_scripts; do
+	w=$corpus/testsuite/$n.wast
 	mkdir -p "$work/$n"
 	wasm-tools json-from-wast "$w" -o "$work/$n/$n.json" --wasm-dir "$work/$n/" 2>/dev/null || {
 		echo "test-decoder: json-from-wast failed on $n"
