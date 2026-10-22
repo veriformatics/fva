@@ -20,6 +20,7 @@ inductive Ref where
   | null (t : RefType)
   | func (a : Nat)
   | extern (a : Nat)
+  deriving DecidableEq
 
 /-- Values (§4.2.1); floats as their bit patterns (§4.3.1). -/
 inductive Val where
@@ -28,6 +29,7 @@ inductive Val where
   | f32 (v : BitVec 32)
   | f64 (v : BitVec 64)
   | ref (r : Ref)
+  deriving DecidableEq
 
 /-- `default_t` (§4.2.1): zero bits, or null. -/
 def _root_.FVA.Wasm.ValType.default : ValType → Val

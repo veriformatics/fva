@@ -406,9 +406,10 @@ def evalConst (fuel : Nat) (s : Store) (inst : ModuleInst) (e : Expr) : Option V
 
 /-- Instantiate `m` in `s` with `imports` (§4.5.4) by running the initializers and the
 initialization code within `fuel` steps each: allocate with placeholder initial values, evaluate
-the initializers in that store, then allocate with their values (a valid module's initializers
-read only imported globals and function addresses, which both allocations share). `none` on a
-failing initializer, a trap or exhausted fuel; import matching is checked separately. -/
+the initializers in that store, allocate with their values, and check the initializers give the
+same values in that final store (the spec's fixpoint; it holds for valid modules, whose
+initializers read only imports and function addresses). `none` on a failing initializer, a
+disagreement, a trap or exhausted fuel; import matching is checked separately. -/
 def instantiate (fuel : Nat) (s : Store) (m : Module) (imports : List ExternVal) :
     Option (Store × ModuleInst) := do
   let (s₀, inst₀) := allocModule s m imports (m.globals.map fun g => g.type.val.default)
@@ -416,6 +417,10 @@ def instantiate (fuel : Nat) (s : Store) (m : Module) (imports : List ExternVal)
   let gvals ← m.globals.mapM fun g => evalConst fuel s₀ inst₀ g.init
   let erefs ← m.elems.mapM fun e => e.init.mapM fun ex => evalConst fuel s₀ inst₀ ex >>= asRef
   let (s₁, inst) := allocModule s m imports gvals erefs
+  -- the spec evaluates the initializers in the final allocation: check they agree there
+  let gvals₁ ← m.globals.mapM fun g => evalConst fuel s₁ inst g.init
+  let erefs₁ ← m.elems.mapM fun e => e.init.mapM fun ex => evalConst fuel s₁ inst ex >>= asRef
+  guard (gvals₁ == gvals && erefs₁ == erefs)
   let c ← run fuel ⟨s₁, ⟨[], inst⟩, (initCode m).map .plain⟩
   match c.instrs with
   | [] => some (c.store, inst)
