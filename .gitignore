@@ -5,6 +5,7 @@ __pycache__/
 .venv/
 *.wasm
 !prototype/fva/examples/**/*.wasm
+!bench/subjects/wasm/*.wasm
 # local state
 .scratch/
 .cache/
