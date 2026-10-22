@@ -1,5 +1,5 @@
 import FVATest.Basic
-import FVATest.Encode
+import FVA.Tool.Encode
 import FVATest.Numeric
 import FVATest.FloatDiff
 import FVATest.Spec
@@ -14,7 +14,7 @@ def main : List String → IO UInt32
     let bs ← IO.FS.readBinFile src
     match FVA.Wasm.Decode.decode (FVA.Tool.packBytes bs) bs.size with
     | .ok m =>
-      IO.FS.writeBinFile dst ⟨(FVA.Test.Encode.module m).toArray⟩
+      IO.FS.writeBinFile dst ⟨(FVA.Tool.Encode.module m).toArray⟩
       return 0
     | .error e =>
       IO.eprintln s!"fvatest reencode: {repr e}"

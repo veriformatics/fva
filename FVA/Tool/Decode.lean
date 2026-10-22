@@ -19,6 +19,11 @@ def instrCount : List Instr → Nat
   | i :: is => instrCount1 i + instrCount is
 end
 
+/-- A decoding error in words. -/
+def decodeError : DecodeError → String
+  | .malformed p msg => s!"malformed at byte {p}: {msg}"
+  | .unsupported p msg => s!"unsupported at byte {p}: {msg}"
+
 /-- One-line result: `ok …` with section counts, `malformed …` or `unsupported …`. -/
 def decodeSummary (bs : ByteArray) : String :=
   match decode (packBytes bs) bs.size with
@@ -27,7 +32,6 @@ def decodeSummary (bs : ByteArray) : String :=
     s!"tables={m.tables.length} mems={m.mems.length} globals={m.globals.length} " ++
     s!"exports={m.exports.length} elems={m.elems.length} datas={m.datas.length} " ++
     s!"instrs={(m.funcs.map fun f => instrCount f.body).sum}"
-  | .error (.malformed p msg) => s!"malformed @{p}: {msg}"
-  | .error (.unsupported p msg) => s!"unsupported @{p}: {msg}"
+  | .error e => decodeError e
 
 end FVA.Tool
