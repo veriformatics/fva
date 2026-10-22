@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Decoder evidence on the pinned corpus (scripts/fetch-corpus):
-# E1 = the official binary-format tests: every assert_malformed binary module is rejected as
-#      malformed, every valid binary module decodes (counts pinned, so an empty run fails);
+# E1 = the official test scripts in the corpus (binary-format + numeric): every assert_malformed
+#      binary module is rejected as malformed, every valid binary module decodes (counts pinned,
+#      so an empty run fails);
 # E2 = whole-module differential: `wasm-tools print` of the original (custom sections stripped)
 #      equals that of the decode → re-encode round trip (FVATest/Encode.lean), for every valid
 #      testsuite module plus uBlock Origin's lz4 codec and R-universe edgeR.so.
@@ -53,8 +54,8 @@ while IFS=$'\t' read -r type file; do
 		bad=1
 	fi
 done <"$work/cases.tsv"
-echo "E1 malformed rejected: $malformed (pinned 702); valid decoded: $valid (pinned 56)"
-((malformed == 702 && valid == 56)) || bad=1
+echo "E1 malformed rejected: $malformed (pinned 702); valid decoded: $valid (pinned 186)"
+((malformed == 702 && valid == 186)) || bad=1
 
 norm() {
 	sed -E '/^  \(elem/{ s/ \(table 0\)//; :a; s/funcref(( [0-9]+)*) \(ref\.func ([0-9]+)\)/funcref\1 \3/; ta; s/funcref(( [0-9]+)*)\)$/func\1)/ }'
@@ -71,8 +72,8 @@ for f in "${valid_files[@]}" "$corpus/ubo-lz4-block-codec.wasm" "$corpus/edgeR.s
 		bad=1
 	fi
 done
-echo "E2 round trips equal: $same (pinned 58)"
-((same == 58)) || bad=1
+echo "E2 round trips equal: $same (pinned 188)"
+((same == 188)) || bad=1
 
 ubo=$corpus/ubo-lz4-block-codec.wasm
 "$fva" lift "$ubo" "$work/L1.lean" --ns L && "$fva" lift "$ubo" "$work/L2.lean" --ns L || bad=1

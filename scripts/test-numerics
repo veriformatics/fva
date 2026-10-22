@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Numeric evidence (U3 E1): the official numeric test scripts (scripts/fetch-corpus) run against
+# the reviewed numeric spec through FVATest/Numeric.lean (straight-line exports only; others are
+# counted as skipped). Pass/fail/skip counts are pinned per script, so a shrinking or failing run
+# fails the gate.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+export PATH="$PWD/.tools/bin:$PATH"
+scripts/fetch-corpus || exit 1
+lake build fvatest >/dev/null || exit 1
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+# script pass fail skip
+pinned="conversions 78 0 515
+f32_bitwise 0 0 360
+f32_cmp 0 0 2400
+f32 0 0 2500
+f64_bitwise 0 0 360
+f64_cmp 0 0 2400
+f64 0 0 2500
+float_exprs 0 0 819
+float_literals 99 0 0
+float_misc 0 0 470
+i32 374 0 0
+i64 384 0 0
+int_exprs 89 0 0
+int_literals 8 0 22"
+jsons=()
+while read -r name _; do
+	wasm-tools json-from-wast ".cache/corpus/testsuite/$name.wast" -o "$work/$name.json" \
+		--wasm-dir "$work/" 2>/dev/null || {
+		echo "test-numerics: json-from-wast failed on $name"
+		exit 1
+	}
+	jsons+=("$work/$name.json")
+done <<<"$pinned"
+.lake/build/bin/fvatest numeric "${jsons[@]}" >"$work/out.txt"
+rc=$?
+grep '^  FAIL' "$work/out.txt" | head -20
+if ! diff <(grep -v '^  ' "$work/out.txt" | sort) <(sort <<<"$pinned") >"$work/diff.txt"; then
+	echo "test-numerics: counts differ from the pinned table (< actual, > pinned):"
+	cat "$work/diff.txt"
+	exit 1
+fi
+echo "test-numerics: $(wc -l <<<"$pinned") scripts match the pinned counts"
+exit "$rc"
