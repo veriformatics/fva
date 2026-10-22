@@ -1,4 +1,3 @@
-import FVA
 import FVA.Spec.Numerics.Int
 import FVA.Impl.Numerics.Float
 import FVA.Tool.Pack

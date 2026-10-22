@@ -1,10 +1,12 @@
 import FVATest.Basic
 import FVATest.Encode
 import FVATest.Numeric
+import FVATest.FloatDiff
 
 /-- Runtime checks (no arguments): the lakefile version matches `FVA.version`.
 `reencode <in.wasm> <out.wasm>`: decode, then write the re-encoding (decoder differential, E2).
-`numeric <script.json>…`: run numeric test scripts (U3 E1); prints `name pass fail skip`. -/
+`numeric <script.json>…`: run numeric test scripts (U3 E1); prints `name pass fail skip`.
+`floatdiff <dir> <seed> <nBin> <nOther>`: write `f32.wast` + `f64.wast` (U3 E3). -/
 def main : List String → IO UInt32
   | ["reencode", src, dst] => do
     let bs ← IO.FS.readBinFile src
@@ -25,6 +27,9 @@ def main : List String → IO UInt32
       for f in t.failures.toList.take 10 do IO.println s!"  FAIL {f}"
       if t.fail > 0 then bad := true
     return if bad then 1 else 0
+  | ["floatdiff", dir, seed, nBin, nOther] => do
+    FVA.Test.FloatDiff.run dir seed.toNat!.toUInt64 nBin.toNat! nOther.toNat!
+    return 0
   | _ => do
     let lake ← IO.FS.readFile "lakefile.toml"
     let want := s!"version = \"{FVA.version}\""

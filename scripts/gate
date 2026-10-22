@@ -28,6 +28,7 @@ lean_lane() {
 	run test lake --wfail test
 	run decoder scripts/test-decoder
 	run numerics scripts/test-numerics
+	if ((fast)); then run floatdiff scripts/test-floatdiff --fast; else run floatdiff scripts/test-floatdiff; fi
 	run lint lake --wfail lint
 }
 lean_lane &

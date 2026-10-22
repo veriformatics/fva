@@ -62,4 +62,22 @@ theorem fconvertU_nonempty (hF : F.Sane) {M : ℕ} (i : BitVec M) : (fconvertU F
 theorem fconvertS_nonempty (hF : F.Sane) {M : ℕ} (i : BitVec M) : (fconvertS F i).Nonempty :=
   ⟨_, fconvertS_mem hF i⟩
 
+/-! NaN-set checks (contract C5): canonical sets hold exactly the canonical NaNs of either sign;
+an operand NaN that is not canonical opens the arithmetic set, which still excludes signaling
+payloads and numbers. -/
+
+example : nan true f32fmt.canon ∈ nans f32fmt [] := by simp [nans]
+example : nan false (f32fmt.canon + 1) ∉ nans f32fmt [] := by
+  simp [nans, f32fmt, FloatFormat.canon]
+example : nan false 1 ∉ nans f32fmt [nan false 5] := by
+  simp [nans, f32fmt, FloatFormat.canon]
+example : nan true (f32fmt.canon + 1) ∈ nans f32fmt [nan false 5] := by
+  simp [nans, f32fmt, FloatFormat.canon]
+example : posZero ∉ nans f64fmt [nan false 5] := by
+  simp [nans, f64fmt, FloatFormat.canon, posZero]
+example : nan false f64fmt.canon ∈ nans f64fmt [nan true f64fmt.canon, posZero] := by
+  simp [nans, posZero]
+example : nan false (f64fmt.canon + 7) ∉ nans f64fmt [nan true f64fmt.canon] := by
+  simp [nans, f64fmt, FloatFormat.canon]
+
 end FVA.Wasm.Num

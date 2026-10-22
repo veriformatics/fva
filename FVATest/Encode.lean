@@ -1,4 +1,5 @@
-import FVA
+import FVA.Spec.Binary.Module
+import Std.Data.HashMap
 import FVA.Tool.Lift
 
 /-!
