@@ -3,6 +3,9 @@ version = "0.1.0"
 defaultTargets = ["FVA", "fva"]
 testDriver = "fvatest"
 lintDriver = "batteries/runLinter"
+# FVA files are not module-system files yet; Mathlib requires the module system and Lake warns
+# (failing `--wfail`) on every Mathlib import from a non-module file unless this is set.
+allowNonModules = true
 
 [leanOptions]
 autoImplicit = false
