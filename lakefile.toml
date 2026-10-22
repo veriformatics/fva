@@ -7,7 +7,6 @@ lintDriver = "batteries/runLinter"
 [leanOptions]
 autoImplicit = false
 relaxedAutoImplicit = false
-linter.missingDocs = true
 
 [[require]]
 name = "mathlib"
