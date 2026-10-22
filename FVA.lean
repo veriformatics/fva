@@ -2,6 +2,8 @@ import FVA.Version
 import FVA.Cli
 import FVA.Spec.Syntax
 import FVA.Spec.Binary.Module
+import FVA.Spec.Numerics.Int
+import FVA.Spec.Numerics.Float
 import FVA.Lifted
 import FVA.Proof.Decode.Reader
 import FVA.Proof.Decode.Name
