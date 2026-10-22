@@ -9,6 +9,7 @@ import FVA.Spec.Exec.Numeric
 import FVA.Spec.Exec.Step
 import FVA.Spec.Exec.Instantiate
 import FVA.Spec.Claims
+import FVA.Spec.Exec.Host
 import FVA.Impl.Numerics.Float
 import FVA.Impl.Exec.Ref
 import FVA.Lifted
