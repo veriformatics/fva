@@ -436,7 +436,8 @@ inductive Step (H : HostSem) : Config → Config → Prop where
       s.funcs[a]? = some (.host ft id) →
       vs.length = ft.params.length → H id s vs .diverged →
       Step H ⟨s, f, vals vs ++ [.invoke a]⟩ ⟨s, f, vals vs ++ [.invoke a]⟩
-  -- contexts (§4.2.13)
+  -- contexts (§4.2.13); `seq` + `label` together give `E[es] ↪ E[es']` for every evaluation
+  -- context `E`; `trap` collapses any non-trivial context in one step
   | seq {s f s' f' es es' vs rest} :
       Step H ⟨s, f, es⟩ ⟨s', f', es'⟩ →
       Step H ⟨s, f, vals vs ++ es ++ rest⟩ ⟨s', f', vals vs ++ es' ++ rest⟩
@@ -446,11 +447,8 @@ inductive Step (H : HostSem) : Config → Config → Prop where
   | frame {s f s' n fi fi' es es'} :
       Step H ⟨s, fi, es⟩ ⟨s', fi', es'⟩ →
       Step H ⟨s, f, [.frame n fi es]⟩ ⟨s', f, [.frame n fi' es']⟩
-  | trapSeq {s f vs rest} :
-      vs ≠ [] ∨ rest ≠ [] →
-      Step H ⟨s, f, vals vs ++ [.trap] ++ rest⟩ ⟨s, f, [.trap]⟩
-  | trapLabel {s f n cont} :
-      Step H ⟨s, f, [.label n cont [.trap]]⟩ ⟨s, f, [.trap]⟩
+  | trap {s f} (E : EvalCtx) : E.fill [.trap] ≠ [.trap] →
+      Step H ⟨s, f, E.fill [.trap]⟩ ⟨s, f, [.trap]⟩
   | trapFrame {s f n fi} :
       Step H ⟨s, f, [.frame n fi [.trap]]⟩ ⟨s, f, [.trap]⟩
 

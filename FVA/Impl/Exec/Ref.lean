@@ -1,4 +1,5 @@
 import FVA.Spec.Exec.Step
+import FVA.Spec.Exec.Instantiate
 import FVA.Impl.Numerics.Float
 
 /-!
@@ -382,5 +383,42 @@ def run : Nat → Config → Option Config
     | .step s f es => run n ⟨s, f, es⟩
     | .final => some c
     | _ => none
+
+end FVA.Wasm.Exec.Ref
+
+namespace FVA.Wasm.Exec.Ref
+
+open FVA.Wasm
+
+/-- The reference a value is, if any. -/
+def asRef : Val → Option Ref
+  | .ref r => some r
+  | _ => none
+
+/-- Evaluate a constant expression (a global or element initializer) in store `s` with instance
+`inst`, within `fuel` steps. -/
+def evalConst (fuel : Nat) (s : Store) (inst : ModuleInst) (e : Expr) : Option Val :=
+  match run fuel ⟨s, ⟨[], inst⟩, e.map .plain⟩ with
+  | some c => match c.instrs with
+    | [v] => toVal v
+    | _ => none
+  | none => none
+
+/-- Instantiate `m` in `s` with `imports` (§4.5.4) by running the initializers and the
+initialization code within `fuel` steps each: allocate with placeholder initial values, evaluate
+the initializers in that store, then allocate with their values (a valid module's initializers
+read only imported globals and function addresses, which both allocations share). `none` on a
+failing initializer, a trap or exhausted fuel; import matching is checked separately. -/
+def instantiate (fuel : Nat) (s : Store) (m : Module) (imports : List ExternVal) :
+    Option (Store × ModuleInst) := do
+  let (s₀, inst₀) := allocModule s m imports (m.globals.map fun g => g.type.val.default)
+    (m.elems.map fun _ => [])
+  let gvals ← m.globals.mapM fun g => evalConst fuel s₀ inst₀ g.init
+  let erefs ← m.elems.mapM fun e => e.init.mapM fun ex => evalConst fuel s₀ inst₀ ex >>= asRef
+  let (s₁, inst) := allocModule s m imports gvals erefs
+  let c ← run fuel ⟨s₁, ⟨[], inst⟩, (initCode m).map .plain⟩
+  match c.instrs with
+  | [] => some (c.store, inst)
+  | _ => none
 
 end FVA.Wasm.Exec.Ref
