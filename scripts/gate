@@ -26,6 +26,7 @@ mapfile -t workflows < <(git ls-files -co --exclude-standard -- '.github/workflo
 lean_lane() {
 	run build lake --wfail build
 	run test lake --wfail test
+	run decoder scripts/test-decoder
 	run lint lake --wfail lint
 }
 lean_lane &
@@ -42,7 +43,7 @@ fi
 run gitleaks-tree gitleaks dir --no-banner --redact --config .gitleaks.toml . &
 if ((! fast)); then
 	run gitleaks-history gitleaks git --no-banner --redact --config .gitleaks.toml . &
-	run osv-scanner osv-scanner scan source -r --x-exclude .lake --x-exclude .tools --x-exclude .scratch . &
+	run osv-scanner osv-scanner scan source -r --x-exclude .lake --x-exclude .tools --x-exclude .scratch --x-exclude .cache . &
 fi
 wait
 

@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Fetch the pinned decoder corpus into .cache/corpus; every download is sha256-checked.
+# Third-party binaries (GPL: lz4-wasm, edgeR) are fetched, never committed.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+dir=.cache/corpus
+mkdir -p "$dir/testsuite"
+ts=https://raw.githubusercontent.com/WebAssembly/testsuite/44f1503f98409fa3737437bf9449a37a5def4210
+lz4wasm=https://raw.githubusercontent.com/gorhill/lz4-wasm/8995cdef7b3adc4a4d2fc4fc86b84a86789ff858
+
+# destination url sha256
+files=(
+	"testsuite/binary.wast $ts/binary.wast 362e0bfa0075dfba9e7f5825deaaad1e8e3e1eeb5bc6f50f81284b0e1921a4dc"
+	"testsuite/binary-leb128.wast $ts/binary-leb128.wast 785c4cbd50e3076200a8e7571cb6dc9cacd37009276fcfee633a7454368b6f61"
+	"testsuite/custom.wast $ts/custom.wast 59067c2c216fe1d6ac1249dbf9fc33573fb23b45b1bf5cc8f8a6eca14cf96f10"
+	"testsuite/utf8-custom-section-id.wast $ts/utf8-custom-section-id.wast 20f6802e8ae0c9515d10687934f8f43a9312dfc64a52761f629f5547a689cb3a"
+	"testsuite/utf8-import-field.wast $ts/utf8-import-field.wast 1b9f2344c4b041c516079c5587c88d6fac1ec06c68d3328eaa5427f5b0242929"
+	"testsuite/utf8-import-module.wast $ts/utf8-import-module.wast 20449f8bb0249777e33aee76472009b48ec2ea3d3ecc78a8b8004173b47223c0"
+	"testsuite/utf8-invalid-encoding.wast $ts/utf8-invalid-encoding.wast 3a051a2d84a51c3bdb6f3eb34b4f498017b07dc065a6065ec24c63ae6f4545bf"
+	"lz4-wasm-block-codec.wasm $lz4wasm/dist/lz4-block-codec.wasm 4bda6947a0498618552cba53ab3780745fd34cc1a0d84696e83a0547dcd68acf"
+	"edgeR_4.99.10.tgz https://r2.ropensci.org/4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93 4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93"
+)
+
+for f in "${files[@]}"; do
+	read -r dest url sha <<<"$f"
+	out=$dir/$dest
+	if [[ ! -f $out ]] || ! echo "$sha  $out" | sha256sum -c --status; then
+		curl -fsSL --retry 3 -o "$out.part" "$url"
+		if ! echo "$sha  $out.part" | sha256sum -c --status; then
+			echo "fetch-corpus: sha256 mismatch for $dest" >&2
+			exit 1
+		fi
+		mv "$out.part" "$out"
+	fi
+done
+
+# R-universe's emscripten build of edgeR 4.99.10: the shared library is the wasm module.
+if [[ ! -f $dir/edgeR.so ]]; then
+	tar -xzf "$dir/edgeR_4.99.10.tgz" -C "$dir" edgeR/libs/edgeR.so
+	mv "$dir/edgeR/libs/edgeR.so" "$dir/edgeR.so"
+	rm -r "$dir/edgeR"
+fi
+echo "e39434314a9eb0399edf943c6a0475d34ff9d0d7ec0bb4a1b8ba726b4a6a88fb  $dir/edgeR.so" | sha256sum -c --status

@@ -4,4 +4,4 @@ useDefault = true
 
 [allowlist]
 description = "gitignored build output, caches, scratch"
-paths = ['''^\.lake/''', '''^\.tools/''', '''^\.scratch/''', '''(^|/)\.lake/''', '''(^|/)\.venv/''']
+paths = ['''^\.lake/''', '''^\.tools/''', '''^\.scratch/''', '''^\.cache/''', '''(^|/)\.lake/''', '''(^|/)\.venv/''']
