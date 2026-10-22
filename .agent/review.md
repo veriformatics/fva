@@ -41,3 +41,15 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | R1 (register) | §4.4.7 bulk-op prose asserts `d+1 < 2^32` after the range check; false at 65536 pages | note | accepted: the transcription wraps only the next zero-count iteration's pointer; every access stays exact; no change |
 | R2 (register) | validity (`ValidHost`, store typing) not yet stated | note | accepted: contract S4/S5 + U6 interface (slices 2–3) |
 
+## U4 re-audit: Instantiate.lean + Host.lean + F1/F2 fixes (reviewer-4, check set I1–I7 X1, target af3ca99)
+
+| row | check | verdict | ruling |
+|---|---|---|---|
+| I1–I4 | allocModule (§4.5.3.10); import matching (§4.5.2); runelem/rundata/initCode order (§4.5.4); Instantiated incl. the initializer fixpoint device | pass | accepted |
+| I5 | store extension per instance kind (appendix); HostOutcome.Allowed + ValidHost (§4.4.10) | pass | accepted, with register R1 |
+| I6–I7 | F1 fix (Val.HasType, InvokeOK, Call*); F2 fix (EvalCtx + Step.trap) | pass | accepted: both fixes confirmed by a second reviewer |
+| X1 | contradictions / missing requirements (validity excluded) | pass | accepted |
+| R1 (register) | host outcome stores are not required to be valid (a mutable i32 global may hold an f64 in an allowed trapped store; exec-instructions.rst host requirement) | note | accepted: store validity = the deferred U6 store typing (U4 R2); `ValidHost` gains the valid-store condition when U6 defines store typing |
+| R2 (register) | upstream: §4.5.4 prose runs all active segments before declarative drops; the equations interleave by segment index | note | accepted: the transcription follows the equations (FVA's convention) |
+| R3 (register) | upstream: appendix extension keeps the table/memory type unchanged while growth updates its min | note | accepted: growth-compatible reading (same element type/maximum, size non-decreasing) |
+
