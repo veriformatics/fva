@@ -1,6 +1,7 @@
-import FVA
+import FVA.Cli
 import FVA.Tool.Decode
 import FVA.Tool.Lift
+import FVA.Tool.Difftest
 
 /-- CLI entry point. -/
 def main (args : List String) : IO UInt32 := do
@@ -21,6 +22,7 @@ def main (args : List String) : IO UInt32 := do
     | .error e =>
       IO.eprintln s!"fva lift: {repr e}"
       return 1
+  | "difftest" :: rest => FVA.Tool.Difftest.main rest
   | _ =>
     let o := FVA.Cli.dispatch args
     IO.print o.out

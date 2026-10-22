@@ -20,7 +20,10 @@ def helpText : String :=
   "FVA checks formal proofs about compiled WebAssembly programs.\n\n" ++
   "Commands:\n" ++
   "  help      Show this help.\n" ++
-  "  version   Show the FVA version.\n"
+  "  version   Show the FVA version.\n" ++
+  "  decode    Show a summary of each .wasm file that FVA decodes.\n" ++
+  "  lift      Write a Lean module that holds a .wasm file and its decoded syntax.\n" ++
+  "  difftest  Compare the Lean semantics with wasmtime on the exported functions of .wasm files.\n"
 
 /-- Map command-line arguments to an outcome. -/
 def dispatch : List String → Outcome

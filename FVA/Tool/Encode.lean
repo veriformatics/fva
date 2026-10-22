@@ -3,7 +3,7 @@ import Std.Data.HashMap
 import FVA.Tool.Lift
 
 /-!
-# Re-encoder for the decoder differential (E2)
+# Module encoder (decoder differential E2, difftest fixtures)
 
 Writes a decoded module back to bytes from the spec's opcode tables (`FVA.Wasm.Binary.plainOps`,
 …), independent of the decoder's dispatch, so `wasm-tools print` of the original (custom
@@ -12,7 +12,7 @@ Encoding choices the syntax does not record: minimal LEBs, no explicit empty `el
 segments in function-index form whenever every initializer is `ref.func`.
 -/
 
-namespace FVA.Test.Encode
+namespace FVA.Tool.Encode
 
 open FVA.Wasm FVA.Wasm.Binary
 
@@ -206,4 +206,4 @@ def module (m : Module) : List UInt8 :=
     ++ section_ 12 (if needsDataCount m then some (uleb m.datas.length) else none)
     ++ vecSec 10 code m.funcs ++ vecSec 11 data m.datas
 
-end FVA.Test.Encode
+end FVA.Tool.Encode

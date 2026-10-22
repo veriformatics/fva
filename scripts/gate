@@ -30,6 +30,7 @@ lean_lane() {
 	run numerics scripts/test-numerics
 	if ((fast)); then run floatdiff scripts/test-floatdiff --fast; else run floatdiff scripts/test-floatdiff; fi
 	if ((fast)); then run spec scripts/test-spec --fast; else run spec scripts/test-spec; fi
+	if ((fast)); then run difftest scripts/test-difftest --fast; else run difftest scripts/test-difftest; fi
 	run lint lake --wfail lint
 }
 lean_lane &
