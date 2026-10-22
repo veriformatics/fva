@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Subjects stay outside git; verify cached bytes as well as new downloads.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/.." && pwd)
+manifest=$root/bench/subjects/manifest.json
+cache=$root/.cache/bench/downloads
+while [[ $# -gt 0 ]]; do
+	case $1 in
+	--manifest | --cache)
+		[[ $# -ge 2 ]] || exit 2
+		if [[ $1 == --manifest ]]; then manifest=$2; else cache=$2; fi
+		shift 2
+		;;
+	--help)
+		echo 'Usage: scripts/fetch-bench [--manifest FILE] [--cache DIR] [SUBJECT_ID ...]'
+		exit 0
+		;;
+	--*)
+		echo "fetch-bench: invalid option: $1" >&2
+		exit 2
+		;;
+	*) break ;;
+	esac
+done
+jq -e '
+  .schema == 1 and (.subjects | type == "array" and length > 0) and
+  ([.subjects[].id] | length == (unique | length)) and
+  all(.subjects[];
+    (.id | test("^[a-z0-9][a-z0-9-]*$")) and
+    (.file | test("^[A-Za-z0-9][A-Za-z0-9_.-]*$")) and
+    (.sha256 | test("^[0-9a-f]{64}$")) and
+    ([.name, .version, .upstream, .url, .license] | all(type == "string" and length > 0))) and
+  (.subjects as $s | all($s[]; .extract == null or
+    (.extract.from as $parent | any($s[]; .id == $parent and .extract == null))))
+' "$manifest" >/dev/null || {
+	echo 'fetch-bench: invalid manifest' >&2
+	exit 1
+}
+mkdir -p -- "$cache"
+tmp=
+trap '[[ -z $tmp ]] || rm -rf -- "$tmp"' EXIT
+
+fetch() {
+	local id=$1 row file sha out parent member parent_file
+	row=$(jq -ce --arg id "$id" '.subjects[] | select(.id == $id)' "$manifest") || {
+		echo "fetch-bench: subject not found: $id" >&2
+		exit 1
+	}
+	file=$(jq -r .file <<<"$row")
+	sha=$(jq -r .sha256 <<<"$row")
+	out=$cache/$id/$file
+	if [[ ! -f $out ]]; then
+		parent=$(jq -r '.extract.from // empty' <<<"$row")
+		if [[ -n $parent ]]; then fetch "$parent"; fi
+		mkdir -p -- "$cache/$id"
+		tmp=$(mktemp -d "$cache/.fetch.XXXXXXXX")
+		if [[ -n $parent ]]; then
+			member=$(jq -r .extract.member <<<"$row")
+			parent_file=$(jq -r --arg id "$parent" '.subjects[] | select(.id == $id) | .file' "$manifest")
+			tar -xOf "$cache/$parent/$parent_file" -- "$member" >"$tmp/payload"
+		else
+			curl -fsSL --retry 3 -o "$tmp/payload" "$(jq -r .url <<<"$row")"
+		fi
+		if ! printf '%s  %s\n' "$sha" "$tmp/payload" | sha256sum -c --status; then
+			echo "fetch-bench: sha256 mismatch for $id" >&2
+			exit 1
+		fi
+		mv -- "$tmp/payload" "$out"
+		rmdir -- "$tmp"
+		tmp=
+	fi
+	if ! printf '%s  %s\n' "$sha" "$out" | sha256sum -c --status; then
+		echo "fetch-bench: sha256 mismatch for $id; remove the cached file and fetch again" >&2
+		exit 1
+	fi
+	printf '%s  %s\n' "$sha" "$out"
+}
+
+if [[ $# == 0 ]]; then mapfile -t ids < <(jq -r '.subjects[].id' "$manifest"); else ids=("$@"); fi
+for id in "${ids[@]}"; do fetch "$id"; done

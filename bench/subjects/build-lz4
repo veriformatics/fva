@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Fresh source + target directories on every build; no source patches.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+if [[ ${1:-} == --help ]]; then
+	echo 'Usage: bench/subjects/build-lz4 [OUTPUT_DIR]'
+	exit 0
+fi
+out=${1:-$root/.cache/bench/wasm}
+mkdir -p "$out" "$root/.cache/bench"
+out=$(realpath -e -- "$out")
+"$root/scripts/fetch-bench" lz4 lz4-flex >/dev/null
+export RUSTUP_HOME=$root/.tools/rustup CARGO_HOME=$root/.tools/cargo
+export PATH=$CARGO_HOME/bin:$root/.tools/bin:$PATH
+clang=$root/.tools/wasi-sdk/bin/clang
+[[ $("$clang" -dumpversion) == 23.1.0-wasi-sdk ]] || {
+	echo 'Expected WASI SDK clang 23.1.0' >&2
+	exit 1
+}
+[[ -f $root/.tools/wasi-sdk/.pin-34.0 ]] || {
+	echo 'Run scripts/fetch-bench-tools' >&2
+	exit 1
+}
+stage=$(mktemp -d "$root/.cache/bench/build.XXXXXXXX")
+trap 'rm -rf -- "$stage"' EXIT
+mkdir "$stage/c" "$stage/rust" "$stage/shim"
+tar -xzf "$root/.cache/bench/downloads/lz4/lz4-1.10.0.tar.gz" -C "$stage/c"
+tar -xzf "$root/.cache/bench/downloads/lz4-flex/lz4_flex-0.14.0.crate" -C "$stage/rust"
+cp -R "$root/bench/subjects/lz4-flex-shim/." "$stage/shim/"
+mkdir "$stage/shim/vendor"
+mv "$stage/rust/lz4_flex-0.14.0" "$stage/shim/vendor/lz4_flex"
+export SOURCE_DATE_EPOCH=0
+cflags=(--target=wasm32-unknown-unknown -mcpu=generic -mno-simd128 -mno-relaxed-simd
+	-O2 -nostdlib -ffreestanding
+	-fno-builtin -fvisibility=hidden -DLZ4_FREESTANDING=1
+	-DLZ4_memcpy=memcpy -DLZ4_memmove=memmove -DLZ4_memset=memset
+	-include "$root/bench/subjects/c-memory.h"
+	-ffile-prefix-map="$stage=/build" -ffile-prefix-map="$root=/fva"
+	'-Wl,--no-entry' '-Wl,--strip-all' '-Wl,--export-memory'
+	'-Wl,--export=LZ4_compress_default' '-Wl,--export=LZ4_decompress_safe'
+	'-Wl,--initial-memory=2097152' '-Wl,--max-memory=2097152' '-Wl,-z,stack-size=65536')
+"$clang" "${cflags[@]}" "$stage/c/lz4-1.10.0/lib/lz4.c" \
+	"$root/bench/subjects/c-memory.c" -o "$stage/lz4-c.wasm"
+export CARGO_TARGET_DIR=$stage/target
+# Encoded flags preserve paths with spaces and replace inherited compiler flags.
+flags=(-C target-cpu=generic -C 'target-feature=-simd128,-relaxed-simd'
+	-C link-arg=--no-entry -C link-arg=--export-memory
+	-C link-arg=--initial-memory=2097152 -C link-arg=--max-memory=2097152
+	-C link-arg=-z -C link-arg=stack-size=65536
+	--remap-path-prefix "$stage=/build" --remap-path-prefix "$root=/fva")
+printf -v CARGO_ENCODED_RUSTFLAGS '%s\x1f' "${flags[@]}"
+export CARGO_ENCODED_RUSTFLAGS=${CARGO_ENCODED_RUSTFLAGS%$'\x1f'}
+unset RUSTFLAGS RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+(cd "$stage/shim" && cargo build --release --frozen --target wasm32-unknown-unknown)
+cp "$stage/target/wasm32-unknown-unknown/release/fva_lz4_flex.wasm" "$stage/lz4-flex.wasm"
+for name in lz4-c lz4-flex; do
+	wasm-tools validate --features=wasm2,-simd "$stage/$name.wasm"
+	wasm-tools print "$stage/$name.wasm" >"$stage/$name.wat"
+	if grep -q '(import ' "$stage/$name.wat"; then
+		echo "build-lz4: unexpected imports in $name" >&2
+		exit 1
+	fi
+	[[ $(grep -c '(export ' "$stage/$name.wat") -ge 3 ]] || exit 1
+done
+for name in lz4-c lz4-flex; do mv "$stage/$name.wasm" "$out/$name.wasm"; done
+(cd "$out" && sha256sum lz4-c.wasm lz4-flex.wasm >SHA256SUMS)
+cat "$out/SHA256SUMS"

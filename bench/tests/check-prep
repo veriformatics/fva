@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# Offline behavior: checked downloads + mock Codex only, never a real agent.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+mkdir -p "$root/.cache/bench/tests"
+tmp=$(mktemp -d "$root/.cache/bench/tests/prep.XXXXXXXX")
+run_prefix=$(realpath -e -- "$HOME")/.cache/fva-bench/runs/bare-mock-$$
+runs=()
+cleanup() {
+	rm -rf -- "$tmp"
+	for run in "${runs[@]}"; do rm -rf -- "$run"; done
+}
+trap cleanup EXIT
+expect_rc() {
+	local expected=$1 actual
+	shift
+	set +e
+	"$@" >"$tmp/last.log" 2>&1
+	actual=$?
+	set -e
+	if [[ $actual != "$expected" ]]; then
+		printf 'Expected rc %s; got %s: %s\n' "$expected" "$actual" "$*" >&2
+		cat "$tmp/last.log" >&2
+		exit 1
+	fi
+}
+
+printf 'verified subject fixture\n' >"$tmp/payload"
+sha=$(sha256sum "$tmp/payload")
+sha=${sha%% *}
+jq -n --arg url "file://$tmp/payload" --arg sha "$sha" \
+	'{schema:1,subjects:[{id:"fixture",name:"fixture",version:"1",upstream:$url,
+    url:$url,file:"payload",sha256:$sha,license:"CC0-1.0"}]}' >"$tmp/manifest.json"
+expect_rc 0 "$root/scripts/fetch-bench" --manifest "$tmp/manifest.json" --cache "$tmp/good"
+cmp "$tmp/payload" "$tmp/good/fixture/payload"
+jq '.subjects[0].sha256 = ("0" * 64)' "$tmp/manifest.json" >"$tmp/bad.json"
+expect_rc 1 "$root/scripts/fetch-bench" --manifest "$tmp/bad.json" --cache "$tmp/bad"
+grep -q 'sha256 mismatch for fixture' "$tmp/last.log"
+printf 'tamper' >>"$tmp/good/fixture/payload"
+expect_rc 1 "$root/scripts/fetch-bench" --manifest "$tmp/manifest.json" --cache "$tmp/good"
+grep -q 'cached file' "$tmp/last.log"
+jq '.subjects[0].id = "../escape"' "$tmp/manifest.json" >"$tmp/invalid.json"
+expect_rc 1 "$root/scripts/fetch-bench" --manifest "$tmp/invalid.json" --cache "$tmp/invalid"
+echo 'fetch: verified fixture, downloaded mismatch, cached mismatch, invalid manifest → pass'
+jq -c 'del(.usage.cache_write_input_tokens, .usage.reasoning_output_tokens)' \
+	"$root/bench/tests/fixtures/codex-events.jsonl" |
+	jq -s -f "$root/bench/harness/codex-result.jq" |
+	jq -e '.usage_complete and .usage.cache_write_input_tokens == null and
+    .usage.reasoning_output_tokens == null and .usage.cost_usd == null' >/dev/null
+echo 'parser: missing optional counters and dollar cost remain null → pass'
+
+mkdir "$tmp/bin" "$tmp/inputs" "$tmp/inputs/.claude" "$tmp/inputs/.codex" "$tmp/inputs/.agents"
+cp "$root/bench/tests/fixtures/mock-codex" "$tmp/bin/codex"
+cp "$root/bench/tests/fixtures/codex-events.jsonl" "$tmp/bin/codex-events.jsonl"
+chmod +x "$tmp/bin/codex"
+printf 'task bytes\n' >"$tmp/inputs/input.txt"
+for name in AGENTS.md AGENTS.override.md CLAUDE.md; do
+	printf 'excluded configuration\n' >"$tmp/inputs/$name"
+done
+printf '{}\n' >"$tmp/inputs/.claude/settings.json"
+printf '{}\n' >"$tmp/inputs/.mcp.json"
+printf 'model = "contamination"\n' >"$tmp/inputs/.codex/config.toml"
+printf '{"fixture":"fixture-auth-value"}\n' >"$tmp/auth.json"
+export PATH=$tmp/bin:$PATH FVA_BENCH_MODEL=fixture-model FVA_BENCH_EFFORT=low
+export FVA_BENCH_SECONDS=10 FVA_BENCH_AUTH_FILE=$tmp/auth.json
+# Inert sentinels prove env -i does not inherit provider/model routing.
+export CLAUDECODE=fixture-parent CLAUDE_CODE_SUBAGENT_MODEL=fixture-routing
+export OPENAI_API_KEY=fixture-key ANTHROPIC_BASE_URL=https://example.invalid CODEX_HOME=$tmp/wrong-home
+unset FVA_BENCH_PATH
+cpus=$(awk '/^Cpus_allowed_list:/ { print $2 }' /proc/self/status)
+printf 'success' >"$tmp/prompt"
+expect_rc 0 "$root/bench/harness/run-session" --dry-run bare "mock-$$" 1 "$cpus" \
+	"$tmp/prompt" "$tmp/inputs"
+[[ ! -e $run_prefix-1 ]]
+grep -q -- '--ignore-user-config' "$tmp/last.log"
+grep -q -- '< /dev/null' "$tmp/last.log"
+if grep -q fixture-auth-value "$tmp/last.log"; then exit 1; fi
+index=0
+for scenario in success agent-error malformed process-error timeout incomplete bad-usage partial-error; do
+	index=$((index + 1))
+	printf '%s' "$scenario" >"$tmp/prompt"
+	export FVA_BENCH_SECONDS=10
+	case $scenario in
+	success)
+		expected=0
+		status=completed
+		;;
+	agent-error | partial-error)
+		expected=1
+		status=agent_error
+		;;
+	malformed | bad-usage)
+		expected=1
+		status=invalid_result
+		;;
+	process-error)
+		expected=7
+		status=process_error
+		;;
+	timeout)
+		expected=124
+		status=timeout
+		export FVA_BENCH_SECONDS=1
+		;;
+	incomplete)
+		expected=1
+		status=incomplete_result
+		;;
+	esac
+	run=$run_prefix-$index
+	runs+=("$run")
+	expect_rc "$expected" "$root/bench/harness/run-session" bare "mock-$$" "$index" \
+		"$cpus" "$tmp/prompt" "$tmp/inputs"
+	[[ -f $run/work/mock-invoked.txt && ! -e $run/codex/auth.json ]]
+	jq -e --arg status "$status" --argjson rc "$expected" \
+		'.status == $status and .exit_code == $rc and .wall_ms >= 0 and
+      .duration_ms == .wall_ms and .codex_version == "codex-cli mock-1"' "$run/result.json" >/dev/null
+	if [[ $scenario == success || $scenario == partial-error ]]; then
+		jq -e '.usage.input_tokens == 123 and .usage.output_tokens == 45 and
+      .usage.cache_write_input_tokens == 6 and .usage.cache_read_input_tokens == 7 and
+      .usage.cost_usd == null and .usage.reasoning_output_tokens == 2 and
+      .usage.duration_api_ms == null and .turns_completed == 2' "$run/result.json" >/dev/null
+	else
+		jq -e '.usage == null' "$run/result.json" >/dev/null
+	fi
+	jq -e --argjson complete "$([[ $scenario == success ]] && echo true || echo false)" \
+		'.usage_complete == $complete' "$run/result.json" >/dev/null
+	if grep -q fixture-auth-value "$run/command.sh" "$run/metadata.json" "$run/result.json"; then exit 1; fi
+	printf 'harness: mock %s → rc %s, metrics/status pass\n' "$scenario" "$expected"
+done
+expect_rc 1 "$root/bench/harness/run-session" bare "mock-$$" 1 "$cpus" "$tmp/prompt" "$tmp/inputs"
+grep -q 'run already exists' "$tmp/last.log"
+echo 'harness: dry-run, auth-only home/cleanup, config exclusion, env isolation, overwrite refusal → pass'

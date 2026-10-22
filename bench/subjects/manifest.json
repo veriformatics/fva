@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "subjects": [
+    {
+      "id": "lz4",
+      "name": "lz4",
+      "version": "1.10.0",
+      "upstream": "https://github.com/lz4/lz4",
+      "url": "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz",
+      "file": "lz4-1.10.0.tar.gz",
+      "sha256": "537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b",
+      "license": "BSD-2-Clause AND GPL-2.0-or-later",
+      "scope": "lib/lz4.c + lib/lz4.h: BSD-2-Clause; other archive components retain their licenses"
+    },
+    {
+      "id": "lz4-flex",
+      "name": "lz4_flex",
+      "version": "0.14.0",
+      "upstream": "https://github.com/PSeitz/lz4_flex",
+      "url": "https://static.crates.io/crates/lz4_flex/lz4_flex-0.14.0.crate",
+      "file": "lz4_flex-0.14.0.crate",
+      "sha256": "ecbdfe44b1bd960b68170b417450a628c43f7cf56bb3c5317e61cb230ee7f226",
+      "license": "MIT"
+    },
+    {
+      "id": "lz4-wasm",
+      "name": "lz4-wasm LZ4 block codec",
+      "version": "8995cdef7b3adc4a4d2fc4fc86b84a86789ff858",
+      "upstream": "https://github.com/gorhill/lz4-wasm",
+      "url": "https://raw.githubusercontent.com/gorhill/lz4-wasm/8995cdef7b3adc4a4d2fc4fc86b84a86789ff858/dist/lz4-block-codec.wasm",
+      "file": "lz4-block-codec.wasm",
+      "sha256": "4bda6947a0498618552cba53ab3780745fd34cc1a0d84696e83a0547dcd68acf",
+      "license": "BSD-2-Clause",
+      "scope": "Byte-identical to gorhill/lz4-wasm dist at 8995cdef7b3adc4a4d2fc4fc86b84a86789ff858"
+    },
+    {
+      "id": "edger-emscripten",
+      "name": "edgeR emscripten package",
+      "version": "4.99.10",
+      "upstream": "https://bioconductor.org/packages/edgeR",
+      "url": "https://r2.ropensci.org/4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93",
+      "file": "edgeR_4.99.10.tgz",
+      "sha256": "4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "id": "edger-wasm",
+      "name": "edgeR emscripten shared library",
+      "version": "4.99.10",
+      "upstream": "https://bioconductor.org/packages/edgeR",
+      "url": "https://r2.ropensci.org/4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93",
+      "file": "edgeR.so",
+      "sha256": "e39434314a9eb0399edf943c6a0475d34ff9d0d7ec0bb4a1b8ba726b4a6a88fb",
+      "license": "GPL-2.0-or-later",
+      "extract": { "from": "edger-emscripten", "member": "edgeR/libs/edgeR.so" }
+    },
+    {
+      "id": "rnanorm",
+      "name": "RNAnorm",
+      "version": "2.2.0",
+      "upstream": "https://github.com/genialis/RNAnorm",
+      "url": "https://files.pythonhosted.org/packages/fd/8c/e79993321f860ff82246f9afeb3915d914388ae5d19dd5aa9c73584d6d0d/rnanorm-2.2.0.tar.gz",
+      "file": "rnanorm-2.2.0.tar.gz",
+      "sha256": "10b3eab8bb692837235f42def6d010abc743f585516451176bf3dfaaea087cb8",
+      "license": "Apache-2.0"
+    }
+  ]
+}

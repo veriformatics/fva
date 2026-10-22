@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Run under offload: two uncached release builds, byte equality, engine behavior.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+mkdir -p "$root/.cache/bench/tests"
+tmp=$(mktemp -d "$root/.cache/bench/tests/repro.XXXXXXXX")
+trap 'rm -rf -- "$tmp"' EXIT
+"$root/bench/subjects/build-lz4" "$tmp/a"
+"$root/bench/subjects/build-lz4" "$tmp/b"
+for name in lz4-c lz4-flex; do cmp "$tmp/a/$name.wasm" "$tmp/b/$name.wasm"; done
+cmp "$tmp/a/SHA256SUMS" "$tmp/b/SHA256SUMS"
+(cd "$tmp/a" && sha256sum -c "$root/bench/subjects/lz4.sha256")
+"$root/bench/tests/smoke-wasm" "$tmp/a"
+echo 'two clean builds: byte-identical, pinned SHA256, six runtime assertions → pass'

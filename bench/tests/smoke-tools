@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Two real verifiers × positive + negative contracts. Install separately.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+mkdir -p "$root/.cache/bench/tests"
+tmp=$(mktemp -d "$root/.cache/bench/tests/tools.XXXXXXXX")
+trap 'rm -rf -- "$tmp"' EXIT
+cp "$root/bench/tests/fixtures/"{true,false}.c "$tmp/"
+for tool in verus frama-c; do
+	for kind in true false; do
+		set +e
+		if [[ $tool == verus ]]; then
+			"$root/bench/tools/verus" "$root/bench/tests/fixtures/$kind.rs" >"$tmp/output" 2>&1
+		else
+			"$root/bench/tools/frama-c" --check-wp "$tmp" -wp-rte -wp-prover qed \
+				"$kind.c" >"$tmp/output" 2>&1
+		fi
+		rc=$?
+		set -e
+		if [[ $kind == true ]]; then
+			[[ $rc == 0 ]] || {
+				cat "$tmp/output" >&2
+				exit 1
+			}
+		else
+			[[ $rc == 1 ]] || {
+				cat "$tmp/output" >&2
+				exit 1
+			}
+		fi
+		case $tool-$kind in
+		verus-true) grep -q '1 verified, 0 errors' "$tmp/output" ;;
+		verus-false) grep -q 'postcondition not satisfied' "$tmp/output" ;;
+		frama-c-true) grep -Eq 'Proved goals: +5 / 5' "$tmp/output" ;;
+		frama-c-false) grep -q 'typed_add_one_ensures' "$tmp/output" ;;
+		esac
+		printf '%s %s: rc %s, expected proof status → pass\n' "$tool" "$kind" "$rc"
+	done
+done

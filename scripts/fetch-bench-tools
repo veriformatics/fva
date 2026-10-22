@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# Linux x86-64 baseline tools; payloads + Rust homes stay project-local.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/.." && pwd)
+verus_version=0.2026.10.18.7d82994
+verus_sha=e9af03732d4bdd32b93a8fcf471706739c24c1473fa5086618d96c47237845dd
+rust_version=1.99.1
+rustup_version=1.29.2
+rustup_sha=5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4
+wasi_version=34.0
+wasi_sha=b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4
+frama_version=33.0
+frama_sha=c754c31bb32d151acf7db3bcfdc5181b076bdbff813b19049e984f639eba3735
+# Hub has no 33.0 image. This pinned 32.1 image supplies GCC/Why3/solvers only;
+# the wrapper explicitly executes the sha-pinned 33.0 bundle mounted over it.
+frama_image=docker.io/framac/frama-c@sha256:4f0b7a2bd600c4daabfdcdfa393a3c18301e0db18f3b2739f1d9650193462d36
+if [[ ${1:-} == --print-frama-image ]]; then
+	printf '%s\n' "$frama_image"
+	exit 0
+fi
+if [[ ${1:-} == --help ]]; then
+	echo 'Usage: scripts/fetch-bench-tools [all|rust|verus|frama-c|wasi-sdk]'
+	exit 0
+fi
+[[ $(uname -sm) == 'Linux x86_64' ]] || {
+	echo 'Linux x86-64 is required' >&2
+	exit 1
+}
+mkdir -p "$root/.tools/downloads"
+export RUSTUP_HOME=$root/.tools/rustup CARGO_HOME=$root/.tools/cargo
+export PATH=$CARGO_HOME/bin:$PATH
+stage=
+trap '[[ -z $stage ]] || rm -rf -- "$stage"' EXIT
+
+download() {
+	local name=$1 file=$2 url=$3 sha=$4
+	payload=$root/.tools/downloads/$name/$file
+	mkdir -p "${payload%/*}"
+	if [[ ! -f $payload ]]; then
+		stage=$(mktemp -d "$root/.tools/.download.XXXXXXXX")
+		curl -fsSL --retry 3 -o "$stage/payload" "$url"
+		printf '%s  %s\n' "$sha" "$stage/payload" | sha256sum -c --status || {
+			echo "fetch-bench-tools: sha256 mismatch for $name" >&2
+			exit 1
+		}
+		mv "$stage/payload" "$payload"
+		rmdir "$stage"
+		stage=
+	fi
+	printf '%s  %s\n' "$sha" "$payload" | sha256sum -c --status || {
+		echo "fetch-bench-tools: cached sha256 mismatch for $name" >&2
+		exit 1
+	}
+}
+
+rust() {
+	download rustup rustup-init \
+		"https://static.rust-lang.org/rustup/archive/$rustup_version/x86_64-unknown-linux-gnu/rustup-init" \
+		"$rustup_sha"
+	if [[ ! -x $CARGO_HOME/bin/rustup ]]; then
+		chmod +x "$payload"
+		RUSTUP_INIT_SKIP_PATH_CHECK=yes "$payload" -y --no-modify-path \
+			--profile minimal --default-toolchain none
+	fi
+	rustup set auto-self-update disable
+	rustup toolchain install "$rust_version" --profile minimal \
+		--component rustc-dev --component llvm-tools --component rustfmt \
+		--target wasm32-unknown-unknown
+	rustup run "$rust_version" rustc --version
+}
+
+verus() {
+	rust
+	download verus verus.zip \
+		"https://github.com/verus-lang/verus/releases/download/release/$verus_version/verus-$verus_version-x86-linux.zip" \
+		"$verus_sha"
+	if [[ ! -f $root/.tools/verus/.pin-$verus_version ]]; then
+		stage=$(mktemp -d "$root/.tools/.verus.XXXXXXXX")
+		unzip -q "$payload" -d "$stage"
+		rm -rf "$root/.tools/verus"
+		mv "$stage/verus-x86-linux" "$root/.tools/verus"
+		rmdir "$stage"
+		stage=
+		touch "$root/.tools/verus/.pin-$verus_version"
+	fi
+	"$root/bench/tools/verus" --version
+}
+
+wasi_sdk() {
+	download wasi-sdk wasi-sdk.tar.gz \
+		"https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${wasi_version%.*}/wasi-sdk-$wasi_version-x86_64-linux.tar.gz" \
+		"$wasi_sha"
+	if [[ ! -f $root/.tools/wasi-sdk/.pin-$wasi_version ]]; then
+		stage=$(mktemp -d "$root/.tools/.wasi.XXXXXXXX")
+		tar -xzf "$payload" -C "$stage"
+		rm -rf "$root/.tools/wasi-sdk"
+		mv "$stage/wasi-sdk-$wasi_version-x86_64-linux" "$root/.tools/wasi-sdk"
+		rmdir "$stage"
+		stage=
+		touch "$root/.tools/wasi-sdk/.pin-$wasi_version"
+	fi
+	"$root/.tools/wasi-sdk/bin/clang" --version
+}
+
+frama_c() {
+	download frama-c frama-c.run \
+		"https://frama-c.com/download/frama-c-linux-x86-64-$frama_version-Arsenic.run" "$frama_sha"
+	if [[ ! -f $root/.tools/frama-c/.pin-$frama_version ]]; then
+		stage=$(mktemp -d "$root/.tools/.frama.XXXXXXXX")
+		bash "$payload" --noexec --target "$stage/bundle"
+		rm -rf "$root/.tools/frama-c"
+		mv "$stage/bundle" "$root/.tools/frama-c"
+		rmdir "$stage"
+		stage=
+		touch "$root/.tools/frama-c/.pin-$frama_version"
+	fi
+	podman pull "$frama_image"
+	"$root/bench/tools/frama-c" "$root/.tools" -version
+}
+
+case ${1:-all} in
+all)
+	verus
+	wasi_sdk
+	frama_c
+	;;
+rust) rust ;;
+verus) verus ;;
+wasi-sdk) wasi_sdk ;;
+frama-c) frama_c ;;
+*)
+	echo "fetch-bench-tools: invalid tool: $1" >&2
+	exit 2
+	;;
+esac
