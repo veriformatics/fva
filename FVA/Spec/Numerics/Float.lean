@@ -13,8 +13,9 @@ result is a NaN may return any element of `nans`, and a claim about a program mu
 allowed result. Exact values are Mathlib reals; the executable implementation is proven against
 this file separately.
 
-Where the spec's prose and its formal equations disagree, the equations are transcribed (noted at
-the definition).
+Where the spec's prose and its formal equations disagree, the equations are transcribed; where
+the equations contradict IEEE 754 and the official tests, IEEE is transcribed (each noted at the
+definition).
 -/
 
 namespace FVA.Wasm.Num
@@ -219,13 +220,15 @@ noncomputable def fsub (F : FloatFormat) (z₁ z₂ : FVal) : Set FVal :=
   else if z₁.toReal F = z₂.toReal F then {posZero}
   else ieee F (z₁.toReal F - z₂.toReal F)
 
-/-- `fmul_N(z₁, z₂)`. -/
+/-- `fmul_N(z₁, z₂)`. A zero times a number has the XOR sign, per IEEE 754 §6.3 and the official
+tests (`f32.wast`: `mul -0x0p+0 0x1p+0 = -0x0p+0`); the spec's equations cover only two zeros and
+send `±0·q` to `ieee_N(0) = +0`. -/
 noncomputable def fmul (F : FloatFormat) (z₁ z₂ : FVal) : Set FVal :=
   if z₁.IsNaN ∨ z₂.IsNaN then nans F [z₁, z₂]
   else if (z₁.IsZero ∧ z₂.IsInf) ∨ (z₁.IsInf ∧ z₂.IsZero) then nans F []
   else if z₁.IsInf ∧ z₂.IsInf then {inf (z₁.neg != z₂.neg)}
   else if z₁.IsInf ∨ z₂.IsInf then {inf (z₁.neg != z₂.neg)}
-  else if z₁.IsZero ∧ z₂.IsZero then {subnormal (z₁.neg != z₂.neg) 0}
+  else if z₁.IsZero ∨ z₂.IsZero then {subnormal (z₁.neg != z₂.neg) 0}
   else ieee F (z₁.toReal F * z₂.toReal F)
 
 /-- `fdiv_N(z₁, z₂)`. -/
