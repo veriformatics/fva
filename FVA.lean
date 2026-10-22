@@ -4,6 +4,10 @@ import FVA.Spec.Syntax
 import FVA.Spec.Binary.Module
 import FVA.Spec.Numerics.Int
 import FVA.Spec.Numerics.Float
+import FVA.Spec.Exec.Runtime
+import FVA.Spec.Exec.Numeric
+import FVA.Spec.Exec.Step
+import FVA.Spec.Claims
 import FVA.Impl.Numerics.Float
 import FVA.Lifted
 import FVA.Proof.Decode.Reader
