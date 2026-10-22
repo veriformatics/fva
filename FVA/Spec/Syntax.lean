@@ -143,6 +143,8 @@ inductive PackSize where
   | p8 | p16 | p32
   deriving DecidableEq, Repr
 
+mutual
+
 /-- Instructions of the profile (spec §2.4); structured control carries nested bodies. -/
 inductive Instr where
   -- numeric
@@ -233,11 +235,11 @@ inductive Instr where
   /-- `nop`. -/
   | nop
   /-- `block bt body end`. -/
-  | block (bt : BlockType) (body : List Instr)
+  | block (bt : BlockType) (body : Instrs)
   /-- `loop bt body end`. -/
-  | loop (bt : BlockType) (body : List Instr)
+  | loop (bt : BlockType) (body : Instrs)
   /-- `if bt thn else els end`. -/
-  | if_ (bt : BlockType) (thn els : List Instr)
+  | if_ (bt : BlockType) (thn els : Instrs)
   /-- `br l`. -/
   | br (l : Nat)
   /-- `br_if l`. -/
@@ -250,10 +252,25 @@ inductive Instr where
   | call (x : Nat)
   /-- `call_indirect x y` (table `x`, type `y`). -/
   | callIndirect (x y : Nat)
-  deriving Repr
+  deriving DecidableEq, Repr
+
+/-- Instruction sequences: a list written as its own inductive, mutual with `Instr`, so that
+`DecidableEq` is derivable and kernel-reducible (Lean 4.35 derives neither for `List Instr`
+nested in `Instr`). -/
+inductive Instrs where
+  | nil
+  | cons (i : Instr) (rest : Instrs)
+  deriving DecidableEq, Repr
+
+end
+
+/-- Instruction sequence from a list. -/
+def Instrs.ofList : List Instr → Instrs
+  | [] => .nil
+  | i :: is => .cons i (ofList is)
 
 /-- Expressions: instruction sequences (the trailing `end` is implicit). -/
-abbrev Expr := List Instr
+abbrev Expr := Instrs
 
 /-- Functions: type index, declared locals (expanded), body. -/
 structure Func where
@@ -263,6 +280,7 @@ structure Func where
   locals : List ValType
   /-- Body. -/
   body : Expr
+  deriving DecidableEq, Repr
 
 /-- Globals. -/
 structure Global where
@@ -270,12 +288,14 @@ structure Global where
   type : GlobalType
   /-- Initializer expression. -/
   init : Expr
+  deriving DecidableEq, Repr
 
 /-- Element segment modes. -/
 inductive ElemMode where
   | passive
   | active (table : Nat) (offset : Expr)
   | declarative
+  deriving DecidableEq, Repr
 
 /-- Element segments. -/
 structure Elem where
@@ -285,11 +305,13 @@ structure Elem where
   init : List Expr
   /-- Mode. -/
   mode : ElemMode
+  deriving DecidableEq, Repr
 
 /-- Data segment modes. -/
 inductive DataMode where
   | passive
   | active (mem : Nat) (offset : Expr)
+  deriving DecidableEq, Repr
 
 /-- Data segments. -/
 structure Data where
@@ -297,6 +319,7 @@ structure Data where
   init : List UInt8
   /-- Mode. -/
   mode : DataMode
+  deriving DecidableEq, Repr
 
 /-- Import descriptions. -/
 inductive ImportDesc where
@@ -304,6 +327,7 @@ inductive ImportDesc where
   | table (t : TableType)
   | mem (t : Limits)
   | global (t : GlobalType)
+  deriving DecidableEq, Repr
 
 /-- Imports. -/
 structure Import where
@@ -313,6 +337,7 @@ structure Import where
   name : String
   /-- Description. -/
   desc : ImportDesc
+  deriving DecidableEq, Repr
 
 /-- Export descriptions. -/
 inductive ExportDesc where
@@ -320,6 +345,7 @@ inductive ExportDesc where
   | table (x : Nat)
   | mem (x : Nat)
   | global (x : Nat)
+  deriving DecidableEq, Repr
 
 /-- Exports. -/
 structure Export where
@@ -327,6 +353,7 @@ structure Export where
   name : String
   /-- Description. -/
   desc : ExportDesc
+  deriving DecidableEq, Repr
 
 /-- Modules (spec §2.5). Custom sections are not part of the abstract syntax. -/
 structure Module where
@@ -350,5 +377,6 @@ structure Module where
   imports : List Import := []
   /-- Exports. -/
   exports : List Export := []
+  deriving DecidableEq, Repr
 
 end FVA.Wasm

@@ -217,15 +217,15 @@ def fcInstr (r : Reader) : Res Instr := do
 
 /-- Instructions up to a terminator (`0x0B` end or `0x05` else); returns the terminator.
 Structural on `fuel`; callers pass the remaining byte count (each instruction is ≥ 1 byte). -/
-def instrs : Nat → Reader → Except DecodeError (List Instr × Nat × Reader)
+def instrs : Nat → Reader → Res (Instrs × Nat)
   | 0, r => r.bad "unexpected end"
   | fuel + 1, r => do
     let (b, r₁) ← r.byte
     let op := b.toNat
-    if op = 0x0B ∨ op = 0x05 then .ok ([], op, r₁) else do
+    if op = 0x0B ∨ op = 0x05 then .ok ((.nil, op), r₁) else do
     let (i, r₂) ← (instrAt fuel op r r₁ : Res Instr)
-    let (is, t, r₃) ← instrs fuel r₂
-    .ok (i :: is, t, r₃)
+    let ((is, t), r₃) ← instrs fuel r₂
+    .ok ((.cons i is, t), r₃)
 where
   /-- One instruction with opcode `op` (already read; `r` points at the opcode). -/
   instrAt (fuel op : Nat) (r r₁ : Reader) : Res Instr :=
@@ -244,14 +244,14 @@ where
     | none =>
     if op = 0x02 ∨ op = 0x03 then do
       let (bt, r₂) ← blockType r₁
-      let (body, t, r₃) ← instrs fuel r₂
+      let ((body, t), r₃) ← instrs fuel r₂
       if t = 0x0B then .ok ((if op = 0x02 then .block bt body else .loop bt body), r₃)
       else r.bad "else outside if"
     else if op = 0x04 then do
       let (bt, r₂) ← blockType r₁
-      let (thn, t, r₃) ← instrs fuel r₂
-      if t = 0x0B then .ok (.if_ bt thn [], r₃) else do
-      let (els, t', r₄) ← instrs fuel r₃
+      let ((thn, t), r₃) ← instrs fuel r₂
+      if t = 0x0B then .ok (.if_ bt thn .nil, r₃) else do
+      let ((els, t'), r₄) ← instrs fuel r₃
       if t' = 0x0B then .ok (.if_ bt thn els, r₄) else r.bad "duplicate else"
     else if op = 0x0E then do
       let (ls, r₂) ← vec u32 r₁
@@ -292,7 +292,7 @@ where
 
 /-- An expression: instructions terminated by `end`. -/
 def expr (r : Reader) : Res Expr := do
-  let (is, t, r') ← instrs r.len r
+  let ((is, t), r') ← instrs r.len r
   if t = 0x0B then .ok (is, r') else r.bad "else outside if"
 
 end FVA.Wasm.Decode

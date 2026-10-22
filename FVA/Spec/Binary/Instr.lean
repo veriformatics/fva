@@ -133,19 +133,19 @@ inductive InstrB : Instr → List UInt8 → Prop where
       (h : (n, mk) ∈ fcIdxOps) (hn : ULeb 32 n b₁) (hx : ULeb 32 x b₂) :
       InstrB (mk x) (0xFC :: b₁ ++ b₂)
   /-- `0x02 bt instr* 0x0B`. -/
-  | block {bt : BlockType} {body : List Instr} {b₁ b₂ : List UInt8}
+  | block {bt : BlockType} {body : Instrs} {b₁ b₂ : List UInt8}
       (ht : BlockTypeB bt b₁) (hb : InstrsB body b₂) :
       InstrB (.block bt body) ([0x02] ++ b₁ ++ b₂ ++ [0x0B])
   /-- `0x03 bt instr* 0x0B`. -/
-  | loop {bt : BlockType} {body : List Instr} {b₁ b₂ : List UInt8}
+  | loop {bt : BlockType} {body : Instrs} {b₁ b₂ : List UInt8}
       (ht : BlockTypeB bt b₁) (hb : InstrsB body b₂) :
       InstrB (.loop bt body) ([0x03] ++ b₁ ++ b₂ ++ [0x0B])
   /-- `0x04 bt instr* 0x0B` (empty else branch). -/
-  | ifNoElse {bt : BlockType} {thn : List Instr} {b₁ b₂ : List UInt8}
+  | ifNoElse {bt : BlockType} {thn : Instrs} {b₁ b₂ : List UInt8}
       (ht : BlockTypeB bt b₁) (hb : InstrsB thn b₂) :
-      InstrB (.if_ bt thn []) ([0x04] ++ b₁ ++ b₂ ++ [0x0B])
+      InstrB (.if_ bt thn .nil) ([0x04] ++ b₁ ++ b₂ ++ [0x0B])
   /-- `0x04 bt instr* 0x05 instr* 0x0B`. -/
-  | ifElse {bt : BlockType} {thn els : List Instr} {b₁ b₂ b₃ : List UInt8}
+  | ifElse {bt : BlockType} {thn els : Instrs} {b₁ b₂ b₃ : List UInt8}
       (ht : BlockTypeB bt b₁) (hb : InstrsB thn b₂) (he : InstrsB els b₃) :
       InstrB (.if_ bt thn els) ([0x04] ++ b₁ ++ b₂ ++ [0x05] ++ b₃ ++ [0x0B])
   /-- `0x0E l*:vec(labelidx) l:labelidx`. -/
@@ -192,10 +192,10 @@ inductive InstrB : Instr → List UInt8 → Prop where
       InstrB (.fconst .w64 bits) (0x44 :: b)
 
 /-- Concatenated instruction encodings (no terminator). -/
-inductive InstrsB : List Instr → List UInt8 → Prop where
-  | nil : InstrsB [] []
-  | cons {i : Instr} {is : List Instr} {b₁ b₂ : List UInt8} (hi : InstrB i b₁)
-      (hs : InstrsB is b₂) : InstrsB (i :: is) (b₁ ++ b₂)
+inductive InstrsB : Instrs → List UInt8 → Prop where
+  | nil : InstrsB .nil []
+  | cons {i : Instr} {is : Instrs} {b₁ b₂ : List UInt8} (hi : InstrB i b₁)
+      (hs : InstrsB is b₂) : InstrsB (.cons i is) (b₁ ++ b₂)
 
 end
 
