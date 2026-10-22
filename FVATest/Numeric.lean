@@ -42,37 +42,37 @@ def partial64 (r : Option (BitVec 64)) : Out := match r with
 def ibin32 : IBinOp → BitVec 32 → BitVec 32 → Out
   | .add, a, b => .push [.i32 (iadd a b)] | .sub, a, b => .push [.i32 (isub a b)]
   | .mul, a, b => .push [.i32 (imul a b)]
-  | .div .u, a, b => partial32 (idiv_u a b) | .div .s, a, b => partial32 (idiv_s a b)
-  | .rem .u, a, b => partial32 (irem_u a b) | .rem .s, a, b => partial32 (irem_s a b)
+  | .div .u, a, b => partial32 (idivU a b) | .div .s, a, b => partial32 (idivS a b)
+  | .rem .u, a, b => partial32 (iremU a b) | .rem .s, a, b => partial32 (iremS a b)
   | .and, a, b => .push [.i32 (iand a b)] | .or, a, b => .push [.i32 (ior a b)]
   | .xor, a, b => .push [.i32 (ixor a b)] | .shl, a, b => .push [.i32 (ishl a b)]
-  | .shr .u, a, b => .push [.i32 (ishr_u a b)] | .shr .s, a, b => .push [.i32 (ishr_s a b)]
+  | .shr .u, a, b => .push [.i32 (ishrU a b)] | .shr .s, a, b => .push [.i32 (ishrS a b)]
   | .rotl, a, b => .push [.i32 (irotl a b)] | .rotr, a, b => .push [.i32 (irotr a b)]
 
 /-- Integer binary ops by width. -/
 def ibin64 : IBinOp → BitVec 64 → BitVec 64 → Out
   | .add, a, b => .push [.i64 (iadd a b)] | .sub, a, b => .push [.i64 (isub a b)]
   | .mul, a, b => .push [.i64 (imul a b)]
-  | .div .u, a, b => partial64 (idiv_u a b) | .div .s, a, b => partial64 (idiv_s a b)
-  | .rem .u, a, b => partial64 (irem_u a b) | .rem .s, a, b => partial64 (irem_s a b)
+  | .div .u, a, b => partial64 (idivU a b) | .div .s, a, b => partial64 (idivS a b)
+  | .rem .u, a, b => partial64 (iremU a b) | .rem .s, a, b => partial64 (iremS a b)
   | .and, a, b => .push [.i64 (iand a b)] | .or, a, b => .push [.i64 (ior a b)]
   | .xor, a, b => .push [.i64 (ixor a b)] | .shl, a, b => .push [.i64 (ishl a b)]
-  | .shr .u, a, b => .push [.i64 (ishr_u a b)] | .shr .s, a, b => .push [.i64 (ishr_s a b)]
+  | .shr .u, a, b => .push [.i64 (ishrU a b)] | .shr .s, a, b => .push [.i64 (ishrS a b)]
   | .rotl, a, b => .push [.i64 (irotl a b)] | .rotr, a, b => .push [.i64 (irotr a b)]
 
 /-- Integer comparisons. -/
 def irel {N : Nat} : IRelOp → BitVec N → BitVec N → BitVec 32
   | .eq, a, b => ieq a b | .ne, a, b => ine a b
-  | .lt .u, a, b => ilt_u a b | .lt .s, a, b => ilt_s a b
-  | .gt .u, a, b => igt_u a b | .gt .s, a, b => igt_s a b
-  | .le .u, a, b => ile_u a b | .le .s, a, b => ile_s a b
-  | .ge .u, a, b => ige_u a b | .ge .s, a, b => ige_s a b
+  | .lt .u, a, b => iltU a b | .lt .s, a, b => iltS a b
+  | .gt .u, a, b => igtU a b | .gt .s, a, b => igtS a b
+  | .le .u, a, b => ileU a b | .le .s, a, b => ileS a b
+  | .ge .u, a, b => igeU a b | .ge .s, a, b => igeS a b
 
 /-- Integer unary ops. -/
 def iun {N : Nat} : IUnOp → BitVec N → BitVec N
   | .clz, a => iclz a | .ctz, a => ictz a | .popcnt, a => ipopcnt a
-  | .extend8s, a => iextend_s 8 a | .extend16s, a => iextend_s 16 a
-  | .extend32s, a => iextend_s 32 a
+  | .extend8s, a => iextendS 8 a | .extend16s, a => iextendS 16 a
+  | .extend32s, a => iextendS 32 a
 
 /-- One numeric instruction on the operand stack (top first). -/
 def step (i : Instr) (stk : List Value) : Out × List Value :=
@@ -90,8 +90,8 @@ def step (i : Instr) (stk : List Value) : Out × List Value :=
   | .iunop .w32 op, .i32 a :: s => (.push [.i32 (iun op a)], s)
   | .iunop .w64 op, .i64 a :: s => (.push [.i64 (iun op a)], s)
   | .cvtop .wrap, .i64 a :: s => (.push [.i32 (wrap a)], s)
-  | .cvtop (.extend .u), .i32 a :: s => (.push [.i64 (extend_u a)], s)
-  | .cvtop (.extend .s), .i32 a :: s => (.push [.i64 (extend_s a)], s)
+  | .cvtop (.extend .u), .i32 a :: s => (.push [.i64 (extendU a)], s)
+  | .cvtop (.extend .s), .i32 a :: s => (.push [.i64 (extendS a)], s)
   | .cvtop (.reinterpret .w32 true), .f32 a :: s => (.push [.i32 a], s)
   | .cvtop (.reinterpret .w64 true), .f64 a :: s => (.push [.i64 a], s)
   | .cvtop (.reinterpret .w32 false), .i32 a :: s => (.push [.f32 a], s)

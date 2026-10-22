@@ -18,13 +18,13 @@ Both elaborators are untrusted: the kernel checks `decode_eq`, and `fva trust` c
 open Lean Elab Term Tactic Meta
 
 /-- The numeral packing the given bytes (hex digits in file order) little-endian. -/
-elab "wasm_bytes% " s:str : term => do
+elab (name := wasmBytesTerm) "wasm_bytes% " s:str : term => do
   match FVA.Tool.ofHex s.getString with
   | some bs => return mkRawNatLit (FVA.Tool.packBytes bs)
   | none => throwErrorAt s "wasm_bytes%: expected an even number of lowercase hex digits"
 
 /-- Prove `lhs = rhs` by kernel definitional unfolding (no elaborator `isDefEq`). -/
-elab "kernel_rfl" : tactic => liftMetaFinishingTactic fun g => do
+elab (name := kernelRflTactic) "kernel_rfl" : tactic => liftMetaFinishingTactic fun g => do
   let t ← instantiateMVars (← g.getType)
   if t.hasMVar || t.hasFVar then throwError "kernel_rfl: goal must be closed"
   let some (α, _, rhs) := t.eq? | throwError "kernel_rfl: goal is not an equality"
