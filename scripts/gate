@@ -27,6 +27,7 @@ lean_lane() {
 	run build lake --wfail build
 	run test lake --wfail test
 	run decoder scripts/test-decoder
+	run numerics scripts/test-numerics
 	run lint lake --wfail lint
 }
 lean_lane &
