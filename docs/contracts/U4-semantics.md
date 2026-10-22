@@ -53,3 +53,7 @@ Purpose: the meaning of running a decoded module (U2 `Module`) with the reviewed
 2. Floats with NaN choice (D6 classifier: decidable `nanClass` reflecting `nans`), `call_indirect` + tables, remaining bulk ops, grow nondeterminism, refs, multi-value; hosts (S4) + oracle (I2).
 3. Instantiation (S5) + `Instantiated`/`LoaderReady`/`CallReturns`; dylink import profile for edgeR.
 4. `run_complete` + must-adequacy; acceptance matrix complete (E4); planted bugs (E3); performance budgets (E5).
+
+## Status + remaining plan
+- Done: slice 1 (stepper, soundness, determinism, `Must` route, spike), instantiation spec + `instantiate_sound`, hosts S4 (`ValidHost`), official scripts in the gate (E1 via `scripts/test-spec`), two audits.
+- Remaining for U4: (a) executable hosts: `Ref.step`/`run` take a host implementation `Nat → Store → List Val → Option HostOutcome` with a proof obligation that each answer is allowed by `H`; soundness + `must_of_step` extended to host calls whose outcome set is a singleton under the contract; (b) `LoaderReady` (dylink.0: `__memory_base`/`__table_base`/`__stack_pointer`/`GOT.mem` imports as parameters, `__wasm_apply_data_relocs` then `__wasm_call_ctors`) + an edgeR.so instantiation smoke with stub hosts; (c) E3 planted bugs at the spec/oracle boundary (a Step rule mutated → a stepper soundness proof or a test-spec pin breaks); (d) E5 budgets frozen from the uBO run + an edgeR call; (e) full gate (pool form) → tick U4. `run_complete`/must-adequacy and the zipper machine stay deferred unless (a)–(d) need them (D30 for memory_copy).
