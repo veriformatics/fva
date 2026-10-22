@@ -1,4 +1,4 @@
-import FVA
+import FVA.Cli
 
 /-! Compile-time checks: a failing `#guard` fails `lake build FVATest`, so `lake test` fails too. -/
 
