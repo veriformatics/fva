@@ -3,302 +3,250 @@ import FVA.Impl.Decode.Reader
 /-!
 # Instruction decoding
 
-Opcode dispatch uses arithmetic on ranges (spec §5.4 groups opcodes by family), so the kernel
-compares a handful of numerals per instruction instead of scanning a 200-entry table.
-`FVA.Proof.Decode` proves the dispatch agrees with the spec tables.
+Opcode dispatch is a tree of `Nat.blt` tests on spec §5.4's opcode ranges, then a short table
+walk inside a family, so the kernel spends a handful of steps per opcode. `FVA.Proof.Decode`
+proves the dispatch agrees with the spec tables (`FVA.Wasm.Binary.plainOps`, …).
 -/
 
 namespace FVA.Wasm.Decode
 
 open FVA.Wasm
 
-/-- Value types (spec §5.3.4); `v128` (`0x7B`) is outside the profile. -/
+/-- The `k`-th entry of a table. -/
+def nth {α : Type} : List α → Nat → Option α
+  | [], _ => none
+  | a :: _, 0 => some a
+  | _ :: as, k + 1 => nth as k
+
+/-- Value type of a type byte (spec §5.3.4); `v128` (`0x7B`) is outside the profile. -/
 def valTypeOf (b : Nat) : Option ValType :=
-  if b = 0x7F then some (.num .i32) else if b = 0x7E then some (.num .i64)
-  else if b = 0x7D then some (.num .f32) else if b = 0x7C then some (.num .f64)
-  else if b = 0x70 then some (.ref .funcref) else if b = 0x6F then some (.ref .externref)
+  bif Nat.blt b 0x7C then
+    (bif Nat.beq b 0x70 then some (.ref .funcref)
+     else bif Nat.beq b 0x6F then some (.ref .externref) else none)
+  else bif Nat.beq b 0x7F then some (.num .i32) else bif Nat.beq b 0x7E then some (.num .i64)
+  else bif Nat.beq b 0x7D then some (.num .f32) else bif Nat.beq b 0x7C then some (.num .f64)
   else none
 
-/-- Read a value type. -/
-def valType (r : Reader) : Res ValType := do
-  let (b, r') ← r.byte
-  match valTypeOf b.toNat with
-  | some t => .ok (t, r')
-  | none => if b.toNat = 0x7B then r.unsup "v128 (SIMD)" else r.bad "malformed value type"
+/-- A value type. -/
+def valType (v n : Nat) : Res ValType :=
+  (byte v n).bind fun b v' n' =>
+  match valTypeOf b with
+  | some t => .ok t v' n'
+  | none => bif Nat.beq b 0x7B then .unsup n "v128 (SIMD)" else .bad n "malformed value type"
 
-/-- Read a reference type. -/
-def refType (r : Reader) : Res RefType := do
-  let (b, r') ← r.byte
-  if b.toNat = 0x70 then .ok (.funcref, r')
-  else if b.toNat = 0x6F then .ok (.externref, r')
-  else r.bad "malformed reference type"
+/-- A reference type. -/
+def refType (v n : Nat) : Res RefType :=
+  (byte v n).bind fun b v' n' =>
+  bif Nat.beq b 0x70 then .ok .funcref v' n'
+  else bif Nat.beq b 0x6F then .ok .externref v' n'
+  else .bad n "malformed reference type"
 
-/-- Read a block type: `0x40`, a value type, or a non-negative `s33` index. -/
-def blockType (r : Reader) : Res BlockType := do
-  let (b, r') ← r.byte
-  if b.toNat = 0x40 then .ok (.empty, r')
-  else match valTypeOf b.toNat with
-    | some t => .ok (.val t, r')
-    | none =>
-      if b.toNat = 0x7B then r.unsup "v128 (SIMD)"
-      else do
-        let (x, r') ← sleb 5 33 r
-        if 0 ≤ x then .ok (.idx x.toNat, r') else r.bad "malformed block type"
+/-- A block type: `0x40`, a value type, or a non-negative `s33` type index. -/
+def blockType (v n : Nat) : Res BlockType :=
+  (byte v n).bind fun b v' n' =>
+  bif Nat.beq b 0x40 then .ok .empty v' n' else
+  match valTypeOf b with
+  | some t => .ok (.val t) v' n'
+  | none =>
+    bif Nat.beq b 0x7B then .unsup n "v128 (SIMD)" else
+    (sleb 5 33 v n).bind fun x v n =>
+    bif Nat.blt x (2 ^ 32) then .ok (.idx x) v n else .bad n "malformed block type"
 
-/-- Read a `memarg`. -/
-def memArg (r : Reader) : Res MemArg := do
-  let (a, r) ← u32 r
-  let (o, r) ← u32 r
-  .ok ({ align := a, offset := o }, r)
+/-- A `memarg`. -/
+def memArg (v n : Nat) : Res MemArg :=
+  (u32 v n).bind fun a v n => (u32 v n).bind fun o v n => .ok { align := a, offset := o } v n
 
-/-- Integer comparison and test opcodes `0x45`–`0x5A`, index `k` within a width group. -/
-def intRelOp (w : Width) : Nat → Option Instr
-  | 0 => some (.itestEqz w) | 1 => some (.irelop w .eq) | 2 => some (.irelop w .ne)
-  | 3 => some (.irelop w (.lt .s)) | 4 => some (.irelop w (.lt .u))
-  | 5 => some (.irelop w (.gt .s)) | 6 => some (.irelop w (.gt .u))
-  | 7 => some (.irelop w (.le .s)) | 8 => some (.irelop w (.le .u))
-  | 9 => some (.irelop w (.ge .s)) | 10 => some (.irelop w (.ge .u))
-  | _ => none
+/-- Integer comparison opcodes from `0x45`/`0x50`. -/
+def intRelOps (w : Width) : List Instr :=
+  [.itestEqz w, .irelop w .eq, .irelop w .ne, .irelop w (.lt .s), .irelop w (.lt .u),
+   .irelop w (.gt .s), .irelop w (.gt .u), .irelop w (.le .s), .irelop w (.le .u),
+   .irelop w (.ge .s), .irelop w (.ge .u)]
 
-/-- Float comparison opcodes `0x5B`–`0x66`. -/
-def floatRelOp (w : Width) : Nat → Option Instr
-  | 0 => some (.frelop w .eq) | 1 => some (.frelop w .ne) | 2 => some (.frelop w .lt)
-  | 3 => some (.frelop w .gt) | 4 => some (.frelop w .le) | 5 => some (.frelop w .ge)
-  | _ => none
+/-- Float comparison opcodes from `0x5B`/`0x61`. -/
+def floatRelOps (w : Width) : List Instr :=
+  [.frelop w .eq, .frelop w .ne, .frelop w .lt, .frelop w .gt, .frelop w .le, .frelop w .ge]
 
-/-- Integer arithmetic opcodes `0x67`–`0x8A`. -/
-def intArithOp (w : Width) : Nat → Option Instr
-  | 0 => some (.iunop w .clz) | 1 => some (.iunop w .ctz) | 2 => some (.iunop w .popcnt)
-  | 3 => some (.ibinop w .add) | 4 => some (.ibinop w .sub) | 5 => some (.ibinop w .mul)
-  | 6 => some (.ibinop w (.div .s)) | 7 => some (.ibinop w (.div .u))
-  | 8 => some (.ibinop w (.rem .s)) | 9 => some (.ibinop w (.rem .u))
-  | 10 => some (.ibinop w .and) | 11 => some (.ibinop w .or) | 12 => some (.ibinop w .xor)
-  | 13 => some (.ibinop w .shl) | 14 => some (.ibinop w (.shr .s))
-  | 15 => some (.ibinop w (.shr .u)) | 16 => some (.ibinop w .rotl)
-  | 17 => some (.ibinop w .rotr)
-  | _ => none
+/-- Integer arithmetic opcodes from `0x67`/`0x79`. -/
+def intArithOps (w : Width) : List Instr :=
+  [.iunop w .clz, .iunop w .ctz, .iunop w .popcnt, .ibinop w .add, .ibinop w .sub,
+   .ibinop w .mul, .ibinop w (.div .s), .ibinop w (.div .u), .ibinop w (.rem .s),
+   .ibinop w (.rem .u), .ibinop w .and, .ibinop w .or, .ibinop w .xor, .ibinop w .shl,
+   .ibinop w (.shr .s), .ibinop w (.shr .u), .ibinop w .rotl, .ibinop w .rotr]
 
-/-- Float arithmetic opcodes `0x8B`–`0xA6`. -/
-def floatArithOp (w : Width) : Nat → Option Instr
-  | 0 => some (.funop w .abs) | 1 => some (.funop w .neg) | 2 => some (.funop w .ceil)
-  | 3 => some (.funop w .floor) | 4 => some (.funop w .trunc) | 5 => some (.funop w .nearest)
-  | 6 => some (.funop w .sqrt) | 7 => some (.fbinop w .add) | 8 => some (.fbinop w .sub)
-  | 9 => some (.fbinop w .mul) | 10 => some (.fbinop w .div) | 11 => some (.fbinop w .min)
-  | 12 => some (.fbinop w .max) | 13 => some (.fbinop w .copysign)
-  | _ => none
+/-- Float arithmetic opcodes from `0x8B`/`0x99`. -/
+def floatArithOps (w : Width) : List Instr :=
+  [.funop w .abs, .funop w .neg, .funop w .ceil, .funop w .floor, .funop w .trunc,
+   .funop w .nearest, .funop w .sqrt, .fbinop w .add, .fbinop w .sub, .fbinop w .mul,
+   .fbinop w .div, .fbinop w .min, .fbinop w .max, .fbinop w .copysign]
 
-/-- Conversion opcodes `0xA7`–`0xBF` (index from `0xA7`). -/
-def convOp : Nat → Option Instr
-  | 0 => some (.cvtop .wrap)
-  | 1 => some (.cvtop (.trunc .w32 .w32 .s)) | 2 => some (.cvtop (.trunc .w32 .w32 .u))
-  | 3 => some (.cvtop (.trunc .w32 .w64 .s)) | 4 => some (.cvtop (.trunc .w32 .w64 .u))
-  | 5 => some (.cvtop (.extend .s)) | 6 => some (.cvtop (.extend .u))
-  | 7 => some (.cvtop (.trunc .w64 .w32 .s)) | 8 => some (.cvtop (.trunc .w64 .w32 .u))
-  | 9 => some (.cvtop (.trunc .w64 .w64 .s)) | 10 => some (.cvtop (.trunc .w64 .w64 .u))
-  | 11 => some (.cvtop (.convert .w32 .w32 .s)) | 12 => some (.cvtop (.convert .w32 .w32 .u))
-  | 13 => some (.cvtop (.convert .w32 .w64 .s)) | 14 => some (.cvtop (.convert .w32 .w64 .u))
-  | 15 => some (.cvtop .demote)
-  | 16 => some (.cvtop (.convert .w64 .w32 .s)) | 17 => some (.cvtop (.convert .w64 .w32 .u))
-  | 18 => some (.cvtop (.convert .w64 .w64 .s)) | 19 => some (.cvtop (.convert .w64 .w64 .u))
-  | 20 => some (.cvtop .promote)
-  | 21 => some (.cvtop (.reinterpret .w32 true)) | 22 => some (.cvtop (.reinterpret .w64 true))
-  | 23 => some (.cvtop (.reinterpret .w32 false)) | 24 => some (.cvtop (.reinterpret .w64 false))
-  | _ => none
+/-- Conversion opcodes `0xA7`–`0xBF`, then sign extension `0xC0`–`0xC4`. -/
+def convOps : List Instr :=
+  [.cvtop .wrap, .cvtop (.trunc .w32 .w32 .s), .cvtop (.trunc .w32 .w32 .u),
+   .cvtop (.trunc .w32 .w64 .s), .cvtop (.trunc .w32 .w64 .u), .cvtop (.extend .s),
+   .cvtop (.extend .u), .cvtop (.trunc .w64 .w32 .s), .cvtop (.trunc .w64 .w32 .u),
+   .cvtop (.trunc .w64 .w64 .s), .cvtop (.trunc .w64 .w64 .u), .cvtop (.convert .w32 .w32 .s),
+   .cvtop (.convert .w32 .w32 .u), .cvtop (.convert .w32 .w64 .s),
+   .cvtop (.convert .w32 .w64 .u), .cvtop .demote, .cvtop (.convert .w64 .w32 .s),
+   .cvtop (.convert .w64 .w32 .u), .cvtop (.convert .w64 .w64 .s),
+   .cvtop (.convert .w64 .w64 .u), .cvtop .promote, .cvtop (.reinterpret .w32 true),
+   .cvtop (.reinterpret .w64 true), .cvtop (.reinterpret .w32 false),
+   .cvtop (.reinterpret .w64 false), .iunop .w32 .extend8s, .iunop .w32 .extend16s,
+   .iunop .w64 .extend8s, .iunop .w64 .extend16s, .iunop .w64 .extend32s]
 
-/-- One-byte opcodes without immediates (the spec table `FVA.Wasm.Binary.plainOps`). -/
-def plainOpOf (op : Nat) : Option Instr :=
-  if op < 0x45 then
-    if op = 0x00 then some .unreachable else if op = 0x01 then some .nop
-    else if op = 0x0F then some .return_ else if op = 0x1A then some .drop
-    else if op = 0x1B then some (.select none) else none
-  else if op < 0x50 then intRelOp .w32 (op - 0x45)
-  else if op < 0x5B then intRelOp .w64 (op - 0x50)
-  else if op < 0x61 then floatRelOp .w32 (op - 0x5B)
-  else if op < 0x67 then floatRelOp .w64 (op - 0x61)
-  else if op < 0x79 then intArithOp .w32 (op - 0x67)
-  else if op < 0x8B then intArithOp .w64 (op - 0x79)
-  else if op < 0x99 then floatArithOp .w32 (op - 0x8B)
-  else if op < 0xA7 then floatArithOp .w64 (op - 0x99)
-  else if op < 0xC0 then convOp (op - 0xA7)
-  else if op = 0xC0 then some (.iunop .w32 .extend8s)
-  else if op = 0xC1 then some (.iunop .w32 .extend16s)
-  else if op = 0xC2 then some (.iunop .w64 .extend8s)
-  else if op = 0xC3 then some (.iunop .w64 .extend16s)
-  else if op = 0xC4 then some (.iunop .w64 .extend32s)
-  else if op = 0xD1 then some .refIsNull
-  else none
+/-- Numeric opcodes `0x45`–`0xC4` (no immediates). -/
+def numOp (op : Nat) : Option Instr :=
+  bif Nat.blt op 0x67 then
+    (bif Nat.blt op 0x5B then
+      (bif Nat.blt op 0x50 then nth (intRelOps .w32) (op - 0x45)
+       else nth (intRelOps .w64) (op - 0x50))
+     else bif Nat.blt op 0x61 then nth (floatRelOps .w32) (op - 0x5B)
+     else nth (floatRelOps .w64) (op - 0x61))
+  else bif Nat.blt op 0x8B then
+    (bif Nat.blt op 0x79 then nth (intArithOps .w32) (op - 0x67)
+     else nth (intArithOps .w64) (op - 0x79))
+  else bif Nat.blt op 0xA7 then
+    (bif Nat.blt op 0x99 then nth (floatArithOps .w32) (op - 0x8B)
+     else nth (floatArithOps .w64) (op - 0x99))
+  else nth convOps (op - 0xA7)
 
-/-- One-byte opcodes taking one `u32` index (the spec table `FVA.Wasm.Binary.idxOps`). -/
-def idxOpOf (op : Nat) : Option (Nat → Instr) :=
-  if op = 0x0C then some .br else if op = 0x0D then some .brIf
-  else if op = 0x10 then some .call else if op = 0xD2 then some .refFunc
-  else if op = 0x20 then some .localGet else if op = 0x21 then some .localSet
-  else if op = 0x22 then some .localTee else if op = 0x23 then some .globalGet
-  else if op = 0x24 then some .globalSet else if op = 0x25 then some .tableGet
-  else if op = 0x26 then some .tableSet else none
+/-- Load opcodes `0x28`–`0x35`. -/
+def loadOps : List (MemArg → Instr) :=
+  [.load .i32, .load .i64, .load .f32, .load .f64, .loadPacked .w32 .p8 .s,
+   .loadPacked .w32 .p8 .u, .loadPacked .w32 .p16 .s, .loadPacked .w32 .p16 .u,
+   .loadPacked .w64 .p8 .s, .loadPacked .w64 .p8 .u, .loadPacked .w64 .p16 .s,
+   .loadPacked .w64 .p16 .u, .loadPacked .w64 .p32 .s, .loadPacked .w64 .p32 .u]
 
-/-- Load/store opcodes `0x28`–`0x3E` (the spec table `FVA.Wasm.Binary.memOps`). -/
-def memOpOf : Nat → Option (MemArg → Instr)
-  | 0x28 => some (.load .i32) | 0x29 => some (.load .i64)
-  | 0x2A => some (.load .f32) | 0x2B => some (.load .f64)
-  | 0x2C => some (.loadPacked .w32 .p8 .s) | 0x2D => some (.loadPacked .w32 .p8 .u)
-  | 0x2E => some (.loadPacked .w32 .p16 .s) | 0x2F => some (.loadPacked .w32 .p16 .u)
-  | 0x30 => some (.loadPacked .w64 .p8 .s) | 0x31 => some (.loadPacked .w64 .p8 .u)
-  | 0x32 => some (.loadPacked .w64 .p16 .s) | 0x33 => some (.loadPacked .w64 .p16 .u)
-  | 0x34 => some (.loadPacked .w64 .p32 .s) | 0x35 => some (.loadPacked .w64 .p32 .u)
-  | 0x36 => some (.store .i32) | 0x37 => some (.store .i64)
-  | 0x38 => some (.store .f32) | 0x39 => some (.store .f64)
-  | 0x3A => some (.storePacked .w32 .p8) | 0x3B => some (.storePacked .w32 .p16)
-  | 0x3C => some (.storePacked .w64 .p8) | 0x3D => some (.storePacked .w64 .p16)
-  | 0x3E => some (.storePacked .w64 .p32)
-  | _ => none
+/-- Store opcodes `0x36`–`0x3E`. -/
+def storeOps : List (MemArg → Instr) :=
+  [.store .i32, .store .i64, .store .f32, .store .f64, .storePacked .w32 .p8,
+   .storePacked .w32 .p16, .storePacked .w64 .p8, .storePacked .w64 .p16, .storePacked .w64 .p32]
 
-/-- Opcodes of features outside the profile, reported as unsupported rather than malformed. -/
-def unsupportedOp (op : Nat) : Option String :=
-  if op = 0xFD then some "SIMD (0xFD prefix)"
-  else if op = 0xFE then some "threads/atomics (0xFE prefix)"
-  else if op = 0xFB then some "GC (0xFB prefix)"
-  else if 0x06 ≤ op ∧ op ≤ 0x0A ∨ op = 0x18 ∨ op = 0x19 ∨ op = 0x1F then
-    some "exception handling"
-  else if op = 0x12 ∨ op = 0x13 then some "tail calls"
-  else if op = 0x14 ∨ op = 0x15 ∨ (0xD3 ≤ op ∧ op ≤ 0xD6) then some "typed function references"
-  else none
+/-- Index opcodes `0x20`–`0x26`. -/
+def varOps : List (Nat → Instr) :=
+  [.localGet, .localSet, .localTee, .globalGet, .globalSet, .tableGet, .tableSet]
 
-/-- Read the zero byte that stands for memory index 0. -/
-def zeroByte (r : Reader) : Res Unit := do
-  let (b, r') ← r.byte
-  if b.toNat = 0 then .ok ((), r') else r.unsup "multiple memories"
+/-- A `u32` immediate, then the instruction. -/
+def withIdx (mk : Nat → Instr) (v n : Nat) : Res Instr :=
+  (u32 v n).bind fun x v n => .ok (mk x) v n
+
+/-- The zero byte standing for memory index 0. -/
+def zeroByte (v n : Nat) : Res Unit :=
+  (byte v n).bind fun b v' n' => bif Nat.beq b 0 then .ok () v' n' else .unsup n "multiple memories"
 
 /-- `0xFC`-prefixed instructions (after the prefix byte). -/
-def fcInstr (r : Reader) : Res Instr := do
-  let (n, r) ← u32 r
-  if n < 8 then
-    let (dst, src, sx) :=
-      match n with
-      | 0 => (Width.w32, Width.w32, Sx.s) | 1 => (.w32, .w32, .u) | 2 => (.w32, .w64, .s)
-      | 3 => (.w32, .w64, .u) | 4 => (.w64, .w32, .s) | 5 => (.w64, .w32, .u)
-      | 6 => (.w64, .w64, .s) | _ => (.w64, .w64, .u)
-    .ok (.cvtop (.truncSat dst src sx), r)
-  else if n = 8 then do
-    let (x, r) ← u32 r
-    let ((), r) ← zeroByte r
-    .ok (.memoryInit x, r)
-  else if n = 9 then do
-    let (x, r) ← u32 r
-    .ok (.dataDrop x, r)
-  else if n = 10 then do
-    let ((), r) ← zeroByte r
-    let ((), r) ← zeroByte r
-    .ok (.memoryCopy, r)
-  else if n = 11 then do
-    let ((), r) ← zeroByte r
-    .ok (.memoryFill, r)
-  else if n = 12 then do
-    let (y, r) ← u32 r
-    let (x, r) ← u32 r
-    .ok (.tableInit x y, r)
-  else if n = 13 then do
-    let (x, r) ← u32 r
-    .ok (.elemDrop x, r)
-  else if n = 14 then do
-    let (x, r) ← u32 r
-    let (y, r) ← u32 r
-    .ok (.tableCopy x y, r)
-  else if n = 15 then do
-    let (x, r) ← u32 r
-    .ok (.tableGrow x, r)
-  else if n = 16 then do
-    let (x, r) ← u32 r
-    .ok (.tableSize x, r)
-  else if n = 17 then do
-    let (x, r) ← u32 r
-    .ok (.tableFill x, r)
-  else r.bad "illegal opcode"
+def fcInstr (v n : Nat) : Res Instr :=
+  (u32 v n).bind fun k v n =>
+  bif Nat.blt k 8 then
+    .ok (.cvtop (.truncSat (bif Nat.blt k 4 then .w32 else .w64)
+      (bif Nat.blt (k % 4) 2 then .w32 else .w64) (bif Nat.beq (k % 2) 0 then .s else .u))) v n
+  else bif Nat.beq k 8 then
+    (u32 v n).bind fun x v n => (zeroByte v n).bind fun _ v n => .ok (.memoryInit x) v n
+  else bif Nat.beq k 9 then withIdx .dataDrop v n
+  else bif Nat.beq k 10 then
+    (zeroByte v n).bind fun _ v n => (zeroByte v n).bind fun _ v n => .ok .memoryCopy v n
+  else bif Nat.beq k 11 then (zeroByte v n).bind fun _ v n => .ok .memoryFill v n
+  else bif Nat.beq k 12 then
+    (u32 v n).bind fun y v n => (u32 v n).bind fun x v n => .ok (.tableInit x y) v n
+  else bif Nat.beq k 13 then withIdx .elemDrop v n
+  else bif Nat.beq k 14 then
+    (u32 v n).bind fun x v n => (u32 v n).bind fun y v n => .ok (.tableCopy x y) v n
+  else bif Nat.beq k 15 then withIdx .tableGrow v n
+  else bif Nat.beq k 16 then withIdx .tableSize v n
+  else bif Nat.beq k 17 then withIdx .tableFill v n
+  else .bad n "illegal opcode"
 
-/-- A non-structured instruction with opcode `op` (already read; `r` points at the opcode,
-`r₁` after it). Not recursive: block, loop and if are handled in `instrs`. -/
-def plainInstr (op : Nat) (r r₁ : Reader) : Res Instr :=
-  match plainOpOf op with
-  | some i => .ok (i, r₁)
-  | none =>
-  match idxOpOf op with
-  | some mk => do
-    let (x, r₂) ← u32 r₁
-    .ok (mk x, r₂)
-  | none =>
-  match memOpOf op with
-  | some mk => do
-    let (m, r₂) ← memArg r₁
-    .ok (mk m, r₂)
-  | none =>
-  if op = 0x0E then do
-    let (ls, r₂) ← vec u32 r₁
-    let (l, r₃) ← u32 r₂
-    .ok (.brTable ls l, r₃)
-  else if op = 0x11 then do
-    let (y, r₂) ← u32 r₁
-    let (x, r₃) ← u32 r₂
-    .ok (.callIndirect x y, r₃)
-  else if op = 0x1C then do
-    let (ts, r₂) ← vec valType r₁
-    .ok (.select (some ts), r₂)
-  else if op = 0xD0 then do
-    let (t, r₂) ← refType r₁
-    .ok (.refNull t, r₂)
-  else if op = 0x3F then do
-    let ((), r₂) ← zeroByte r₁
-    .ok (.memorySize, r₂)
-  else if op = 0x40 then do
-    let ((), r₂) ← zeroByte r₁
-    .ok (.memoryGrow, r₂)
-  else if op = 0x41 then do
-    let (n, r₂) ← sleb 5 32 r₁
-    .ok (.iconst .w32 (n % 2 ^ 32).toNat, r₂)
-  else if op = 0x42 then do
-    let (n, r₂) ← sleb 10 64 r₁
-    .ok (.iconst .w64 (n % 2 ^ 64).toNat, r₂)
-  else if op = 0x43 then do
-    let (z, r₂) ← leNat 4 r₁
-    .ok (.fconst .w32 z, r₂)
-  else if op = 0x44 then do
-    let (z, r₂) ← leNat 8 r₁
-    .ok (.fconst .w64 z, r₂)
-  else if op = 0xFC then fcInstr r₁
-  else match unsupportedOp op with
-    | some what => r.unsup what
-    | none => r.bad "illegal opcode"
+/-- Opcodes below `0x20` other than structured control (`0x02`–`0x05`, `0x0B`). -/
+def lowInstr (op v n r : Nat) : Res Instr :=
+  bif Nat.blt op 0x0C then
+    (bif Nat.beq op 0x00 then .ok .unreachable v n
+     else bif Nat.beq op 0x01 then .ok .nop v n
+     else .unsup r "exception handling")
+  else bif Nat.blt op 0x10 then
+    (bif Nat.beq op 0x0C then withIdx .br v n
+     else bif Nat.beq op 0x0D then withIdx .brIf v n
+     else bif Nat.beq op 0x0F then .ok .return_ v n
+     else (vec u32 v n).bind fun ls v n => (u32 v n).bind fun l v n => .ok (.brTable ls l) v n)
+  else bif Nat.beq op 0x10 then withIdx .call v n
+  else bif Nat.beq op 0x11 then
+    (u32 v n).bind fun y v n => (u32 v n).bind fun x v n => .ok (.callIndirect x y) v n
+  else bif Nat.beq op 0x1A then .ok .drop v n
+  else bif Nat.beq op 0x1B then .ok (.select none) v n
+  else bif Nat.beq op 0x1C then (vec valType v n).bind fun ts v n => .ok (.select (some ts)) v n
+  else bif Nat.blt op 0x14 then .unsup r "tail calls"
+  else bif Nat.blt op 0x16 then .unsup r "typed function references"
+  else bif Nat.beq op 0x18 || Nat.beq op 0x19 || Nat.beq op 0x1F then .unsup r "exception handling"
+  else .bad r "illegal opcode"
 
-/-- Instructions up to a terminator (`0x0B` end or `0x05` else); returns the terminator.
-Structural on `fuel` (all recursion stays here, so the kernel can evaluate it); callers pass
-the remaining byte count (each instruction is ≥ 1 byte). -/
-def instrs : Nat → Reader → Res (Instrs × Nat)
-  | 0, r => r.bad "unexpected end"
-  | fuel + 1, r => do
-    let (b, r₁) ← r.byte
-    let op := b.toNat
-    if op = 0x0B ∨ op = 0x05 then .ok ((.nil, op), r₁)
-    else if op = 0x02 ∨ op = 0x03 then do
-      let (bt, r₂) ← blockType r₁
-      let ((body, t), r₃) ← instrs fuel r₂
-      if t ≠ 0x0B then r.bad "else outside if" else do
-      let ((is, t'), r₄) ← instrs fuel r₃
-      .ok ((.cons (if op = 0x02 then .block bt body else .loop bt body) is, t'), r₄)
-    else if op = 0x04 then do
-      let (bt, r₂) ← blockType r₁
-      let ((thn, t), r₃) ← instrs fuel r₂
-      let ((els, r₄) : Instrs × Reader) ← (if t = 0x0B then .ok (.nil, r₃) else do
-        let ((els, t'), r₄) ← instrs fuel r₃
-        if t' = 0x0B then .ok (els, r₄) else r.bad "duplicate else" : Res Instrs)
-      let ((is, t''), r₅) ← instrs fuel r₄
-      .ok ((.cons (.if_ bt thn els) is, t''), r₅)
-    else do
-      let (i, r₂) ← plainInstr op r r₁
-      let ((is, t), r₃) ← instrs fuel r₂
-      .ok ((.cons i is, t), r₃)
+/-- Opcodes from `0xC5`. -/
+def highInstr (op v n r : Nat) : Res Instr :=
+  bif Nat.beq op 0xD0 then (refType v n).bind fun t v n => .ok (.refNull t) v n
+  else bif Nat.beq op 0xD1 then .ok .refIsNull v n
+  else bif Nat.beq op 0xD2 then withIdx .refFunc v n
+  else bif Nat.beq op 0xFC then fcInstr v n
+  else bif Nat.blt op 0xD3 then .bad r "illegal opcode"
+  else bif Nat.blt op 0xD7 then .unsup r "typed function references"
+  else bif Nat.beq op 0xFB then .unsup r "GC (0xFB prefix)"
+  else bif Nat.beq op 0xFD then .unsup r "SIMD (0xFD prefix)"
+  else bif Nat.beq op 0xFE then .unsup r "threads/atomics (0xFE prefix)"
+  else .bad r "illegal opcode"
+
+/-- A non-structured instruction with opcode `op`; `(v, n)` follows the opcode, `r` = bytes
+left at the opcode (for failures). Not recursive: `seq` handles block, loop and if. -/
+def instr (op v n r : Nat) : Res Instr :=
+  bif Nat.blt op 0x45 then
+    (bif Nat.blt op 0x20 then lowInstr op v n r
+     else bif Nat.blt op 0x28 then
+       (match nth varOps (op - 0x20) with
+        | some mk => withIdx mk v n
+        | none => .bad r "illegal opcode")
+     else bif Nat.blt op 0x3F then
+       (match (bif Nat.blt op 0x36 then nth loadOps (op - 0x28) else nth storeOps (op - 0x36)) with
+        | some mk => (memArg v n).bind fun m v n => .ok (mk m) v n
+        | none => .bad r "illegal opcode")
+     else bif Nat.beq op 0x3F then (zeroByte v n).bind fun _ v n => .ok .memorySize v n
+     else bif Nat.beq op 0x40 then (zeroByte v n).bind fun _ v n => .ok .memoryGrow v n
+     else bif Nat.beq op 0x41 then (sleb 5 32 v n).bind fun x v n => .ok (.iconst .w32 x) v n
+     else bif Nat.beq op 0x42 then (sleb 10 64 v n).bind fun x v n => .ok (.iconst .w64 x) v n
+     else bif Nat.beq op 0x43 then (leNat 4 v n).bind fun z v n => .ok (.fconst .w32 z) v n
+     else (leNat 8 v n).bind fun z v n => .ok (.fconst .w64 z) v n)
+  else bif Nat.blt op 0xC5 then
+    (match numOp op with
+     | some i => .ok i v n
+     | none => .bad r "illegal opcode")
+  else highInstr op v n r
+
+/-- Instructions up to a terminator (`0x0B` end or `0x05` else), prepended in reverse to `acc`;
+returns the terminator. Sequences iterate by tail calls and only nesting recurses, so kernel
+evaluation depth follows block nesting. Structural on `fuel` (all recursion stays here);
+callers pass the input length (each instruction takes ≥ 1 byte). -/
+def seq : Nat → List Instr → Nat → Nat → Res (List Instr × Nat)
+  | 0, _, _, n => .bad n "unexpected end"
+  | fuel + 1, acc, v, n =>
+    match n with
+    | 0 => .bad 0 "unexpected end"
+    | n' + 1 =>
+      let op := Nat.land v 255
+      let v' := Nat.shiftRight v 8
+      let plain := (instr op v' n' n).bind fun i v n => seq fuel (i :: acc) v n
+      bif Nat.blt 0x05 op then (bif Nat.beq op 0x0B then .ok (acc, op) v' n' else plain)
+      else bif Nat.blt op 0x02 then plain
+      else bif Nat.beq op 0x05 then .ok (acc, op) v' n'
+      else (blockType v' n').bind fun bt v n =>
+        (seq fuel [] v n).bind fun body v n =>
+        bif Nat.beq op 0x04 then
+          (bif Nat.beq body.2 0x0B then seq fuel (.if_ bt body.1.reverse [] :: acc) v n
+           else (seq fuel [] v n).bind fun els v n =>
+             bif Nat.beq els.2 0x0B then
+               seq fuel (.if_ bt body.1.reverse els.1.reverse :: acc) v n
+             else .bad n "else without if")
+        else bif Nat.beq body.2 0x0B then
+          seq fuel ((bif Nat.beq op 0x02 then Instr.block else Instr.loop) bt body.1.reverse :: acc)
+            v n
+        else .bad n "else without if"
 
 /-- An expression: instructions terminated by `end`. -/
-def expr (r : Reader) : Res Expr := do
-  let ((is, t), r') ← instrs r.len r
-  if t = 0x0B then .ok (is, r') else r.bad "else outside if"
+def expr (v n : Nat) : Res Expr :=
+  (seq n [] v n).bind fun is v' n' =>
+  bif Nat.beq is.2 0x0B then .ok is.1.reverse v' n' else .bad n "else without if"
 
 end FVA.Wasm.Decode

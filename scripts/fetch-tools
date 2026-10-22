@@ -13,6 +13,8 @@ tools=(
 	"actionlint 1.7.12 rhysd/actionlint actionlint_{v}_linux_amd64.tar.gz 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
 	"zizmor 1.31.1 zizmorcore/zizmor zizmor-x86_64-unknown-linux-gnu.tar.gz d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99"
 	"shfmt 3.14.1 mvdan/sh shfmt_v{v}_linux_amd64 76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf"
+	"wasm-tools 1.262.0 bytecodealliance/wasm-tools wasm-tools-{v}-x86_64-linux.tar.gz 655b8df67d54c3ef9b52fc237c4e94bbfbb5f5f43825245cb0940a7002a9ed65"
+	"wasmtime 50.0.0 bytecodealliance/wasmtime wasmtime-v{v}-x86_64-linux.tar.xz 77c19ee0437991f9ac7837b9c269d9c7076744f85dad263fea5214cc2723c7ff"
 )
 
 for t in "${tools[@]}"; do
@@ -27,7 +29,12 @@ for t in "${tools[@]}"; do
 		exit 1
 	fi
 	case $file in
-	*.tar.gz) tar -xzf "$file" -C "$bin" "$name" ;;
+	*.tar.gz | *.tar.xz)
+		x=$(mktemp -d)
+		tar -xf "$file" -C "$x"
+		find "$x" -type f -name "$name" -exec cp {} "$bin/$name" \;
+		rm -rf "$x"
+		;;
 	*) cp "$file" "$bin/$name" ;;
 	esac
 	chmod +x "$bin/$name"

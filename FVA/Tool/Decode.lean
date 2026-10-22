@@ -1,14 +1,11 @@
 import FVA.Impl.Decode
+import FVA.Tool.Pack
 
 /-! `fva decode`: decode a `.wasm` file with the verified decoder and summarize the result. -/
 
 namespace FVA.Tool
 
 open FVA.Wasm FVA.Wasm.Decode
-
-/-- Little-endian packing of file bytes, the representation `decode` reads. -/
-def packBytes (bs : ByteArray) : Nat :=
-  bs.toList.foldr (fun b acc => acc * 256 + b.toNat) 0
 
 mutual
 /-- Number of instructions in an instruction, counting nested bodies. -/
@@ -17,9 +14,9 @@ def instrCount1 : Instr → Nat
   | .if_ _ t e => 1 + instrCount t + instrCount e
   | _ => 1
 /-- Number of instructions in a sequence, counting nested bodies. -/
-def instrCount : Instrs → Nat
-  | .nil => 0
-  | .cons i is => instrCount1 i + instrCount is
+def instrCount : List Instr → Nat
+  | [] => 0
+  | i :: is => instrCount1 i + instrCount is
 end
 
 /-- One-line result: `ok …` with section counts, `malformed …` or `unsupported …`. -/

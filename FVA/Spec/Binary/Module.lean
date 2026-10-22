@@ -72,7 +72,7 @@ def ExportB (ex : Export) (bs : List UInt8) : Prop :=
 def ElemKindB (t : RefType) (bs : List UInt8) : Prop := t = .funcref ∧ bs = [0x00]
 
 /-- Function indices as `(ref.func y) end` initializers. -/
-def funcInits (ys : List Nat) : List Expr := ys.map fun y => .cons (Instr.refFunc y) .nil
+def funcInits (ys : List Nat) : List Expr := ys.map fun y => [Instr.refFunc y]
 
 /-- Element segments: the eight encodings selected by a `u32` flag (spec §5.5.12). -/
 inductive ElemB : Elem → List UInt8 → Prop where
@@ -119,12 +119,10 @@ def LocalsB (g : Nat × ValType) (bs : List UInt8) : Prop :=
   ∃ b₁ b₂, ULeb 32 g.1 b₁ ∧ ValTypeB g.2 b₂ ∧ bs = b₁ ++ b₂
 
 /-- A code entry: `size:u32` then local runs and the body; at most 2^32 − 1 locals in total
-(spec §5.5.13). -/
-def CodeB (c : List ValType × Expr) (bs : List UInt8) : Prop :=
-  ∃ (groups : List (Nat × ValType)) (bsz bl be : List UInt8),
-    Vec LocalsB groups bl ∧ ExprB c.2 be ∧
-    (groups.map Prod.fst).sum < 2 ^ 32 ∧
-    c.1 = groups.flatMap (fun g => List.replicate g.1 g.2) ∧
+(spec §5.5.13). The runs stay as encoded (`Func.locals`). -/
+def CodeB (c : List (Nat × ValType) × Expr) (bs : List UInt8) : Prop :=
+  ∃ (bsz bl be : List UInt8),
+    Vec LocalsB c.1 bl ∧ ExprB c.2 be ∧ (c.1.map Prod.fst).sum < 2 ^ 32 ∧
     ULeb 32 (bl ++ be).length bsz ∧ bs = bsz ++ bl ++ be
 
 mutual
@@ -132,14 +130,14 @@ mutual
 inductive UsesData : Instr → Prop where
   | init (x : Nat) : UsesData (.memoryInit x)
   | drop (x : Nat) : UsesData (.dataDrop x)
-  | block {bt : BlockType} {body : Instrs} (h : UsesDataS body) : UsesData (.block bt body)
-  | loop {bt : BlockType} {body : Instrs} (h : UsesDataS body) : UsesData (.loop bt body)
-  | thn {bt : BlockType} {thn els : Instrs} (h : UsesDataS thn) : UsesData (.if_ bt thn els)
-  | els {bt : BlockType} {thn els : Instrs} (h : UsesDataS els) : UsesData (.if_ bt thn els)
+  | block {bt : BlockType} {body : List Instr} (h : UsesDataS body) : UsesData (.block bt body)
+  | loop {bt : BlockType} {body : List Instr} (h : UsesDataS body) : UsesData (.loop bt body)
+  | thn {bt : BlockType} {thn els : List Instr} (h : UsesDataS thn) : UsesData (.if_ bt thn els)
+  | els {bt : BlockType} {thn els : List Instr} (h : UsesDataS els) : UsesData (.if_ bt thn els)
 /-- Some instruction of the sequence uses a data index. -/
-inductive UsesDataS : Instrs → Prop where
-  | head {i : Instr} {is : Instrs} (h : UsesData i) : UsesDataS (.cons i is)
-  | tail {i : Instr} {is : Instrs} (h : UsesDataS is) : UsesDataS (.cons i is)
+inductive UsesDataS : List Instr → Prop where
+  | head {i : Instr} {is : List Instr} (h : UsesData i) : UsesDataS (i :: is)
+  | tail {i : Instr} {is : List Instr} (h : UsesDataS is) : UsesDataS (i :: is)
 end
 
 /-- The magic number `\0asm` and version 1 (spec §5.5.16). -/
@@ -149,7 +147,7 @@ def preamble : List UInt8 := [0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00]
 sections have equal length; a data count, when present, equals the number of data segments;
 code may use data indices only when the data count section is present. -/
 def ModuleB (m : Module) (bs : List UInt8) : Prop :=
-  ∃ (typeIdxs : List Nat) (codes : List (List ValType × Expr)) (dataCount : Option Nat)
+  ∃ (typeIdxs : List Nat) (codes : List (List (Nat × ValType) × Expr)) (dataCount : Option Nat)
     (c₀ s₁ c₁ s₂ c₂ s₃ c₃ s₄ c₄ s₅ c₅ s₆ c₆ s₇ c₇ s₈ c₈ s₉ c₉ s₁₂ c₁₂ s₁₀ c₁₀ s₁₁ c₁₁ :
       List UInt8),
     CustomsB c₀ ∧ VecSecB 1 FuncTypeB m.types s₁ ∧ CustomsB c₁ ∧

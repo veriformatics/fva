@@ -1,177 +1,130 @@
 import FVA.Impl.Decode.Instr
+import FVA.Spec.Binary.Types
 
 /-!
 # Module decoding
 
-Sections are read in the spec's order; each section's content is a sub-reader of exactly its
+Sections are read in the spec's order; each section's content is a sub-input of exactly its
 declared size, which must be consumed completely. Custom sections may appear anywhere and are
-skipped after their name is checked.
+skipped after their name is checked. Data segment bytes stay one numeral (`leBytes k lit`), so a
+20 KB segment costs the kernel a single `&&&` instead of a byte list.
 -/
 
 namespace FVA.Wasm.Decode
 
 open FVA.Wasm
 
-/-- Run `p` on `r` and require it to consume all of `r`. -/
-def whole {α : Type} (p : Reader → Res α) (r : Reader) : Except DecodeError α := do
-  let (a, r') ← p r
-  if r'.len = 0 then .ok a else .error (.malformed r'.pos "section size mismatch")
-
-/-- Limits: flag `0x00` (min) or `0x01` (min, max); other flags are outside the profile. -/
-def limits (r : Reader) : Res Limits := do
-  let (f, r') ← r.byte
-  if f.toNat = 0 then do
-    let (n, r') ← u32 r'
-    .ok ({ min := n, max := none }, r')
-  else if f.toNat = 1 then do
-    let (n, r') ← u32 r'
-    let (m, r') ← u32 r'
-    .ok ({ min := n, max := some m }, r')
-  else if f.toNat < 8 then r.unsup "shared memory or 64-bit limits"
-  else r.bad "integer too large"
+/-- Limits: flag `0x00` (min) or `0x01` (min, max); flags up to `0x07` are outside the
+profile (shared memory, 64-bit). -/
+def limits (v n : Nat) : Res Limits :=
+  (byte v n).bind fun f v' n' =>
+  bif Nat.beq f 0 then (u32 v' n').bind fun a v n => .ok { min := a, max := none } v n
+  else bif Nat.beq f 1 then
+    (u32 v' n').bind fun a v n => (u32 v n).bind fun b v n => .ok { min := a, max := some b } v n
+  else bif Nat.blt f 8 then .unsup n "shared memory or 64-bit limits"
+  else .bad n "integer too large"
 
 /-- Function types: `0x60 vec(valtype) vec(valtype)`. -/
-def funcType (r : Reader) : Res FuncType := do
-  let (b, r') ← r.byte
-  if b.toNat = 0x60 then do
-    let (ps, r') ← vec valType r'
-    let (rs, r') ← vec valType r'
-    .ok ({ params := ps, results := rs }, r')
-  else if b.toNat = 0x4E ∨ b.toNat = 0x4F ∨ b.toNat = 0x50 ∨ b.toNat = 0x5E ∨ b.toNat = 0x5F then
-    r.unsup "GC types"
-  else r.bad "integer representation too long"
+def funcType (v n : Nat) : Res FuncType :=
+  (byte v n).bind fun b v' n' =>
+  bif Nat.beq b 0x60 then
+    (vec valType v' n').bind fun ps v n => (vec valType v n).bind fun rs v n =>
+    .ok { params := ps, results := rs } v n
+  else bif Nat.beq b 0x4E || Nat.beq b 0x4F || Nat.beq b 0x50 || Nat.beq b 0x5E ||
+      Nat.beq b 0x5F then .unsup n "GC types"
+  else .bad n "integer representation too long"
 
 /-- Table types: `reftype limits`. -/
-def tableType (r : Reader) : Res TableType := do
-  let (t, r) ← refType r
-  let (l, r) ← limits r
-  .ok ({ limits := l, elem := t }, r)
+def tableType (v n : Nat) : Res TableType :=
+  (refType v n).bind fun t v n => (limits v n).bind fun l v n => .ok { limits := l, elem := t } v n
 
 /-- Global types: `valtype mut`. -/
-def globalType (r : Reader) : Res GlobalType := do
-  let (t, r) ← valType r
-  let (m, r') ← r.byte
-  if m.toNat = 0 then .ok ({ mutability := .const, val := t }, r')
-  else if m.toNat = 1 then .ok ({ mutability := .var, val := t }, r')
-  else r.bad "malformed mutability"
+def globalType (v n : Nat) : Res GlobalType :=
+  (valType v n).bind fun t v n => (byte v n).bind fun m v' n' =>
+  bif Nat.beq m 0 then .ok { mutability := .const, val := t } v' n'
+  else bif Nat.beq m 1 then .ok { mutability := .var, val := t } v' n'
+  else .bad n "malformed mutability"
 
 /-- Imports. -/
-def import_ (r : Reader) : Res Import := do
-  let (md, r) ← name r
-  let (nm, r) ← name r
-  let (k, r') ← r.byte
-  let (d, r') ←
-    (if k.toNat = 0 then do let (x, r') ← u32 r'; .ok (ImportDesc.func x, r')
-     else if k.toNat = 1 then do let (t, r') ← tableType r'; .ok (.table t, r')
-     else if k.toNat = 2 then do let (t, r') ← limits r'; .ok (.mem t, r')
-     else if k.toNat = 3 then do let (t, r') ← globalType r'; .ok (.global t, r')
-     else if k.toNat = 4 then r.unsup "exception handling (tag import)"
-     else r.bad "malformed import kind" : Res ImportDesc)
-  .ok ({ module := md, name := nm, desc := d }, r')
+def import_ (v n : Nat) : Res Import :=
+  (name v n).bind fun md v n => (name v n).bind fun nm v n => (byte v n).bind fun k v' n' =>
+  let desc : Res ImportDesc :=
+    bif Nat.beq k 0 then (u32 v' n').bind fun x v n => .ok (.func x) v n
+    else bif Nat.beq k 1 then (tableType v' n').bind fun t v n => .ok (.table t) v n
+    else bif Nat.beq k 2 then (limits v' n').bind fun t v n => .ok (.mem t) v n
+    else bif Nat.beq k 3 then (globalType v' n').bind fun t v n => .ok (.global t) v n
+    else bif Nat.beq k 4 then .unsup n "exception handling (tag import)"
+    else .bad n "malformed import kind"
+  desc.bind fun d v n => .ok { module := md, name := nm, desc := d } v n
 
 /-- Exports. -/
-def export_ (r : Reader) : Res Export := do
-  let (nm, r) ← name r
-  let (k, r') ← r.byte
-  let (x, r') ← u32 r'
-  let d : Option ExportDesc :=
-    if k.toNat = 0 then some (.func x) else if k.toNat = 1 then some (.table x)
-    else if k.toNat = 2 then some (.mem x) else if k.toNat = 3 then some (.global x) else none
-  match d with
-  | some d => .ok ({ name := nm, desc := d }, r')
-  | none => if k.toNat = 4 then r.unsup "exception handling (tag export)"
-            else r.bad "malformed export kind"
+def export_ (v n : Nat) : Res Export :=
+  (name v n).bind fun nm v n => (byte v n).bind fun k v' n' => (u32 v' n').bind fun x v'' n'' =>
+  let ok (d : ExportDesc) : Res Export := .ok { name := nm, desc := d } v'' n''
+  bif Nat.beq k 0 then ok (.func x) else bif Nat.beq k 1 then ok (.table x)
+  else bif Nat.beq k 2 then ok (.mem x) else bif Nat.beq k 3 then ok (.global x)
+  else bif Nat.beq k 4 then .unsup n "exception handling (tag export)"
+  else .bad n "malformed export kind"
 
 /-- Globals. -/
-def global (r : Reader) : Res Global := do
-  let (t, r) ← globalType r
-  let (e, r) ← expr r
-  .ok ({ type := t, init := e }, r)
+def global (v n : Nat) : Res Global :=
+  (globalType v n).bind fun t v n => (expr v n).bind fun e v n => .ok { type := t, init := e } v n
 
 /-- `elemkind`: only `0x00` (funcref). -/
-def elemKind (r : Reader) : Res RefType := do
-  let (b, r') ← r.byte
-  if b.toNat = 0 then .ok (.funcref, r') else r.bad "malformed element kind"
+def elemKind (v n : Nat) : Res RefType :=
+  (byte v n).bind fun b v' n' =>
+  bif Nat.beq b 0 then .ok .funcref v' n' else .bad n "malformed element kind"
 
 /-- `(ref.func y) end` initializers from function indices. -/
-def funcInits (ys : List Nat) : List Expr := ys.map fun y => .cons (Instr.refFunc y) .nil
+def funcInits (ys : List Nat) : List Expr := ys.map fun y => [Instr.refFunc y]
 
-/-- Element segments (eight encodings). -/
-def elem (r : Reader) : Res Elem := do
-  let (f, r) ← u32 r
-  if f = 0 then do
-    let (e, r) ← expr r
-    let (ys, r) ← vec u32 r
-    .ok ({ type := .funcref, init := funcInits ys, mode := .active 0 e }, r)
-  else if f = 1 then do
-    let (t, r) ← elemKind r
-    let (ys, r) ← vec u32 r
-    .ok ({ type := t, init := funcInits ys, mode := .passive }, r)
-  else if f = 2 then do
-    let (x, r) ← u32 r
-    let (e, r) ← expr r
-    let (t, r) ← elemKind r
-    let (ys, r) ← vec u32 r
-    .ok ({ type := t, init := funcInits ys, mode := .active x e }, r)
-  else if f = 3 then do
-    let (t, r) ← elemKind r
-    let (ys, r) ← vec u32 r
-    .ok ({ type := t, init := funcInits ys, mode := .declarative }, r)
-  else if f = 4 then do
-    let (e, r) ← expr r
-    let (es, r) ← vec expr r
-    .ok ({ type := .funcref, init := es, mode := .active 0 e }, r)
-  else if f = 5 then do
-    let (t, r) ← refType r
-    let (es, r) ← vec expr r
-    .ok ({ type := t, init := es, mode := .passive }, r)
-  else if f = 6 then do
-    let (x, r) ← u32 r
-    let (e, r) ← expr r
-    let (t, r) ← refType r
-    let (es, r) ← vec expr r
-    .ok ({ type := t, init := es, mode := .active x e }, r)
-  else if f = 7 then do
-    let (t, r) ← refType r
-    let (es, r) ← vec expr r
-    .ok ({ type := t, init := es, mode := .declarative }, r)
-  else r.bad "malformed elements segment kind"
+/-- Element segments: the eight encodings selected by a `u32` flag. Bit 0 = passive or
+declarative, bit 1 = explicit table index (active) or declarative (with bit 0), bit 2 =
+initializers are expressions rather than function indices. -/
+def elem (v n : Nat) : Res Elem :=
+  (u32 v n).bind fun f v n =>
+  bif Nat.blt 7 f then .bad n "malformed elements segment kind" else
+  let exprs := Nat.ble 4 f
+  let k := f % 4
+  -- mode: active (k = 0 table 0, k = 2 explicit table), passive (k = 1), declarative (k = 3)
+  let mode : Res (ElemMode × Bool) :=
+    bif Nat.beq k 1 then .ok (.passive, true) v n
+    else bif Nat.beq k 3 then .ok (.declarative, true) v n
+    else bif Nat.beq k 0 then (expr v n).bind fun e v n => .ok (.active 0 e, false) v n
+    else (u32 v n).bind fun x v n => (expr v n).bind fun e v n => .ok (.active x e, true) v n
+  mode.bind fun (md, typed) v n =>
+  let ty : Res RefType :=
+    bif typed then (bif exprs then refType v n else elemKind v n) else .ok .funcref v n
+  ty.bind fun t v n =>
+  let inits : Res (List Expr) :=
+    bif exprs then vec expr v n else (vec u32 v n).bind fun ys v n => .ok (funcInits ys) v n
+  inits.bind fun es v n => .ok { type := t, init := es, mode := md } v n
 
-/-- Data segments (three encodings). -/
-def data (r : Reader) : Res Data := do
-  let (f, r) ← u32 r
-  if f = 0 then do
-    let (e, r) ← expr r
-    let (n, r) ← u32 r
-    let (bs, r) ← bytesList n r
-    .ok ({ init := bs, mode := .active 0 e }, r)
-  else if f = 1 then do
-    let (n, r) ← u32 r
-    let (bs, r) ← bytesList n r
-    .ok ({ init := bs, mode := .passive }, r)
-  else if f = 2 then do
-    let (x, r) ← u32 r
-    let (e, r) ← expr r
-    let (n, r) ← u32 r
-    let (bs, r) ← bytesList n r
-    .ok ({ init := bs, mode := .active x e }, r)
-  else r.bad "malformed data segment kind"
+/-- Data segments: three encodings selected by a `u32` flag; the bytes stay one numeral. -/
+def data (v n : Nat) : Res Data :=
+  (u32 v n).bind fun f v n =>
+  let mode : Res DataMode :=
+    bif Nat.beq f 0 then (expr v n).bind fun e v n => .ok (.active 0 e) v n
+    else bif Nat.beq f 1 then .ok .passive v n
+    else bif Nat.beq f 2 then
+      (u32 v n).bind fun x v n => (expr v n).bind fun e v n => .ok (.active x e) v n
+    else .bad n "malformed data segment kind"
+  mode.bind fun md v n => (u32 v n).bind fun k v n => (leNat k v n).bind fun bs v n =>
+  .ok { init := Binary.leBytes k bs, mode := md } v n
 
 /-- A run of locals. -/
-def localsRun (r : Reader) : Res (Nat × ValType) := do
-  let (n, r) ← u32 r
-  let (t, r) ← valType r
-  .ok ((n, t), r)
+def localsRun (v n : Nat) : Res (Nat × ValType) :=
+  (u32 v n).bind fun c v n => (valType v n).bind fun t v n => .ok (c, t) v n
 
-/-- A code entry: size-delimited locals and body; at most 2^32 − 1 locals in total. -/
-def code (r : Reader) : Res (List ValType × Expr) := do
-  let (sz, r) ← u32 r
-  let (c, r') ← r.take sz
-  let (groups, c) ← vec localsRun c
-  if 2 ^ 32 ≤ (groups.map Prod.fst).sum then c.bad "too many locals" else do
-  let (e, c) ← expr c
-  if c.len = 0 then .ok ((groups.flatMap fun g => List.replicate g.1 g.2, e), r')
-  else c.bad "section size mismatch"
+/-- A code entry's content: local runs (at most 2^32 − 1 locals in total) and the body. -/
+def codeBody (v n : Nat) : Res (List (Nat × ValType) × Expr) :=
+  (vec localsRun v n).bind fun ls v n =>
+  bif Nat.blt ((ls.map Prod.fst).sum) (2 ^ 32) then (expr v n).bind fun e v n => .ok (ls, e) v n
+  else .bad n "too many locals"
+
+/-- A code entry: `size:u32`, then exactly that many bytes of content. -/
+def code (v n : Nat) : Res (List (Nat × ValType) × Expr) :=
+  (u32 v n).bind fun k v n => sub k codeBody v n
 
 mutual
 /-- Whether an instruction uses a data index (`memory.init`, `data.drop`), possibly nested. -/
@@ -181,18 +134,10 @@ def usesData : Instr → Bool
   | .if_ _ t e => usesDataList t || usesDataList e
   | _ => false
 /-- Whether any instruction in the sequence uses a data index. -/
-def usesDataList : Instrs → Bool
-  | .nil => false
-  | .cons i is => usesData i || usesDataList is
+def usesDataList : List Instr → Bool
+  | [] => false
+  | i :: is => usesData i || usesDataList is
 end
-
-/-- Canonical position of each known section id in the module (custom = 0). -/
-def sectionRank (id : Nat) : Option Nat :=
-  if id = 1 then some 1 else if id = 2 then some 2 else if id = 3 then some 3
-  else if id = 4 then some 4 else if id = 5 then some 5 else if id = 6 then some 6
-  else if id = 7 then some 7 else if id = 8 then some 8 else if id = 9 then some 9
-  else if id = 12 then some 10 else if id = 10 then some 11 else if id = 11 then some 12
-  else none
 
 /-- Section contents gathered so far. -/
 structure Acc where
@@ -201,68 +146,87 @@ structure Acc where
   /-- Function section type indices. -/
   typeIdxs : List Nat := []
   /-- Code section entries. -/
-  codes : List (List ValType × Expr) := []
+  codes : List (List (Nat × ValType) × Expr) := []
   /-- Data count, when the section is present. -/
   dataCount : Option Nat := none
 
-/-- Decode one non-custom section's content into the accumulator. -/
-def sectionInto (id : Nat) (c : Reader) (a : Acc) : Except DecodeError Acc := do
-  if id = 1 then do let ts ← whole (vec funcType) c; .ok { a with m := { a.m with types := ts } }
-  else if id = 2 then do
-    let is ← whole (vec import_) c; .ok { a with m := { a.m with imports := is } }
-  else if id = 3 then do let xs ← whole (vec u32) c; .ok { a with typeIdxs := xs }
-  else if id = 4 then do
-    let ts ← whole (vec tableType) c; .ok { a with m := { a.m with tables := ts } }
-  else if id = 5 then do let ms ← whole (vec limits) c; .ok { a with m := { a.m with mems := ms } }
-  else if id = 6 then do
-    let gs ← whole (vec global) c; .ok { a with m := { a.m with globals := gs } }
-  else if id = 7 then do
-    let es ← whole (vec export_) c; .ok { a with m := { a.m with exports := es } }
-  else if id = 8 then do let x ← whole u32 c; .ok { a with m := { a.m with start := some x } }
-  else if id = 9 then do let es ← whole (vec elem) c; .ok { a with m := { a.m with elems := es } }
-  else if id = 12 then do let n ← whole u32 c; .ok { a with dataCount := some n }
-  else if id = 10 then do let cs ← whole (vec code) c; .ok { a with codes := cs }
-  else do let ds ← whole (vec data) c; .ok { a with m := { a.m with datas := ds } }
+/-- Canonical position of each known section id in the module (custom = 0). -/
+def sectionRank (id : Nat) : Nat :=
+  bif Nat.blt id 10 then id
+  else bif Nat.beq id 12 then 10 else bif Nat.beq id 10 then 11 else bif Nat.beq id 11 then 12
+  else 0
+
+/-- Decode a non-custom section's content `(v, n)` into the accumulator. -/
+def sectionInto (id : Nat) (a : Acc) (v n : Nat) : Res Acc :=
+  bif Nat.beq id 10 then (vec code v n).bind fun cs v n => .ok { a with codes := cs } v n
+  else bif Nat.beq id 1 then
+    (vec funcType v n).bind fun ts v n => .ok { a with m := { a.m with types := ts } } v n
+  else bif Nat.beq id 2 then
+    (vec import_ v n).bind fun is v n => .ok { a with m := { a.m with imports := is } } v n
+  else bif Nat.beq id 3 then (vec u32 v n).bind fun xs v n => .ok { a with typeIdxs := xs } v n
+  else bif Nat.beq id 4 then
+    (vec tableType v n).bind fun ts v n => .ok { a with m := { a.m with tables := ts } } v n
+  else bif Nat.beq id 5 then
+    (vec limits v n).bind fun ms v n => .ok { a with m := { a.m with mems := ms } } v n
+  else bif Nat.beq id 6 then
+    (vec global v n).bind fun gs v n => .ok { a with m := { a.m with globals := gs } } v n
+  else bif Nat.beq id 7 then
+    (vec export_ v n).bind fun es v n => .ok { a with m := { a.m with exports := es } } v n
+  else bif Nat.beq id 8 then
+    (u32 v n).bind fun x v n => .ok { a with m := { a.m with start := some x } } v n
+  else bif Nat.beq id 9 then
+    (vec elem v n).bind fun es v n => .ok { a with m := { a.m with elems := es } } v n
+  else bif Nat.beq id 12 then (u32 v n).bind fun c v n => .ok { a with dataCount := some c } v n
+  else (vec data v n).bind fun ds v n => .ok { a with m := { a.m with datas := ds } } v n
 
 /-- Read sections until the input ends; `last` = rank of the last non-custom section.
 Structural on `fuel` (callers pass the byte count; each section takes ≥ 2 bytes). -/
-def sections : Nat → Nat → Reader → Acc → Except DecodeError Acc
-  | 0, _, r, a => if r.len = 0 then .ok a else .error (.malformed r.pos "unexpected end")
-  | fuel + 1, last, r, a =>
-    if r.len = 0 then .ok a else do
-    let (idb, r₁) ← r.byte
-    let id := idb.toNat
-    let (sz, r₂) ← u32 r₁
-    let (c, r₃) ← r₂.take sz
-    if id = 0 then do
-      let _ ← (name c : Res String)
-      sections fuel last r₃ a
-    else match sectionRank id with
-      | none =>
-        if id = 13 then .error (.unsupported r.pos "exception handling (tag section)")
-        else .error (.malformed r.pos "malformed section id")
-      | some rank =>
-        if rank ≤ last then .error (.malformed r.pos "unexpected content after last section")
-        else do
-          let a ← sectionInto id c a
-          sections fuel rank r₃ a
+def sections : Nat → Nat → Acc → Nat → Nat → Res Acc
+  | 0, _, a, v, n => bif Nat.beq n 0 then .ok a v n else .bad n "unexpected end"
+  | fuel + 1, last, a, v, n =>
+    bif Nat.beq n 0 then .ok a v n else
+    (byte v n).bind fun id v₁ n₁ =>
+    (u32 v₁ n₁).bind fun k v₂ n₂ =>
+    bif Nat.beq id 0 then
+      (sub k (fun v n => (name v n).bind fun _ _ _ => .ok () 0 0) v₂ n₂).bind fun _ v n =>
+      sections fuel last a v n
+    else
+      let rank := sectionRank id
+      bif Nat.beq rank 0 then
+        (bif Nat.beq id 13 then .unsup n "exception handling (tag section)"
+         else .bad n "malformed section id")
+      else bif Nat.ble rank last then .bad n "unexpected content after last section"
+      else (sub k (sectionInto id a) v₂ n₂).bind fun a v n => sections fuel rank a v n
+
+/-- The module from its sections, after the cross-section checks of spec §5.5.16. -/
+def finish (a : Acc) (n : Nat) : Res Module :=
+  bif !Nat.beq a.typeIdxs.length a.codes.length then
+    .bad n "function and code section have inconsistent lengths"
+  else match a.dataCount with
+    | some c =>
+      bif Nat.beq c a.m.datas.length then .ok (assemble a) 0 n
+      else .bad n "data count and data section have inconsistent lengths"
+    | none =>
+      bif a.codes.any (fun c => usesDataList c.2) then .bad n "data count section required"
+      else .ok (assemble a) 0 n
+where
+  /-- Functions pair the function section's type indices with the code entries. -/
+  assemble (a : Acc) : Module :=
+    { a.m with
+      funcs := List.zipWith (fun t c => { type := t, locals := c.1, body := c.2 }) a.typeIdxs
+        a.codes }
 
 /-- Decode a whole module from `len` bytes packed little-endian in `bytes` (spec §5.5.16). -/
-def decode (bytes len : Nat) : Except DecodeError Module := do
-  let r : Reader := ⟨bytes, len, 0⟩
-  let (magic, r) ← leNat 4 r
-  if magic ≠ 0x6D736100 then .error (.malformed 0 "magic header not detected") else do
-  let (version, r) ← leNat 4 r
-  if version ≠ 1 then .error (.malformed 4 "unknown binary version") else do
-  let a ← sections r.len 0 r {}
-  if a.typeIdxs.length ≠ a.codes.length then
-    .error (.malformed len "function and code section have inconsistent lengths")
-  else if a.dataCount.isSome ∧ a.dataCount ≠ some a.m.datas.length then
-    .error (.malformed len "data count and data section have inconsistent lengths")
-  else if a.dataCount.isNone ∧ a.codes.any (fun c => usesDataList c.2) then
-    .error (.malformed len "data count section required")
-  else .ok { a.m with
-    funcs := List.zipWith (fun t c => { type := t, locals := c.1, body := c.2 }) a.typeIdxs
-        a.codes }
+def decode (bytes len : Nat) : Except DecodeError Module :=
+  let r : Res Module :=
+    (leNat 4 bytes len).bind fun magic v n =>
+    bif !Nat.beq magic 0x6D736100 then .bad len "magic header not detected" else
+    (leNat 4 v n).bind fun version v n =>
+    bif !Nat.beq version 1 then .bad (len - 4) "unknown binary version" else
+    (sections n 0 {} v n).bind fun a _ n => finish a n
+  match r with
+  | .ok m _ _ => .ok m
+  | .bad rem msg => .error (.malformed (len - rem) msg)
+  | .unsup rem msg => .error (.unsupported (len - rem) msg)
 
 end FVA.Wasm.Decode

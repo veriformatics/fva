@@ -10,10 +10,9 @@ def main (args : List String) : IO UInt32 := do
     return 0
   | ["lift", path, out, "--ns", ns] =>
     let bs ← IO.FS.readBinFile path
-    let packed := FVA.Tool.packBytes bs
-    match FVA.Wasm.Decode.decode packed bs.size with
+    match FVA.Wasm.Decode.decode (FVA.Tool.packBytes bs) bs.size with
     | .ok m =>
-      IO.FS.writeFile out (FVA.Tool.Lift.file ns packed bs.size m)
+      IO.FS.writeFile out (FVA.Tool.Lift.file ns bs m)
       return 0
     | .error e =>
       IO.eprintln s!"fva lift: {repr e}"
