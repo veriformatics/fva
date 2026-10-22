@@ -4,10 +4,11 @@ import FVA.Spec.Binary.Types
 /-!
 # Module decoding
 
-Sections are read in the spec's order; each section's content is a sub-input of exactly its
-declared size, which must be consumed completely. Custom sections may appear anywhere and are
-skipped after their name is checked. Data segment bytes stay one numeral (`leBytes k lit`), so a
-20 KB segment costs the kernel a single `&&&` instead of a byte list.
+Sections are read slot by slot in the spec's order; each section's content is a sub-input of
+exactly its declared size, which must be consumed completely. Custom sections may appear
+anywhere and are skipped after their name is checked. Data segment bytes stay one numeral
+(`leBytes k lit`), so a 20 KB segment costs the kernel a single `Nat.land` instead of a byte
+list.
 -/
 
 namespace FVA.Wasm.Decode
@@ -150,12 +151,6 @@ structure Acc where
   /-- Data count, when the section is present. -/
   dataCount : Option Nat := none
 
-/-- Canonical position of each known section id in the module (custom = 0). -/
-def sectionRank (id : Nat) : Nat :=
-  bif Nat.blt id 10 then id
-  else bif Nat.beq id 12 then 10 else bif Nat.beq id 10 then 11 else bif Nat.beq id 11 then 12
-  else 0
-
 /-- Decode a non-custom section's content `(v, n)` into the accumulator. -/
 def sectionInto (id : Nat) (a : Acc) (v n : Nat) : Res Acc :=
   bif Nat.beq id 10 then (vec code v n).bind fun cs v n => .ok { a with codes := cs } v n
@@ -179,24 +174,30 @@ def sectionInto (id : Nat) (a : Acc) (v n : Nat) : Res Acc :=
   else bif Nat.beq id 12 then (u32 v n).bind fun c v n => .ok { a with dataCount := some c } v n
   else (vec data v n).bind fun ds v n => .ok { a with m := { a.m with datas := ds } } v n
 
-/-- Read sections until the input ends; `last` = rank of the last non-custom section.
-Structural on `fuel` (callers pass the byte count; each section takes ≥ 2 bytes). -/
-def sections : Nat → Nat → Acc → Nat → Nat → Res Acc
-  | 0, _, a, v, n => bif Nat.beq n 0 then .ok a v n else .bad n "unexpected end"
-  | fuel + 1, last, a, v, n =>
-    bif Nat.beq n 0 then .ok a v n else
-    (byte v n).bind fun id v₁ n₁ =>
-    (u32 v₁ n₁).bind fun k v₂ n₂ =>
-    bif Nat.beq id 0 then
-      (sub k (fun v n => (name v n).bind fun _ _ _ => .ok () 0 0) v₂ n₂).bind fun _ v n =>
-      sections fuel last a v n
-    else
-      let rank := sectionRank id
-      bif Nat.beq rank 0 then
-        (bif Nat.beq id 13 then .unsup n "exception handling (tag section)"
-         else .bad n "malformed section id")
-      else bif Nat.ble rank last then .bad n "unexpected content after last section"
-      else (sub k (sectionInto id a) v₂ n₂).bind fun a v n => sections fuel rank a v n
+/-- Section ids in the order a module lists them (spec §5.5.16); data count (12) precedes code. -/
+def slotIds : List Nat := [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 10, 11]
+
+/-- Custom sections while the next id byte is 0: names checked, contents skipped. Structural on
+`fuel` (callers pass the byte count; each section takes ≥ 2 bytes). -/
+def customs : Nat → Nat → Nat → Res Unit
+  | 0, v, n => .ok () v n
+  | fuel + 1, v, n =>
+    bif Nat.beq n 0 || !Nat.beq (Nat.land v 255) 0 then .ok () v n else
+    (byte v n).bind fun _ v n => (u32 v n).bind fun k v n =>
+    (sub k (fun v n => (name v n).bind fun _ _ _ => .ok () 0 0) v n).bind fun _ v n =>
+    customs fuel v n
+
+/-- The optional sections `ids` in order, each after custom sections, then trailing custom
+sections. A section out of order stays unread, and `decode` rejects the leftover input. Reading
+in the spec's slot order (rather than tracking ranks) keeps the proof a slot-by-slot walk. -/
+def slots : List Nat → Acc → Nat → Nat → Res Acc
+  | [], a, v, n => (customs n v n).bind fun _ v n => .ok a v n
+  | id :: ids, a, v, n =>
+    (customs n v n).bind fun _ v n =>
+    bif !Nat.beq n 0 && Nat.beq (Nat.land v 255) id then
+      (byte v n).bind fun _ v n => (u32 v n).bind fun k v n =>
+      (sub k (sectionInto id a) v n).bind fun a v n => slots ids a v n
+    else slots ids a v n
 
 /-- The module from its sections, after the cross-section checks of spec §5.5.16. -/
 def finish (a : Acc) (n : Nat) : Res Module :=
@@ -223,7 +224,11 @@ def decode (bytes len : Nat) : Except DecodeError Module :=
     bif !Nat.beq magic 0x6D736100 then .bad len "magic header not detected" else
     (leNat 4 v n).bind fun version v n =>
     bif !Nat.beq version 1 then .bad (len - 4) "unknown binary version" else
-    (sections n 0 {} v n).bind fun a _ n => finish a n
+    (slots slotIds {} v n).bind fun a v n =>
+    bif Nat.beq n 0 then finish a n
+    else bif Nat.beq (Nat.land v 255) 13 then .unsup n "exception handling (tag section)"
+    else bif Nat.blt 12 (Nat.land v 255) then .bad n "malformed section id"
+    else .bad n "unexpected content after last section"
   match r with
   | .ok m _ _ => .ok m
   | .bad rem msg => .error (.malformed (len - rem) msg)
