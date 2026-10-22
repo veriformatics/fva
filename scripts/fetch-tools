@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Install pinned scanner binaries into .tools/bin; every download is sha256-checked.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+bin=.tools/bin dl=.tools/dl
+mkdir -p "$bin" "$dl"
+
+# name version repo asset sha256; "{v}" in asset = version. Renovate bumps the version (regex
+# manager); a bump PR fails here until its sha256 is refreshed from the release.
+tools=(
+	"gitleaks 8.30.1 gitleaks/gitleaks gitleaks_{v}_linux_x64.tar.gz 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+	"osv-scanner 2.7.0 google/osv-scanner osv-scanner_linux_amd64 160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b"
+	"actionlint 1.7.12 rhysd/actionlint actionlint_{v}_linux_amd64.tar.gz 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+	"zizmor 1.31.1 zizmorcore/zizmor zizmor-x86_64-unknown-linux-gnu.tar.gz d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99"
+	"shfmt 3.14.1 mvdan/sh shfmt_v{v}_linux_amd64 76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf"
+)
+
+for t in "${tools[@]}"; do
+	read -r name version repo asset sha <<<"$t"
+	url="https://github.com/$repo/releases/download/v$version/${asset//\{v\}/$version}"
+	stamp="$bin/.$name-$version"
+	[[ -x $bin/$name && -e $stamp ]] && continue
+	file="$dl/${url##*/}"
+	[[ -e $file ]] || curl -fsSL -o "$file" "$url"
+	if ! echo "$sha  $file" | sha256sum -c --quiet -; then
+		echo "fetch-tools: sha256 mismatch for $file" >&2
+		exit 1
+	fi
+	case $file in
+	*.tar.gz) tar -xzf "$file" -C "$bin" "$name" ;;
+	*) cp "$file" "$bin/$name" ;;
+	esac
+	chmod +x "$bin/$name"
+	rm -f "$bin/.$name-"*
+	touch "$stamp"
+done

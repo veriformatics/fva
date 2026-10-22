@@ -1,0 +1,6 @@
+# FVA gate
+
+- Full gate = `scripts/gate` (CI + every closing commit); fast gate = `scripts/gate --fast` (iteration; skips the network/history scanners `osv-scanner`, `gitleaks git`). rc 0 = every step passed; each step prints its wall-clock, failures print their last 20 log lines.
+- Steps: `lake --wfail build` (type-check; warnings fail), `lake --wfail test` (`fvatest` + compile-time `#guard`s in `FVATest`), `lake --wfail lint` (Batteries `runLinter`), `scripts/check-format` (Lean text format: ≤ 100 columns, no tabs, no trailing whitespace, final newline — Lean has no official formatter), `scripts/test-checks` (planted inputs for the purpose-built checks), shellcheck + `shfmt -d` (scripts/), `.agent/spec-lint`, `scripts/check-pins`, actionlint + `zizmor --offline` (workflows), `gitleaks dir` (+ `gitleaks git` full), `osv-scanner` (lockfiles; full).
+- `lake build` success alone proves nothing about proofs (accepts `sorry`, custom axioms, kernel bypass); verification claims go through `fva trust` (U7 onward).
+- Pins move together: `lean-toolchain` = installed `lean` = Mathlib tag in `lakefile.toml` = `lake-manifest.json` inputRev (`scripts/check-pins`); Renovate groups Lean + Mathlib and never automerges. Scanner binaries = `scripts/fetch-tools` (version + sha256; a Renovate bump fails there until the sha256 is refreshed from the release).
