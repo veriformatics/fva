@@ -53,3 +53,9 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | R2 (register) | upstream: §4.5.4 prose runs all active segments before declarative drops; the equations interleave by segment index | note | accepted: the transcription follows the equations (FVA's convention) |
 | R3 (register) | upstream: appendix extension keeps the table/memory type unchanged while growth updates its min | note | accepted: growth-compatible reading (same element type/maximum, size non-decreasing) |
 
+## U4 LoaderReady / RunsExport (b119c25) — open for the U4/phase closing review
+
+| row | check | verdict | ruling |
+|---|---|---|---|
+| L1 | `LoaderReady` = Instantiated, then exported `__wasm_apply_data_relocs`, then `__wasm_call_ctors`, before any other export (tool-conventions DynamicLinking.md, pinned 25aceba: "the loader will call it after the module is instantiated, and before any other function, including `__wasm_call_ctors`"); an absent export leaves the store unchanged | open | MAIN self-check matches the quoted protocol; adjudication by the closing reviewer |
+
