@@ -32,3 +32,12 @@ Wasm 2.0 binary format minus SIMD: types (i32 i64 f32 f64 funcref externref), fu
 - C2 Nested `Instr` vs flat instruction stream + structured-control well-formedness (semantics + type-soundness proofs downstream).
 - C3 T2 completeness scope: P only, with `unsupported` outside — sufficient for "decoder sound + complete for the supported profile" (Decisions: Self-verification)?
 - C4 Packed-Nat kernel decoding at 96.5 KB: risks + alternatives (chunking boundary, `Nat.toDigits`-free reads).
+
+## Rulings on consultant-2 (C1–C4, D1–D6)
+- C1 keep (relation `ModuleB` is the reviewed object; parser lemmas stay outside the spec). C2 keep (nested syntax; `Instr`/`Instrs` mutual so `DecidableEq` derives kernel-reducibly).
+- C3/D2: P = the productions of `FVA.Spec.Binary` (Wasm 2.0 §5 minus SIMD). Decoding is syntax fidelity only: typing, index bounds, constant-expression validity, memory/table cardinality and limits belong to U6. `unsupported` = best-effort diagnostic for a recognized feature outside P, first error in byte order; it is outside T1–T3.
+- D3: side conditions are part of `ModuleB` (data count presence when code uses data indices, total locals < 2^32, section rank/uniqueness, literal `0x00` reserved bytes); each gets positive + negative fixtures.
+- D4: the link binds bytes AND length: T4 states `pack b` with `b.length`; U7 checks the literal and `len` against the file and the exact type of `decode_eq`; fixtures: appended zero byte, tampered length.
+- D5/C4: the lifted theorem type stays `decode bytes len = .ok module`; when one kernel check exceeds the budget it is assembled from proved split equations (exact spans, no gaps/overlap/reordering) + per-chunk decode theorems. Measured (E4): lz4 C 14.5 KB 32 s user / 3.4 GB (decode ≈ 12 s, structural comparison ≈ 16 s, elaboration ≈ 7 s), lz4_flex 25.3 KB 49 s / 4.9 GB ⇒ chunking needed before edgeR.
+- D6: `Func.locals` keeps the encoded runs `List (Nat × ValType)` (expansion = U4); fuel = remaining byte count, proved sufficient in T2 (each step consumes ≥ 1 byte); operational limits report resource exhaustion, never `malformed`/`unsupported`.
+- D1: E2 compares the whole module: Lean re-encoder (untrusted test tool) → `wasm-tools print` of original vs re-encoded must match; mutant battery adds a wrong export binding and a changed data/initializer byte.
