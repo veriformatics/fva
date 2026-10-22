@@ -27,6 +27,12 @@ def Byte (x : UInt8) (bs : List UInt8) : Prop := bs = [x]
 /-- `name`: `vec(byte)` holding exactly the UTF-8 encoding of the string (spec §5.2.4). -/
 def Name (s : String) (bs : List UInt8) : Prop := Vec Byte s.toUTF8.toList bs
 
+/-- Little-endian packing of a byte list into one number: the representation `decode` reads and
+`fva trust` recomputes from the file. -/
+def pack : List UInt8 → Nat
+  | [] => 0
+  | b :: bs => b.toNat + 256 * pack bs
+
 /-- Little-endian bytes of the low `8·k` bits of `n`. -/
 def leBytes : Nat → Nat → List UInt8
   | 0, _ => []
