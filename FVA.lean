@@ -30,3 +30,4 @@ import FVA.Proof.Numerics.AdequacyLemmas
 import FVA.Proof.Numerics.Adequacy
 import FVA.Proof.Numerics.Integral
 import FVA.Proof.Numerics.Total
+import FVA.Proof.Numerics.NanClass
