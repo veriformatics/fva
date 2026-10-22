@@ -106,4 +106,85 @@ theorem roundDyadic_mem (hF : F.Sane) (s : Bool) {n d : ℕ} (hn : 0 < n) (hd : 
   rw [roundDyadic_eq F s hn hd e]
   exact (ieee_iff_grid hF _ _).2 rfl
 
+theorem ltNum_iff {z₁ z₂ : FVal} (h₁ : z₁.IsNum) (h₂ : z₂.IsNum) :
+    ltNum F z₁ z₂ = true ↔ z₁.toReal F < z₂.toReal F := by
+  have hp : (0 : ℝ) < 2 ^ min (ex F z₁) (ex F z₂) := zpow_pos (by norm_num) _
+  unfold ltNum
+  rw [toReal_eq_units z₁ h₁ (min_le_left _ _), toReal_eq_units z₂ h₂ (min_le_right _ _),
+    decide_eq_true_iff, mul_lt_mul_iff_left₀ hp]
+  exact_mod_cast Iff.rfl
+
+theorem leNum_iff {z₁ z₂ : FVal} (h₁ : z₁.IsNum) (h₂ : z₂.IsNum) :
+    leNum F z₁ z₂ = true ↔ z₁.toReal F ≤ z₂.toReal F := by
+  unfold leNum
+  rw [Bool.not_eq_true', ← Bool.not_eq_true, ltNum_iff h₂ h₁, not_lt]
+
+/-- Formats whose integers up to `2^(M+1)` are exact (f32, f64). -/
+structure FloatFormat.Wide (F : FloatFormat) : Prop extends F.Sane where
+  /-- `M + 1 ≤ emax`. -/
+  hEM : (F.M : ℤ) + 1 ≤ F.emax
+
+theorem f32fmt_wide : f32fmt.Wide := ⟨f32fmt_sane, by decide⟩
+theorem f64fmt_wide : f64fmt.Wide := ⟨f64fmt_sane, by decide⟩
+
+/-- A grid value `±k·2^e` with `k < 2^(M+1)`, `e ≥ emin − M` and binade `≤ emax` is exact: the
+rounder returns a well-formed number of that value and sign. -/
+theorem roundDyadic_exact (hF : F.Sane) (s : Bool) {k : ℕ} {e : ℤ} (hk : 0 < k)
+    (hk' : k < 2 ^ (F.M + 1)) (he : F.emin - F.M ≤ e) (hb : (Nat.log2 k : ℤ) + e ≤ F.emax) :
+    (roundDyadic F s k 1 e).WF F ∧ (roundDyadic F s k 1 e).IsNum ∧
+      (roundDyadic F s k 1 e).neg = s ∧
+      (roundDyadic F s k 1 e).toReal F = (if s then -1 else 1) * ((k : ℝ) * 2 ^ e) := by
+  set b := Nat.log2 k with hbdef
+  have hk1 : 2 ^ b ≤ k := Nat.log2_self_le (by omega)
+  have hk2 : k < 2 ^ (b + 1) := Nat.lt_log2_self
+  have hbM : b ≤ F.M := by
+    by_contra h
+    have : 2 ^ (F.M + 1) ≤ 2 ^ b := Nat.pow_le_pow_right (by norm_num) (by omega)
+    omega
+  have h2 : (2 : ℝ) ≠ 0 := two_ne_zero
+  -- the representation `w` of `±k·2^e`
+  obtain ⟨w, hw, hn, hs, hv⟩ : ∃ w : FVal, w.WF F ∧ w.IsNum ∧ w.neg = s ∧
+      w.toReal F = (if s then -1 else 1) * ((k : ℝ) * 2 ^ e) := by
+    by_cases hnorm : F.emin ≤ (b : ℤ) + e
+    · refine ⟨normal s (k * 2 ^ (F.M - b) - 2 ^ F.M) (b + e), ⟨?_, hnorm, hb⟩, trivial, rfl, ?_⟩
+      · have : k * 2 ^ (F.M - b) < 2 ^ (F.M + 1) := by
+          calc k * 2 ^ (F.M - b) < 2 ^ (b + 1) * 2 ^ (F.M - b) :=
+                Nat.mul_lt_mul_of_pos_right hk2 (Nat.two_pow_pos _)
+            _ = 2 ^ (F.M + 1) := by rw [← Nat.pow_add]; congr 1; omega
+        rw [Nat.pow_succ] at this; omega
+      · have hge : 2 ^ F.M ≤ k * 2 ^ (F.M - b) := by
+          calc 2 ^ F.M = 2 ^ b * 2 ^ (F.M - b) := by rw [← Nat.pow_add]; congr 1; omega
+            _ ≤ k * 2 ^ (F.M - b) := Nat.mul_le_mul_right _ hk1
+        simp only [toReal]
+        rw [Nat.cast_sub hge]
+        push_cast
+        rw [zpow_add₀ h2, zpow_neg, zpow_natCast, zpow_natCast,
+          show (2 : ℝ) ^ (F.M - b) = 2 ^ F.M / 2 ^ b by
+            rw [eq_div_iff (by positivity), ← pow_add]; congr 1; omega]
+        field_simp
+        ring
+    · push Not at hnorm
+      have hexp : 0 ≤ e - (F.emin - F.M) := by omega
+      refine ⟨subnormal s (k * 2 ^ (e - (F.emin - F.M)).toNat), ?_, trivial, rfl, ?_⟩
+      · show k * 2 ^ (e - (F.emin - F.M)).toNat < 2 ^ F.M
+        calc k * 2 ^ (e - (F.emin - F.M)).toNat < 2 ^ (b + 1) * 2 ^ (e - (F.emin - F.M)).toNat :=
+              Nat.mul_lt_mul_of_pos_right hk2 (Nat.two_pow_pos _)
+          _ = 2 ^ (b + 1 + (e - (F.emin - F.M)).toNat) := by rw [← Nat.pow_add]
+          _ ≤ 2 ^ F.M := Nat.pow_le_pow_right (by norm_num) (by omega)
+      · simp only [toReal]
+        push_cast
+        rw [← zpow_natCast, Int.toNat_of_nonneg hexp, zpow_neg, zpow_natCast]
+        rw [show (2 : ℝ) ^ (e - (F.emin - F.M)) = 2 ^ e * 2 ^ (F.M : ℤ) / 2 ^ F.emin by
+          rw [zpow_sub₀ h2, zpow_sub₀ h2]; field_simp]
+        rw [zpow_natCast]
+        field_simp
+  have hr0 : (if s then -1 else 1) * ((k : ℝ) * 2 ^ e) ≠ 0 := by
+    have : (0 : ℝ) < k * 2 ^ e := mul_pos (by exact_mod_cast hk) (zpow_pos (by norm_num) _)
+    cases s <;> simp [this.ne']
+  have hmem := roundDyadic_mem hF s hk Nat.one_pos e
+  rw [Nat.cast_one, div_one] at hmem
+  have heq : roundDyadic F s k 1 e = w := (ieee_exact_iff hw hn hv hr0).1 hmem
+  rw [heq]
+  exact ⟨hw, hn, hs, hv⟩
+
 end FVA.Wasm.Num
