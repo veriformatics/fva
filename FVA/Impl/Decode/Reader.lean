@@ -165,3 +165,5 @@ def name (r : Reader) : Res String := do
   | none => start.bad "malformed UTF-8 encoding"
 
 end FVA.Wasm.Decode
+
+deriving instance DecidableEq for Except
