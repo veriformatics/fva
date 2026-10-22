@@ -215,80 +215,86 @@ def fcInstr (r : Reader) : Res Instr := do
     .ok (.tableFill x, r)
   else r.bad "illegal opcode"
 
+/-- A non-structured instruction with opcode `op` (already read; `r` points at the opcode,
+`r₁` after it). Not recursive: block, loop and if are handled in `instrs`. -/
+def plainInstr (op : Nat) (r r₁ : Reader) : Res Instr :=
+  match plainOpOf op with
+  | some i => .ok (i, r₁)
+  | none =>
+  match idxOpOf op with
+  | some mk => do
+    let (x, r₂) ← u32 r₁
+    .ok (mk x, r₂)
+  | none =>
+  match memOpOf op with
+  | some mk => do
+    let (m, r₂) ← memArg r₁
+    .ok (mk m, r₂)
+  | none =>
+  if op = 0x0E then do
+    let (ls, r₂) ← vec u32 r₁
+    let (l, r₃) ← u32 r₂
+    .ok (.brTable ls l, r₃)
+  else if op = 0x11 then do
+    let (y, r₂) ← u32 r₁
+    let (x, r₃) ← u32 r₂
+    .ok (.callIndirect x y, r₃)
+  else if op = 0x1C then do
+    let (ts, r₂) ← vec valType r₁
+    .ok (.select (some ts), r₂)
+  else if op = 0xD0 then do
+    let (t, r₂) ← refType r₁
+    .ok (.refNull t, r₂)
+  else if op = 0x3F then do
+    let ((), r₂) ← zeroByte r₁
+    .ok (.memorySize, r₂)
+  else if op = 0x40 then do
+    let ((), r₂) ← zeroByte r₁
+    .ok (.memoryGrow, r₂)
+  else if op = 0x41 then do
+    let (n, r₂) ← sleb 5 32 r₁
+    .ok (.iconst .w32 (n % 2 ^ 32).toNat, r₂)
+  else if op = 0x42 then do
+    let (n, r₂) ← sleb 10 64 r₁
+    .ok (.iconst .w64 (n % 2 ^ 64).toNat, r₂)
+  else if op = 0x43 then do
+    let (z, r₂) ← leNat 4 r₁
+    .ok (.fconst .w32 z, r₂)
+  else if op = 0x44 then do
+    let (z, r₂) ← leNat 8 r₁
+    .ok (.fconst .w64 z, r₂)
+  else if op = 0xFC then fcInstr r₁
+  else match unsupportedOp op with
+    | some what => r.unsup what
+    | none => r.bad "illegal opcode"
+
 /-- Instructions up to a terminator (`0x0B` end or `0x05` else); returns the terminator.
-Structural on `fuel`; callers pass the remaining byte count (each instruction is ≥ 1 byte). -/
+Structural on `fuel` (all recursion stays here, so the kernel can evaluate it); callers pass
+the remaining byte count (each instruction is ≥ 1 byte). -/
 def instrs : Nat → Reader → Res (Instrs × Nat)
   | 0, r => r.bad "unexpected end"
   | fuel + 1, r => do
     let (b, r₁) ← r.byte
     let op := b.toNat
-    if op = 0x0B ∨ op = 0x05 then .ok ((.nil, op), r₁) else do
-    let (i, r₂) ← (instrAt fuel op r r₁ : Res Instr)
-    let ((is, t), r₃) ← instrs fuel r₂
-    .ok ((.cons i is, t), r₃)
-where
-  /-- One instruction with opcode `op` (already read; `r` points at the opcode). -/
-  instrAt (fuel op : Nat) (r r₁ : Reader) : Res Instr :=
-    match plainOpOf op with
-    | some i => .ok (i, r₁)
-    | none =>
-    match idxOpOf op with
-    | some mk => do
-      let (x, r₂) ← u32 r₁
-      .ok (mk x, r₂)
-    | none =>
-    match memOpOf op with
-    | some mk => do
-      let (m, r₂) ← memArg r₁
-      .ok (mk m, r₂)
-    | none =>
-    if op = 0x02 ∨ op = 0x03 then do
+    if op = 0x0B ∨ op = 0x05 then .ok ((.nil, op), r₁)
+    else if op = 0x02 ∨ op = 0x03 then do
       let (bt, r₂) ← blockType r₁
       let ((body, t), r₃) ← instrs fuel r₂
-      if t = 0x0B then .ok ((if op = 0x02 then .block bt body else .loop bt body), r₃)
-      else r.bad "else outside if"
+      if t ≠ 0x0B then r.bad "else outside if" else do
+      let ((is, t'), r₄) ← instrs fuel r₃
+      .ok ((.cons (if op = 0x02 then .block bt body else .loop bt body) is, t'), r₄)
     else if op = 0x04 then do
       let (bt, r₂) ← blockType r₁
       let ((thn, t), r₃) ← instrs fuel r₂
-      if t = 0x0B then .ok (.if_ bt thn .nil, r₃) else do
-      let ((els, t'), r₄) ← instrs fuel r₃
-      if t' = 0x0B then .ok (.if_ bt thn els, r₄) else r.bad "duplicate else"
-    else if op = 0x0E then do
-      let (ls, r₂) ← vec u32 r₁
-      let (l, r₃) ← u32 r₂
-      .ok (.brTable ls l, r₃)
-    else if op = 0x11 then do
-      let (y, r₂) ← u32 r₁
-      let (x, r₃) ← u32 r₂
-      .ok (.callIndirect x y, r₃)
-    else if op = 0x1C then do
-      let (ts, r₂) ← vec valType r₁
-      .ok (.select (some ts), r₂)
-    else if op = 0xD0 then do
-      let (t, r₂) ← refType r₁
-      .ok (.refNull t, r₂)
-    else if op = 0x3F then do
-      let ((), r₂) ← zeroByte r₁
-      .ok (.memorySize, r₂)
-    else if op = 0x40 then do
-      let ((), r₂) ← zeroByte r₁
-      .ok (.memoryGrow, r₂)
-    else if op = 0x41 then do
-      let (n, r₂) ← sleb 5 32 r₁
-      .ok (.iconst .w32 (n % 2 ^ 32).toNat, r₂)
-    else if op = 0x42 then do
-      let (n, r₂) ← sleb 10 64 r₁
-      .ok (.iconst .w64 (n % 2 ^ 64).toNat, r₂)
-    else if op = 0x43 then do
-      let (z, r₂) ← leNat 4 r₁
-      .ok (.fconst .w32 z, r₂)
-    else if op = 0x44 then do
-      let (z, r₂) ← leNat 8 r₁
-      .ok (.fconst .w64 z, r₂)
-    else if op = 0xFC then fcInstr r₁
-    else match unsupportedOp op with
-      | some what => r.unsup what
-      | none => r.bad "illegal opcode"
+      let ((els, r₄) : Instrs × Reader) ← (if t = 0x0B then .ok (.nil, r₃) else do
+        let ((els, t'), r₄) ← instrs fuel r₃
+        if t' = 0x0B then .ok (els, r₄) else r.bad "duplicate else" : Res Instrs)
+      let ((is, t''), r₅) ← instrs fuel r₄
+      .ok ((.cons (.if_ bt thn els) is, t''), r₅)
+    else do
+      let (i, r₂) ← plainInstr op r r₁
+      let ((is, t), r₃) ← instrs fuel r₂
+      .ok ((.cons i is, t), r₃)
 
 /-- An expression: instructions terminated by `end`. -/
 def expr (r : Reader) : Res Expr := do
