@@ -10,3 +10,6 @@ __pycache__/
 .claude/settings.local.json
 CLAUDE.local.md
 !prototype/bench/tasks/**/*.wasm
+
+# FVA tool binaries (scripts/fetch-tools)
+.tools/

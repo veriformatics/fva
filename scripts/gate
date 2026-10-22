@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Full gate (default) or fast gate (--fast): every check this repo grades by, one rc.
+# Prints each step's wall-clock; Lean steps run in sequence (one lake workspace), the rest in parallel.
+# Fast = skips network/history scanners (osv-scanner, gitleaks history); full = CI + closing commits.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+fast=0
+[[ ${1:-} == --fast ]] && fast=1
+scripts/fetch-tools || exit 1
+export PATH="$PWD/.tools/bin:$PATH"
+logs=$(mktemp -d)
+trap 'rm -rf "$logs"' EXIT
+
+run() { # name cmd... -> logs/name.{out,rc,sec}
+	local name=$1 t0
+	shift
+	t0=$(date +%s%N)
+	"$@" >"$logs/$name.out" 2>&1
+	echo $? >"$logs/$name.rc"
+	echo $((($(date +%s%N) - t0) / 1000000)) >"$logs/$name.ms"
+}
+
+mapfile -t shells < <(git ls-files -co --exclude-standard -- 'scripts/*')
+mapfile -t workflows < <(git ls-files -co --exclude-standard -- '.github/workflows/*.yml')
+
+lean_lane() {
+	run build lake --wfail build
+	run test lake --wfail test
+	run lint lake --wfail lint
+}
+lean_lane &
+run format-lean scripts/check-format &
+run checks scripts/test-checks &
+run shellcheck shellcheck -x "${shells[@]}" &
+run shfmt shfmt -d "${shells[@]}" &
+run spec-lint .agent/spec-lint &
+run pins scripts/check-pins &
+if ((${#workflows[@]})); then
+	run actionlint actionlint "${workflows[@]}" &
+	run zizmor zizmor --offline "${workflows[@]}" &
+fi
+run gitleaks-tree gitleaks dir --no-banner --redact --config .gitleaks.toml . &
+if ((! fast)); then
+	run gitleaks-history gitleaks git --no-banner --redact --config .gitleaks.toml . &
+	run osv-scanner osv-scanner scan source -r --x-exclude .lake --x-exclude .tools --x-exclude .scratch . &
+fi
+wait
+
+status=0
+printf '%-16s %8s  %s\n' step seconds result
+for rc in "$logs"/*.rc; do
+	name=$(basename "$rc" .rc)
+	r=$(<"$rc")
+	ms=$(<"$logs/$name.ms")
+	printf '%-16s %5d.%01d  %s\n' "$name" $((ms / 1000)) $((ms % 1000 / 100)) "$([[ $r == 0 ]] && echo ok || echo "FAIL (rc $r)")"
+	if [[ $r != 0 ]]; then
+		status=1
+		sed 's/^/    /' "$logs/$name.out" | tail -20
+	fi
+done
+exit "$status"

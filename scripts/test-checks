@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Planted-bad inputs for the purpose-built checks (check-format, check-pins): each must fail.
+# Runs on a throwaway copy so the working tree is never touched.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+fail=0
+expect_fail() { # label dir cmd...
+	local label=$1 dir=$2
+	shift 2
+	if (cd "$dir" && "$@" >/dev/null 2>&1); then
+		echo "test-checks: $label passed a planted bad input"
+		fail=1
+	fi
+}
+fresh() { # copy the files a check reads into a scratch git repo
+	local d=$tmp/$1
+	mkdir -p "$d/scripts"
+	cp scripts/check-format scripts/check-pins lean-toolchain lakefile.toml lake-manifest.json "$d/" 2>/dev/null
+	cp scripts/check-format scripts/check-pins "$d/scripts/"
+	git -C "$d" init -q
+	echo "$d"
+}
+d=$(fresh long) && printf 'def x : Nat := %0101d\n' 0 >"$d/A.lean" && expect_fail "long line" "$d" scripts/check-format
+d=$(fresh tab) && printf 'def\tx : Nat := 0\n' >"$d/A.lean" && expect_fail "tab" "$d" scripts/check-format
+d=$(fresh trail) && printf 'def x : Nat := 0 \n' >"$d/A.lean" && expect_fail "trailing space" "$d" scripts/check-format
+d=$(fresh eof) && printf 'def x : Nat := 0' >"$d/A.lean" && expect_fail "no final newline" "$d" scripts/check-format
+d=$(fresh toolchain) && echo 'leanprover/lean4:v4.0.0' >"$d/lean-toolchain" && expect_fail "toolchain drift" "$d" scripts/check-pins
+d=$(fresh rev) && sed -i 's/^rev = "v/rev = "x/' "$d/lakefile.toml" && expect_fail "mathlib rev drift" "$d" scripts/check-pins
+d=$(fresh manifest) && jq '(.packages[] | select(.name == "mathlib") | .inputRev) = "master"' lake-manifest.json >"$d/lake-manifest.json" && expect_fail "manifest drift" "$d" scripts/check-pins
+d=$(fresh good)
+printf 'def x : Nat := 0\n' >"$d/A.lean"
+if ! (cd "$d" && scripts/check-format && scripts/check-pins) >/dev/null; then
+	echo "test-checks: clean copy failed"
+	fail=1
+fi
+exit "$fail"
