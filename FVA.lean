@@ -4,3 +4,5 @@ import FVA.Spec.Syntax
 import FVA.Spec.Binary.Module
 import FVA.Lifted
 import FVA.Proof.Decode.Reader
+import FVA.Proof.Decode.Name
+import FVA.Proof.Decode.Instr
