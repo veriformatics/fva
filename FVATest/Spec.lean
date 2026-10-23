@@ -1,15 +1,18 @@
 import FVA.Impl.Exec.Ref
 import FVA.Spec.Claims
 import FVATest.Numeric
+import FVATest.Valid
 
 /-!
 # Official execution-script runner
 
-`wasm-tools json-from-wast` commands run against `Exec.Ref`; one tally entry per command.
-Rejected modules and validation/link-error assertions are skipped, with dependent actions
-skipped too. Execution failures remain failures, including a stuck configuration. Fuel
-exhaustion passes only `assert_exhaustion`; it is not evidence of divergence. Numeric expected
-values use `Numeric.Expect`, including canonical/arithmetic NaN payload classes.
+`wasm-tools json-from-wast` commands run against `Valid.validate` and `Exec.Ref`; one tally
+entry per command. Modules, unlinkable modules and uninstantiable modules must validate before
+execution or import resolution; every decodable invalid module must be rejected. Unsupported
+payloads, malformed assertions and invalid modules rejected by the decoder have separate
+counts. Link-error assertions check validity alone. Execution failures remain failures,
+including a stuck configuration. Fuel exhaustion passes only `assert_exhaustion`; it is not
+evidence of divergence. Numeric expectations include canonical/arithmetic NaN payload classes.
 
 Execution iterates `Ref.step`, snapshotting the active frame's memory every 4096 steps to
 avoid growing byte-function closure chains. A snapshot agrees on `[0, size)` (every observable
@@ -43,9 +46,13 @@ def spectest : ModuleInst :=
 
 /-- Script state: names and registrations retain rejected-module entries as `none`. -/
 structure State where
+  /-- Store retained across module initialization and actions, including trapped writes. -/
   store : Store := spectestStore
+  /-- Latest module; rejection clears it rather than reusing the previous instance. -/
   current : Option ModuleInst := none
+  /-- Script identifiers retain rejected modules as `none`. -/
   named : List (String × Option ModuleInst) := []
+  /-- Import registrations, seeded with the `spectest` fixture. -/
   registered : List (String × Option ModuleInst) := [("spectest", some spectest)]
 
 /-- Resolve a script module name, or the latest module when no name is given. -/
@@ -63,24 +70,6 @@ def resolveImports (s : State) (m : FVA.Wasm.Module) : Option (List ExternVal) :
   m.imports.mapM fun im => do
     let inst ← (s.registered.lookup im.module).join
     exported inst im.name
-
-/-- The Wasm 2 constant-expression instruction set, with only imported immutable globals. -/
-def constantExpr (globals : List GlobalType) : FVA.Wasm.Expr → Bool
-  | [.iconst ..] | [.fconst ..] | [.refNull _] | [.refFunc _] => true
-  | [.globalGet x] => (globals[x]?).any fun g => decide (g.mutability = .const)
-  | _ => false
-
-/-- Newer proposals mixed into the pinned corpus must not be mistaken for profile P. -/
-def profileIssue (m : FVA.Wasm.Module) : Option String := Id.run do
-  let mems := m.imports.filterMap fun im => match im.desc with | .mem t => some t | _ => none
-  if mems.length + m.mems.length > 1 then return some "post-profile: multi-memory"
-  let globals := m.imports.filterMap fun im =>
-    match im.desc with | .global t => some t | _ => none
-  let es := (m.globals.map (·.init)) ++ (m.elems.flatMap fun e =>
-    e.init ++ match e.mode with | .active _ off => [off] | _ => []) ++
-    (m.datas.filterMap fun d => match d.mode with | .active _ off => some off | _ => none)
-  if !es.all (constantExpr globals) then return some "post-profile: extended-const"
-  return none
 
 /-- Translate a numeric runner value to an execution value. -/
 def fromNumeric : Numeric.Value → Val
@@ -206,10 +195,42 @@ def Result.describe : Result → String
   | .trapped => "trap" | .exhausted => "fuel exhausted" | .stuck => "stuck"
   | .skipped why => s!"skipped ({why})"
 
+/-- Disjoint payload categories: checked modules by command kind, then explicit exclusions. -/
+structure ValidationCounts where
+  /-- Decodable baseline module commands sent to the validator. -/
+  modules : Nat := 0
+  /-- Unlinkable baseline payloads checked for validity before import resolution. -/
+  unlinkable : Nat := 0
+  /-- Baseline payloads checked before their trapping initialization runs. -/
+  uninstantiable : Nat := 0
+  /-- Decodable invalid payloads checked for rejection. -/
+  invalid : Nat := 0
+  /-- Assertions assigned to decoder/parser coverage rather than validation. -/
+  malformed : Nat := 0
+  /-- Payloads excluded by the feature oracle or an unsupported decoder feature. -/
+  outside : Nat := 0
+  /-- Payloads rejected before validation by binary decoding or text parsing. -/
+  undecodable : Nat := 0
+
+/-- Stable column order for the gate's pinned validation denominators. -/
+def ValidationCounts.summary (v : ValidationCounts) : String :=
+  s!"{v.modules} {v.unlinkable} {v.uninstantiable} {v.invalid} " ++
+    s!"{v.malformed} {v.outside} {v.undecodable}"
+
+/-- Count every validation attempt, whether its verdict agrees with the oracle or not. -/
+def ValidationCounts.checked (v : ValidationCounts) (kind : String) : ValidationCounts :=
+  match kind with
+  | "module" => { v with modules := v.modules + 1 }
+  | "assert_unlinkable" => { v with unlinkable := v.unlinkable + 1 }
+  | "assert_uninstantiable" => { v with uninstantiable := v.uninstantiable + 1 }
+  | _ => { v with invalid := v.invalid + 1 }
+
 /-- One entry per script command; skipped setup cannot silently reuse an older module. -/
 structure Tally extends Numeric.Tally where
   /-- Skip details, for coverage accounting without treating a skip as a passing assertion. -/
   skips : Array String := #[]
+  /-- Payload denominators, separate from the execution command tallies. -/
+  validation : ValidationCounts := {}
 
 /-- Add a pass, failure, or explicit coverage exclusion. -/
 def tally (t : Tally) (line : Nat) (result : Except String (Option String)) : Tally :=
@@ -251,18 +272,70 @@ def runInit (fuel : Nat) (s : Store) (m : FVA.Wasm.Module) (imports : List Exter
   let (s₁, inst) := allocModule s m imports gvals erefs
   Ref.run fuel ⟨s₁, ⟨[], inst⟩, (initCode m).map .plain⟩
 
-/-- Decode a script module and enforce profile P beyond the decoder's syntactic checks. -/
-def readModule (dir : System.FilePath) (c : Json) : IO (Except String FVA.Wasm.Module) := do
+/-- Unsupported payloads differ from malformed inputs that never reach validation. -/
+inductive ModuleIssue where
+  | outside (why : String)
+  | malformed (why : String)
+
+/-- The pinned suite mixes newer proposals into positive modules. The independent baseline
+oracle classifies those before decoding; a baseline-positive decode failure is an error.
+Negative cases check every decodable AST, including invalid globals and combined memories. -/
+def readModule (dir : System.FilePath) (c : Json) (negative : Bool) :
+    IO (Except ModuleIssue FVA.Wasm.Module) := do
   let file ← IO.ofExcept (c.getObjValAs? String "filename")
-  let bs ← IO.FS.readBinFile (dir / file)
+  let mut path := dir / file
+  if (c.getObjValAs? String "module_type").toOption == some "text" then
+    let binary := path.addExtension "wasm"
+    let parsed ← IO.Process.output {
+      cmd := "wasm-tools"
+      args := #["parse", path.toString, "-o", binary.toString] }
+    if parsed.exitCode == 1 then
+      return .error (.malformed s!"text parser: {parsed.stderr.trimAscii}")
+    if parsed.exitCode != 0 then
+      throw (IO.userError s!"text parser exited {parsed.exitCode}: {parsed.stderr.trimAscii}")
+    path := binary
+  if !negative then
+    let oracle ← IO.Process.output {
+      cmd := "wasm-tools"
+      args := #["validate", "--features=wasm2,-simd", path.toString] }
+    if oracle.exitCode == 1 then
+      return .error (.outside s!"outside wasm2,-simd: {oracle.stderr.trimAscii}")
+    if oracle.exitCode != 0 then
+      throw (IO.userError s!"profile oracle exited {oracle.exitCode}: {oracle.stderr.trimAscii}")
+  let bs ← IO.FS.readBinFile path
   return match FVA.Wasm.Decode.decode (FVA.Tool.packBytes bs) bs.size with
-    | .error e => .error s!"decoder: {repr e}"
-    | .ok m => match profileIssue m with | some why => .error why | none => .ok m
+    | .error (.unsupported pos why) =>
+      if negative then .error (.outside s!"decoder offset {pos}: {why}")
+      else .error (.malformed s!"baseline-positive unsupported at {pos}: {why}")
+    | .error (.malformed pos why) => .error (.malformed s!"decoder offset {pos}: {why}")
+    | .ok m => .ok m
+
+/-- Only accepted positive payloads reach instantiation; validation failures still count. -/
+def validatePayload (dir : System.FilePath) (c : Json) (kind : String) (line : Nat) (t : Tally) :
+    IO (Tally × Option FVA.Wasm.Module) := do
+  match ← readModule dir c (kind == "assert_invalid") with
+  | .error (.outside why) =>
+    let t := { t with validation.outside := t.validation.outside + 1 }
+    return (tally t line (.ok (some why)), none)
+  | .error (.malformed why) =>
+    let t := { t with validation.undecodable := t.validation.undecodable + 1 }
+    let result := if kind == "assert_invalid" then .ok (some why)
+      else .error s!"{kind}: positive module is undecodable: {why}"
+    return (tally t line result, none)
+  | .ok m =>
+    let t := { t with validation := t.validation.checked kind }
+    let accepted := FVA.Wasm.Valid.validate m
+    if kind == "assert_invalid" then
+      return (tally t line (if accepted then .error "assert_invalid: validator accepted"
+        else .ok none), none)
+    if !accepted then return (tally t line (.error s!"{kind}: validator rejected"), none)
+    return (t, some m)
 
 /-- Interpret one script with an action budget and a smaller stack-exhaustion probe budget. -/
 def runScript (dir : System.FilePath) (json : Json) (fuel : Nat := 2000000) : IO Tally := do
   let cmds ← IO.ofExcept (json.getObjValAs? (Array Json) "commands")
   let trace := (← IO.getEnv "FVA_SPEC_TRACE") == some "1"
+  let validationOnly := (← IO.getEnv "FVA_SPEC_VALIDATE_ONLY") == some "1"
   let mut s : State := {}
   let mut t : Tally := {}
   for c in cmds do
@@ -271,30 +344,47 @@ def runScript (dir : System.FilePath) (json : Json) (fuel : Nat := 2000000) : IO
     if trace then IO.eprintln s!"spec line {line}: {ty}"
     if ty == "module" then
       let mut inst : Option ModuleInst := none
-      match ← readModule dir c with
-      | .error why => t := tally t line (.ok (some why))
-      | .ok m => match resolveImports s m with
-        | none => t := tally t line (.ok (some "unavailable import"))
-        | some imports => match Ref.instantiate fuel s.store m imports with
-          | some (store, i) =>
-            s := { s with store }
-            inst := some i
-            t := tally t line (.ok none)
-          | none => t := tally t line (.error "module: instantiation failed")
+      let (t', module) ← validatePayload dir c ty line t
+      t := t'
+      match module with
+      | none => pure ()
+      | some m =>
+        if validationOnly then t := tally t line (.ok none)
+        else
+          match resolveImports s m with
+          | none => t := tally t line (.ok (some "unavailable import"))
+          | some imports => match Ref.instantiate fuel s.store m imports with
+            | some (store, i) =>
+              s := { s with store }
+              inst := some i
+              t := tally t line (.ok none)
+            | none => t := tally t line (.error "module: instantiation failed")
       s := { s with current := inst }
       if let some name := (c.getObjValAs? String "name").toOption then
         s := { s with named := (name, inst) :: s.named }
     else if ty == "assert_uninstantiable" then
-      match ← readModule dir c with
-      | .error why => t := tally t line (.ok (some why))
-      | .ok m => match resolveImports s m with
-        | none => t := tally t line (.ok (some "unavailable import"))
-        | some imports => match runInit fuel s.store m imports with
-          | none => t := tally t line (.error "initialization stuck or fuel exhausted")
-          | some c' =>
-            s := { s with store := c'.store }
-            t := tally t line (if Ref.isTrapOnly c'.instrs then .ok none
-              else .error "assert_uninstantiable: expected trap, initialization returned")
+      let (t', module) ← validatePayload dir c ty line t
+      t := t'
+      match module with
+      | none => pure ()
+      | some m =>
+        if validationOnly then t := tally t line (.ok none)
+        else
+          match resolveImports s m with
+          | none => t := tally t line (.ok (some "unavailable import"))
+          | some imports => match runInit fuel s.store m imports with
+            | none => t := tally t line (.error "initialization stuck or fuel exhausted")
+            | some c' =>
+              s := { s with store := c'.store }
+              t := tally t line (if Ref.isTrapOnly c'.instrs then .ok none
+                else .error "assert_uninstantiable: expected trap, initialization returned")
+    else if ty == "assert_unlinkable" || ty == "assert_invalid" then
+      let (t', module) ← validatePayload dir c ty line t
+      t := t'
+      if module.isSome then t := tally t line (.ok none)
+    else if ty == "assert_malformed" then
+      t := { t with validation.malformed := t.validation.malformed + 1 }
+      t := tally t line (.ok (some ty))
     else if ty == "register" then
       let name ← IO.ofExcept (c.getObjValAs? String "as")
       let inst := match (c.getObjValAs? String "name").toOption with
@@ -302,9 +392,11 @@ def runScript (dir : System.FilePath) (json : Json) (fuel : Nat := 2000000) : IO
       s := { s with registered := (name, inst) :: s.registered }
       t := tally t line (.ok (if inst.isSome then none else some "register rejected module"))
     else if ["action", "assert_return", "assert_trap", "assert_exhaustion"].contains ty then
-      let (s', r) := checkAction (if ty == "assert_exhaustion" then 1000 else fuel) s ty c
-      s := s'
-      t := tally t line r
+      if validationOnly then t := tally t line (.ok (some "validation-only"))
+      else
+        let (s', r) := checkAction (if ty == "assert_exhaustion" then 1000 else fuel) s ty c
+        s := s'
+        t := tally t line r
     else t := tally t line (.ok (some ty))
   return t
 
