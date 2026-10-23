@@ -13,11 +13,11 @@ scripts/fetch-bench-tools all
 scripts/fetch-bench
 bench/tests/smoke-tools
 bench/tests/check-prep
-offload run --local -- bench/tests/check-build
+bench/tests/check-build
 bench/subjects/build-lz4
 ```
 
-`offload` = local scheduling wrapper; other hosts can run `check-build` directly. `fetch-bench-tools` accepts `rust`, `verus`, `frama-c`, `wasi-sdk`, `all`. Cached payloads are hash-checked every fetch; a mismatch fails. Downloads = `.cache/bench/downloads/<id>/`; tools + Rust homes = `.tools/`. Third-party archives/binaries stay untracked.
+`fetch-bench-tools` accepts `rust`, `verus`, `frama-c`, `wasi-sdk`, `all`. Cached payloads are hash-checked every fetch; a mismatch fails. Downloads = `.cache/bench/downloads/<id>/`; tools + Rust homes = `.tools/`. Third-party archives/binaries stay untracked.
 
 ### Tool pins
 

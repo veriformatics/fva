@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run under offload: two uncached release builds, byte equality, engine behavior.
+# Two uncached release builds (CPU-heavy), byte equality, engine behavior.
 set -euo pipefail
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 mkdir -p "$root/.cache/bench/tests"

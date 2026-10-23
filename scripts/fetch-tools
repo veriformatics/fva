@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install pinned scanner binaries into .tools/bin; every download is sha256-checked.
+# Install pinned tool binaries into .tools/bin; every download is sha256-checked.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 bin=.tools/bin dl=.tools/dl
@@ -13,6 +13,7 @@ tools=(
 	"actionlint 1.7.12 rhysd/actionlint actionlint_{v}_linux_amd64.tar.gz 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
 	"zizmor 1.31.1 zizmorcore/zizmor zizmor-x86_64-unknown-linux-gnu.tar.gz d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99"
 	"shfmt 3.14.1 mvdan/sh shfmt_v{v}_linux_amd64 76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf"
+	"shellcheck 0.11.0 koalaman/shellcheck shellcheck-v{v}.linux.x86_64.tar.xz 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
 	"wasm-tools 1.262.0 bytecodealliance/wasm-tools wasm-tools-{v}-x86_64-linux.tar.gz 655b8df67d54c3ef9b52fc237c4e94bbfbb5f5f43825245cb0940a7002a9ed65"
 	"wasmtime 50.0.0 bytecodealliance/wasmtime wasmtime-v{v}-x86_64-linux.tar.xz 77c19ee0437991f9ac7837b9c269d9c7076744f85dad263fea5214cc2723c7ff"
 )
