@@ -2,8 +2,10 @@ import FVA.Spec.Binary.Module
 import FVA.Spec.Claims
 import FVA.Spec.Exec.Instantiate
 import FVA.Spec.Trust
+import FVA.Spec.Valid.Soundness
 import FVA.Impl.Decode
 import FVA.Impl.Exec.Det
+import FVA.Impl.Valid
 import FVA.Impl.Numerics.Float
 import FVA.Trust.Verdict
 import FVA.Impl.Cert.Sort
@@ -76,5 +78,13 @@ def CertSortSound : Prop :=
 def CertCompileSound : Prop :=
   ∀ i o : FVA.Cert.Blob, FVA.Cert.Compiled.check i o = true →
     FVA.Cert.Accepted FVA.Cert.Compiled i o
+
+/-- The validator accepts only modules the typing rules make valid. -/
+def ValidateSound : Prop :=
+  ∀ m : Module, FVA.Wasm.Valid.validate m = true → FVA.Wasm.Valid.ModuleValid m
+
+/-- Validated modules never get stuck: every configuration reachable from a well-typed call of an
+export of a module the validator accepts is well typed and final or steps. -/
+def NeverStuck : Prop := FVA.Wasm.Valid.NeverStuck FVA.Wasm.Valid.validate
 
 end FVA.Self

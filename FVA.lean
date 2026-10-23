@@ -11,6 +11,9 @@ import FVA.Spec.Exec.Instantiate
 import FVA.Spec.Claims
 import FVA.Spec.Exec.Host
 import FVA.Spec.CAbi
+import FVA.Spec.Valid.Runtime
+import FVA.Spec.Valid.Soundness
+import FVA.Impl.Valid
 import FVA.Impl.Numerics.Float
 import FVA.Impl.Exec.Ref
 import FVA.Lifted
@@ -41,6 +44,11 @@ import FVA.Proof.Exec.Spike
 import FVA.Proof.Exec.Instantiate
 import FVA.Proof.Pin.Decode
 import FVA.Proof.Pin.Exec
+import FVA.Proof.Valid.Validator
+import FVA.Proof.Valid.Soundness
+import FVA.Proof.Valid.Instantiate
+import FVA.Proof.Valid.Corollary
+import FVA.Proof.Valid.InstantiateBounds
 import FVA.Proof.Lib
 import FVA.Explain
 import FVA.Spec.Trust
