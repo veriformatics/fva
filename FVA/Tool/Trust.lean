@@ -3,6 +3,7 @@ import FVA.Trust.Canary
 import FVA.Trust.Collect
 import FVA.Trust.Replay
 import FVA.Trust.Verdict
+import FVA.Tool.BaseManifest
 
 /-!
 # `fva trust` (CLI glue)
@@ -71,18 +72,23 @@ def Opts.args (o : Opts) : Array String :=
     (o.canarySet.map fun f => #["--canary-set", f]).getD #[] ++
     (o.known.map fun f => #["--known", f]).getD #[]
 
-/-- FVA base modules of a project inside the FVA package: every `FVA/**` module except the
-judged package's own (`FVA.Self.*` when judging `FVA.Self.Spec`); vendored copies in other
-projects = U11. -/
-def baseModules (root : System.FilePath) (judged : Name) : IO NameSet := do
-  let dir := root / "FVA"
-  unless ← dir.isDir do return {}
+/-- FVA base modules: every imported module whose source is byte-identical (sha256) to the FVA
+library file of the same path in `baseManifest` (compiled into this binary), except the judged
+package's own (`FVA.Self.*` when judging `FVA.Self.Spec`). An edited or unknown `FVA` file is
+project code and enters the review surface. -/
+def baseModules (env : Environment) (judged : Name) : IO NameSet := do
+  let pinned : Std.HashMap String String :=
+    FVA.Tool.baseManifest.foldl (fun m (p, h) => m.insert p h) {}
+  let mut cands := #[]
+  for m in env.header.moduleNames do
+    if judged.isPrefixOf m then continue
+    let rel := "/".intercalate (m.components.map toString) ++ ".lean"
+    unless pinned.contains rel do continue
+    if let some f ← sourceOf m then cands := cands.push (m, rel, f)
+  let shas ← sha256Of (cands.map (·.2.2))
   let mut out := {}
-  for f in ← dir.walkDir do
-    if f.extension == some "lean" then
-      let rel := (f.toString.drop (root.toString.length + 1)).toString
-      let m := ((rel.dropEnd 5).toString.splitOn "/").foldl Name.str .anonymous
-      unless judged.isPrefixOf m do out := out.insert m
+  for (m, rel, f) in cands do
+    if shas.get? f.toString == pinned.get? rel then out := out.insert m
   return out
 
 /-- The FVA package this binary was built in (`<pkg>/.lake/build/bin/fva`). -/
@@ -197,7 +203,7 @@ def run (argv : List String) : IO UInt32 := do
     IO.eprintln s!"fva trust: cannot read the pinned packages: {e}"; return 2
   let env ← try importModules #[{ module := spec }, { module := rootMod }] {} catch e =>
     IO.eprintln s!"fva trust: cannot import {spec} and {rootMod} (built?): {e}"; return 2
-  let base ← baseModules root spec.getPrefix
+  let base ← baseModules env spec.getPrefix
   let input : Input :=
     { root, specModule := spec, rootModule := rootMod, subjects := o.subjects, base,
       trustedPkgs }

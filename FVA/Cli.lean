@@ -20,6 +20,7 @@ def helpText : String :=
   "FVA checks formal proofs about compiled WebAssembly programs.\n\n" ++
   "Commands:\n" ++
   "  help      Show this help.\n" ++
+  "  init      Create a verification project with FVA in it.\n" ++
   "  version   Show the FVA version.\n" ++
   "  decode    Show a summary of each .wasm file that FVA decodes.\n" ++
   "  lift      Write a Lean module that holds a .wasm file and its decoded syntax.\n" ++
