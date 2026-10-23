@@ -10,6 +10,7 @@ import FVA.Spec.Exec.Step
 import FVA.Spec.Exec.Instantiate
 import FVA.Spec.Claims
 import FVA.Spec.Exec.Host
+import FVA.Spec.CAbi
 import FVA.Impl.Numerics.Float
 import FVA.Impl.Exec.Ref
 import FVA.Lifted
@@ -40,6 +41,7 @@ import FVA.Proof.Exec.Spike
 import FVA.Proof.Exec.Instantiate
 import FVA.Proof.Pin.Decode
 import FVA.Proof.Pin.Exec
+import FVA.Proof.Lib
 import FVA.Spec.Trust
 import FVA.Trust.Verdict
 import FVA.Proof.Trust

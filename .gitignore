@@ -9,6 +9,7 @@ __pycache__/
 !bench/subjects/wasm-pflog/*.wasm
 !bench/subjects/wasm-glm/*.wasm
 !FVATest/Cheats/*.wasm
+!FVATest/Examples/**/*.wasm
 # local state
 .scratch/
 .cache/
