@@ -23,7 +23,9 @@ def helpText : String :=
   "  version   Show the FVA version.\n" ++
   "  decode    Show a summary of each .wasm file that FVA decodes.\n" ++
   "  lift      Write a Lean module that holds a .wasm file and its decoded syntax.\n" ++
-  "  difftest  Compare the Lean semantics with wasmtime on the exported functions of .wasm files.\n"
+  "  difftest  Compare the Lean semantics with wasmtime on the exported functions of .wasm\n" ++
+  "            files.\n" ++
+  "  trust     Check that a project's claims are proven, about the artifact, with a small spec.\n"
 
 /-- Map command-line arguments to an outcome. -/
 def dispatch : List String → Outcome

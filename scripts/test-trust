@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# fva trust (U7 S2, E1): the glue checks (FVATest.Trust) hold; FVA's self package must PASS; every
+# cheat project under FVATest/Cheats/ must FAIL with exactly its pinned tag set (Clean = PASS);
+# planted canary sets fail `[checker]`. rc 0 = all as pinned.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+scripts/fetch-canaries || exit 2
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+set=trust/canaries/set.tsv
+: >"$tmp/empty.tsv"
+# a positive control listed as known-false: every kernel accepts it
+grep -P '^arena/good/tutorial/001_basicDef\t' "$set" | sed 's/\tgood$/\tbad/' >"$tmp/good.tsv"
+printf 'leanchecker\tarena/good/tutorial/001_basicDef\tplanted\ncon-leche\tarena/good/tutorial/001_basicDef\tplanted\n' >"$tmp/good-known.tsv"
+# a canary whose pinned sha256 its file misses: never run
+grep -P '^arena/bad/bugs/constlevels\t' "$set" | sed 's/\t[0-9a-f]\{64\}\t/\t'"$(printf '0%.0s' {1..64})"'\t/' >"$tmp/altered.tsv"
+# Lean's kernel accepts the #15704 export by design: covered by con-leche's reject when known
+grep -P '^prelude-15704/exploit\t' "$set" >"$tmp/prelude.tsv"
+for f in good altered prelude; do [[ -s $tmp/$f.tsv ]] || exit 2; done
+# project, wanted tag set, extra `fva trust` arguments
+pinned="Clean PASS
+Clean checker --canary-set $tmp/empty.tsv
+Clean checker --canary-set $tmp/good.tsv
+Clean checker --canary-set $tmp/good.tsv --known $tmp/good-known.tsv
+Clean checker --canary-set $tmp/altered.tsv
+Clean checker --canary-set $tmp/prelude.tsv --known $tmp/empty.tsv
+Clean PASS --canary-set $tmp/prelude.tsv
+Clean surface --surface-budget 3
+Clean PASS --surface-budget 4
+Axiom axiom,replay
+Sorry axiom,replay
+SkipKernel replay
+NativeDecide axiom,replay
+Vacuous vacuous
+Syntax syntax
+Syntax syntax --subject FVATest.Cheats.Syntax.Vocab
+Layout layout
+LinkSource link
+LinkMissing link
+LinkEscape link
+LinkNoDecodeEq link,vacuous
+LinkOtherNumeral link,vacuous
+LinkExtra link,syntax
+Prelude prelude
+Override override
+OverridePartial override
+OverrideExtern override"
+mapfile -t cheats < <(cut -d" " -f1 <<<"$pinned" | sort -u)
+# the cheat roots are no default target: build them by module name
+lake build fva FVA "${cheats[@]/#/FVATest.Cheats.}" >/dev/null || exit 2
+fva=.lake/build/bin/fva
+fail=0
+log=$tmp/log
+if ! lake build FVATest.Trust >"$log" 2>&1; then
+	echo "test-trust: glue checks (FVATest.Trust) failed"
+	grep '^error' "$log" | head -5
+	fail=1
+fi
+subjects=()
+for m in FVA.Impl.Decode FVA.Impl.Decode.Reader FVA.Impl.Decode.Instr FVA.Impl.Decode.Module \
+	FVA.Impl.Exec.Ref FVA.Impl.Exec.Det FVA.Impl.Numerics.Float FVA.Trust.Verdict; do
+	subjects+=(--subject "$m")
+done
+"$fva" trust . --spec-module FVA.Self.Spec --root-module FVA.Self "${subjects[@]}" >"$log" 2>&1
+rc=$?
+grep -A3 'Kernel replay' "$log"
+if ((rc != 0)); then
+	echo "test-trust: self package rc $rc"
+	head -20 "$log"
+	fail=1
+fi
+"$fva" trust . --spec-module FVA.Self.Spec --root-module FVA.Self "${subjects[@]}" --paranoid \
+	>"$log" 2>&1
+rc=$?
+grep -A7 'Kernel replay' "$log"
+if ((rc != 0)); then
+	echo "test-trust: self package --paranoid rc $rc"
+	head -20 "$log"
+	fail=1
+fi
+n=0
+while read -r c want args; do
+	n=$((n + 1))
+	# shellcheck disable=SC2086 # extra arguments split on purpose
+	got=$("$fva" trust . --spec-module "FVATest.Cheats.$c.Spec" \
+		--root-module "FVATest.Cheats.$c" $args 2>/dev/null |
+		sed -n 's/^  \[\([a-z]*\)\].*/\1/p' | sort -u | paste -sd,)
+	[[ -z $got ]] && got=PASS
+	if [[ $got != "$want" ]]; then
+		echo "test-trust: FVATest.Cheats.$c $args → $got, pinned $want"
+		fail=1
+	fi
+done <<<"$pinned"
+# a relative project directory, from its parent: trust-run works inside the project
+here=$(basename "$PWD")
+rc=$(
+	cd .. || exit 2
+	"$here/$fva" trust "$here" --spec-module FVATest.Cheats.Clean.Spec \
+		--root-module FVATest.Cheats.Clean >/dev/null 2>&1
+	echo $?
+)
+if ((rc != 0)); then
+	echo "test-trust: relative project directory → rc $rc, pinned 0"
+	fail=1
+fi
+# the spec module declared a subject (which would leave the review surface) = usage error
+"$fva" trust . --spec-module FVATest.Cheats.Clean.Spec --root-module FVATest.Cheats.Clean \
+	--subject FVATest.Cheats.Clean.Spec >/dev/null 2>&1
+rc=$?
+if ((rc != 2)); then
+	echo "test-trust: spec module as subject → rc $rc, pinned 2"
+	fail=1
+fi
+echo "test-trust: glue checks + self package + $n cheat runs + 2 usage cases checked"
+exit "$fail"

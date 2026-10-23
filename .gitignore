@@ -8,6 +8,7 @@ __pycache__/
 !bench/subjects/wasm/*.wasm
 !bench/subjects/wasm-pflog/*.wasm
 !bench/subjects/wasm-glm/*.wasm
+!FVATest/Cheats/*.wasm
 # local state
 .scratch/
 .cache/
@@ -16,4 +17,4 @@ CLAUDE.local.md
 !prototype/bench/tasks/**/*.wasm
 
 # FVA tool binaries (scripts/fetch-tools)
-.tools/
+.tools
