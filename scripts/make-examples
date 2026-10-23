@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Rebuilds each worked example's .wasm (FVATest/Examples/*) from its source and compares it with
+# the committed artifact (the .wasm is what FVA verifies: a compiler change shows as a byte
+# difference), then regenerates its Lifted.lean with fva lift. Host-dependent (clang, rustc
+# versions), so it is a regeneration script, not a gate step. rc 1 = a rebuild differs.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+fva=.lake/build/bin/fva
+ex=FVATest/Examples
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+same() {
+	cmp -s "$1" "$2" || {
+		echo "make-examples: $2 differs from its rebuild ($1)" >&2
+		exit 1
+	}
+}
+clang --target=wasm32 -O2 -nostdlib -Wl,--no-entry -Wl,--strip-all -Wl,--export=clamp \
+	-Wl,--export=gcd -Wl,--export=sum_to -o "$tmp/toy.wasm" "$ex/Toy/toy.c"
+same "$tmp/toy.wasm" "$ex/Toy/toy.wasm"
+"$fva" lift "$ex/Toy/toy.wasm" "$ex/Toy/Lifted.lean" --ns Examples.Toy.Lifted
+clang --target=wasm32 -O2 -nostdlib -Wl,--no-entry -Wl,--strip-all -Wl,--export=array_sum \
+	-Wl,--export=call_scale -Wl,--export=classify -o "$tmp/mem.wasm" "$ex/Mem/mem.c"
+same "$tmp/mem.wasm" "$ex/Mem/mem.wasm"
+"$fva" lift "$ex/Mem/mem.wasm" "$ex/Mem/Lifted.lean" --ns Examples.Mem.Lifted
+rustc --target wasm32-unknown-unknown -O --crate-type cdylib -C link-arg=--strip-all \
+	"$ex/Rust/lib.rs" -o "$tmp/rust.wasm"
+same "$tmp/rust.wasm" "$ex/Rust/rust.wasm"
+"$fva" lift "$ex/Rust/rust.wasm" "$ex/Rust/Lifted.lean" --ns Examples.Rust.Lifted

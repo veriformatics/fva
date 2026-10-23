@@ -48,6 +48,9 @@ OverrideExtern override"
 mapfile -t cheats < <(cut -d" " -f1 <<<"$pinned" | sort -u)
 # the cheat roots are no default target: build them by module name
 lake build fva FVA "${cheats[@]/#/FVATest.Cheats.}" >/dev/null || exit 2
+examples=(Toy Mem Rust)
+# the examples are proofs FVA ships: warnings fail them (the cheats warn by design)
+lake --wfail build "${examples[@]/#/FVATest.Examples.}" >/dev/null || exit 2
 fva=.lake/build/bin/fva
 fail=0
 log=$tmp/log
@@ -91,6 +94,22 @@ while read -r c want args; do
 		fail=1
 	fi
 done <<<"$pinned"
+# worked examples (U8): each must PASS (independent runs, in parallel)
+for ex in "${examples[@]}"; do
+	"$fva" trust . --spec-module "FVATest.Examples.$ex.Spec" --root-module "FVATest.Examples.$ex" \
+		>"$log.$ex" 2>&1 &
+done
+for ex in "${examples[@]}"; do
+	wait -n || true
+done
+for ex in "${examples[@]}"; do
+	if ! grep -q '^fva trust: PASS' "$log.$ex"; then
+		echo "test-trust: example $ex is no PASS"
+		grep '^  \[' "$log.$ex" | head -5
+		fail=1
+	fi
+	rm -f "$log.$ex"
+done
 # a relative project directory, from its parent: trust-run works inside the project
 here=$(basename "$PWD")
 rc=$(
