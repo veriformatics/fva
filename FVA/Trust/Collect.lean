@@ -245,16 +245,14 @@ literal (non-ASCII counts: misreading a literal only overcounts). -/
 def idChar (c : Char) : Bool :=
   c.isAlphanum || c == '_' || c == '\'' || c == '!' || c == '?' || c.toNat ≥ 0x80
 
-/-- Code lines of a Lean source (D11): lines holding a non-blank character outside comments and
-docstrings; string, char and `«…»` contents count as code. Lean's comment rules: `--` to the
-line end, `/-` … `-/` nested (docstrings included), neither inside a literal. Every misread
-overcounts, never undercounts. -/
-def codeLines (src : String) : Nat := Id.run do
+/-- Which characters of a Lean source lie inside a comment or docstring (D11): `--` to the line
+end, `/-` … `-/` nested (docstrings included), neither inside a string, raw string, char or
+`«…»` literal. Every misread marks too little, never too much. -/
+def commentMask (src : String) : Array Bool := Id.run do
   let cs := src.toList.toArray
   let at_ (k : Nat) : Char := cs[k]?.getD ' '
+  let mut mask := Array.replicate cs.size false
   let mut i := 0
-  let mut n := 0
-  let mut code := false
   let mut depth := 0
   -- inside a literal: `"` string, `r#…"` raw string (hash count), `«` quoted name
   let mut str := false
@@ -263,34 +261,32 @@ def codeLines (src : String) : Nat := Id.run do
   while i < cs.size do
     let c := cs[i]!
     if c == '\n' then
-      if code then n := n + 1
-      code := false
       i := i + 1
     else if depth > 0 then
-      if c == '/' && at_ (i + 1) == '-' then depth := depth + 1; i := i + 2
-      else if c == '-' && at_ (i + 1) == '/' then depth := depth - 1; i := i + 2
+      mask := mask.set! i true
+      if c == '/' && at_ (i + 1) == '-' then
+        mask := mask.set! (i + 1) true; depth := depth + 1; i := i + 2
+      else if c == '-' && at_ (i + 1) == '/' then
+        mask := mask.set! (i + 1) true; depth := depth - 1; i := i + 2
       else i := i + 1
     else if str then
-      if !c.isWhitespace then code := true
       if c == '\\' then i := i + 2
       else
         if c == '"' then str := false
         i := i + 1
     else if let some h := raw then
-      if !c.isWhitespace then code := true
       if c == '"' && (List.range h).all (fun k => at_ (i + 1 + k) == '#') then
         raw := none; i := i + 1 + h
       else i := i + 1
     else if quoted then
-      if !c.isWhitespace then code := true
       if c == '»' then quoted := false
       i := i + 1
     else if c == '-' && at_ (i + 1) == '-' then
-      while i < cs.size && cs[i]! != '\n' do i := i + 1
+      while i < cs.size && cs[i]! != '\n' do
+        mask := mask.set! i true; i := i + 1
     else if c == '/' && at_ (i + 1) == '-' then
-      depth := 1; i := i + 2
+      mask := (mask.set! i true).set! (i + 1) true; depth := 1; i := i + 2
     else
-      if !c.isWhitespace then code := true
       let prevId := i > 0 && idChar cs[i - 1]!
       if c == '"' then str := true; i := i + 1
       else if c == '«' then quoted := true; i := i + 1
@@ -309,8 +305,27 @@ def codeLines (src : String) : Nat := Id.run do
         else if at_ (i + 2) == '\'' && at_ (i + 1) != '\n' then i := i + 3
         else i := i + 1
       else i := i + 1
+  return mask
+
+/-- Code lines of a Lean source (D11): lines holding a non-blank character outside comments and
+docstrings (`commentMask`); string, char and `«…»` contents count as code. -/
+def codeLines (src : String) : Nat := Id.run do
+  let mask := commentMask src
+  let mut n := 0
+  let mut code := false
+  for (c, k) in src.toList.zipIdx do
+    if c == '\n' then
+      if code then n := n + 1
+      code := false
+    else if !c.isWhitespace && !mask[k]! then code := true
   if code then n := n + 1
   return n
+
+/-- A Lean source without its comments and docstrings (`commentMask`), line breaks kept. -/
+def stripComments (src : String) : String :=
+  let mask := commentMask src
+  String.ofList <| src.toList.zipIdx.filterMap fun (c, k) =>
+    if mask[k]! && c != '\n' then none else some c
 
 /-- Every environment fact of the report (build, replay, canaries and budget are set later). -/
 def collect (input : Input) : CoreM Report := do

@@ -54,8 +54,8 @@ lake --wfail build "${examples[@]/#/FVATest.Examples.}" >/dev/null || exit 2
 fva=.lake/build/bin/fva
 fail=0
 log=$tmp/log
-if ! lake build FVATest.Trust >"$log" 2>&1; then
-	echo "test-trust: glue checks (FVATest.Trust) failed"
+if ! lake build FVATest.Trust FVATest.Explain >"$log" 2>&1; then
+	echo "test-trust: glue checks (FVATest.Trust, FVATest.Explain) failed"
 	grep '^error' "$log" | head -5
 	fail=1
 fi
@@ -94,18 +94,20 @@ while read -r c want args; do
 		fail=1
 	fi
 done <<<"$pinned"
-# worked examples (U8): each must PASS (independent runs, in parallel)
+# worked examples (U8): each must PASS; `fva explain` runs `fva trust` itself, then shows the
+# saved explanation (U10: rc 0 = trust PASS + every intent check `matches` + the text current)
+declare -A pid
 for ex in "${examples[@]}"; do
-	"$fva" trust . --spec-module "FVATest.Examples.$ex.Spec" --root-module "FVATest.Examples.$ex" \
-		>"$log.$ex" 2>&1 &
+	"$fva" explain . --spec-module "FVATest.Examples.$ex.Spec" \
+		--root-module "FVATest.Examples.$ex" >"$log.$ex" 2>&1 &
+	pid[$ex]=$!
 done
 for ex in "${examples[@]}"; do
-	wait -n || true
-done
-for ex in "${examples[@]}"; do
-	if ! grep -q '^fva trust: PASS' "$log.$ex"; then
-		echo "test-trust: example $ex is no PASS"
-		grep '^  \[' "$log.$ex" | head -5
+	wait "${pid[$ex]}"
+	rc=$?
+	if ((rc != 0)) || ! grep -q '^  Proof check (fva trust): PASS$' "$log.$ex"; then
+		echo "test-trust: example $ex → explain rc $rc"
+		grep -E '^  (Proof check|STALE)|Intent check|✗' "$log.$ex" | head -5
 		fail=1
 	fi
 	rm -f "$log.$ex"
