@@ -52,7 +52,10 @@
       "file": "edgeR.so",
       "sha256": "e39434314a9eb0399edf943c6a0475d34ff9d0d7ec0bb4a1b8ba726b4a6a88fb",
       "license": "GPL-2.0-or-later",
-      "extract": { "from": "edger-emscripten", "member": "edgeR/libs/edgeR.so" }
+      "extract": {
+        "from": "edger-emscripten",
+        "member": "edgeR/libs/edgeR.so"
+      }
     },
     {
       "id": "rnanorm",
@@ -63,6 +66,41 @@
       "file": "rnanorm-2.2.0.tar.gz",
       "sha256": "10b3eab8bb692837235f42def6d010abc743f585516451176bf3dfaaea087cb8",
       "license": "Apache-2.0"
+    },
+    {
+      "id": "lz4-wasm-source",
+      "name": "lz4-wasm hand-written WAT source",
+      "version": "8995cdef7b3adc4a4d2fc4fc86b84a86789ff858",
+      "upstream": "https://github.com/gorhill/lz4-wasm",
+      "url": "https://raw.githubusercontent.com/gorhill/lz4-wasm/8995cdef7b3adc4a4d2fc4fc86b84a86789ff858/src/lz4-block-codec.wat",
+      "file": "lz4-block-codec.wat",
+      "sha256": "737b63992149810690086420d4802d86db058359c998768a9737962c974250e3",
+      "license": "BSD-2-Clause",
+      "scope": "source of the shipped lz4-block-codec.wasm"
+    },
+    {
+      "id": "lz4-block-doc",
+      "name": "LZ4 block format description",
+      "version": "1.10.0",
+      "upstream": "https://github.com/lz4/lz4",
+      "url": "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz",
+      "file": "lz4_Block_format.md",
+      "sha256": "dce3c34a8738c44ed1dffb48c73e30297fca98ba7881408dc228865912c9a42e",
+      "license": "BSD-2-Clause",
+      "extract": {
+        "from": "lz4",
+        "member": "lz4-1.10.0/doc/lz4_Block_format.md"
+      }
+    },
+    {
+      "id": "edger-source",
+      "name": "edgeR source package",
+      "version": "4.99.10",
+      "upstream": "https://bioconductor.org/packages/edgeR",
+      "url": "https://bioc.r-universe.dev/src/contrib/edgeR_4.99.10.tar.gz",
+      "file": "edgeR_4.99.10.tar.gz",
+      "sha256": "c33c3f85edf6a67abbcb3e899124d266adc039b32e811d11e69fc34cedba6218",
+      "license": "GPL-2.0-or-later"
     }
   ]
 }
