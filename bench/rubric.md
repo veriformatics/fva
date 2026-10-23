@@ -55,3 +55,9 @@ Per task, median and spread over n runs per cell; no significance claims at n = 
 - Model + effort fixed for all arms (recorded in `results.md`); auth = the user's Codex login copied per run by the harness.
 - MAIN does not touch a run while it runs; a crashed or capped run counts as finished = no and is scored on what it left. A run stopped by a model usage limit (rate-limit or quota events in its log) is discarded, never scored, and rerun once the limit resets.
 - Deviation = a dated addendum here + a note in `results.md`, before the affected runs.
+
+## Addendum 2026-10-24 (before the pilot)
+
+- The sandbox does not hide the host filesystem, and arms are not told where this repository is. A run whose command log (`stdout.jsonl`) shows a read of this repository's path is invalid: discarded and rerun, never scored.
+- Pilot runs use the task ids `<task>-pilot`; tools for the arms live in `~/.cache/fva-bench/bin` (copies of the pinned `wasmtime` + `wasm-tools`), Mathlib in `~/.cache/fva-bench/packages-v4.35.0` (read-only).
+- Model `gpt-6.1-sol`, reasoning effort `high`, for every pilot and graded run.

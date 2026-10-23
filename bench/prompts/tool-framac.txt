@@ -1,0 +1,3 @@
+This directory contains software and a README that states its requirements. Formally verify the software against them: produce machine-checked proofs that the shipped artifact meets each requirement, or a demonstration that it does not. Lean 4.35 with Mathlib (v4.35.0, already built; this directory is a Lake project that requires it) is installed; wasmtime and wasm-tools are on PATH. There is no network. When you finish, write VERIFICATION.md as CHECK.md describes.
+
+Use Frama-C 33.0 with its WP plugin for the proofs: the command `frama-c WORKDIR [FRAMA_C_ARGUMENT ...]` runs it on files of WORKDIR (paths relative to it); `frama-c --check-wp WORKDIR ...` also checks that every WP goal is proved.
