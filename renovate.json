@@ -22,7 +22,7 @@
     },
     {
       "customType": "regex",
-      "description": "Pinned scanner binaries; a bump fails fetch-tools until its sha256 is refreshed",
+      "description": "Pinned tool binaries; a bump fails fetch-tools until its sha256 is refreshed",
       "managerFilePatterns": ["/^scripts/fetch-tools$/"],
       "matchStrings": ["\"(?<depName>[a-z-]+) (?<currentValue>\\d+\\.\\d+\\.\\d+) (?<packageName>[\\w.-]+/[\\w.-]+) "],
       "datasourceTemplate": "github-releases",
