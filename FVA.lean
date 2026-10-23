@@ -40,3 +40,7 @@ import FVA.Proof.Exec.Spike
 import FVA.Proof.Exec.Instantiate
 import FVA.Proof.Pin.Decode
 import FVA.Proof.Pin.Exec
+import FVA.Spec.Trust
+import FVA.Trust.Verdict
+import FVA.Proof.Trust
+import FVA.Self

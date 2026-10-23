@@ -2,6 +2,7 @@ import FVA.Cli
 import FVA.Tool.Decode
 import FVA.Tool.Lift
 import FVA.Tool.Difftest
+import FVA.Tool.Trust
 
 /-- CLI entry point. -/
 def main (args : List String) : IO UInt32 := do
@@ -14,15 +15,23 @@ def main (args : List String) : IO UInt32 := do
       IO.println s!"{path}: {FVA.Tool.decodeSummary (← IO.FS.readBinFile path)}"
     return 0
   | ["lift", path, out, "--ns", ns] =>
+    -- `fva trust` reads the artifact back through this path, relative to the project root
+    let rel : System.FilePath := path
+    if rel.isAbsolute || rel.components.contains ".." then
+      IO.eprintln "fva lift: give the .wasm path relative to the project root, without `..`"
+      return 2
     let bs ← IO.FS.readBinFile path
     match FVA.Wasm.Decode.decode (FVA.Tool.packBytes bs) bs.size with
     | .ok m =>
-      IO.FS.writeFile out (FVA.Tool.Lift.file ns bs m)
+      IO.FS.writeFile out (FVA.Tool.Lift.file ns bs m path)
       return 0
     | .error e =>
       IO.eprintln s!"fva lift: {repr e}"
       return 1
   | "difftest" :: rest => FVA.Tool.Difftest.main rest
+  | "trust" :: rest => FVA.Tool.Trust.main rest
+  | "trust-run" :: rest => FVA.Tool.Trust.run rest
+  | "trust-matrix" :: rest => FVA.Tool.Trust.matrix rest
   | _ =>
     let o := FVA.Cli.dispatch args
     IO.print o.out

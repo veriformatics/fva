@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Kernel canaries (U7 F6): the Lean Kernel Arena closed round `round-2026-09` tests (bad = known-
+# false exports every run-set kernel must refuse; good = positive controls), sha256-pinned, into
+# .cache/canaries/arena/{good,bad}/; plus the lean4#15704 prelude-replacement export (gersh/
+# lean-kernel-bug, pinned commit; Lean's own kernels accept it by design, the arena excludes
+# prelude replacements) into .cache/canaries/prelude-15704/. `--pin` (after a pin change only)
+# rewrites trust/canaries/set.tsv = name, sha256, kind of every fetched canary.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+url=https://github.com/leanprover/lean-kernel-arena/releases/download/round-2026-09/lean-arena-round-2026-09-tests.tar.gz
+sha=98a69742b538296c5f413d0527dfeef8c4d1815fe64b12c8623cd33de63bee0d
+dir=.cache/canaries/arena
+if [[ ! -e $dir/.ok-$sha ]]; then
+	mkdir -p .cache/canaries
+	tgz=.cache/canaries/arena-round-2026-09.tar.gz
+	[[ -e $tgz ]] || curl -fsSL -o "$tgz" "$url"
+	echo "$sha  $tgz" | sha256sum -c --quiet - || {
+		echo "fetch-canaries: sha256 mismatch for $tgz" >&2
+		exit 1
+	}
+	rm -rf "$dir" && mkdir -p "$dir"
+	tar -xzf "$tgz" -C "$dir"
+	touch "$dir/.ok-$sha"
+fi
+pre=.cache/canaries/prelude-15704/exploit.ndjson
+presha=cccb9cb57613d5c262688e14db16e10da36d636472295b187b2ea4b8c8fb7d46
+if [[ ! -e $pre ]] || ! echo "$presha  $pre" | sha256sum -c --quiet - 2>/dev/null; then
+	mkdir -p "$(dirname "$pre")"
+	curl -fsSL -o "$pre.tmp" \
+		https://raw.githubusercontent.com/gersh/lean-kernel-bug/aa5157ea29fdf3e6d69566457e728ffb0b814966/exploit.export
+	echo "$presha  $pre.tmp" | sha256sum -c --quiet - || {
+		echo "fetch-canaries: sha256 mismatch for the #15704 export" >&2
+		exit 1
+	}
+	mv "$pre.tmp" "$pre"
+fi
+[[ ${1-} == --pin ]] || exit 0
+{
+	echo "# name	sha256	kind (scripts/fetch-canaries --pin)"
+	(cd .cache/canaries && find arena prelude-15704 -name '*.ndjson' -print0 | sort -z |
+		xargs -0 sha256sum) |
+		while read -r h f; do
+			kind=bad
+			[[ $f == arena/good/* ]] && kind=good
+			printf '%s\t%s\t%s\n' "${f%.ndjson}" "$h" "$kind"
+		done
+} >trust/canaries/set.tsv

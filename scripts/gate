@@ -39,6 +39,8 @@ lean_lane() {
 	if ((fast)); then run spec scripts/test-spec --fast; else run spec scripts/test-spec; fi
 	if ((fast)); then run difftest scripts/test-difftest --fast; else run difftest scripts/test-difftest; fi
 	run lint lake --wfail lint
+	# fva trust: self package + cheat suite (≈ 5 min, kernel replay dominated): full gate only
+	if ((! fast)); then run trust scripts/test-trust; fi
 	if ((fast)); then run mutation scripts/test-mutation --fast; else run mutation scripts/test-mutation; fi
 	wait
 }

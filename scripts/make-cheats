@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Regenerates every cheat project's Lifted.lean (FVATest/Cheats/*) with `fva lift` from
+# FVATest/Cheats/{id,zero}.wasm, then re-applies each link cheat's planted edit. Idempotent;
+# needs a built fva (`lake build fva`).
+# shellcheck disable=SC2016 # backticks are Lean text inside sed scripts
+set -euo pipefail
+cd "$(dirname "$0")/.."
+fva=.lake/build/bin/fva
+cheats=FVATest/Cheats
+lift() { "$fva" lift "$2" "$cheats/$1/Lifted.lean" --ns "Cheats.$1.Lifted"; }
+for d in "$cheats"/*/; do
+	c=$(basename "$d")
+	[[ -f $d/Lifted.lean ]] && lift "$c" "$cheats/id.wasm"
+done
+src() { sed -i "s|^def source : String := .*|def source : String := \"$2\"|" "$cheats/$1/Lifted.lean"; }
+# lifted from another artifact than the one `source` names
+lift LinkSource "$cheats/zero.wasm"
+src LinkSource "$cheats/id.wasm"
+src LinkMissing "$cheats/gone.wasm"
+src LinkEscape "$cheats/../Cheats/id.wasm"
+# decode_eq removed / about another numeral than `bytes`
+f=$cheats/LinkNoDecodeEq/Lifted.lean
+sed -i -e '/^\/-- The kernel evaluates the verified decoder on `bytes`. -\/$/,/^$/d' \
+	-e 's/`decode_eq` re-checks it\./its `decode_eq` was removed (cheat)./' "$f"
+sed -i 's/^theorem decode_eq : decode bytes len = /theorem decode_eq : decode (bytes + 7 * 256 ^ 40) len = /' \
+	"$cheats/LinkOtherNumeral/Lifted.lean"
+# a declaration `fva lift` never writes: notation the spec reads
+f=$cheats/LinkExtra/Lifted.lean
+sed -i 's/^end Cheats\.LinkExtra\.Lifted$/\/-- Added after `fva lift` (cheat LinkExtra): the spec reads `fine`, the kernel sees `True`. -\/\nnotation "fine" => True\n\nend Cheats.LinkExtra.Lifted/' "$f"
