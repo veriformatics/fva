@@ -1,6 +1,8 @@
 import Lean
 import FVA.Spec.Trust
 import FVA.Tool.Lift
+import FVA.Tool.Blob
+import FVA.Spec.Cert
 
 /-!
 # Trust facts from the environment (trusted glue)
@@ -105,8 +107,8 @@ def trustedPackages (root fvaRoot : System.FilePath) : IO (Array System.FilePath
   return out
 
 /-- Origin of every imported module: core by the sysroot, Mathlib (+ its dependencies) by the
-trusted package directories, then base, subject (declared or lifted), project. -/
-def origins (env : Environment) (input : Input) (lifted : NameSet) :
+trusted package directories, then base, subject (declared, lifted or a blob), project. -/
+def origins (env : Environment) (input : Input) (generated : NameSet) :
     IO (Std.HashMap Name Origin) := do
   let sys ← IO.FS.realPath ((← findSysroot) / "lib" / "lean")
   let mut out := {}
@@ -115,7 +117,7 @@ def origins (env : Environment) (input : Input) (lifted : NameSet) :
     let o :=
       if under sys f then .core
       else if input.trustedPkgs.any (under · f) then .mathlib
-      else if input.subjects.contains m || lifted.contains m then .subject
+      else if input.subjects.contains m || generated.contains m then .subject
       else if input.base.contains m then .base
       else .project
     out := out.insert m o
@@ -224,21 +226,54 @@ def artifactPath (root : System.FilePath) (src : String) : IO (Option System.Fil
 def linkOf (env : Environment) (root : System.FilePath) (m ns : Name) : IO Link := do
   let file := m.toString
   let none' (file : String) : Link :=
-    { file, wasmPresent := false, bytesMatch := false, lenMatch := false, decodeEq := true,
-      relifts := false }
+    { file, kind := .wasm, present := false, bytesMatch := false, lenMatch := false,
+      decodeEq := true, regenerates := false }
   let some src := strValue env (ns ++ `source) | return none' file
   let some path ← artifactPath root src | return none' s!"{file} ({src}: outside the project)"
   unless ← path.pathExists do return none' s!"{file} ({src})"
   let bs ← IO.FS.readBinFile path
   -- the module's file must be exactly what `fva lift` writes for these bytes: nothing added
-  let relifts ← match FVA.Wasm.Decode.decode (packBytes bs) bs.size, ← sourceOf m with
+  let regenerates ← match FVA.Wasm.Decode.decode (packBytes bs) bs.size, ← sourceOf m with
     | .ok mod, some f => do
       pure ((← IO.FS.readFile f) == FVA.Tool.Lift.file ns.toString bs mod src)
     | _, _ => pure false
-  return { file := s!"{file} ({src})", wasmPresent := true,
+  return { file := s!"{file} ({src})", kind := .wasm, present := true,
            bytesMatch := natValue env (ns ++ `bytes) == some (packBytes bs),
            lenMatch := natValue env (ns ++ `len) == some bs.size,
-           decodeEq := true, relifts }
+           decodeEq := true, regenerates }
+
+/-- Blob modules (`fva blob`: a certificate's input or output file): module → namespace, for
+every module declaring `<ns>.blob : FVA.Cert.Blob := ⟨<ns>.bytes, <ns>.len⟩`. -/
+def blobModules (env : Environment) : Std.HashMap Name Name := Id.run do
+  let mut out := {}
+  for m in env.header.moduleNames do
+    for c in moduleConsts env m do
+      if let .str ns "blob" := c then
+        if let some (.defnInfo d) := env.find? c then
+          if d.type == .const ``FVA.Cert.Blob [] &&
+              d.value == mkApp2 (.const ``FVA.Cert.Blob.mk []) (.const (ns ++ `bytes) [])
+                (.const (ns ++ `len) []) then
+            out := out.insert m ns
+  return out
+
+/-- Link facts of one blob module: the file present inside the project, the numeral and length
+equal to its bytes, the module exactly `fva blob`'s output. -/
+def blobLinkOf (env : Environment) (root : System.FilePath) (m ns : Name) : IO Link := do
+  let file := m.toString
+  let none' (file : String) : Link :=
+    { file, kind := .blob, present := false, bytesMatch := false, lenMatch := false,
+      decodeEq := false, regenerates := false }
+  let some src := strValue env (ns ++ `source) | return none' file
+  let some path ← artifactPath root src | return none' s!"{file} ({src}: outside the project)"
+  unless ← path.pathExists do return none' s!"{file} ({src})"
+  let bs ← IO.FS.readBinFile path
+  let regenerates ← match ← sourceOf m with
+    | some f => pure ((← IO.FS.readFile f) == FVA.Tool.Blob.file ns.toString bs src)
+    | none => pure false
+  return { file := s!"{file} ({src})", kind := .blob, present := true,
+           bytesMatch := natValue env (ns ++ `bytes) == some (packBytes bs),
+           lenMatch := natValue env (ns ++ `len) == some bs.size,
+           decodeEq := false, regenerates }
 
 /-- A character that continues an identifier, so a following `'` is a prime, not a char
 literal (non-ASCII counts: misreading a literal only overcounts). -/
@@ -331,8 +366,10 @@ def stripComments (src : String) : String :=
 def collect (input : Input) : CoreM Report := do
   let env ← getEnv
   let lifted := liftedModules env
-  let liftedSet : NameSet := lifted.fold (fun s m _ => s.insert m) {}
-  let orig ← origins env input liftedSet
+  let blobs := blobModules env
+  let generated : NameSet :=
+    blobs.fold (fun s m _ => s.insert m) (lifted.fold (fun s m _ => s.insert m) {})
+  let orig ← origins env input generated
   let originOf (c : Name) : Origin := ((modOf env c).bind orig.get?).getD .project
   let trusted (c : Name) : Bool := originOf c == .core || originOf c == .mathlib
   -- claims: Prop-valued definitions of the spec module; a theorem there = a claim proven in place
@@ -439,6 +476,8 @@ def collect (input : Input) : CoreM Report := do
   let mut links := #[]
   for (m, ns) in lifted.toList do
     if specClosure.contains m then links := links.push (← linkOf env input.root m ns)
+  for (m, ns) in blobs.toList do
+    if specClosure.contains m then links := links.push (← blobLinkOf env input.root m ns)
   return { built := true, claims := claims.toList, flags := flags.toList,
            reviewModules := reviewModules.toList, subjectSyntax := subjectSyntax.toList,
            vocabulary := vocabulary.toList,

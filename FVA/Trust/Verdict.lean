@@ -38,15 +38,15 @@ def Status.name : Status → String
 
 /-- The failed parts of a link check, for the report. -/
 def Link.problems (l : Link) : List String :=
-  (if l.wasmPresent then [] else ["the .wasm is missing or outside the project"]) ++
+  (if l.present then [] else ["the file is missing or outside the project"]) ++
   (if l.bytesMatch then [] else ["`bytes` is not the file's bytes"]) ++
   (if l.lenMatch then [] else ["`len` is not the file's size"]) ++
-  (if l.decodeEq then [] else ["`decode_eq` is missing or mistyped"]) ++
-  (if l.relifts then [] else ["the file is not `fva lift`'s output for the .wasm"])
+  (if l.kind != .wasm || l.decodeEq then [] else ["`decode_eq` is missing or mistyped"]) ++
+  (if l.regenerates then [] else ["the module is not its generator's output for the file"])
 
 /-- A link check passes. -/
 def Link.ok (l : Link) : Bool :=
-  l.wasmPresent && l.bytesMatch && l.lenMatch && l.decodeEq && l.relifts
+  l.present && l.bytesMatch && l.lenMatch && (l.kind != .wasm || l.decodeEq) && l.regenerates
 
 /-- A canary accepted by `c.kernel` is covered: a known defect another kernel rejects. -/
 def canaryCovered (cs : List CanaryRun) (c : CanaryRun) : Bool :=
@@ -101,7 +101,7 @@ def rulePrelude (r : Report) : List Issue :=
 
 /-- `[link]`. -/
 def ruleLink (r : Report) : List Issue :=
-  (if r.needsLink && r.links.isEmpty then [⟨"link", "no lifted module in the project"⟩]
+  (if r.needsLink && r.links.isEmpty then [⟨"link", "no generated module in the project"⟩]
    else []) ++
   r.links.flatMap fun l =>
     if l.ok then [] else [⟨"link", s!"{l.file}: {"; ".intercalate l.problems}"⟩]

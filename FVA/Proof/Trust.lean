@@ -12,9 +12,9 @@ theorem Status.bad_iff (s : Status) : s.bad = true ↔ s.Bad := by
   cases s <;> simp [Status.bad, Status.Bad]
 
 theorem Link.ok_iff (l : Link) : l.ok = true ↔
-    l.wasmPresent = true ∧ l.bytesMatch = true ∧ l.lenMatch = true ∧ l.decodeEq = true ∧
-      l.relifts = true := by
-  simp [Link.ok, Bool.and_eq_true, and_assoc]
+    l.present = true ∧ l.bytesMatch = true ∧ l.lenMatch = true ∧
+      (l.kind = .wasm → l.decodeEq = true) ∧ l.regenerates = true := by
+  cases h : l.kind <;> simp [Link.ok, Bool.and_eq_true, and_assoc, h]
 
 theorem ruleBuild_nil (r : Report) : ruleBuild r = [] ↔ r.built = true := by
   unfold ruleBuild; split <;> simp_all
@@ -57,8 +57,8 @@ theorem rulePrelude_nil (r : Report) : rulePrelude r = [] ↔ r.prelude = [] := 
   simp [rulePrelude]
 
 theorem ruleLink_nil (r : Report) : ruleLink r = [] ↔ (r.needsLink = true → r.links ≠ []) ∧
-    ∀ l ∈ r.links, l.wasmPresent = true ∧ l.bytesMatch = true ∧ l.lenMatch = true ∧
-      l.decodeEq = true ∧ l.relifts = true := by
+    ∀ l ∈ r.links, l.present = true ∧ l.bytesMatch = true ∧ l.lenMatch = true ∧
+      (l.kind = .wasm → l.decodeEq = true) ∧ l.regenerates = true := by
   simp only [ruleLink, List.append_eq_nil_iff, List.flatMap_eq_nil_iff]
   refine and_congr ?_ (forall₂_congr fun l _ => ?_)
   · split <;> simp_all [List.isEmpty_iff]

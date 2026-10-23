@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Regenerates the certificate fixtures (FVATest/Certs, FVATest/Cheats/Cert*): reruns every
+# producer on its pinned input and compares its bytes with the committed output (certificates
+# bind bytes: a producer whose output changed fails here), then rewrites each certificate's
+# modules with `fva certify` and re-applies the link cheats' edits. Host-dependent producers
+# (python3, Rscript, java, node), so a regeneration script, not a gate step. Needs a built fva.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+fva=.lake/build/bin/fva
+c=FVATest/Certs
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+same() {
+	cmp -s "$1" "$2" || {
+		echo "make-certs: $2 differs from its producer's output ($1)" >&2
+		exit 1
+	}
+}
+s=$c/Sort
+python3 "$s/sort.py" <"$s/input.txt" >"$tmp/py" && same "$tmp/py" "$s/out-py.txt"
+Rscript --vanilla "$s/sort.R" <"$s/input.txt" >"$tmp/r" && same "$tmp/r" "$s/out-r.txt"
+java "$s/Sort.java" <"$s/input.txt" >"$tmp/java" && same "$tmp/java" "$s/out-java.txt"
+node "$s/sort.ts" <"$s/input.txt" >"$tmp/ts" 2>/dev/null && same "$tmp/ts" "$s/out-ts.txt"
+Rscript --vanilla "$s/naive.R" <"$s/input.txt" >"$tmp/naive" && same "$tmp/naive" "$s/out-naive-r.txt"
+node "$s/sort.ts" <"$c/Neg/big-in.txt" >"$tmp/big" 2>/dev/null && same "$tmp/big" "$c/Neg/big-out-ts.txt"
+for k in 1 2 3; do
+	python3 "$c/Compile/compile.py" <"$c/Compile/e$k.txt" >"$tmp/e$k"
+	same "$tmp/e$k" "$c/Compile/e$k.wasm"
+done
+certify() {
+	"$fva" certify . --relation "$1" --input "$2" --output "$3" --ns "$4" "${@:5}" >/dev/null
+}
+sorted=FVA.Cert.SortedPerm
+compiled=FVA.Cert.Compiled
+# accepted
+certify $sorted "$s/input.txt" "$s/out-py.txt" FVATest.Certs.Sort.Py
+certify $sorted "$s/input.txt" "$s/out-r.txt" FVATest.Certs.Sort.R
+certify $sorted "$s/input.txt" "$s/out-java.txt" FVATest.Certs.Sort.Java
+certify $sorted "$s/input.txt" "$s/out-ts.txt" FVATest.Certs.Sort.Ts
+certify $sorted "$c/Neg/dup-in.txt" "$c/Pos/sorted-out.txt" FVATest.Certs.Pos.Sorted
+certify $sorted "$c/Pos/empty.txt" "$c/Pos/empty.txt" FVATest.Certs.Pos.Empty
+for k in 1 2 3; do
+	certify $compiled "$c/Compile/e$k.txt" "$c/Compile/e$k.wasm" "FVATest.Certs.Compile.E$k"
+done
+certify FVATest.Certs.Custom.Reversed "$c/Custom/in.txt" "$c/Custom/out.txt" \
+	FVATest.Certs.Custom.Rev --relation-module FVATest.Certs.Custom.Rel \
+	--sound-module FVATest.Certs.Custom.Check
+# no proof: each certificate's build fails (its relation does not hold, or the checker rejects)
+certify $sorted "$s/input.txt" "$s/out-naive-r.txt" FVATest.Certs.Neg.NaiveR
+certify $sorted "$c/Neg/dup-in.txt" "$c/Neg/dup-out.txt" FVATest.Certs.Neg.Dup
+certify $sorted "$c/Neg/dup-in.txt" "$c/Neg/unsorted-out.txt" FVATest.Certs.Neg.Unsorted
+certify $sorted "$c/Neg/big-in.txt" "$c/Neg/big-out-ts.txt" FVATest.Certs.Neg.JsRound
+certify $sorted "$c/Neg/trailing-in.txt" "$c/Neg/trailing-out.txt" FVATest.Certs.Neg.Trailing
+certify $compiled "$c/Compile/e1.txt" "$c/Neg/e1-tampered.wasm" FVATest.Certs.Neg.Tampered
+certify $compiled "$c/Neg/x.txt" "$c/Neg/unused-invalid.wasm" FVATest.Certs.Neg.UnusedInvalid
+# link cheats: a valid certificate whose file changed afterwards
+ch=FVATest/Cheats
+for side in Out In; do
+	d=$ch/CertEdited$side
+	mkdir -p "$d"
+	printf '3\n1\n2\n' >"$d/in.txt"
+	printf '1\n2\n3\n' >"$d/out.txt"
+	certify $sorted "$d/in.txt" "$d/out.txt" "FVATest.Cheats.CertEdited$side"
+done
+printf '1\n2\n4\n' >"$ch/CertEditedOut/out.txt"
+printf '3\n1\n4\n' >"$ch/CertEditedIn/in.txt"

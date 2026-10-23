@@ -27,7 +27,10 @@ def helpText : String :=
   "            files.\n" ++
   "  trust     Check that a project's claims are proven, about the artifact, with a small\n" ++
   "            spec.\n" ++
-  "  explain   Explain a project's claims in plain English and compare them with their intent.\n"
+  "  explain   Explain a project's claims in plain English and compare them with their intent.\n" ++
+  "  blob      Write a Lean module that holds the bytes of a file.\n" ++
+  "  certify   Write a certificate: a claim that an output file stands in a relation to an\n" ++
+  "            input file, and its proof by a verified checker.\n"
 
 /-- Map command-line arguments to an outcome. -/
 def dispatch : List String → Outcome

@@ -18,8 +18,8 @@ namespace FVA.Tool.Trust
 
 open Lean FVA.Trust
 
-deriving instance ToJson for Proof, Claim, Flag, ReviewModule, FVA.Trust.Term, Link, Status,
-  KernelRun, CanaryRun, Report, Issue, Verdict
+deriving instance ToJson for Proof, Claim, Flag, ReviewModule, FVA.Trust.Term, LinkKind, Link,
+  Status, KernelRun, CanaryRun, Report, Issue, Verdict
 
 /-- Parsed options. -/
 structure Opts where
@@ -93,12 +93,14 @@ def fvaRoot : IO System.FilePath := do
 /-- FVA's trust boundary (Decisions: Self-verification), shipped in every report. -/
 def boundary : List (String × String) :=
   [("reviewed once", "FVA's specs: Wasm syntax + binary grammar, execution semantics, " ++
-      "integer + IEEE-754 numerics, claim forms, the verdict rules (FVA/Spec/**)"),
+      "integer + IEEE-754 numerics, claim forms, certificate relations, the verdict rules " ++
+      "(FVA/Spec/**)"),
    ("verified implementation", "the decoder (sound + complete for the profile), the reference " ++
-      "stepper, the float operators, instantiation, the verdict function (FVA.Self: fva trust " ++
-      "on FVA itself)"),
-   ("trusted glue", "fact collection from the environment, the link and surface checks, " ++
-      "process orchestration, the external kernels (each canaried)"),
+      "stepper, the float operators, instantiation, the verdict function, the certificate " ++
+      "checkers (FVA.Self: fva trust on FVA itself)"),
+   ("trusted glue", "fact collection from the environment, the link and surface checks (a " ++
+      "certificate's files included), process orchestration, the external kernels (each " ++
+      "canaried)"),
    ("residual trust", "the Lean kernel cross-checked by an independent kernel, the Lean " ++
       "compiler that built fva, Mathlib at the pinned revision, the specs")]
 
@@ -111,16 +113,39 @@ def clean (s : String) : String :=
       acc ++ "\\u{" ++ String.ofList (Nat.toDigits 16 n) ++ "}"
     else acc.push c
 
+/-- How each claim attaches to the code: `artifact` (a lifted module the claim is about),
+`accepted output of R` (a certificate over blobs), `native` (a declared Lean subject); a mixed
+claim lists each. -/
+def attachments (env : Environment) (r : Report) : List (String × String) :=
+  r.claims.map fun c =>
+    let rel := match env.find? c.name.toName with
+      | some (.defnInfo d) =>
+        if d.value.isAppOfArity ``FVA.Cert.Accepted 3 then (d.value.getArg! 0).constName?
+        else none
+      | _ => none
+    let kindOf (m : String) : String :=
+      match r.links.find? (·.file.startsWith (m ++ " (")) with
+      | some l => if l.kind == .blob then "blob" else "artifact"
+      | none => "native"
+    let kinds := (c.subjects.map kindOf).eraseDups
+    let parts := kinds.map fun k =>
+      if k == "blob" then
+        s!"accepted output{(rel.map fun n => s!" of {n}").getD ""}"
+      else k
+    (c.name, ", ".intercalate parts)
+
 /-- Plain report (`setFile` = the canary set used, `subjects` = the declared ones). -/
 def render (r : Report) (v : Verdict) (is : List Issue) (times : List (String × Nat))
-    (setFile : String) (subjects : Array Name) : String :=
+    (setFile : String) (subjects : Array Name) (attach : List (String × String) := []) :
+    String :=
   Id.run do
     let mut out := s!"fva trust: {if v == .pass then "PASS" else "FAIL"}\n"
     for i in is do out := out ++ s!"  [{i.tag}] {clean i.detail}\n"
     out := out ++ "\nClaims\n"
     for c in r.claims do
       let prfs := c.proofs.map fun p => s!"{p.name} (axioms: {", ".intercalate p.axioms})"
-      out := out ++ s!"  {clean c.name} — about {clean (", ".intercalate c.subjects)}\n" ++
+      let how := ((attach.find? (·.1 == c.name)).map fun (_, k) => s!" ({k})").getD ""
+      out := out ++ s!"  {clean c.name} — about {clean (", ".intercalate c.subjects)}{how}\n" ++
         s!"    proved by {clean ("; ".intercalate prfs)}\n"
     unless subjects.isEmpty do
       out := out ++ "\nDeclared subjects (Lean-native implementations: judged, never reviewed)\n"
@@ -138,7 +163,8 @@ def render (r : Report) (v : Verdict) (is : List Issue) (times : List (String ×
     unless r.links.isEmpty do
       out := out ++ "\nLinks\n"
       for l in r.links do
-        out := out ++ s!"  {clean l.file}: {if l.ok then "matches" else "MISMATCH"}\n"
+        let kind := if l.kind == .blob then "blob" else "lifted"
+        out := out ++ s!"  {clean l.file} [{kind}]: {if l.ok then "matches" else "MISMATCH"}\n"
     out := out ++ s!"\nRead these: {r.surfaceLines} code lines\n"
     for m in r.reviewModules do out := out ++ s!"  {clean m.module}: {m.codeLines} lines\n"
     unless r.vocabulary.isEmpty do
@@ -215,11 +241,14 @@ def run (argv : List String) : IO UInt32 := do
                     canaries := canaryRuns, canarySet := pinned.toList.map (·.name) }
   let is := issues r
   let v := verdict r
+  let attach := attachments env r
   if o.json then
     IO.println (Json.mkObj [("verdict", toJson v), ("issues", toJson is), ("report", toJson r),
+      ("attachments", Json.mkObj (attach.map fun (c, k) => (c, toJson k))),
       ("canarySet", toJson setFile.toString), ("known", toJson knownFile.toString),
       ("boundary", toJson boundary)]).pretty
-  else IO.print (render r v is times.toList s!"{setFile}; known acceptances {knownFile}" o.subjects)
+  else IO.print (render r v is times.toList s!"{setFile}; known acceptances {knownFile}" o.subjects
+    attach)
   return if v == .pass then 0 else 1
 
 /-- `fva trust-matrix [--canary-limit S]`: every bundled kernel on every pinned canary, known-false

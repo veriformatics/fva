@@ -4,6 +4,8 @@ import FVA.Proof.Exec.Det
 import FVA.Proof.Exec.Instantiate
 import FVA.Proof.Numerics.Arith
 import FVA.Proof.Trust
+import FVA.Proof.Cert.Sort
+import FVA.Proof.Cert.Compile
 
 /-! Proofs of the self package's claims, from the unit theorems. -/
 
@@ -41,5 +43,9 @@ theorem fdivSound : FdivSound := fun _ hF _ _ h₁ h₂ =>
   FVA.Wasm.Num.fdiv_mem (sane_of_mem hF) h₁ h₂
 
 theorem verdictCorrect : VerdictCorrect := FVA.Trust.verdict_pass_iff
+
+theorem certSortSound : CertSortSound := FVA.Cert.SortedPerm.check_sound
+
+theorem certCompileSound : CertCompileSound := FVA.Cert.Compiled.check_sound
 
 end FVA.Self.Proof

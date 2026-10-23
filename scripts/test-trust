@@ -44,7 +44,9 @@ LinkExtra link,syntax
 Prelude prelude
 Override override
 OverridePartial override
-OverrideExtern override"
+OverrideExtern override
+CertEditedOut link
+CertEditedIn link"
 mapfile -t cheats < <(cut -d" " -f1 <<<"$pinned" | sort -u)
 # the cheat roots are no default target: build them by module name
 lake build fva FVA "${cheats[@]/#/FVATest.Cheats.}" >/dev/null || exit 2
@@ -61,7 +63,8 @@ if ! lake build FVATest.Trust FVATest.Explain >"$log" 2>&1; then
 fi
 subjects=()
 for m in FVA.Impl.Decode FVA.Impl.Decode.Reader FVA.Impl.Decode.Instr FVA.Impl.Decode.Module \
-	FVA.Impl.Exec.Ref FVA.Impl.Exec.Det FVA.Impl.Numerics.Float FVA.Trust.Verdict; do
+	FVA.Impl.Exec.Ref FVA.Impl.Exec.Det FVA.Impl.Numerics.Float FVA.Trust.Verdict \
+	FVA.Impl.Cert.Sort FVA.Impl.Cert.Compile; do
 	subjects+=(--subject "$m")
 done
 "$fva" trust . --spec-module FVA.Self.Spec --root-module FVA.Self "${subjects[@]}" >"$log" 2>&1
@@ -95,7 +98,11 @@ while read -r c want args; do
 	fi
 done <<<"$pinned"
 # worked examples (U8): each must PASS; `fva explain` runs `fva trust` itself, then shows the
-# saved explanation (U10: rc 0 = trust PASS + every intent check `matches` + the text current)
+# saved explanation (U10: rc 0 = trust PASS + every intent check `matches` + the text current);
+# beside them the accepted certificates (U9), one aggregate run, must PASS
+lake --wfail build FVATest.Certs FVATest.Certs.Custom.Rev >/dev/null || exit 2
+"$fva" trust . --spec-module FVATest.Certs.Spec --root-module FVATest.Certs >"$log.certs" 2>&1 &
+certs=$!
 declare -A pid
 for ex in "${examples[@]}"; do
 	"$fva" explain . --spec-module "FVATest.Examples.$ex.Spec" \
@@ -112,6 +119,28 @@ for ex in "${examples[@]}"; do
 	fi
 	rm -f "$log.$ex"
 done
+wait "$certs"
+rc=$?
+if ((rc != 0)) || ! grep -q '^fva trust: PASS' "$log.certs"; then
+	echo "test-trust: accepted certificates → rc $rc"
+	grep '^  \[' "$log.certs" | head -5
+	fail=1
+fi
+# a certificate without a valid proof fails its build at the kernel check
+for n in NaiveR Dup Unsorted JsRound Trailing Tampered UnusedInvalid; do
+	if lake build "FVATest.Certs.Neg.$n" >"$log" 2>&1 || ! grep -q 'declaration type mismatch' "$log"; then
+		echo "test-trust: certificate Neg.$n built, or failed for another reason"
+		fail=1
+	fi
+done
+# a project relation is read in the project's review surface (10 lines with its spec: budget 5)
+"$fva" trust . --spec-module FVATest.Certs.Custom.Rev.Spec --root-module FVATest.Certs.Custom.Rev \
+	--surface-budget 5 >"$log" 2>&1
+if ! grep -q '^  \[surface\] .* code lines to review, budget 5' "$log" ||
+	! grep -q 'FVATest.Certs.Custom.Rel' "$log"; then
+	echo "test-trust: project relation outside the surface or budget not enforced"
+	fail=1
+fi
 # a relative project directory, from its parent: trust-run works inside the project
 here=$(basename "$PWD")
 rc=$(

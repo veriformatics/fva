@@ -6,6 +6,8 @@ import FVA.Impl.Decode
 import FVA.Impl.Exec.Det
 import FVA.Impl.Numerics.Float
 import FVA.Trust.Verdict
+import FVA.Impl.Cert.Sort
+import FVA.Impl.Cert.Compile
 
 /-!
 # FVA's guarantees about itself (the self package's claims)
@@ -64,5 +66,15 @@ def FdivSound : Prop :=
 /-- The trust verdict passes exactly when the reviewed verdict spec holds. -/
 def VerdictCorrect : Prop :=
   ∀ r : FVA.Trust.Report, FVA.Trust.verdict r = .pass ↔ FVA.Trust.Pass r
+
+/-- The sorted-integers certificate checker accepts only outputs in relation `SortedPerm`. -/
+def CertSortSound : Prop :=
+  ∀ i o : FVA.Cert.Blob, FVA.Cert.SortedPerm.check i o = true →
+    FVA.Cert.Accepted FVA.Cert.SortedPerm i o
+
+/-- The toy compiler's certificate checker accepts only outputs in relation `Compiled`. -/
+def CertCompileSound : Prop :=
+  ∀ i o : FVA.Cert.Blob, FVA.Cert.Compiled.check i o = true →
+    FVA.Cert.Accepted FVA.Cert.Compiled i o
 
 end FVA.Self
