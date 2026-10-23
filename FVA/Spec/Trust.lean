@@ -69,20 +69,30 @@ structure Term where
   doc : String
 deriving Repr, Inhabited
 
-/-- One lifted module and the artifact it claims to be. -/
+/-- What a link binds: a WebAssembly artifact the claims are about (`fva lift`), or a file a
+certificate accepts as its input or output (`fva blob`). -/
+inductive LinkKind where
+  | wasm | blob
+deriving Repr, DecidableEq, Inhabited
+
+/-- One generated module and the file it claims to hold. -/
 structure Link where
-  /-- The `Lifted.lean` file. -/
+  /-- The generated module, with the file it names. -/
   file : String
-  /-- The `.wasm` file exists. -/
-  wasmPresent : Bool
+  /-- A lifted artifact or a certificate blob. -/
+  kind : LinkKind
+  /-- The file exists inside the project. -/
+  present : Bool
   /-- The `bytes` numeral packs exactly the file's bytes. -/
   bytesMatch : Bool
   /-- `len` = the file's size. -/
   lenMatch : Bool
-  /-- `decode_eq : decode bytes len = .ok module` exists with exactly that type. -/
+  /-- For a lifted module: `decode_eq : decode bytes len = .ok module` exists with exactly that
+  type (a blob has none). -/
   decodeEq : Bool
-  /-- The file is exactly `fva lift`'s output for the `.wasm` (no added declaration or syntax). -/
-  relifts : Bool
+  /-- The module is exactly its generator's output for the file (no added declaration or
+  syntax). -/
+  regenerates : Bool
 deriving Repr, Inhabited
 
 /-- What a kernel said about an export. -/
@@ -129,9 +139,9 @@ structure Report where
   vocabulary : List Term
   /-- `[prelude]` violations: fixed-bundle constants outside the sysroot, modules without `Init`. -/
   prelude : List String
-  /-- The project's subjects are lifted artifacts (Lean-native subjects need no link). -/
+  /-- The project's subjects are generated modules (Lean-native subjects need no link). -/
   needsLink : Bool
-  /-- Its lifted modules. -/
+  /-- Its generated modules (lifted artifacts and certificate blobs). -/
   links : List Link
   /-- The export of claims, proofs and the fixed bundle succeeded. -/
   exportOk : Bool
@@ -163,8 +173,8 @@ structure Pass (r : Report) : Prop where
   syntax_ : (∀ m ∈ r.reviewModules, m.syntaxExts = []) ∧ r.subjectSyntax = []
   prelude : r.prelude = []
   link : (r.needsLink = true → r.links ≠ []) ∧
-    ∀ l ∈ r.links, l.wasmPresent = true ∧ l.bytesMatch = true ∧ l.lenMatch = true ∧
-      l.decodeEq = true ∧ l.relifts = true
+    ∀ l ∈ r.links, l.present = true ∧ l.bytesMatch = true ∧ l.lenMatch = true ∧
+      (l.kind = .wasm → l.decodeEq = true) ∧ l.regenerates = true
   replay : r.exportOk = true ∧ (∀ k ∈ r.replay, ¬ k.status.Bad) ∧
     ∃ k ∈ r.replay, k.status = .accept ∧ k.lineage ≠ "lean"
   checker : r.canarySet ≠ [] ∧

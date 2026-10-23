@@ -72,6 +72,13 @@ theorem vals_ne_trap (vs : List Val) : vals vs ≠ [.trap] := by
     rw [toVal_instr, toVal_trap] at hv
     cases hv
 
+/-- `Must` is monotone in its postcondition. -/
+theorem Must.mono {H : HostSem} {Q Q' : Outcome → Prop} {c : Config} (h : Must H Q c)
+    (hq : ∀ o, Q o → Q' o) : Must H Q' c := by
+  induction h with
+  | done hf hq' => exact .done hf (hq _ hq')
+  | next hs _ ih => exact .next hs ih
+
 /-- A deterministic run that ends returning `vs` in store `s'` proves the call returns: the shape
 `CallReturns` asks of the invoke configuration. -/
 theorem must_returned_of_runDet {H : HostSem} {P : Store → List Val → Prop} {n : Nat}

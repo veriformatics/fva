@@ -4,6 +4,7 @@ import FVA.Tool.Lift
 import FVA.Tool.Difftest
 import FVA.Tool.Trust
 import FVA.Tool.Explain
+import FVA.Tool.Certify
 
 /-- CLI entry point. -/
 def main (args : List String) : IO UInt32 := do
@@ -29,6 +30,14 @@ def main (args : List String) : IO UInt32 := do
     | .error e =>
       IO.eprintln s!"fva lift: {repr e}"
       return 1
+  | ["blob", path, out, "--ns", ns] =>
+    let rel : System.FilePath := path
+    if rel.isAbsolute || rel.components.contains ".." then
+      IO.eprintln "fva blob: give the file's path relative to the project root, without `..`"
+      return 2
+    IO.FS.writeFile out (FVA.Tool.Blob.file ns (← IO.FS.readBinFile path) path)
+    return 0
+  | "certify" :: rest => FVA.Tool.Certify.main rest
   | "difftest" :: rest => FVA.Tool.Difftest.main rest
   | "trust" :: rest => FVA.Tool.Trust.main rest
   | "trust-run" :: rest => FVA.Tool.Trust.run rest

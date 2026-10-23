@@ -39,11 +39,11 @@ open FVA.Trust Lean
 
 #guard [Status.accept, .reject, .decline, .crash, .timeout].map Status.name ==
   ["accepted", "rejected", "declined", "crashed", "timed out"]
-#guard Link.problems ⟨"L.lean", true, true, true, true, true⟩ == []
-#guard Link.problems ⟨"L.lean", false, false, false, false, false⟩ ==
-  ["the .wasm is missing or outside the project", "`bytes` is not the file's bytes",
+#guard Link.problems ⟨"L.lean", .wasm, true, true, true, true, true⟩ == []
+#guard Link.problems ⟨"L.lean", .wasm, false, false, false, false, false⟩ ==
+  ["the file is missing or outside the project", "`bytes` is not the file's bytes",
    "`len` is not the file's size", "`decode_eq` is missing or mistyped",
-   "the file is not `fva lift`'s output for the .wasm"]
+   "the module is not its generator's output for the file"]
 #guard (ruleChecker { (default : Report) with
     canarySet := ["a", "b", "c"], replay := [⟨"k", "lean", .accept⟩],
     canaries := [⟨"k", "a", .reject, false⟩] }).map (·.detail) ==
@@ -52,6 +52,17 @@ open FVA.Trust Lean
 #guard (ruleAxiom { (default : Report) with
     claims := [⟨"c", false, [⟨"p", ["propext", "Classical.choice", "Quot.sound", "sorryAx"]⟩],
       ["S"]⟩] }).map (·.detail) == ["p (proof of c) depends on sorryAx"]
+
+/-! ## Link kinds (U9): a blob has no `decode_eq`; every other part counts as for a lifted module -/
+
+#guard Link.problems ⟨"B.lean", .blob, true, true, true, false, true⟩ == []
+#guard Link.problems ⟨"B.lean", .blob, false, false, false, false, false⟩ ==
+  ["the file is missing or outside the project", "`bytes` is not the file's bytes",
+   "`len` is not the file's size", "the module is not its generator's output for the file"]
+#guard (⟨"B.lean", .blob, true, true, true, false, true⟩ : Link).ok
+#guard !(⟨"L.lean", .wasm, true, true, true, false, true⟩ : Link).ok
+#guard Link.problems ⟨"L.lean", .wasm, true, true, true, false, true⟩ ==
+  ["`decode_eq` is missing or mistyped"]
 
 /-- Write a Lake manifest pinning `pkgs` (name, url, rev) under packages directory `dir`. -/
 def writeManifest (root : System.FilePath) (dir : String)
