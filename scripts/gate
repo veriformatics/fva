@@ -41,6 +41,8 @@ lean_lane() {
 	run lint lake --wfail lint
 	# fva trust: self package + cheat suite (≈ 5 min, kernel replay dominated): full gate only
 	if ((! fast)); then run trust scripts/test-trust; fi
+	# fva init end to end (a consumer project + its trust run): full gate only
+	if ((! fast)); then run init scripts/test-init; fi
 	if ((fast)); then run mutation scripts/test-mutation --fast; else run mutation scripts/test-mutation; fi
 	wait
 }
@@ -50,6 +52,7 @@ run shellcheck shellcheck -x "${shells[@]}" &
 run shfmt shfmt -d "${shells[@]}" &
 run spec-lint .agent/spec-lint &
 run pins scripts/check-pins &
+run base-manifest scripts/make-base-manifest --check &
 if ((${#workflows[@]})); then
 	run actionlint actionlint "${workflows[@]}" &
 	run zizmor zizmor --offline "${workflows[@]}" &

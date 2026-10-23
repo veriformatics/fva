@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# `fva init` end to end (U11, full gate): a project made by `fva init --wasm` with the toy
+# example's claims and proofs builds and passes `fva trust` (this binary, from outside the
+# project) with a 14-line surface: the vendored FVA counts as base by content; the same project
+# with one vendored spec file edited reviews that file. The project reuses this checkout's
+# Mathlib (symlink) and FVA build (copy), so nothing is fetched or rebuilt.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+fva=$PWD/.lake/build/bin/fva
+[[ -x $fva ]] || exit 2
+tmp=$(mktemp -d "$PWD/.lake/test-init.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
+p=$tmp/demo
+"$fva" init "$p" --lib Demo --wasm FVATest/Examples/Toy/toy.wasm >/dev/null || exit 2
+ex=FVATest/Examples/Toy
+sed 's/FVATest.Examples.Toy.Lifted/Demo.Lifted/; s/Examples.Toy/Demo/' "$ex/Spec.lean" \
+	>"$p/Demo/Spec.lean"
+sed 's/FVATest.Examples.Toy.Spec/Demo.Spec/; s/Examples.Toy/Demo/' "$ex/Proof.lean" \
+	>"$p/Demo/Proof.lean"
+mkdir -p "$p/.lake" "$p/fva/.lake"
+ln -s "$PWD/.lake/packages" "$p/.lake/packages"
+cp -a .lake/build "$p/fva/.lake/build"
+(cd "$p" && lake build >"$tmp/build.log" 2>&1) || {
+	echo "test-init: the project does not build"
+	tail -5 "$tmp/build.log"
+	exit 1
+}
+fail=0
+trust() { (cd "$p" && "$fva" trust . --spec-module Demo.Spec --root-module Demo) >"$tmp/$1" 2>&1; }
+trust plain.out
+if ! grep -q '^fva trust: PASS' "$tmp/plain.out" ||
+	! grep -q '^Read these: 14 code lines' "$tmp/plain.out"; then
+	echo "test-init: fresh project → $(head -1 "$tmp/plain.out"), surface $(grep '^Read these' "$tmp/plain.out")"
+	fail=1
+fi
+echo '-- edited after vendoring' >>"$p/fva/FVA/Spec/CAbi.lean"
+(cd "$p" && lake build >"$tmp/build2.log" 2>&1) || exit 2
+trust edited.out
+if ! grep -q '^  FVA.Spec.CAbi: [0-9]* lines' "$tmp/edited.out"; then
+	echo "test-init: an edited vendored spec file stayed out of the review surface"
+	fail=1
+fi
+echo "test-init: fresh project PASS, 14-line surface; edited vendored spec reviewed"
+exit "$fail"
