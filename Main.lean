@@ -3,6 +3,7 @@ import FVA.Tool.Decode
 import FVA.Tool.Lift
 import FVA.Tool.Difftest
 import FVA.Tool.Trust
+import FVA.Tool.Explain
 
 /-- CLI entry point. -/
 def main (args : List String) : IO UInt32 := do
@@ -32,6 +33,7 @@ def main (args : List String) : IO UInt32 := do
   | "trust" :: rest => FVA.Tool.Trust.main rest
   | "trust-run" :: rest => FVA.Tool.Trust.run rest
   | "trust-matrix" :: rest => FVA.Tool.Trust.matrix rest
+  | "explain" :: rest => FVA.Tool.Explain.main rest
   | _ =>
     let o := FVA.Cli.dispatch args
     IO.print o.out

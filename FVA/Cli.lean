@@ -25,7 +25,9 @@ def helpText : String :=
   "  lift      Write a Lean module that holds a .wasm file and its decoded syntax.\n" ++
   "  difftest  Compare the Lean semantics with wasmtime on the exported functions of .wasm\n" ++
   "            files.\n" ++
-  "  trust     Check that a project's claims are proven, about the artifact, with a small spec.\n"
+  "  trust     Check that a project's claims are proven, about the artifact, with a small\n" ++
+  "            spec.\n" ++
+  "  explain   Explain a project's claims in plain English and compare them with their intent.\n"
 
 /-- Map command-line arguments to an outcome. -/
 def dispatch : List String → Outcome
