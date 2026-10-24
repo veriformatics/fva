@@ -4,10 +4,12 @@
 # matrix (every op on every pair of 46 representatives per width: each spec bullet hit) +
 # fixed-seed, boundary-biased random operands: --fast 2,000 per binary op / 500 per other op;
 # default (full gate, CI) 100,000 / 10,000. The assertion count is pinned per size.
+# Exit status (U12 K4): 0 pass, 1 assertion failure, 2 setup/infrastructure, 3 the program
+# under test crashed (signal).
 set -uo pipefail
-cd "$(dirname "$0")/.." || exit 1
+cd "$(dirname "$0")/.." || exit 2
 export PATH="$PWD/.tools/bin:$PATH"
-lake build fvatest >/dev/null || exit 1
+lake build fvatest >/dev/null || exit 2
 if [[ ${1:-} == --fast ]]; then
 	nbin=2000 nother=500 want=105832
 else
@@ -15,17 +17,23 @@ else
 fi
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-.lake/build/bin/fvatest floatdiff "$work" 42 "$nbin" "$nother" >/dev/null || exit 1
+.lake/build/bin/fvatest floatdiff "$work" 42 "$nbin" "$nother" >/dev/null
+rc=$?
+((rc < 128)) || exit 3
+((rc == 0)) || exit 1
 n=$(cat "$work"/f32.wast "$work"/f64.wast | grep -c '^(assert_')
 if [[ $n != "$want" ]]; then
 	echo "test-floatdiff: $n assertions, pinned $want"
 	exit 1
 fi
 for w in f32 f64; do
-	if ! wasmtime wast "$work/$w.wast" >"$work/$w.out" 2>&1; then
-		echo "test-floatdiff: $w.wast failed"
+	wasmtime wast "$work/$w.wast" >"$work/$w.out" 2>&1
+	rc=$?
+	if ((rc != 0)); then
+		echo "test-floatdiff: $w.wast failed (wasmtime rc $rc)"
 		head -12 "$work/$w.out"
-		exit 1
+		((rc == 1)) && exit 1
+		exit 2
 	fi
 done
 echo "test-floatdiff: $n assertions pass (seed 42)"

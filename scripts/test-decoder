@@ -10,11 +10,13 @@
 # `funcref (ref.func N)…` vs `func N…`.
 # E5 = `fva lift` is deterministic and its `decode_eq` kernel-checks (lz4-wasm codec); the same file
 #      with `len` + 1 or one byte changed must fail the kernel check (the link binds both).
+# Exit status (U12 K4): 0 pass, 1 assertion failure, 2 setup/infrastructure, 3 the program
+# under test crashed (signal).
 set -uo pipefail
-cd "$(dirname "$0")/.." || exit 1
+cd "$(dirname "$0")/.." || exit 2
 export PATH="$PWD/.tools/bin:$PATH"
-scripts/fetch-corpus || exit 1
-lake build fva fvatest >/dev/null || exit 1
+scripts/fetch-corpus || exit 2
+lake build fva fvatest >/dev/null || exit 2
 fva=.lake/build/bin/fva enc=.lake/build/bin/fvatest corpus=.cache/corpus
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -28,7 +30,7 @@ for n in $decoder_scripts; do
 	mkdir -p "$work/$n"
 	wasm-tools json-from-wast "$w" -o "$work/$n/$n.json" --wasm-dir "$work/$n/" 2>/dev/null || {
 		echo "test-decoder: json-from-wast failed on $n"
-		exit 1
+		exit 2
 	}
 done
 
@@ -37,7 +39,14 @@ jq -r --arg d "$work" 'input_filename as $f | .commands[]
 	| select((.type == "assert_malformed" or .type == "module") and (.module_type // "binary") == "binary")
 	| [.type, ($f | sub("/[^/]*$"; "")) + "/" + .filename] | @tsv' "$work"/*/*.json >"$work/cases.tsv"
 mapfile -t files < <(cut -f2 "$work/cases.tsv")
-"$fva" decode "${files[@]}" /dev/null >"$work/decoded.txt" 2>&1
+# A program under test killed by a signal makes no verdict.
+sut() {
+	"$@"
+	local rc=$?
+	((rc < 128)) || exit 3
+	return "$rc"
+}
+sut "$fva" decode "${files[@]}" /dev/null >"$work/decoded.txt" 2>&1
 
 bad=0 malformed=0 valid=0
 declare -A result
@@ -66,8 +75,9 @@ norm() {
 }
 same=0
 for f in "${valid_files[@]}" "$corpus/lz4-wasm-block-codec.wasm" "$corpus/edgeR.so"; do
-	if wasm-tools strip --all "$f" -o "$work/a.wasm" && "$enc" reencode "$f" "$work/b.wasm" &&
-		wasm-tools print "$work/a.wasm" | norm >"$work/a.wat" &&
+	wasm-tools strip --all "$f" -o "$work/a.wasm" && wasm-tools print "$work/a.wasm" | norm >"$work/a.wat" ||
+		exit 2
+	if sut "$enc" reencode "$f" "$work/b.wasm" &&
 		wasm-tools print "$work/b.wasm" | norm >"$work/b.wat" && cmp -s "$work/a.wat" "$work/b.wat"; then
 		same=$((same + 1))
 	else
@@ -80,12 +90,12 @@ echo "E2 round trips equal: $same (pinned 188)"
 ((same == 188)) || bad=1
 
 codec=$corpus/lz4-wasm-block-codec.wasm
-"$fva" lift "$codec" "$work/L1.lean" --ns L && "$fva" lift "$codec" "$work/L2.lean" --ns L || bad=1
+sut "$fva" lift "$codec" "$work/L1.lean" --ns L && sut "$fva" lift "$codec" "$work/L2.lean" --ns L || bad=1
 cmp -s "$work/L1.lean" "$work/L2.lean" || {
 	echo "E5 FAIL lift not deterministic"
 	bad=1
 }
-check() { lake env lean "$1" >"$work/check.out" 2>&1; }
+check() { sut lake env lean "$1" >"$work/check.out" 2>&1; }
 check "$work/L1.lean" || {
 	echo "E5 FAIL decode_eq rejected"
 	head -5 "$work/check.out"

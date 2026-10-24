@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Planted-bad inputs for the purpose-built checks (check-format, check-pins): each must fail.
+# Planted-bad inputs for the purpose-built checks (check-format, check-pins, the mutation check via
+# scripts/test-mutation-fixture): each must fail.
 # Runs on a throwaway copy so the working tree is never touched.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
@@ -35,4 +36,5 @@ if ! (cd "$d" && scripts/check-format && scripts/check-pins) >/dev/null; then
 	echo "test-checks: clean copy failed"
 	fail=1
 fi
+scripts/test-mutation-fixture || fail=1
 exit "$fail"

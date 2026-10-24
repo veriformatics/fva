@@ -1,0 +1,158 @@
+Fix/Ops.lean:Fix.Ops.ror:ROR:0	line 7	< → ≤
+Fix/Ops.lean:Fix.Ops.ror:LCR:0	line 7	&& → ||
+Fix/Ops.lean:Fix.Ops.ror:ROR:1	line 7	≤ → <
+Fix/Ops.lean:Fix.Ops.ror:LCR:1	line 7	&& → ||
+Fix/Ops.lean:Fix.Ops.ror:ROR:2	line 7	> → ≥
+Fix/Ops.lean:Fix.Ops.ror:LCR:2	line 7	&& → ||
+Fix/Ops.lean:Fix.Ops.ror:ROR:3	line 7	≥ → >
+Fix/Ops.lean:Fix.Ops.ror:LCR:3	line 7	&& → ||
+Fix/Ops.lean:Fix.Ops.ror:ROR:4	line 7	Nat.blt → Nat.ble
+Fix/Ops.lean:Fix.Ops.ror:LCR:4	line 7	&& → ||
+Fix/Ops.lean:Fix.Ops.ror:ROR:5	line 8	Nat.ble → Nat.blt
+Fix/Ops.lean:Fix.Ops.ror:LCR:5	line 8	&& → ||
+Fix/Ops.lean:Fix.Ops.ror:ROR:6	line 8	Nat.beq → Nat.blt
+Fix/Ops.lean:Fix.Ops.eqn:EQN:0	line 10	== → !=
+Fix/Ops.lean:Fix.Ops.eqn:LCR:0	line 10	|| → &&
+Fix/Ops.lean:Fix.Ops.eqn:EQN:1	line 10	!= → ==
+Fix/Ops.lean:Fix.Ops.eqn:LCR:1	line 10	&& → ||
+Fix/Ops.lean:Fix.Ops.eqn:EQN:2	line 10	= → ≠
+Fix/Ops.lean:Fix.Ops.eqn:LCR:2	line 10	&& → ||
+Fix/Ops.lean:Fix.Ops.eqn:EQN:3	line 10	≠ → =
+Fix/Ops.lean:Fix.Ops.lcr:LCR:0	line 12	&& → ||
+Fix/Ops.lean:Fix.Ops.lcr:LCR:1	line 12	|| → &&
+Fix/Ops.lean:Fix.Ops.lcr:BOOL:0	line 12	!p → p
+Fix/Ops.lean:Fix.Ops.lcr:LCR:2	line 12	&& → ||
+Fix/Ops.lean:Fix.Ops.lcr:EQN:0	line 12	= → ≠
+Fix/Ops.lean:Fix.Ops.lcr:LCR:3	line 12	∧ → ∨
+Fix/Ops.lean:Fix.Ops.lcr:EQN:1	line 12	= → ≠
+Fix/Ops.lean:Fix.Ops.lcr:BOOL:1	line 12	true → false
+Fix/Ops.lean:Fix.Ops.lcr:LCR:4	line 12	∨ → ∧
+Fix/Ops.lean:Fix.Ops.lcr:EQN:2	line 12	= → ≠
+Fix/Ops.lean:Fix.Ops.lcr:BOOL:2	line 12	false → true
+Fix/Ops.lean:Fix.Ops.aor:AOR:0	line 15	+ → -
+Fix/Ops.lean:Fix.Ops.aor:AOR:1	line 15	- → +
+Fix/Ops.lean:Fix.Ops.aor:AOR:2	line 15	* → /
+Fix/Ops.lean:Fix.Ops.aor:AOR:3	line 15	/ → *
+Fix/Ops.lean:Fix.Ops.aor:AOR:4	line 15	% → /
+Fix/Ops.lean:Fix.Ops.aor:LIT:0	line 15	3 → 4
+Fix/Ops.lean:Fix.Ops.aor:AOR:5	line 15	+ → -
+Fix/Ops.lean:Fix.Ops.aor:AOR:6	line 15	Nat.add → Nat.sub
+Fix/Ops.lean:Fix.Ops.aor:AOR:7	line 15	+ → -
+Fix/Ops.lean:Fix.Ops.aor:AOR:8	line 15	Nat.sub → Nat.add
+Fix/Ops.lean:Fix.Ops.aor:AOR:9	line 15	+ → -
+Fix/Ops.lean:Fix.Ops.aor:AOR:10	line 15	Nat.mul → Nat.div
+Fix/Ops.lean:Fix.Ops.aor:AOR:11	line 15	+ → -
+Fix/Ops.lean:Fix.Ops.aor:AOR:12	line 15	Nat.div → Nat.mul
+Fix/Ops.lean:Fix.Ops.aor:AOR:13	line 15	+ → -
+Fix/Ops.lean:Fix.Ops.aor:AOR:14	line 16	Nat.mod → Nat.div
+Fix/Ops.lean:Fix.Ops.aor:AOR:15	line 16	+ → -
+Fix/Ops.lean:Fix.Ops.aor:AOR:16	line 16	min → max
+Fix/Ops.lean:Fix.Ops.aor:AOR:17	line 16	+ → -
+Fix/Ops.lean:Fix.Ops.aor:AOR:18	line 16	max → min
+Fix/Ops.lean:Fix.Ops.idiv:AOR:0	line 18	x.tdiv → x.fdiv
+Fix/Ops.lean:Fix.Ops.idiv:AOR:1	line 18	+ → -
+Fix/Ops.lean:Fix.Ops.idiv:AOR:2	line 18	Int.fdiv → Int.tdiv
+Fix/Ops.lean:Fix.Ops.idiv:AOR:3	line 18	+ → -
+Fix/Ops.lean:Fix.Ops.idiv:AOR:4	line 18	x.tmod → x.fmod
+Fix/Ops.lean:Fix.Ops.idiv:AOR:5	line 18	+ → -
+Fix/Ops.lean:Fix.Ops.idiv:AOR:6	line 18	Int.fmod → Int.tmod
+Fix/Ops.lean:Fix.Ops.idiv:AOR:7	line 18	+ → -
+Fix/Ops.lean:Fix.Ops.idiv:AOR:8	line 18	x.ediv → x.tdiv
+Fix/Ops.lean:Fix.Ops.idiv:AOR:9	line 18	+ → -
+Fix/Ops.lean:Fix.Ops.idiv:AOR:10	line 19	x.emod → x.tmod
+Fix/Ops.lean:Fix.Ops.idiv:AOR:11	line 19	+ → -
+Fix/Ops.lean:Fix.Ops.idiv:AOR:12	line 19	+ → -
+Fix/Ops.lean:Fix.Ops.idiv:AOR:13	line 19	tdiv → fdiv
+Fix/Ops.lean:Fix.Ops.bit:BIT:0	line 22	&&& → |||
+Fix/Ops.lean:Fix.Ops.bit:BIT:1	line 22	||| → &&&
+Fix/Ops.lean:Fix.Ops.bit:BIT:2	line 22	^^^ → |||
+Fix/Ops.lean:Fix.Ops.bit:BIT:3	line 22	||| → &&&
+Fix/Ops.lean:Fix.Ops.bit:BIT:4	line 22	<<< → >>>
+Fix/Ops.lean:Fix.Ops.bit:LIT:0	line 22	1 → 0
+Fix/Ops.lean:Fix.Ops.bit:LIT:1	line 22	1 → 2
+Fix/Ops.lean:Fix.Ops.bit:BIT:5	line 22	||| → &&&
+Fix/Ops.lean:Fix.Ops.bit:BIT:6	line 22	>>> → <<<
+Fix/Ops.lean:Fix.Ops.bit:LIT:2	line 22	1 → 0
+Fix/Ops.lean:Fix.Ops.bit:LIT:3	line 22	1 → 2
+Fix/Ops.lean:Fix.Ops.bit:BIT:7	line 22	||| → &&&
+Fix/Ops.lean:Fix.Ops.bit:BIT:8	line 22	Nat.land → Nat.lor
+Fix/Ops.lean:Fix.Ops.bit:BIT:9	line 22	||| → &&&
+Fix/Ops.lean:Fix.Ops.bit:BIT:10	line 22	Nat.lor → Nat.land
+Fix/Ops.lean:Fix.Ops.bit:BIT:11	line 22	||| → &&&
+Fix/Ops.lean:Fix.Ops.bit:BIT:12	line 23	Nat.xor → Nat.lor
+Fix/Ops.lean:Fix.Ops.bit:BIT:13	line 23	||| → &&&
+Fix/Ops.lean:Fix.Ops.bit:BIT:14	line 23	Nat.shiftLeft → Nat.shiftRight
+Fix/Ops.lean:Fix.Ops.bit:LIT:4	line 23	1 → 0
+Fix/Ops.lean:Fix.Ops.bit:LIT:5	line 23	1 → 2
+Fix/Ops.lean:Fix.Ops.bit:BIT:15	line 23	||| → &&&
+Fix/Ops.lean:Fix.Ops.bit:BIT:16	line 23	Nat.shiftRight → Nat.shiftLeft
+Fix/Ops.lean:Fix.Ops.bit:LIT:6	line 23	1 → 0
+Fix/Ops.lean:Fix.Ops.bit:LIT:7	line 23	1 → 2
+Fix/Ops.lean:Fix.Ops.lit:LIT:0	line 25	0 → 1
+Fix/Ops.lean:Fix.Ops.lit:AOR:0	line 25	+ → -
+Fix/Ops.lean:Fix.Ops.lit:LIT:1	line 25	1 → 0
+Fix/Ops.lean:Fix.Ops.lit:LIT:2	line 25	1 → 2
+Fix/Ops.lean:Fix.Ops.lit:AOR:1	line 25	+ → -
+Fix/Ops.lean:Fix.Ops.lit:LIT:3	line 25	0x1f → 0x20
+Fix/Ops.lean:Fix.Ops.lit:AOR:2	line 25	+ → -
+Fix/Ops.lean:Fix.Ops.lit:LIT:4	line 25	0b10 → 0b11
+Fix/Ops.lean:Fix.Ops.lit:AOR:3	line 25	+ → -
+Fix/Ops.lean:Fix.Ops.lit:LIT:5	line 25	0o7 → 0o10
+Fix/Ops.lean:Fix.Ops.lit:AOR:4	line 25	+ → -
+Fix/Ops.lean:Fix.Ops.lit:LIT:6	line 25	41 → 42
+Fix/Ops.lean:Fix.Ops.gib:GIB:0	line 28	n else 0 → 0 else n
+Fix/Ops.lean:Fix.Ops.gib:LIT:0	line 28	0 → 1
+Fix/Ops.lean:Fix.Ops.gib:AOR:0	line 28	+ → -
+Fix/Ops.lean:Fix.Ops.gib:GIB:1	line 28	1 else 2 → 2 else 1
+Fix/Ops.lean:Fix.Ops.gib:LIT:1	line 28	1 → 0
+Fix/Ops.lean:Fix.Ops.gib:LIT:2	line 28	1 → 2
+Fix/Ops.lean:Fix.Ops.gib:LIT:3	line 28	2 → 3
+Fix/Ops.lean:Fix.Ops.gib:AOR:1	line 28	+ → -
+Fix/Ops.lean:Fix.Ops.gib:EQN:0	line 28	= → ≠
+Fix/Ops.lean:Fix.Ops.gib:LIT:4	line 28	0 → 1
+Fix/Ops.lean:Fix.Ops.gib:GIB:2	line 28	3 else 4 → 4 else 3
+Fix/Ops.lean:Fix.Ops.gib:LIT:5	line 28	3 → 4
+Fix/Ops.lean:Fix.Ops.gib:LIT:6	line 28	4 → 5
+Fix/Ops.lean:Fix.Ops.gme:LIT:0	line 31	10 → 11
+Fix/Ops.lean:Fix.Ops.gme:GME:0	line 32	11 → 10
+Fix/Ops.lean:Fix.Ops.gme:LIT:1	line 32	11 → 12
+Fix/Ops.lean:Fix.Ops.gme:GME:1	line 33	12 → 11
+Fix/Ops.lean:Fix.Ops.gme:LIT:2	line 33	12 → 13
+Fix/Ops.lean:Fix.Ops.lst:LST:0	line 35	(1 :: xs) ++ [2, 3] → (1 :: xs)
+Fix/Ops.lean:Fix.Ops.lst:LST:1	line 35	(1 :: xs) ++ [2, 3] ++ xs.reverse → (1 :: xs) ++ [2, 3]
+Fix/Ops.lean:Fix.Ops.lst:LST:2	line 35	(1 :: xs) ++ [2, 3] ++ xs.reverse ++ List.reverse xs → (1 :: xs) ++ [2, 3] ++ xs.reverse
+Fix/Ops.lean:Fix.Ops.lst:LST:3	line 35	(1 :: xs) ++ [2, 3] ++ xs.reverse ++ List.reverse xs → List.reverse xs
+Fix/Ops.lean:Fix.Ops.lst:LST:4	line 35	(1 :: xs) ++ [2, 3] ++ xs.reverse ++ List.reverse xs → List.reverse xs ++ (1 :: xs) ++ [2, 3] ++ xs.reverse
+Fix/Ops.lean:Fix.Ops.lst:LST:5	line 35	(1 :: xs) ++ [2, 3] → [2, 3]
+Fix/Ops.lean:Fix.Ops.lst:LST:6	line 35	(1 :: xs) ++ [2, 3] → [2, 3] ++ (1 :: xs)
+Fix/Ops.lean:Fix.Ops.lst:LST:7	line 35	(1 :: xs) ++ [2, 3] ++ xs.reverse → xs.reverse
+Fix/Ops.lean:Fix.Ops.lst:LST:8	line 35	(1 :: xs) ++ [2, 3] ++ xs.reverse → xs.reverse ++ (1 :: xs) ++ [2, 3]
+Fix/Ops.lean:Fix.Ops.lst:LIT:0	line 35	1 → 0
+Fix/Ops.lean:Fix.Ops.lst:LIT:1	line 35	1 → 2
+Fix/Ops.lean:Fix.Ops.lst:LST:9	line 35	1 :: xs → xs
+Fix/Ops.lean:Fix.Ops.lst:LST:10	line 35	[2, 3] → []
+Fix/Ops.lean:Fix.Ops.lst:LIT:2	line 35	2 → 3
+Fix/Ops.lean:Fix.Ops.lst:LIT:3	line 35	3 → 4
+Fix/Ops.lean:Fix.Ops.lst:LST:11	line 35	xs.reverse → xs
+Fix/Ops.lean:Fix.Ops.lst:LST:12	line 35	List.reverse xs → xs
+Fix/Ops.lean:Fix.Ops.opt:EQN:0	line 37	= → ≠
+Fix/Ops.lean:Fix.Ops.opt:LIT:0	line 37	0 → 1
+Fix/Ops.lean:Fix.Ops.opt:GIB:0	line 37	some n else Option.some 1 → Option.some 1 else some n
+Fix/Ops.lean:Fix.Ops.opt:OPT:0	line 37	some n → none
+Fix/Ops.lean:Fix.Ops.opt:OPT:1	line 37	Option.some 1 → none
+Fix/Ops.lean:Fix.Ops.opt:LIT:1	line 37	1 → 0
+Fix/Ops.lean:Fix.Ops.opt:LIT:2	line 37	1 → 2
+Fix/Ops.lean:Fix.Ops.neg:NEG:0	line 39	-i → i
+Fix/Ops.lean:Fix.Ops.neg:AOR:0	line 39	+ → -
+Fix/Ops.lean:Fix.Ops.neg:NEG:1	line 39	-(i + 1) → (i + 1)
+Fix/Ops.lean:Fix.Ops.neg:AOR:1	line 39	+ → -
+Fix/Ops.lean:Fix.Ops.neg:LIT:0	line 39	1 → 0
+Fix/Ops.lean:Fix.Ops.neg:LIT:1	line 39	1 → 2
+Fix/Ops.lean:Fix.Ops.excl:AOR:0	line 45	+ → -
+Fix/Ops.lean:Fix.Ops.excl:AOR:1	line 45	+ → -
+Fix/Ops.lean:Fix.Ops.excl:GME:0	line 48	(0 : Nat) → (k : Nat) + ("5 + 6".length : Nat) +\n      (⟨k, by have : k < k + 1 + 1 := by omega\n              exact this⟩ : Fin (k + 2)).val
+Fix/Ops.lean:Fix.Ops.excl:LIT:0	line 48	0 → 1
+Fix/Ops.lean:Fix.Ops.uni:AOR:0	line 53	+ → -
+Fix/Ops.lean:Fix.Ops.uni:LIT:0	line 53	1 → 0
+Fix/Ops.lean:Fix.Ops.uni:LIT:1	line 53	1 → 2
+fvamut: 157 mutants

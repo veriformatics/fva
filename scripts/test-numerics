@@ -3,11 +3,13 @@
 # FVATest/Numeric.lean against the reviewed integer spec (executable) and the verified float
 # implementation (straight-line exports only; others are counted as skipped). Pass/fail/skip
 # counts are pinned per script, so a shrinking or failing run fails the gate.
+# Exit status (U12 K4): 0 pass, 1 assertion failure, 2 setup/infrastructure, 3 the program
+# under test crashed (signal).
 set -uo pipefail
-cd "$(dirname "$0")/.." || exit 1
+cd "$(dirname "$0")/.." || exit 2
 export PATH="$PWD/.tools/bin:$PATH"
-scripts/fetch-corpus || exit 1
-lake build fvatest >/dev/null || exit 1
+scripts/fetch-corpus || exit 2
+lake build fvatest >/dev/null || exit 2
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 # script pass fail skip
@@ -30,12 +32,13 @@ while read -r name _; do
 	wasm-tools json-from-wast ".cache/corpus/testsuite/$name.wast" -o "$work/$name.json" \
 		--wasm-dir "$work/" 2>/dev/null || {
 		echo "test-numerics: json-from-wast failed on $name"
-		exit 1
+		exit 2
 	}
 	jsons+=("$work/$name.json")
 done <<<"$pinned"
 .lake/build/bin/fvatest numeric "${jsons[@]}" >"$work/out.txt"
 rc=$?
+((rc < 128)) || exit 3
 grep '^  FAIL' "$work/out.txt" | head -20
 if ! diff <(grep -v '^  ' "$work/out.txt" | sort) <(sort <<<"$pinned") >"$work/diff.txt"; then
 	echo "test-numerics: counts differ from the pinned table (< actual, > pinned):"

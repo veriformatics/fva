@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Official execution scripts through Exec.Ref; exact per-command counts prevent shrinking runs.
 # Four workers; --fast omits the three long bulk scripts; names select checks for iteration.
+# Exit status (U12 K4): 0 pass, 1 assertion failure, 2 setup/infrastructure, 3 the program
+# under test crashed (signal).
 set -uo pipefail
-cd "$(dirname "$0")/.." || exit 1
+cd "$(dirname "$0")/.." || exit 2
 export PATH="$PWD/.tools/bin:$PATH"
 started=$SECONDS
-scripts/fetch-corpus || exit 1
-lake build fvatest >/dev/null || exit 1
+scripts/fetch-corpus || exit 2
+lake build fvatest >/dev/null || exit 2
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 root=$PWD
@@ -109,18 +111,18 @@ fi
 for name in "${names[@]}"; do
 	if $fast && [[ $name =~ ^(bulk|memory_copy|memory_fill)$ ]]; then
 		echo "test-spec: $name requires the full mode" >&2
-		exit 1
+		exit 2
 	fi
 	row=$(awk -v name="$name" '$1 == name {print}' <<<"$pinned")
 	if [[ -z $row ]]; then
 		echo "test-spec: script is not pinned: $name" >&2
-		exit 1
+		exit 2
 	fi
 	printf '%s\n' "$row" >>"$work/expected.txt"
 done
 if [[ $(printf '%s\n' "${names[@]}" | sort -u | wc -l) != "${#names[@]}" ]]; then
 	echo "test-spec: duplicate script names" >&2
-	exit 1
+	exit 2
 fi
 
 # Exported for the xargs child shells.
@@ -131,6 +133,7 @@ run_script() {
 	if ! wasm-tools json-from-wast "$root/.cache/corpus/testsuite/$name.wast" \
 		-o "$work/$name/$name.json" --wasm-dir "$work/$name/" 2>"$work/$name.err"; then
 		echo "test-spec: json-from-wast failed on $name" >>"$work/$name.err"
+		: >"$work/$name.infra"
 		return 1
 	fi
 	timeout 900s "$root/.lake/build/bin/fvatest" spec "$work/$name/$name.json" \
@@ -139,6 +142,9 @@ run_script() {
 	if ((rc)); then
 		echo "test-spec: $name rc=$rc (124 = 900-second execution limit)" >>"$work/$name.err"
 	fi
+	# no verdict (U12 K4): the 900-second limit or a signal = crash, a missing program = setup
+	if ((rc == 124 || rc >= 128)); then : >"$work/$name.crash"; fi
+	if ((rc == 126 || rc == 127)); then : >"$work/$name.infra"; fi
 	printf '%s %s\n' "$((SECONDS - start))" "$name" >"$work/$name.time"
 	return "$rc"
 }
@@ -166,4 +172,6 @@ if compgen -G "$work/*.time" >/dev/null; then
 	echo "test-spec: slowest scripts (seconds name):"
 	sort -nr "$work/"*.time | head -5
 fi
-exit "$rc"
+compgen -G "$work/*.infra" >/dev/null && exit 2
+compgen -G "$work/*.crash" >/dev/null && exit 3
+((rc == 0)) || exit 1

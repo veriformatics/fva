@@ -1,0 +1,329 @@
+#!/usr/bin/env bash
+# Planted inputs for the mutation check (U12 E1, docs/contracts/U12-mutation.md): copies of
+# FVATest/Mutate/fixture (a Lake package on Lean core) run through the real fvamut; every case
+# asserts an exact rc, row or finding. Called by scripts/test-checks; needs a built fvamut.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+fvamut=$PWD/.lake/build/bin/fvamut
+[[ -x $fvamut ]] || {
+	echo "test-mutation-fixture: $fvamut is not built"
+	exit 1
+}
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+base=$tmp/base
+cp -a FVATest/Mutate/fixture "$base" && rm -rf "$base/.lake" "$base/.cache" || exit 1
+(cd "$base" && lake build >/dev/null 2>&1 && git init -q && git add -A &&
+	git -c user.email=fixture@fvamut -c user.name=fixture commit -qm base) || {
+	echo "test-mutation-fixture: the fixture does not build"
+	exit 1
+}
+# A variant: a fresh copy of the built fixture whose config keeps the named groups.
+variant() { # name group...
+	local d=$tmp/$1 groups
+	shift
+	cp -a "$base" "$d" || exit 1
+	groups=$(printf '"%s",' "$@")
+	jq ".groups |= map(select(.name | IN(${groups%,})))" "$d/fvamut.json" >"$d/v.json"
+	git -C "$d" add v.json && git -C "$d" -c user.email=f@f -c user.name=f commit -qm v
+	echo "$d"
+}
+run() { # dir log args... → rc
+	local d=$1 log=$2
+	shift 2
+	(cd "$d" && lake env "$fvamut" "$@" --config v.json >"$log" 2>&1)
+}
+fail=0
+bad() {
+	echo "test-mutation-fixture: $*"
+	fail=1
+}
+rc_is() { # want label dir log args...
+	local want=$1 label=$2
+	shift 2
+	run "$@"
+	local rc=$?
+	((rc == want)) || bad "$label: rc $rc, want $want (log: $(tail -3 "$2" | tr '\n' ' '))"
+}
+row_is() { # dir id outcome killer
+	local got
+	got=$(awk -F'\t' -v id="$2" '$1 == id {print $3 "|" $4}' "$1/results.tsv")
+	[[ $got == "$3|$4" ]] || bad "row $2: '$got', want '$3|$4'"
+}
+has() { # log pattern label
+	grep -qF -- "$2" "$1" || bad "$3: '$2' missing from $1"
+}
+ran() { # dir log → the mutant ids an update run executed (probes excluded), sorted; rc → log.rc
+	run "$1" "$2" update
+	echo $? >"$2.rc"
+	sed -n 's/^fvamut: \[[0-9]*\/[0-9]*\] \([^ ]*\) → .*/\1/p' "$2" | grep -v ':probe:' | sort
+}
+reran() { # dir label id… → the update reruns exactly these ids and exits 0
+	local d=$1 label=$2 got
+	shift 2
+	got=$(ran "$d" "$d/r.log")
+	[[ $got == "$(ids "$@")" ]] || bad "$label reruns: $(tr '\n' ' ' <<<"$got")"
+	[[ $(<"$d/r.log.rc") == 0 ]] || bad "$label rerun: rc $(<"$d/r.log.rc")"
+}
+ids() { # id… → sorted, one per line
+	printf '%s\n' "$@" | sort
+}
+stale() { # dir → stale count of a check run
+	run "$1" "$1/stale.log" check --spot 0
+	grep -o 'stale: [0-9]*' "$1/stale.log" | grep -o '[0-9]*' || echo 0
+}
+
+clean_cases() {
+	local d
+	d=$(variant clean clean)
+	rc_is 0 "clean update" "$d" "$d/u.log" update
+	row_is "$d" Fix/Clean.lean:Fix.inc:AOR:0 killed "proofs Fix/Proof.lean:8"
+	row_is "$d" Fix/Clean.lean:Fix.inc:LIT:0 killed "proofs Fix/Proof.lean:8"
+	row_is "$d" Fix/Clean.lean:Fix.inc:LIT:1 killed "proofs Fix/Proof.lean:8"
+	row_is "$d" Fix/Clean.lean:Fix.dbl:AOR:0 killed test:check
+	row_is "$d" Fix/Clean.lean:Fix.dbl:LIT:0 killed test:check
+	row_is "$d" Fix/Clean.lean:Fix.mk:LIT:0 unviable "module Fix/Clean.lean:12"
+	row_is "$d" Fix/Clean.lean:Fix.width:LIT:0 downstream-unviable "proofs Fix/Down.lean:6"
+	row_is "$d" Fix/Clean.lean:Fix.width:LIT:1 downstream-unviable "proofs Fix/Down.lean:6"
+	[[ $(grep -vc '^#' "$d/results.tsv") == 8 ]] || bad "clean: want 8 rows"
+	git -C "$d" add -A && git -C "$d" -c user.email=f@f -c user.name=f commit -qm rows
+	rc_is 0 "clean check" "$d" "$d/c.log" check
+	[[ $(grep -c 'reproduced' "$d/c.log") == 3 ]] || bad "clean check: want 3 spot-checks"
+	git -C "$d" diff --quiet || bad "clean: the runs changed tracked files: $(git -C "$d" diff --stat)"
+	# each dependency class reruns exactly the rows that depend on it; each case in its own copy
+	local pids=() c
+	for c in script data proof argv order noop import module order-free integrity forged; do
+		cp -a "$d" "$tmp/c-$c"
+		(
+			clean_case "$c" "$tmp/c-$c"
+			exit "$fail"
+		) >"$tmp/c-$c.out" 2>&1 &
+		pids+=($!)
+	done
+	for c in "${pids[@]}"; do wait "$c" || fail=1; done
+	cat "$tmp"/c-*.out
+}
+
+clean_case() { # name dir
+	local d=$2 n c=Fix/Clean.lean:Fix
+	case $1 in
+	script)
+		echo '# c' >>"$d/test.sh" && n=$(stale "$d") && [[ $n == 2 ]] || bad "test script: $n stale, want 2"
+		reran "$d" "test script" "$c.dbl:AOR:0" "$c.dbl:LIT:0"
+		;;
+	data)
+		echo x >"$d/tool.ok" && n=$(stale "$d") && [[ $n == 2 ]] || bad "data file: $n stale, want 2"
+		reran "$d" "data file" "$c.dbl:AOR:0" "$c.dbl:LIT:0"
+		;;
+	proof)
+		echo '-- c' >>"$d/Fix/Proof.lean" && n=$(stale "$d") && [[ $n == 3 ]] ||
+			bad "proof module: $n stale, want 3"
+		reran "$d" "proof module" "$c.inc:AOR:0" "$c.inc:LIT:0" "$c.inc:LIT:1"
+		;;
+	argv)
+		jq '.tests[0].cmd = ["bash", "./test.sh"]' "$d/v.json" >"$d/v2" && mv "$d/v2" "$d/v.json" &&
+			n=$(stale "$d") && [[ $n == 2 ]] || bad "test argv: $n stale, want 2"
+		reran "$d" "test argv" "$c.dbl:AOR:0" "$c.dbl:LIT:0"
+		;;
+	order)
+		jq '.groups[0].stages = ["module", "exes", "test:check", "proofs"]' "$d/v.json" >"$d/v2" &&
+			mv "$d/v2" "$d/v.json" && n=$(stale "$d") && [[ $n == 7 ]] || bad "stage order: $n stale, want 7"
+		if [[ $(ran "$d" "$d/r.log" | grep -c .) != 7 ]] || grep -q 'mk:LIT:0 →' "$d/r.log" ||
+			[[ $(<"$d/r.log.rc") != 0 ]]; then
+			bad "stage order reruns"
+		fi
+		;;
+	noop)
+		jq '.workers = 3 | .spotChecks = 1' "$d/v.json" >"$d/v2" && mv "$d/v2" "$d/v.json" &&
+			n=$(stale "$d") && [[ $n == 0 ]] || bad "workers + spot-check count: $n stale, want 0"
+		[[ -z $(ran "$d" "$d/r.log") && $(<"$d/r.log.rc") == 0 ]] ||
+			bad "workers + spot-check count reran mutants"
+		;;
+	import)
+		printf 'theorem extra : True := trivial\n' >"$d/Fix/Extra.lean" &&
+			sed -i '1i import Fix.Extra' "$d/Fix/Proof.lean" && (cd "$d" && lake build >/dev/null 2>&1) &&
+			n=$(stale "$d") && [[ $n == 3 ]] || bad "added import: $n stale, want 3"
+		reran "$d" "added import" "$c.inc:AOR:0" "$c.inc:LIT:0" "$c.inc:LIT:1"
+		;;
+	module)
+		sed -i 's/n \* 2/n * 2 + 0/' "$d/Fix/Clean.lean" && n=$(stale "$d") && [[ $n == 10 ]] ||
+			bad "edited module: $n stale, want 10"
+		# the new `+ 0` adds an equivalent mutant (`- 0`): the rerun reports it unruled (rc 1)
+		if [[ $(ran "$d" "$d/r.log" | grep -c .) != 10 || $(<"$d/r.log.rc") != 1 ]] ||
+			! grep -q "1 unruled.*$c.dbl:AOR:1" "$d/r.log"; then
+			bad "edited module reruns"
+		fi
+		;;
+	order-free)
+		# results do not depend on worker count or order: one worker reproduces the table
+		cp "$d/results.tsv" "$d/two"
+		rc_is 0 "fresh, one worker" "$d" "$d/f.log" fresh --workers 1
+		cmp -s "$d/results.tsv" "$d/two" || bad "fresh with one worker differs from two workers"
+		;;
+	integrity)
+		cp "$d/results.tsv" "$d/good"
+		grep -v 'dbl:LIT' "$d/good" >"$d/results.tsv"
+		rc_is 1 "missing row" "$d" "$d/m.log" check --spot 0
+		(cat "$d/good" && grep 'dbl:LIT' "$d/good") >"$d/results.tsv"
+		rc_is 1 "duplicate row" "$d" "$d/d.log" check --spot 0
+		has "$d/d.log" "duplicate row" "duplicate row"
+		(cat "$d/good" && echo 'not a row') >"$d/results.tsv"
+		rc_is 1 "malformed row" "$d" "$d/x.log" check --spot 0
+		;;
+	forged)
+		# the recorded execution contradicts a forged killer; without that record only a
+		# spot-check that samples the row catches it (documented sampling limit, R3)
+		sed -i 's/killed\tproofs Fix\/Proof.lean:8\t/killed\tproofs Fix\/Proof.lean:9\t/' "$d/results.tsv"
+		rc_is 1 "forged row vs cache" "$d" "$d/f1.log" check --spot 0
+		has "$d/f1.log" "cache conflict" "forged row vs cache"
+		rm -rf "$d/.cache/mutate/exec"
+		rc_is 0 "forged row, unsampled (sampling limit)" "$d" "$d/f2.log" check --spot 0
+		rc_is 1 "forged row, sampled" "$d" "$d/f3.log" check --spot 20
+		has "$d/f3.log" "spot-check Fix/Clean.lean:Fix.inc" "forged row, sampled"
+		;;
+	esac
+}
+
+open_cases() {
+	local d
+	d=$(variant open open)
+	rc_is 1 "unruled survivors" "$d" "$d/u.log" update
+	has "$d/u.log" "3 unruled" "unruled survivors"
+	row_is "$d" Fix/Open.lean:Fix.pick:GIB:0 survived -
+	[[ $(grep -c . "$d/.cache/mutate/rulings-todo.tsv") == 3 ]] || bad "want 3 ruling templates"
+	awk -F'\t' 'BEGIN {OFS = "\t"} {$3 = "equivalent"; $6 = "fixture"; $7 = "planted"; print}' \
+		"$d/.cache/mutate/rulings-todo.tsv" >"$d/rulings.tsv"
+	rc_is 0 "ruled survivors" "$d" "$d/r.log" check --spot 0
+	sed -i 's/Unpinned: no theorem or test mentions it./Unpinned./' "$d/Fix/Open.lean"
+	rc_is 1 "declaration changed under its rulings" "$d" "$d/s.log" update
+	[[ $(grep -c 'stale ruling' "$d/s.log") == 3 ]] || bad "want 3 stale rulings"
+	git -C "$d" checkout -q Fix/Open.lean
+	printf 'Fix/Open.lean:Fix.pick:LIT:9\tx → y\tequivalent\t0\t-\tf\tno such row\n' >>"$d/rulings.tsv"
+	rc_is 1 "ruling without a survivor" "$d" "$d/n.log" update
+	has "$d/n.log" "stale ruling Fix/Open.lean:Fix.pick:LIT:9" "ruling without a survivor"
+}
+
+odd_cases() {
+	local d
+	d=$(variant odd odd)
+	rc_is 1 "inconclusive + error" "$d" "$d/u.log" update
+	has "$d/u.log" "FINDING error Fix/Odd.lean:Fix.infra:LIT:0" "test rc 2 = error"
+	local rows
+	rows=$(cut -f1,3,4 "$d"/.cache/mutate/exec/*.tsv)
+	for want in $'Fix/Odd.lean:Fix.res:LIT:0\tinconclusive\tproofs Fix/Proof.lean:12 resource' \
+		$'Fix/Odd.lean:Fix.slow:LIT:1\tinconclusive\ttest:check timeout' \
+		$'Fix/Odd.lean:Fix.slow:LIT:0\tkilled\ttest:check' \
+		$'Fix/Odd.lean:Fix.crashy:LIT:0\tinconclusive\ttest:check crash'; do
+		grep -qxF "$want" <<<"$rows" || bad "odd: missing execution '$want'"
+	done
+	has "$d/u.log" "timeouts/crashes rerun alone" "solo rerun"
+}
+
+guard_cases() {
+	local d
+	# a test that rewrites a tracked file (same size) is an integrity error, never a verdict
+	d=$(variant stray clean)
+	cat >"$d/ins" <<'EOT'
+[[ $dbl == 9 ]] && printf 'no\n' >tool.ok
+EOT
+	sed -i "/^read -r/r $d/ins" "$d/test.sh" && rm "$d/ins"
+	git -C "$d" commit -qam stray
+	rc_is 1 "stray write into the worker tree" "$d" "$d/s.log" update
+	has "$d/s.log" "changed outside its build directory" "stray write"
+	# verdicts must fit the row they rule; outcomes must come from the vocabulary
+	d=$(variant verdicts open)
+	run "$d" "$d/u.log" update
+	awk -F'\t' 'BEGIN {OFS = "\t"} NR == 1 {$3 = "resource"} NR == 2 {$3 = "unspecified"}
+		NR == 3 {$3 = "equivalent"} {$6 = "f"; $7 = "planted"; print}' \
+		"$d/.cache/mutate/rulings-todo.tsv" >"$d/rulings.tsv"
+	rc_is 1 "resource on a survivor, unspecified without a contract" "$d" "$d/r.log" check --spot 0
+	has "$d/r.log" "verdict resource on a survived row" "resource on a survivor"
+	has "$d/r.log" "stale ruling Fix/Open.lean:Fix.pick:LIT:0" "unspecified without a contract"
+	git -C "$d" add results.tsv && git -C "$d" -c user.email=f@f -c user.name=f commit -qm rows
+	sed -i '2s/\tsurvived\t/\tsurvivd\t/' "$d/results.tsv"
+	rc_is 1 "unknown outcome" "$d" "$d/o.log" check --spot 0
+	has "$d/o.log" "malformed lines" "unknown outcome"
+	git -C "$d" checkout -q results.tsv
+	head -1 "$d/rulings.tsv" >"$d/dup" && cat "$d/dup" >>"$d/rulings.tsv"
+	rc_is 1 "duplicate ruling id" "$d" "$d/dr.log" check --spot 0
+	has "$d/dr.log" "duplicate ruling id" "duplicate ruling id"
+	# a build-directory write with a preserved mtime (cp -p) must not reach the next mutant
+	d=$(variant leak open)
+	printf 'namespace Fix\ndef leakA : Nat := 0\ndef leakB : Nat := 0\nend Fix\n' >"$d/Fix/Leak.lean"
+	sed -i 's/^import Fix.Odd$/import Fix.Odd\nimport Fix.Leak/' "$d/FixTest.lean"
+	sed -i 's/{Fix.infra}"/{Fix.infra} {Fix.leakA} {Fix.leakB}"/' "$d/FixTest.lean"
+	cat >"$d/ins" <<'EOT'
+[[ $leakA == 1 ]] && cp -p one.txt .lake/build/state
+[[ $leakB == 1 && $(cat .lake/build/state) == 1 ]] && exit 1
+EOT
+	sed -i 's/^read -r dbl slow crashy infra <<</read -r dbl slow crashy infra leakA leakB <<</' "$d/test.sh"
+	sed -i "/^read -r/r $d/ins" "$d/test.sh" && rm "$d/ins"
+	echo 1 >"$d/one.txt" && touch -d '2000-01-01' "$d/one.txt"
+	jq '.groups[0].dirs = ["Fix/Leak.lean"]' "$d/v.json" >"$d/v2" && mv "$d/v2" "$d/v.json"
+	(cd "$d" && lake build >/dev/null 2>&1 && echo 0 >.lake/build/state)
+	git -C "$d" add -A && git -C "$d" -c user.email=f@f -c user.name=f commit -qm leak
+	run "$d" "$d/l.log" update --workers 1
+	grep -q 'leakB:LIT:0 → survived' "$d/l.log" || bad "build-directory leak: $(grep 'leakB:LIT:0' "$d/l.log")"
+	# shared inputs: a configured shared path that a test rewrites fails the run
+	d=$(variant shared clean)
+	mkdir "$d/shared" && echo data >"$d/shared/data.txt" && echo 'shared/' >>"$d/.gitignore"
+	jq '.shared = ["shared"]' "$d/v.json" >"$d/v2" && mv "$d/v2" "$d/v.json"
+	git -C "$d" add -A && git -C "$d" -c user.email=f@f -c user.name=f commit -qm shared
+	rc_is 0 "shared input, untouched" "$d" "$d/s0.log" update
+	cat >"$d/ins" <<'EOT'
+[[ $dbl == 9 ]] && echo tampered >>shared/data.txt
+EOT
+	sed -i "/^read -r/r $d/ins" "$d/test.sh" && rm "$d/ins"
+	rc_is 1 "shared input rewritten by a test" "$d" "$d/s1.log" update
+	has "$d/s1.log" "shared inputs changed" "shared input rewritten"
+}
+
+setup_cases() {
+	local d
+	d=$(variant broken clean)
+	sed -i 's/inc 2 = 3/inc 2 = 4/' "$d/Fix/Proof.lean"
+	rc_is 2 "broken baseline" "$d" "$d/b.log" update
+	d=$(variant tool clean)
+	rm "$d/tool.ok"
+	rc_is 2 "missing tool before the baseline" "$d" "$d/t.log" update
+	has "$d/t.log" "probe of Fix/Clean.lean did not survive" "missing tool"
+	d=$(variant ops ops)
+	run "$d" "$d/l.log" list || bad "ops listing failed"
+	diff "$d/l.log" "$d/ops.expected" >"$d/l.diff" || bad "ops listing differs from ops.expected"
+	grep -qP '^Fix/Ops.lean\tFix.Ops.zero\tdef\t0$' "$d/.cache/mutate/inventory.tsv" ||
+		bad "zero-site declaration missing from the inventory"
+	grep -qP '^Fix/Ops.lean\tFix.Ops.thm\ttheorem\texcluded$' "$d/.cache/mutate/inventory.tsv" ||
+		bad "theorem not reported as excluded"
+}
+
+# Case groups run in parallel, each in its own copies; a group's rc = its own `fail`.
+pids=()
+(
+	clean_cases
+	exit "$fail"
+) >"$tmp/clean.out" 2>&1 &
+pids+=($!)
+(
+	open_cases
+	exit "$fail"
+) >"$tmp/open.out" 2>&1 &
+pids+=($!)
+(
+	odd_cases
+	exit "$fail"
+) >"$tmp/odd.out" 2>&1 &
+pids+=($!)
+(
+	setup_cases
+	exit "$fail"
+) >"$tmp/setup.out" 2>&1 &
+pids+=($!)
+(
+	guard_cases
+	exit "$fail"
+) >"$tmp/guard.out" 2>&1 &
+pids+=($!)
+status=0
+for p in "${pids[@]}"; do wait "$p" || status=1; done
+cat "$tmp"/clean.out "$tmp"/open.out "$tmp"/odd.out "$tmp"/setup.out "$tmp"/guard.out
+exit "$status"
