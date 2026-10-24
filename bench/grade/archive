@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Archives one finished run for grading and the record: result.json, metadata.json, the
+# gzipped event log, and every work file the agent created or changed (the inputs are
+# re-derivable from bench/tasks/prepare; build outputs are not kept).
+set -euo pipefail
+[[ $# == 2 ]] || {
+	echo 'Usage: bench/grade/archive RUN_DIR OUT_DIR' >&2
+	exit 2
+}
+run=$(realpath -e -- "$1") out=$2
+[[ -f $run/result.json && -f $run/inputs.sha256 ]] || {
+	echo "archive: $run is not a finished run" >&2
+	exit 2
+}
+[[ ! -e $out ]] || {
+	echo "archive: $out exists" >&2
+	exit 2
+}
+mkdir -p "$out/work"
+cp "$run/result.json" "$run/metadata.json" "$out/"
+gzip -9 -c "$run/stdout.jsonl" >"$out/stdout.jsonl.gz"
+declare -A input
+while read -r sha path; do input[$path]=$sha; done <"$run/inputs.sha256"
+(cd "$run/work" && find . \( -path ./.lake -o -path ./fva/.lake -o -path '*/target' -o \
+	-path ./.git \) -prune -o -type f -print0) |
+	while IFS= read -r -d '' f; do
+		sha=$(sha256sum "$run/work/$f")
+		sha=${sha%% *}
+		[[ ${input[$f]:-} == "$sha" ]] && continue
+		mkdir -p "$out/work/$(dirname "$f")"
+		cp -p "$run/work/$f" "$out/work/$f"
+	done
+echo "archive: $(find "$out/work" -type f | wc -l) agent files → $out"

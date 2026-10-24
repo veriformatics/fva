@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# M1 proof validity for one rebuilt project (bench/grade/rebuild): a clean `lake build`, the
+# axioms of each THEOREM ⊆ {propext, Classical.choice, Quot.sound}, no forbidden construct in
+# the agent's Lean files, and the export of the theorems (+ closure) accepted by leanchecker and
+# con-leche. One line per theorem: name, axioms ok, leanchecker, con-leche; rc 0 = all valid.
+set -euo pipefail
+[[ $# -ge 3 ]] || {
+	echo 'Usage: bench/grade/check-lean PROJECT MODULE THEOREM...' >&2
+	exit 2
+}
+proj=$(realpath -e -- "$1") module=$2
+shift 2
+cd "$proj"
+bin=$(lean --print-prefix)/bin
+tmp=$(mktemp -d)
+trap 'rm -rf -- "$tmp"' EXIT
+lake build >"$tmp/build.log" 2>&1 || {
+	tail -20 "$tmp/build.log" >&2
+	echo 'check-lean: build failed' >&2
+	exit 1
+}
+bad=0
+# agent-written Lean files only (the vendored FVA package and the inputs are not theirs)
+# comments stripped first (block comments, nesting included, and line comments)
+# shellcheck disable=SC2016 # an awk program, not shell expansions
+strip='FNR == 1 { depth = 0 } { out = ""; i = 1; n = length($0)
+	while (i <= n) {
+		two = substr($0, i, 2)
+		if (depth > 0) { if (two == "/-") { depth++; i += 2 } else if (two == "-/") { depth--; i += 2 } else i++; continue }
+		if (two == "/-") { depth = 1; i += 2; continue }
+		if (two == "--") break
+		out = out substr($0, i, 1); i++ }
+	print FILENAME ":" FNR ":" out }'
+if find . \( -path ./.lake -o -path ./fva \) -prune -o -name '*.lean' -print0 |
+	xargs -0 -r awk "$strip" |
+	grep -E ':[0-9]+:(.*\b(sorry|admit|native_decide|implemented_by|extern|debug\.skipKernelTC)\b|axiom )' \
+		>"$tmp/forbidden"; then
+	echo 'check-lean: forbidden constructs:' >&2
+	cat "$tmp/forbidden" >&2
+	bad=1
+fi
+{
+	echo "import $module"
+	for t in "$@"; do echo "#print axioms $t"; done
+} >"$tmp/Axioms.lean"
+lake env lean "$tmp/Axioms.lean" >"$tmp/axioms.out" 2>&1 || {
+	cat "$tmp/axioms.out" >&2
+	exit 1
+}
+lake env "$bin/leanexport" "$module" -- "$@" >"$tmp/export.ndjson" 2>"$tmp/export.err" || {
+	cat "$tmp/export.err" >&2
+	echo 'check-lean: export failed' >&2
+	exit 1
+}
+status() { "$@" >/dev/null 2>&1 && echo accept || echo "reject($?)"; }
+lc=$(status "$bin/leanchecker" --silent --from-export "$tmp/export.ndjson")
+cl=$(status "$bin/con-leche" "$tmp/export.ndjson")
+[[ $lc == accept && $cl == accept ]] || bad=1
+for t in "$@"; do
+	ax=$(awk -v t="'$t'" 'index($0, t) { getline_ok = 1 } getline_ok { print; if (/\]/ || /does not depend/) exit }' \
+		"$tmp/axioms.out" | tr '\n' ' ')
+	extra=$(grep -o '\[.*\]' <<<"$ax" | tr -d '[] ' | tr ',' '\n' |
+		grep -vxE 'propext|Classical\.choice|Quot\.sound|' || true)
+	ok=yes
+	[[ -z $extra ]] || {
+		ok="no($(tr '\n' ' ' <<<"$extra"))"
+		bad=1
+	}
+	printf '%s\taxioms=%s\tleanchecker=%s\tcon-leche=%s\n' "$t" "$ok" "$lc" "$cl"
+done
+exit "$bad"

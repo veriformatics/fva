@@ -69,15 +69,23 @@ public_env=("HOME=$run/home" "CODEX_HOME=$run/codex"
 	"XDG_CONFIG_HOME=$run/home/.config" "XDG_CACHE_HOME=$run/home/.cache"
 	"XDG_DATA_HOME=$run/home/.local/share" "TMPDIR=$run/tmp"
 	LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC GIT_CONFIG_NOSYSTEM=1)
+# Container-backed tools (FVA_BENCH_TOOLS, e.g. frama-c) run outside the sandbox through
+# bench/tools/tool-broker; the arm calls them by name via bench/tools/broker-client.
+read -ra tools <<<"${FVA_BENCH_TOOLS:-}"
+((${#tools[@]} == 0)) || public_env+=("FVA_TOOL_SPOOL=$run/tmp/fva-tool")
 args=(exec -C "$run/work" -s workspace-write --json --color never --ephemeral
 	--ignore-user-config --ignore-rules -m "$FVA_BENCH_MODEL"
 	-c "model_reasoning_effort=\"$FVA_BENCH_EFFORT\""
 	-c approval_policy='"never"' -c project_doc_max_bytes=0)
-command=(timeout --signal=TERM --kill-after=30 "$FVA_BENCH_SECONDS"
+# CPU time of the whole tree (time waits for timeout, which waits for codex and its children)
+command=(/usr/bin/time -o "$run/time.txt" -f '%e %U %S %M'
+	timeout --signal=TERM --kill-after=30 "$FVA_BENCH_SECONDS"
 	taskset -c "$cpus" "$codex" "${args[@]}")
 # Secret bytes never enter commands/logs. stdin stays closed even with a prompt arg.
 print_command() {
 	printf 'install -m 600 -- %q %q\n' "$auth" "$run/codex/auth.json"
+	((${#tools[@]} == 0)) || printf '%q %q %q%s &\n' "$root/bench/tools/tool-broker" "$run/work" \
+		"$run/tmp/fva-tool" "$(printf ' %q' "${tools[@]}")"
 	printf 'cd %q\n' "$run/work"
 	printf 'env -i'
 	printf ' %q' "${public_env[@]}" "${command[@]}"
@@ -117,13 +125,23 @@ jq -n --arg arm "$arm" --arg task "$task" --argjson index "$index" \
     limit_seconds:$seconds,prompt_sha256:$prompt_sha,input_manifest_sha256:$input_sha,
     codex_executable:$codex,codex_executable_sha256:$codex_sha,codex_version:$version}' >"$run/metadata.json"
 prompt_text=$(<"$run/prompt.txt")
+broker=
+if ((${#tools[@]} > 0)); then
+	"$root/bench/tools/tool-broker" "$run/work" "$run/tmp/fva-tool" "${tools[@]}" \
+		>"$run/broker.log" 2>&1 &
+	broker=$!
+fi
+load_start=$(cut -d" " -f1 /proc/loadavg)
 start=$(date +%s%3N)
 set +e
 (cd "$run/work" && env -i "${public_env[@]}" "${command[@]}" "$prompt_text" \
 	</dev/null >"$run/stdout.jsonl" 2>"$run/stderr.log")
 rc=$?
 set -e
+[[ -z $broker ]] || kill "$broker" 2>/dev/null || true
 elapsed=$(($(date +%s%3N) - start))
+load_end=$(cut -d" " -f1 /proc/loadavg)
+read -r _ cpu_user cpu_sys max_rss < <(tail -n 1 "$run/time.txt" 2>/dev/null || echo "0 0 0 0")
 rm -f -- "$run/codex/auth.json"
 if ! jq -s -f "$root/bench/harness/codex-result.jq" "$run/stdout.jsonl" \
 	>"$run/parsed.json" 2>"$run/parser.log"; then
@@ -139,8 +157,12 @@ agent_rc=$rc
 if [[ $rc == 0 && $status != completed ]]; then rc=1; fi
 jq -n --slurpfile metadata "$run/metadata.json" --slurpfile parsed "$run/parsed.json" \
 	--arg status "$status" --argjson rc "$rc" --argjson agent_rc "$agent_rc" --argjson elapsed "$elapsed" \
+	--argjson cpu_user "$cpu_user" --argjson cpu_sys "$cpu_sys" --argjson max_rss "$max_rss" \
+	--argjson load_start "$load_start" --argjson load_end "$load_end" \
 	'$metadata[0] + $parsed[0] + {status:$status,exit_code:$rc,agent_exit_code:$agent_rc,
     wall_ms:$elapsed,duration_ms:$elapsed,
+    cpu_user_s:$cpu_user,cpu_sys_s:$cpu_sys,max_rss_kb:$max_rss,
+    load1_start:$load_start,load1_end:$load_end,
     usage_complete:($parsed[0].usage_complete and $status == "completed")}' >"$run/result.json"
 rm "$run/parsed.json"
 printf '%s\n' "$run/result.json"

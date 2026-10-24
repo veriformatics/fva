@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Builds runorm-pflog.wasm (T6): pinned runorm (unmodified) + bench/subjects/runorm-shim, with
+# the crates its Cargo.lock pins; fresh source + target directories on every build.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+if [[ ${1:-} == --help ]]; then
+	echo 'Usage: bench/subjects/build-runorm [OUTPUT_DIR]'
+	exit 0
+fi
+out=${1:-$root/.cache/bench/wasm}
+mkdir -p "$out" "$root/.cache/bench"
+out=$(realpath -e -- "$out")
+"$root/scripts/fetch-bench" runorm >/dev/null
+export RUSTUP_HOME=$root/.tools/rustup CARGO_HOME=$root/.tools/cargo
+export PATH=$CARGO_HOME/bin:$root/.tools/bin:$PATH
+stage=$(mktemp -d "$root/.cache/bench/build.XXXXXXXX")
+trap 'rm -rf -- "$stage"' EXIT
+cp -R "$root/bench/subjects/runorm-shim/." "$stage/"
+mkdir "$stage/vendor"
+tar -xzf "$root/.cache/bench/downloads/runorm/runorm-9429aa0.tar.gz" -C "$stage/vendor"
+mv "$stage/vendor/runorm-9429aa00784a972fdeae64e0ca050ea08f3c5bc9" "$stage/vendor/runorm"
+export SOURCE_DATE_EPOCH=0 CARGO_TARGET_DIR=$stage/target
+flags=(-C target-cpu=generic -C 'target-feature=-simd128,-relaxed-simd'
+	-C link-arg=--no-entry -C link-arg=--export-memory
+	-C link-arg=-z -C link-arg=stack-size=65536
+	--remap-path-prefix "$stage=/build" --remap-path-prefix "$root=/fva"
+	--remap-path-prefix "$CARGO_HOME=/cargo")
+printf -v CARGO_ENCODED_RUSTFLAGS '%s\x1f' "${flags[@]}"
+export CARGO_ENCODED_RUSTFLAGS=${CARGO_ENCODED_RUSTFLAGS%$'\x1f'}
+unset RUSTFLAGS RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER
+(cd "$stage" && cargo build --release --locked --target wasm32-unknown-unknown)
+w=$stage/target/wasm32-unknown-unknown/release/fva_runorm.wasm
+wasm-tools validate --features=wasm2,-simd "$w"
+if wasm-tools print "$w" | grep -q '(import '; then
+	echo 'build-runorm: unexpected imports' >&2
+	exit 1
+fi
+mv "$w" "$out/runorm-pflog.wasm"
+(cd "$out" && sha256sum runorm-pflog.wasm)

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Builds (absent) or verifies (present) the arms' shared read-only Lake package store
+# FVA_BENCH_PACKAGES (default ~/.cache/fva-bench/packages-v4.35.0) from this checkout's
+# .lake/packages (Mathlib oleans from `lake exe cache get`). Mathlib's cache writes digit-only
+# artifact hashes without their leading zeros (`0202…` → `202…`); Lake rewrites such a `.hash`
+# file when it replays the module, which fails in a read-only store (permission denied), so each
+# one is zero-padded to its `.trace` entry. Verification = no short hash file, no writable file,
+# and a project importing all of Mathlib builds against the store (rc 0).
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+dst=${FVA_BENCH_PACKAGES:-$HOME/.cache/fva-bench/packages-v4.35.0}
+if [[ ! -e $dst ]]; then
+	cp -a --reflink=auto "$root/.lake/packages" "$dst"
+	while IFS= read -r -d '' f; do
+		c=$(<"$f")
+		p=$(printf '%16s' "$c")
+		p=${p// /0}
+		name=${f##*/}
+		dir=${f%/*}
+		build=${f%%/.lake/build/*}/.lake/build
+		rel=${dir#"$build"/}
+		rel=${rel#lib/lean}
+		rel=${rel#ir}
+		trace=$build/lib/lean$rel/${name%%.*}.trace
+		if ! [[ $c =~ ^[0-9a-f]+$ ]] || ! grep -qF "\"$p." "$trace"; then
+			echo "make-packages: $f ($c) has no padded entry in $trace" >&2
+			exit 1
+		fi
+		printf '%s' "$p" >"$f"
+	done < <(find "$dst" -path '*/.lake/build/*' -name '*.hash' -size -16c -print0)
+	chmod -R a-w "$dst"
+fi
+[[ -z $(find "$dst" -path '*/.lake/build/*' -name '*.hash' -size -16c -print -quit) ]] || {
+	echo "make-packages: unpadded hash files remain in $dst" >&2
+	exit 1
+}
+[[ -z $(find "$dst" ! -type l -perm -u+w -print -quit) ]] || {
+	echo "make-packages: $dst is writable" >&2
+	exit 1
+}
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+cp "$root/lean-toolchain" "$tmp/"
+printf '%s\n' 'name = "check"' 'defaultTargets = ["Check"]' '' '[[require]]' \
+	'name = "mathlib"' 'git = "https://github.com/leanprover-community/mathlib4"' \
+	'rev = "v4.35.0"' '' '[[lean_lib]]' 'name = "Check"' >"$tmp/lakefile.toml"
+jq --arg d "$dst" '.name = "check" | .packagesDir = $d |
+	.packages |= map(.inherited = (.name != "mathlib"))' "$root/lake-manifest.json" \
+	>"$tmp/lake-manifest.json"
+printf 'import Mathlib\n' >"$tmp/Check.lean"
+(cd "$tmp" && lake build >build.log 2>&1) || {
+	tail -20 "$tmp/build.log" >&2
+	echo "make-packages: a Mathlib import fails against $dst" >&2
+	exit 1
+}
+echo "make-packages: $dst verified (import Mathlib builds read-only)"

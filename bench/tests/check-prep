@@ -125,6 +125,8 @@ for scenario in success agent-error malformed process-error timeout incomplete b
 	fi
 	jq -e --argjson complete "$([[ $scenario == success ]] && echo true || echo false)" \
 		'.usage_complete == $complete' "$run/result.json" >/dev/null
+	jq -e '[.cpu_user_s, .cpu_sys_s, .max_rss_kb, .load1_start, .load1_end] | all(type == "number")' \
+		"$run/result.json" >/dev/null
 	if grep -q fixture-auth-value "$run/command.sh" "$run/metadata.json" "$run/result.json"; then exit 1; fi
 	printf 'harness: mock %s → rc %s, metrics/status pass\n' "$scenario" "$expected"
 done

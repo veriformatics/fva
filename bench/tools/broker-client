@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# In-sandbox stand-in for a container-backed arm tool, installed under the tool's name (e.g.
+# `frama-c`) by bench/tools/install-arm-tools. The Codex sandbox cannot start rootless podman
+# (newuidmap needs capabilities it drops), so each call becomes a request that
+# bench/tools/tool-broker runs outside the sandbox with the real wrapper; stdout, stderr and rc
+# come back unchanged.
+set -euo pipefail
+spool=${FVA_TOOL_SPOOL:?"$(basename -- "$0"): this run has no tool broker"}
+req=$(mktemp -d "$spool/req.XXXXXXXX")
+printf '%s\0' "$(basename -- "$0")" "$PWD" "$@" >"$req/argv"
+: >"$req/ready"
+until [[ -e $req/done ]]; do sleep 0.2; done
+cat -- "$req/stdout"
+cat -- "$req/stderr" >&2
+exit "$(<"$req/rc")"

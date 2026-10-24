@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Recreates a run's project outside its sandbox for grading: the exact input directory the run
+# started from (bench/tasks/prepare output) + the agent's files from its archive
+# (bench/grade/archive). Build outputs are rebuilt by the graders, never copied.
+set -euo pipefail
+[[ $# == 3 ]] || {
+	echo 'Usage: bench/grade/rebuild INPUT_DIR ARCHIVE_DIR OUT_DIR' >&2
+	exit 2
+}
+inputs=$(realpath -e -- "$1") archive=$(realpath -e -- "$2") out=$3
+[[ ! -e $out ]] || {
+	echo "rebuild: $out exists" >&2
+	exit 2
+}
+cp -a "$inputs" "$out"
+cp -a "$archive/work/." "$out/"
+echo "rebuild: $out = $(basename "$inputs") + $(find "$archive/work" -type f | wc -l) agent files"
