@@ -59,3 +59,32 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 |---|---|---|---|
 | L1 | `LoaderReady` = Instantiated, then exported `__wasm_apply_data_relocs`, then `__wasm_call_ctors`, before any other export (tool-conventions DynamicLinking.md, pinned 25aceba: "the loader will call it after the module is instantiated, and before any other function, including `__wasm_call_ctors`"); an absent export leaves the store unchanged | open | MAIN self-check matches the quoted protocol; adjudication by the closing reviewer |
 
+
+## U12 fvamut runner (reviewer-5, check set R1–R9, targets wip/u12 9d10d0a → f30c52c → 68de45d)
+
+| row | check | verdict | ruling |
+|---|---|---|---|
+| R1 | kill witnesses only (K4 rc protocol) | finding R1a (test-spec mapped its own timeout/spawn failure to rc 1) | accepted → fixed: rc 124/signal → crash marker (exit 3), 126/127 → infra (exit 2); re-check: stubbed statuses 0/3/2 |
+| R2 | error-line mapping (multi-edit GIB, multi-line GME, later declarations) | pass | accepted |
+| R3 | digests cover every outcome input; reuse + cache conflict | finding R3a (test argv joined by spaces: `'a b'` ≡ `a b`) | accepted → fixed: argv serialized as JSON in the stage line; re-check: exactly 2 rows stale, fresh shows 2 survivors |
+| R4 | worker isolation + restoration | finding R4a (`cp -p` into `.lake/build` kept an old mtime: leak to the next mutant) | accepted → fixed: build reset by ctime (`find -cnewer`); battery case `leak` seen red on the old reset (leakB killed), green now |
+| R5 | mode semantics, current/complete rows | finding R5a (ad-hoc `check` green with no executions) | accepted → fixed: an ad-hoc selection needs a current row per selected mutant |
+| R6 | rulings binding, staleness, vocabulary | finding R6a (duplicate ruling id hid a stale line) | accepted → fixed: duplicate ids rejected (battery case) |
+| R7 | site exclusions + operator coverage | finding R7a (`show T from e` dropped `e`) | accepted → fixed: the `from` part is walked |
+| R8 | battery labels vs assertions; E1 completeness | finding R8a (dependency cases checked stale counts only; then `ran()` discarded the rerun rc) | accepted → fixed: each case reruns `update` and asserts the exact executed ids + rc (`reran`), plus `order-free`, `leak`, `shared` cases; re-check: the reviewer's poisoned-rc reproducer now fails the battery (rc 1), the battery is green |
+| R9 | processes, setup, incomplete runs | finding R9a (`--workers 0` green with nothing run) | accepted → fixed: zero workers = usage error; a run leaving a selected mutant without a result is a finding |
+| X1 (register) | contract G1 said `check` never writes, yet it writes its local cache | note | accepted: G1 = writes no tracked file |
+
+## U12 mutation survivors (reviewer-8, check set = U2/U3/U4 contracts + U12 L1–L3, targets 877d19b = wip/u12 + the B5 rows)
+
+| row | check | verdict | ruling |
+|---|---|---|---|
+| F1 | decoder error coordinates (U2 I1 "failures carry bytes-left, rebased at each sub-input, file offset = `len − rem`") — 33 survivors (`Reader.byte/uleb/sleb/sub/utf8`, `Module.decode`, `Instr.seq`) | specified | accepted → killed by `FVA/Proof/Pin/Decode.lean` (15 `rfl` pins on concrete failures) |
+| F2 | `Impl.nanOf` default sign (U3 I2) | specified | accepted → killed by `nanOf_default` |
+| F3 | imported table addresses precede defined ones (U4 S5, Wasm 2.0 §4.5.3) | specified (major: no test covered it) | accepted → killed by `allocModule_tables_imports_first` |
+| F4 | element initialization before data (U4 S5) | specified | accepted → killed by `initCode_elems_first` |
+| F5 | reference-local default is null (U4) | specified | accepted → killed by `default_ref` |
+| F6 | memory growth to exactly 2^16 pages succeeds (Wasm 2.0 `growmem`) | specified | accepted → killed by `grow_to_limit` |
+| F7 | `ref.is_null` on null returns true (Wasm 2.0 §4.4.2) | specified | accepted → killed by `isNull_null` |
+| F8 | `TableInst.grow` bound + max (5 inconclusive rows, test:spec crashed under the memory cap) + `ictz` of 1 | specified | accepted → killed by `tableGrow_limit`, `ictz_one` |
+| E | the 66 remaining survivors: 15 equivalent (no input distinguishes, argument per row), 51 unspecified (contract clause per row, `path@sha16`) | ruled | accepted: independent ruler (reviewer-8 ≠ the author of the tests and proofs involved); MAIN rematched every unspecified anchor (6/6 clause texts `rg -Fc` = 1); rulings in `FVATest/Mutate/rulings.tsv` |

@@ -20,11 +20,18 @@ run() { # name cmd... -> logs/name.{out,rc,sec}
 	echo $((($(date +%s%N) - t0) / 1000000)) >"$logs/$name.ms"
 }
 
-mapfile -t shells < <(git ls-files -co --exclude-standard -- 'scripts/*')
+# bash scripts by shebang (scripts/ also holds data such as Batteries' nolints.json)
+mapfile -t shells < <(
+	git ls-files -co --exclude-standard -- 'scripts/*' 'bench/*' | while IFS= read -r f; do
+		head -n1 -- "$f" | grep -qx '#!/usr/bin/env bash' && printf '%s\n' "$f"
+	done
+)
 mapfile -t workflows < <(git ls-files -co --exclude-standard -- '.github/workflows/*.yml')
 
 lean_lane() {
 	run build lake --wfail build
+	# the planted checks need the built fvamut; they run beside the rest of this lane
+	run checks scripts/test-checks &
 	run test lake --wfail test
 	run decoder scripts/test-decoder
 	run numerics scripts/test-numerics
@@ -32,10 +39,11 @@ lean_lane() {
 	if ((fast)); then run spec scripts/test-spec --fast; else run spec scripts/test-spec; fi
 	if ((fast)); then run difftest scripts/test-difftest --fast; else run difftest scripts/test-difftest; fi
 	run lint lake --wfail lint
+	if ((fast)); then run mutation scripts/test-mutation --fast; else run mutation scripts/test-mutation; fi
+	wait
 }
 lean_lane &
 run format-lean scripts/check-format &
-run checks scripts/test-checks &
 run shellcheck shellcheck -x "${shells[@]}" &
 run shfmt shfmt -d "${shells[@]}" &
 run spec-lint .agent/spec-lint &

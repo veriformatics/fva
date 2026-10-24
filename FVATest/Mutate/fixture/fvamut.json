@@ -1,0 +1,106 @@
+{
+  "srcRoots": [
+    "Fix",
+    "Fix.lean",
+    "FixTest.lean"
+  ],
+  "exclude": [],
+  "exeRoots": [
+    "FixTest"
+  ],
+  "proofRoots": [
+    "Fix"
+  ],
+  "exes": [
+    "fixtest"
+  ],
+  "shared": [],
+  "tools": [],
+  "versions": [
+    [
+      "lean",
+      "--version"
+    ]
+  ],
+  "keyFiles": [
+    "lakefile.toml",
+    "lean-toolchain"
+  ],
+  "tests": [
+    {
+      "name": "check",
+      "cmd": [
+        "bash",
+        "test.sh"
+      ],
+      "exeRoots": [
+        "FixTest"
+      ],
+      "files": [
+        "test.sh",
+        "tool.ok"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "clean",
+      "dirs": [
+        "Fix/Clean.lean"
+      ],
+      "reachFrom": [],
+      "within": "",
+      "stages": [
+        "module",
+        "proofs",
+        "exes",
+        "test:check"
+      ]
+    },
+    {
+      "name": "open",
+      "dirs": [
+        "Fix/Open.lean"
+      ],
+      "reachFrom": [],
+      "within": "",
+      "stages": [
+        "module",
+        "proofs",
+        "exes",
+        "test:check"
+      ]
+    },
+    {
+      "name": "odd",
+      "dirs": [
+        "Fix/Odd.lean"
+      ],
+      "reachFrom": [],
+      "within": "",
+      "stages": [
+        "module",
+        "proofs",
+        "exes",
+        "test:check"
+      ]
+    },
+    {
+      "name": "ops",
+      "dirs": [
+        "Fix/Ops.lean"
+      ],
+      "reachFrom": [],
+      "within": "",
+      "stages": [
+        "module"
+      ]
+    }
+  ],
+  "results": "results.tsv",
+  "rulings": "rulings.tsv",
+  "cacheDir": ".cache/mutate",
+  "workers": 2,
+  "spotChecks": 3,
+  "minLimit": 10
+}

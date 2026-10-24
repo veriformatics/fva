@@ -1,6 +1,6 @@
 name = "fva"
 version = "0.1.0"
-defaultTargets = ["FVA", "fva"]
+defaultTargets = ["FVA", "fva", "fvamut"]
 testDriver = "fvatest"
 lintDriver = "batteries/runLinter"
 # FVA files are not module-system files yet; Mathlib requires the module system and Lake warns
@@ -29,3 +29,9 @@ name = "FVATest"
 [[lean_exe]]
 name = "fvatest"
 root = "FVATest.Main"
+
+[[lean_exe]]
+name = "fvamut"
+root = "FVATest.Mutate.Main"
+# `fvamut sites` elaborates package files: their imported elaborators run in the interpreter
+supportInterpreter = true

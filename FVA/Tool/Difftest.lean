@@ -574,6 +574,8 @@ def script (sub : Subject) (cfg : Config) (name : String) (ft : FuncType) (ep₀
 structure Verdict where
   script : Script
   failure : Option String
+  /-- wasmtime did not run the script (not spawned, or killed by a signal): no verdict. -/
+  infra : Bool := false
 
 /-- A module's verdicts, or why FVA could not script it. -/
 structure ModuleReport where
@@ -643,7 +645,8 @@ def check (cfg : Config) (paths : List String) (dir : System.FilePath) (jobs : N
         IO.FS.writeFile f ("\n".intercalate (sc.lines.map (·.text)).toList ++ "\n")
       let runs ← runWast files jobs
       let verdicts := (scs.zip runs).map fun (sc, rc, out) =>
-        { script := sc, failure := if rc == 0 then none else some (explain sc out) : Verdict }
+        { script := sc, failure := if rc == 0 then none else some (explain sc out),
+          infra := rc == 127 || rc ≥ 128 : Verdict }
       reports := reports.push { path, size := bs.size, verdicts }
   return reports
 
@@ -708,7 +711,7 @@ def usage : String :=
   "  --keep DIR     Write the WAST scripts to DIR and keep them.\n" ++
   "  --json         Write the report as JSON.\n\n" ++
   "Exit status: 0 when wasmtime agrees with every prediction, 1 when it does not or a file\n" ++
-  "cannot be tested, 2 for a usage error.\n"
+  "cannot be tested, 2 for a usage error, 3 when wasmtime cannot run (not found or crashed).\n"
 
 /-- Parsed command line. -/
 structure Args where
@@ -752,7 +755,7 @@ def main (argv : List String) : IO UInt32 := do
       pure (o.stdout.trimAscii.toString)
     catch _ =>
       IO.eprintln "fva difftest: wasmtime is not on PATH. Install wasmtime, then try again."
-      return 1
+      return 3
   let run (dir : System.FilePath) := check a.cfg a.paths dir a.jobs
   let reports ← match a.keep with
     | some d => do IO.FS.createDirAll d; run d
@@ -763,6 +766,6 @@ def main (argv : List String) : IO UInt32 := do
   else
     let header := s!"fva difftest: {version}; seed {a.cfg.seed}; {a.cfg.cases} cases per function"
     IO.print (render header reports)
-  return if allPass reports then 0 else 1
+  return if reports.any (·.verdicts.any (·.infra)) then 3 else if allPass reports then 0 else 1
 
 end FVA.Tool.Difftest

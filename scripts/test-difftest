@@ -4,11 +4,13 @@
 # Corpus = lz4-wasm codec + edgeR (scripts/fetch-corpus) + the committed lz4 C/Rust builds. Cases per
 # function: --fast 8 (edgeR 2); default (full gate, CI) 32 (edgeR 16). Seed 1. The assertion
 # count is pinned per size, so a generator change that drops checks fails here until re-pinned.
+# Exit status (U12 K4): 0 pass, 1 assertion failure, 2 setup/infrastructure, 3 the program
+# under test crashed (signal).
 set -uo pipefail
-cd "$(dirname "$0")/.." || exit 1
+cd "$(dirname "$0")/.." || exit 2
 export PATH="$PWD/.tools/bin:$PATH"
-scripts/fetch-corpus >/dev/null || exit 1
-lake build fva >/dev/null || exit 1
+scripts/fetch-corpus >/dev/null || exit 2
+lake build fva >/dev/null || exit 2
 if [[ ${1:-} == --fast ]]; then
 	cases=8 edger=2 want=21605
 else
@@ -17,10 +19,18 @@ fi
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 fva=.lake/build/bin/fva
+# fva difftest: 1 = mismatch, 2 = usage, 3 = wasmtime cannot run; a signal = crash.
+status() {
+	(($1 < 128)) || exit 3
+	(($1 == 2 || $1 == 3)) && exit 2
+	return "$1"
+}
 "$fva" difftest --json --cases "$cases" .cache/corpus/lz4-wasm-block-codec.wasm \
 	bench/subjects/wasm/lz4-c.wasm bench/subjects/wasm/lz4-flex.wasm >"$work/lz4.json"
+status $?
 rc=$?
-"$fva" difftest --json --cases "$edger" .cache/corpus/edgeR.so >"$work/edger.json" || rc=1
+"$fva" difftest --json --cases "$edger" .cache/corpus/edgeR.so >"$work/edger.json"
+status $? || rc=1
 n=$(jq -s '[.[].modules[].functions[].assertions] | add' "$work/lz4.json" "$work/edger.json")
 fns=$(jq -s '[.[].modules[].functions[]] | length' "$work/lz4.json" "$work/edger.json")
 if ((rc != 0)); then

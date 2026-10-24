@@ -38,3 +38,5 @@ import FVA.Proof.Exec.DetLemmas
 import FVA.Proof.Exec.Det
 import FVA.Proof.Exec.Spike
 import FVA.Proof.Exec.Instantiate
+import FVA.Proof.Pin.Decode
+import FVA.Proof.Pin.Exec
