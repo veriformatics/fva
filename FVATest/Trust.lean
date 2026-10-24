@@ -4,11 +4,11 @@ import FVA.Trust.Canary
 import FVA.Trust.Verdict
 
 /-!
-# Trust glue checks (U7; built by `scripts/test-trust`)
+# Trust glue checks (U7; built with `fvatest`, so `lake test` runs them)
 
 The collector's pure parts by `#guard`, its file-system parts by `#eval` in temporary
-directories (an exception fails the build). Outside `FVATest.Main` on purpose: the files of
-`fvatest`'s dispatch enter every U12 test-kill digest.
+directories (an exception fails the build). The report-text guards are the U12 `exes`-stage
+kills of the verdict module's wording mutants.
 -/
 
 namespace FVA.Trust.Check

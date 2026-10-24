@@ -86,10 +86,15 @@ deriving ToJson, FromJson
 
 /-- A site before numbering: operator, edits, original + replacement text, start byte. -/
 structure Site where
+  /-- Operator name (`ROR`, `GIB`, …). -/
   op : String
+  /-- Byte-range replacements that make the mutant. -/
   edits : List Edit
+  /-- Original text of the mutated span. -/
   orig : String
+  /-- Replacement text of the mutated span. -/
   repl : String
+  /-- Start byte of the mutated span. -/
   pos : Nat
 
 /-- Binary operator token → (operator name, replacements). -/
@@ -245,9 +250,11 @@ def sitesAt (src : String) (stx : Syntax) : List Site :=
     else []
   | _ => []
 where
+  /-- Source text of `s`, empty without a range. -/
   text (s : Syntax) : String := match range? s with
     | some (a, b) => slice src a b
     | none => ""
+  /-- `GIB`: the two branches of an `if` exchanged. -/
   swap (t e : Option Syntax) : List Site := match t, e with
     | some t, some e => match range? t, range? e with
       | some (ta, tb), some (ea, eb) =>
@@ -329,8 +336,11 @@ def cmdKind (cmd : Syntax) : String :=
 
 /-- A command with its namespace and the constants it added. -/
 structure Cmd where
+  /-- The command's syntax. -/
   stx : Syntax
+  /-- Namespace the command elaborated in. -/
   ns : Name
+  /-- Constants the command added to the environment. -/
   newConsts : Array Name
 
 /-- Elaborate `path` command by command; return the commands and the error messages. Needs the

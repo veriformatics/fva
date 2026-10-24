@@ -213,7 +213,9 @@ odd_cases() {
 	for want in $'Fix/Odd.lean:Fix.res:LIT:0\tinconclusive\tproofs Fix/Proof.lean:12 resource' \
 		$'Fix/Odd.lean:Fix.slow:LIT:1\tinconclusive\ttest:check timeout' \
 		$'Fix/Odd.lean:Fix.slow:LIT:0\tkilled\ttest:check' \
-		$'Fix/Odd.lean:Fix.crashy:LIT:0\tinconclusive\ttest:check crash'; do
+		$'Fix/Odd.lean:Fix.crashy:LIT:0\tinconclusive\ttest:check crash' \
+		$'Fix/Odd.lean:Fix.panicky:LIT:0\tkilled\texes FixTest.lean:4' \
+		$'Fix/Odd.lean:Fix.panicky:LIT:1\tinconclusive\texes crash'; do
 		grep -qxF "$want" <<<"$rows" || bad "odd: missing execution '$want'"
 	done
 	has "$d/u.log" "timeouts/crashes rerun alone" "solo rerun"

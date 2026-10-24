@@ -99,9 +99,13 @@ def Res.show : Res → String
 
 /-- A located Lean diagnostic of a Lake log. -/
 structure Diag where
+  /-- File path as Lake prints it. -/
   file : String
+  /-- Line, 1-based. -/
   line : Nat
+  /-- Column, 0-based. -/
   col : Nat
+  /-- Message text with its continuation lines. -/
   msg : String
 
 /-- Located `error:` diagnostics of a Lake log, in log order, each with its continuation. -/
@@ -130,6 +134,11 @@ def isResource (msg : String) : Bool :=
   ["maximum recursion depth", "deterministic) timeout", "maximum number of heartbeats",
    "deep recursion", "stack overflow", "out of memory", "maxheartbeats", "maxrecdepth"].any
     fun p => (m.splitOn p).length > 1
+
+/-- Lean died without a diagnostic (a runtime panic such as a `Nat.pow` exponent past a machine
+word, a signal): the build is no verdict on the mutant (K5), later stages still decide. -/
+def isCrash (log : String) : Bool :=
+  (log.splitOn "INTERNAL PANIC").length > 1 || (log.splitOn "Lean exited with code").length > 1
 
 /-- Original byte offset of byte `p` of the mutated text. -/
 def origOffset (edits : List Edit) (p : Nat) : Nat := Id.run do
@@ -182,7 +191,9 @@ def classifyDown (ctx : Ctx) (d : Diag) (stage : String) : IO Res := do
 
 /-- A worker: its tree and its log directory. -/
 structure Worker where
+  /-- The worker's tree. -/
   dir : FilePath
+  /-- Directory of the worker's stage logs. -/
   logs : FilePath
 deriving Inhabited
 
@@ -196,9 +207,11 @@ def runStage (ctx : Ctx) (w : Worker) (j : Job) (text : String) (stage : String)
     | none => return .inconclusive "module timeout"
     | some 0 => return .pass
     | some _ =>
-      match (diags (← IO.FS.readFile log)).find? (·.file == j.m.file) with
+      let out ← IO.FS.readFile log
+      match (diags out).find? (·.file == j.m.file) with
       | some d => return classifyHere j text d "module"
-      | none => return .error s!"module: build failed without a located error ({log})"
+      | none => return if isCrash out then .inconclusive "module crash"
+          else .error s!"module: build failed without a located error ({log})"
   else if stage == "proofs" then
     let mut failed : NameSet := {}
     let mut inconcl : Option String := none
@@ -211,8 +224,13 @@ def runStage (ctx : Ctx) (w : Worker) (j : Job) (text : String) (stage : String)
         if inconcl.isNone then inconcl := some s!"proofs {p} timeout"
       | some 0 => pure ()
       | some _ =>
-        match (diags (← IO.FS.readFile plog)).find? (·.file == pathOfMod p) with
-        | none => return .error s!"proofs: {p} failed without a located error ({plog})"
+        let out ← IO.FS.readFile plog
+        match (diags out).find? (·.file == pathOfMod p) with
+        | none =>
+          unless isCrash out do
+            return .error s!"proofs: {p} failed without a located error ({plog})"
+          failed := failed.insert p
+          if inconcl.isNone then inconcl := some s!"proofs {p} crash"
         | some d =>
           match ← classifyDown ctx d "proofs" with
           | .inconclusive why =>
@@ -227,9 +245,11 @@ def runStage (ctx : Ctx) (w : Worker) (j : Job) (text : String) (stage : String)
     | none => return .inconclusive "exes timeout"
     | some 0 => return .pass
     | some _ =>
-      match (diags (← IO.FS.readFile log))[0]? with
+      let out ← IO.FS.readFile log
+      match (diags out)[0]? with
       | some d => classifyDown ctx d "exes"
-      | none => return .error s!"exes: build failed without a located error ({log})"
+      | none => return if isCrash out then .inconclusive "exes crash"
+          else .error s!"exes: build failed without a located error ({log})"
   else
     let some t := ctx.cfg.tests.find? (s!"test:{·.name}" == stage)
       | return .error s!"unknown stage {stage}"
