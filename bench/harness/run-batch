@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# One graded batch (rubric addendum 2026-10-24): every arm of TASK × runs 1..N, in an order
+# shuffled from SEED (recorded), one run per CPU of FVA_BENCH_CPUS at a time. Inputs are
+# prepared once per arm (bench/tasks/prepare) under ~/.cache/fva-bench/inputs/TASK/ARM; the fva
+# arm vendors the FVA of FVA_BENCH_FVA_BIN/FVA_BENCH_FVA_BUILD (the bench tag's build). Needs the
+# run-session variables (FVA_BENCH_MODEL, _EFFORT, _SECONDS, _AUTH_FILE). Prints one TSV row per
+# run: arm, index, cpu, status, wall s, cpu s, load at start.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+[[ $# -ge 3 && $2 =~ ^[0-9]+$ ]] || {
+	echo 'Usage: bench/harness/run-batch TASK SEED ARM...' >&2
+	exit 2
+}
+task=$1 seed=$2
+shift 2
+arms=("$@")
+n=${FVA_BENCH_N:-5}
+read -ra cpus <<<"${FVA_BENCH_CPUS:-2 3 4 5 6 7}"
+base=$HOME/.cache/fva-bench
+export FVA_BENCH_PATH=${FVA_BENCH_PATH:-$base/bin:/usr/local/bin:/usr/bin:/bin}
+prompt_of() { # arm → prompt file + container tools
+	case $1:$task in
+	tool:lz4-c | tool:edger-cpm) echo "tool-framac.txt frama-c" ;;
+	tool:lz4-rust | tool:pflog) echo "tool-verus.txt" ;;
+	tool:*)
+		echo "run-batch: no tool arm for $task" >&2
+		exit 2
+		;;
+	*) echo "$1.txt" ;;
+	esac
+}
+for arm in "${arms[@]}"; do
+	prompt_of "$arm" >/dev/null
+	in=$base/inputs/$task/$arm
+	[[ -d $in ]] || "$root/bench/tasks/prepare" "$task" "$arm" "$in"
+done
+mkdir -p "$base/batches" "$base/harness-logs"
+order=$base/batches/$task-seed$seed.order
+for arm in "${arms[@]}"; do
+	for i in $(seq "$n"); do printf '%s %s\n' "$arm" "$i"; done
+done | shuf --random-source=<(openssl enc -aes-256-ctr -pass "pass:$seed" -nosalt -pbkdf2 \
+	</dev/zero 2>/dev/null) >"$order"
+declare -A busy=()
+launch() { # arm index cpu
+	local p tools
+	read -r p tools <<<"$(prompt_of "$1")"
+	FVA_BENCH_TOOLS=$tools "$root/bench/harness/run-session" "$1" "$task" "$2" "$3" \
+		"$root/bench/prompts/$p" "$base/inputs/$task/$1" >"$base/harness-logs/$1-$task-$2.log" 2>&1 &
+	busy[$3]=$!
+}
+while read -r arm i; do
+	cpu=
+	while [[ -z $cpu ]]; do
+		for c in "${cpus[@]}"; do
+			if [[ -z ${busy[$c]:-} ]] || ! kill -0 "${busy[$c]}" 2>/dev/null; then
+				cpu=$c
+				break
+			fi
+		done
+		[[ -n $cpu ]] || sleep 10
+	done
+	launch "$arm" "$i" "$cpu"
+	sleep 2
+done <"$order"
+wait
+while read -r arm i; do
+	r=$base/runs/$arm-$task-$i/result.json
+	if [[ -f $r ]]; then
+		jq -r --arg a "$arm" --arg i "$i" '[$a, $i, .cpus, .status, (.wall_ms / 1000 | floor),
+			((.cpu_user_s + .cpu_sys_s) | floor), .load1_start] | @tsv' "$r"
+	else printf '%s\t%s\t-\tno result\n' "$arm" "$i"; fi
+done <"$order"
