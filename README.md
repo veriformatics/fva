@@ -70,7 +70,7 @@ fva explain . --spec-module MyProof.Spec --root-module MyProof
 | layer | what it is | why you can rely on it |
 |---|---|---|
 | reviewed once | FVA's specifications: WebAssembly syntax, binary format, execution, integer and IEEE-754 arithmetic, claim forms, certificate relations, the verdict rules | short Lean definitions, audited against the WebAssembly 2.0 specification and tested against its official test suite and against wasmtime |
-| verified implementation | the decoder, the reference interpreter, the floating-point operations, instantiation, the verdict function, the certificate checkers | proved correct against the specifications, and checked by a mutation test |
+| verified implementation | the decoder, the reference interpreter, the floating-point operations, instantiation, the validator (a validated module never gets stuck), the verdict function, the certificate checkers | proved correct against the specifications, and checked by a mutation test |
 | trusted glue | reading facts from Lean, the file checks, process control, the external kernels | small and tested; each kernel must reject the known false proofs |
 | residual trust | the Lean kernel (checked again by an independent kernel), the Lean compiler, Mathlib at its pinned revision | standard for Lean proofs |
 

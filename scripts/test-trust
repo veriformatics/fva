@@ -64,7 +64,7 @@ fi
 subjects=()
 for m in FVA.Impl.Decode FVA.Impl.Decode.Reader FVA.Impl.Decode.Instr FVA.Impl.Decode.Module \
 	FVA.Impl.Exec.Ref FVA.Impl.Exec.Det FVA.Impl.Numerics.Float FVA.Trust.Verdict \
-	FVA.Impl.Cert.Sort FVA.Impl.Cert.Compile; do
+	FVA.Impl.Cert.Sort FVA.Impl.Cert.Compile FVA.Impl.Valid; do
 	subjects+=(--subject "$m")
 done
 "$fva" trust . --spec-module FVA.Self.Spec --root-module FVA.Self "${subjects[@]}" >"$log" 2>&1
@@ -127,9 +127,9 @@ if ((rc != 0)) || ! grep -q '^fva trust: PASS' "$log.certs"; then
 	fail=1
 fi
 # a certificate without a valid proof fails its build at the kernel check
-for n in NaiveR Dup Unsorted JsRound Trailing Tampered UnusedInvalid; do
-	if lake build "FVATest.Certs.Neg.$n" >"$log" 2>&1 || ! grep -q 'declaration type mismatch' "$log"; then
-		echo "test-trust: certificate Neg.$n built, or failed for another reason"
+for neg in NaiveR Dup Unsorted JsRound Trailing Tampered UnusedInvalid; do
+	if lake build "FVATest.Certs.Neg.$neg" >"$log" 2>&1 || ! grep -q 'declaration type mismatch' "$log"; then
+		echo "test-trust: certificate Neg.$neg built, or failed for another reason"
 		fail=1
 	fi
 done
