@@ -9,6 +9,10 @@ import FVA.Tool.Init
 
 /-- CLI entry point. -/
 def main (args : List String) : IO UInt32 := do
+  if let cmd :: rest := args then
+    if (rest.contains "--help" || rest.contains "-h") && (FVA.Cli.usage cmd).isSome then
+      IO.print (FVA.Cli.usage cmd).get!
+      return 0
   match args with
   | ["decode", path] =>
     IO.println (FVA.Tool.decodeSummary (← IO.FS.readBinFile path))

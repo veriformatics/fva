@@ -512,7 +512,9 @@ def render (dir model trustVerdict : String) (saved : Option (String × Bool × 
 def main (argv : List String) : IO UInt32 := do
   let o ← match parse {} argv with
     | .ok o => pure o
-    | .error e => IO.eprintln s!"fva explain: {e}"; return 2
+    | .error e =>
+      IO.eprintln s!"fva explain: {e}. Run \"fva explain --help\" to see the options."
+      return 2
   let root ← try IO.FS.realPath o.dir catch e => IO.eprintln s!"fva explain: {e}"; return 2
   let fva ← FVA.Tool.Trust.fvaRoot
   let spec := o.spec.getD ""

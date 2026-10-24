@@ -92,7 +92,9 @@ def parse (o : Opts) : List String → Except String Opts
 def main (fvaRoot : System.FilePath) (argv : List String) : IO UInt32 := do
   let o ← match parse {} argv with
     | .ok o => pure o
-    | .error e => IO.eprintln s!"fva init: {e}"; return 2
+    | .error e =>
+      IO.eprintln s!"fva init: {e}. Run \"fva init --help\" to see the options."
+      return 2
   unless o.lib.front.isUpper && o.lib.all fun c => c.isAlphanum || c == '_' do
     IO.eprintln s!"fva init: --lib must be a module name such as Verified, got {o.lib}"
     return 2

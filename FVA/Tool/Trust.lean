@@ -277,8 +277,13 @@ def matrix (argv : List String) : IO UInt32 := do
 /-- `fva trust`: build, then `trust-run` under the project's `lake env`. -/
 def main (argv : List String) : IO UInt32 := do
   let o ← match parse {} argv with
-    | .ok o => pure o
-    | .error e => IO.eprintln s!"fva trust: {e}"; return 2
+    | .ok o => if o.spec.isSome then pure o else
+      IO.eprintln
+        "fva trust: --spec-module is required. Run \"fva trust --help\" to see the options."
+      return 2
+    | .error e =>
+      IO.eprintln s!"fva trust: {e}. Run \"fva trust --help\" to see the options."
+      return 2
   -- `trust-run` runs inside the project: every path it gets must be absolute
   let o ← try pure { o with dir := (← IO.FS.realPath o.dir).toString } catch e =>
     IO.eprintln s!"fva trust: {e}"; return 2

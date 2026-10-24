@@ -88,3 +88,43 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | F7 | `ref.is_null` on null returns true (Wasm 2.0 §4.4.2) | specified | accepted → killed by `isNull_null` |
 | F8 | `TableInst.grow` bound + max (5 inconclusive rows, test:spec crashed under the memory cap) + `ictz` of 1 | specified | accepted → killed by `tableGrow_limit`, `ictz_one` |
 | E | the 66 remaining survivors: 15 equivalent (no input distinguishes, argument per row), 51 unspecified (contract clause per row, `path@sha16`) | ruled | accepted: independent ruler (reviewer-8 ≠ the author of the tests and proofs involved); MAIN rematched every unspecified anchor (6/6 clause texts `rg -Fc` = 1); rulings in `FVATest/Mutate/rulings.tsv` |
+
+## U7 trust glue: MAIN security lens (check set S1–S16, target wt/u7 slices 1–3) + second pass + advisor
+
+| row | check | verdict | ruling |
+|---|---|---|---|
+| S1 | Mathlib origin | finding (every `.lake/packages/*` package counted as Mathlib: a fake package hid spec from the surface) | accepted → fixed: Mathlib = packages pinned exactly as FVA's own manifest pins them (`lake-manifest.json` + `.git/HEAD` read as files, no git process); glue check `trusted packages` red on the unfixed revision |
+| S2 | untrusted code during collection | finding (project initializers ran inside trust-run) | accepted → fixed: imports with `loadExts := false`, no initializers, no `supportInterpreter`; `implemented_by`/`extern` detection intact (builtin extension entries) |
+| S3 | lifted `source` path | finding (absolute or escaping the project root) | accepted → fixed: relative, no `..`, inside the root after symlinks (`artifactPath`); cheat LinkEscape → `[link]`; glue check `parent escape` red on the unfixed revision |
+| S4 | surface line count | finding (`codeLines` undercounted lines that start inside a block comment) | accepted → fixed: D11 lexer + glue lexer cases |
+| S16 | export file | finding (fixed `.lake/fva-trust.ndjson`: concurrent runs clobber, 163 MB left behind) | accepted → fixed: private temp dir |
+| S5–S15 | the lens's other rows | no finding | accepted |
+| P2 | second pass (slices 2–3) | findings | accepted → fixed: claims detected through `whnf`, byte-identical re-lift, `[syntax]` on declared subjects, a missing source → `[surface]`, report text sanitized, `--subject` declarations (spec module refused); cheats LinkExtra + Syntax-as-subject |
+| A1–A6 | advisor pass | findings | accepted → fixed: relative project dir absolutized; every lifted module's `decode_eq` replayed by the run-set kernels (lz4-wasm ≤ 4 s each); canary timeouts uncached + undecided in `Pass.checker` (planted slow-kernel case; kernel hash = the binary run); spec module refused as `--subject`; known-acceptance file in the report; lean4lean `unknown constant` = decline |
+| E4 | verdict-module mutation (ad hoc, stages module + proofs: 110 mutants, 76 killed, 1 unviable, 33 survived: report wording `Status.name`, `Link.problems`, `standardAxioms`) | open | guards added in `FVATest/Trust.lean`; their kills + rulings of the rest = the `--fresh` run with the verdict module in scope (ruler ≠ MAIN) |
+
+## U8 C1 vocabulary audit (reviewer-6, check set V1–V8 + R1, target wt/u8 overlay on a5da228)
+
+| row | check | verdict | ruling |
+|---|---|---|---|
+| V1, V3–V6 | `Instance`; `Returns` meaning; `Fits`/`withBytes`; `le32`/`le32s` vs §4.3.1 + BasicCABI.md; `ReturnsAfterWrite` vs a real embedder's write-then-call | pass | accepted |
+| V2 | non-vacuity | finding (major: `ReturnsAfterWrite` true for any export + result when no instance has room; kernel-checked witness on the empty module) | accepted → fixed: strong form (a fresh instance with room exists), `array_sum` domain explicit (p + 4n ≤ 65536); re-check: the witness no longer type-checks |
+| V7 | example claims vs their docstrings + sources | finding (minor: Rust `clamp` comment reads as an interval, false for lo > hi) | accepted → fixed: the comment states the ordered comparisons |
+| V8 | minimality + naming | finding (minor: `Instantiable` docstring "neither traps nor gets stuck" overstates existential initialization) | accepted → fixed: docstring |
+| R1 | contract C1 vs built vocabulary | finding (C1 listed unbuilt predicates) | accepted → fixed: C1 rewritten (the rest moves to its first consumer, U14) |
+
+## U9 contract (consultant-6, K1–K8) + U6 contract (consultant-7, S1–S6)
+
+| row | check | verdict | ruling |
+|---|---|---|---|
+| U9 K1–K8 | relation over exact bytes, checker soundness, toy-compiler profile, attachment tags, kernel budget | accept (K7: TMM → U14; K3: unused-invalid-function witness → negative fixture) | accepted, adopted into `docs/contracts/U9-certify.md` |
+| U6 S1–S6 | typing spec, validator, preservation/progress split, host typing, instantiation, slices | 1 accept + 5 amend | accepted, adopted into `docs/contracts/U6-soundness.md` (host typing ≠ store extension: witness = a valid host appending an `i32` global holding an `f64`) |
+
+## U6 typing spec audit (reviewer-7, check set A1–A10 + R1, target df7c367) + prover findings
+
+| row | check | verdict | ruling |
+|---|---|---|---|
+| A1–A3, A5–A9 | T1–T4 rules vs wg-2.0 §3 + appendix Soundness | pass | accepted |
+| A4 + A10 | block/label/frame results (A4 major, A10 blocker; one root) | finding (exact results rejected `unreachable; select` in a funcref block, which wasm-tools accepts, and falsified Preservation at `Step.invoke`; kernel witness) | accepted → fixed: `SeqT`/`ASeqT` output subsumption (`sub`); acceptance re-review: A4 + A10 pass |
+| R1 (register) | wg-2.0 declarative boundary rules lack the bottom-result matching its algorithm allows | note | accepted: recorded in the `SeqT` docstring |
+| S2 (prover-2) | module validity vs §2.2.5 vector bounds | finding (a valid module with a 2^32-byte data segment had untypable `initCode`; kernel witness) | accepted → fixed: `ModuleValid.elemLengths`/`dataLengths`; `InstantiateBounds.lean` proves the witness invalid |

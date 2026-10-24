@@ -161,5 +161,5 @@ if ((rc != 2)); then
 	echo "test-trust: spec module as subject → rc $rc, pinned 2"
 	fail=1
 fi
-echo "test-trust: glue checks + self package + $n cheat runs + 2 usage cases checked"
+((fail)) || echo "test-trust: glue checks + self package + $n cheat runs + 2 usage cases checked"
 exit "$fail"

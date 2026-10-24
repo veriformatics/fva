@@ -4,6 +4,7 @@ import FVATest.Numeric
 import FVATest.FloatDiff
 import FVATest.Spec
 import FVATest.ValidRun
+import FVATest.Valid
 
 /-- Runtime checks (no arguments): the lakefile version matches `FVA.version`.
 `reencode <in.wasm> <out.wasm>`: decode, then write the re-encoding (decoder differential, E2).

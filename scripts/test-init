@@ -8,6 +8,8 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 fva=$PWD/.lake/build/bin/fva
 [[ -x $fva ]] || exit 2
+# the trust runs check the pinned canaries (test-trust fetches them too; this keeps the order free)
+scripts/fetch-canaries || exit 2
 tmp=$(mktemp -d "$PWD/.lake/test-init.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 p=$tmp/demo
@@ -40,5 +42,5 @@ if ! grep -q '^  FVA.Spec.CAbi: [0-9]* lines' "$tmp/edited.out"; then
 	echo "test-init: an edited vendored spec file stayed out of the review surface"
 	fail=1
 fi
-echo "test-init: fresh project PASS, 14-line surface; edited vendored spec reviewed"
+((fail)) || echo "test-init: fresh project PASS, 14-line surface; edited vendored spec reviewed"
 exit "$fail"
