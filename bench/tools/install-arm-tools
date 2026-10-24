@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Installs the arms' tools outside this repository (arms are not told where it is; a run that
+# reads it is invalid): FVA_BENCH_HOME (default ~/.cache/fva-bench)/bin = pinned wasmtime +
+# wasm-tools, `frama-c` = bench/tools/broker-client (the real wrapper runs outside the sandbox),
+# `verus` = a wrapper over copies of the pinned Verus release + Rust homes in tools/.
+# Prerequisites: scripts/fetch-tools, scripts/fetch-bench-tools verus frama-c.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+home=${FVA_BENCH_HOME:-$HOME/.cache/fva-bench}
+bin=$home/bin tools=$home/tools
+mkdir -p "$bin" "$tools"
+install -m 755 "$root/.tools/bin/wasmtime" "$root/.tools/bin/wasm-tools" "$bin/"
+install -m 755 "$root/bench/tools/broker-client" "$bin/frama-c"
+for d in verus rustup cargo; do
+	[[ -d $root/.tools/$d ]] || {
+		echo "install-arm-tools: run scripts/fetch-bench-tools first (.tools/$d missing)" >&2
+		exit 1
+	}
+	rm -rf "${tools:?}/$d"
+	cp -a --reflink=auto "$root/.tools/$d" "$tools/$d"
+done
+cat >"$bin/verus" <<EOF
+#!/usr/bin/env bash
+export RUSTUP_HOME=$tools/rustup CARGO_HOME=$tools/cargo
+export PATH=$tools/cargo/bin:\$PATH
+exec $tools/verus/verus "\$@"
+EOF
+chmod 755 "$bin/verus"
+"$bin/verus" --version >/dev/null
+echo "install-arm-tools: $bin ready"

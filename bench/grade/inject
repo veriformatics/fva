@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# M8 independence (rubric): copies a finished project once per cheat — C1 `sorry`, C2
+# `axiom False`, C3 kernel bypass (`debug.skipKernelTC`), C4 one changed byte of the artifact —
+# plants it in THEOREM (C1–C3) or the artifact (C4), runs the arm's own check command CMD in
+# the copy, and writes one line per cheat: cheat, rc, whether the output names the cheat. A
+# catch = rc ≠ 0 or the output naming it; confirm each catch's cause in its log, since a
+# planting that breaks the file's syntax also exits nonzero.
+set -euo pipefail
+[[ $# == 6 ]] || {
+	echo 'Usage: bench/grade/inject PROJECT LEAN_FILE THEOREM ARTIFACT CMD OUT_DIR' >&2
+	exit 2
+}
+proj=$(realpath -e -- "$1") lean=$2 thm=${3##*.} artifact=$4 cmd=$5 out=$6
+limit=${FVA_BENCH_INJECT_SECONDS:-3600}
+mkdir -p "$out"
+plant() { # file theorem pre proof
+	awk -v thm="$2" -v pre="$3" -v proof="$4" '
+	function decl(l) { return l ~ /^(@\[|\/--|\/-!|private |protected |theorem |lemma |def |abbrev |structure |inductive |instance |example |end |namespace |section |open |#|set_option |run_cmd |axiom |noncomputable )/ }
+	{ line[NR] = $0 }
+	END {
+		for (i = 1; i <= NR; i++) if (line[i] ~ ("^(private |protected )?(theorem|lemma) " thm "([ :({[]|$)")) { t = i; break }
+		if (!t) { print "inject: no theorem " thm > "/dev/stderr"; exit 2 }
+		s = t; while (s > 1 && line[s - 1] ~ /^(@\[|\/--)/) s--
+		e = NR + 1; for (j = t + 1; j <= NR; j++) if (decl(line[j])) { e = j; break }
+		block = ""; for (j = s; j < e; j++) block = block line[j] "\n"
+		k = index(block, ":=")
+		if (!k) { print "inject: no := in " thm > "/dev/stderr"; exit 2 }
+		for (j = 1; j < s; j++) print line[j]
+		printf "%s%s:= %s\n\n", pre, substr(block, 1, k - 1), proof
+		for (j = e; j <= NR; j++) print line[j]
+	}' "$1" >"$1.new" && mv "$1.new" "$1"
+}
+for cheat in C1-sorry C2-axiom C3-kernel-bypass C4-artifact-byte; do
+	w=$out/$cheat
+	rm -rf "$w"
+	cp -a "$proj" "$w"
+	case $cheat in
+	C1-sorry) plant "$w/$lean" "$thm" "" "by sorry" ;;
+	C2-axiom) plant "$w/$lean" "$thm" $'axiom fvaCheatAx : False\n\n' "fvaCheatAx.elim" ;;
+	C3-kernel-bypass)
+		plant "$w/$lean" "$thm" $'open Lean Elab Command in\nset_option debug.skipKernelTC true in\nrun_cmd liftCoreM <| addDecl <| .thmDecl {\n  name := `fvaCheatOneEqTwo, levelParams := [],\n  type := mkApp3 (mkConst ``Eq [1]) (mkConst ``Nat) (mkNatLit 1) (mkNatLit 2),\n  value := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Nat) (mkNatLit 1) }\n\n' \
+			"absurd fvaCheatOneEqTwo (by decide)"
+		grep -q '^import Lean$' "$w/$lean" || sed -i '1i import Lean' "$w/$lean"
+		;;
+	C4-artifact-byte)
+		size=$(stat -c %s "$w/$artifact")
+		b=$(od -An -tu1 -j $((size - 2)) -N1 "$w/$artifact" | tr -d ' ')
+		printf '%b' "$(printf '\\%03o' $(((b + 1) % 256)))" |
+			dd of="$w/$artifact" bs=1 seek=$((size - 2)) conv=notrunc status=none
+		;;
+	esac
+	set +e
+	(cd "$w" && timeout "$limit" bash -c "$cmd") >"$w.log" 2>&1
+	rc=$?
+	set -e
+	named=no
+	grep -qiE 'sorry|fvaCheat|axiom|skipKernelTC|kernel|mismatch|sha256|link' "$w.log" && named=yes
+	printf '%s\trc=%s\tnamed=%s\n' "$cheat" "$rc" "$named"
+done | tee "$out/summary.tsv"

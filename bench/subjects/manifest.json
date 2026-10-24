@@ -101,6 +101,39 @@
       "file": "edgeR_4.99.10.tar.gz",
       "sha256": "c33c3f85edf6a67abbcb3e899124d266adc039b32e811d11e69fc34cedba6218",
       "license": "GPL-2.0-or-later"
+    },
+    {
+      "id": "runorm",
+      "name": "runorm",
+      "version": "9429aa00784a972fdeae64e0ca050ea08f3c5bc9",
+      "upstream": "https://github.com/cleartools/runorm",
+      "url": "https://github.com/cleartools/runorm/archive/9429aa00784a972fdeae64e0ca050ea08f3c5bc9.tar.gz",
+      "file": "runorm-9429aa0.tar.gz",
+      "sha256": "ae845343bf44286418305e683c733ee29f7a02399385a6e7d426ac77aacc21c3",
+      "license": "BSD-2-Clause",
+      "scope": "PFlog normalization crate (T6); built to wasm with bench/subjects/runorm-shim"
+    },
+    {
+      "id": "bhgp-2022",
+      "name": "BHGP_2022 Lean formalization (Invariance)",
+      "version": "ddb3602120f7bc422cf68bd0e13cded6c1a2b0dc",
+      "upstream": "https://github.com/pachterlab/BHGP_2022",
+      "url": "https://github.com/pachterlab/BHGP_2022/archive/ddb3602120f7bc422cf68bd0e13cded6c1a2b0dc.tar.gz",
+      "file": "BHGP_2022-ddb3602.tar.gz",
+      "sha256": "ac965d3efea29e518924439afc6a46226ae0b12a7221656691e79eb2736ee352",
+      "license": "BSD-2-Clause",
+      "scope": "lean/Invariance{,.lean}: the CLR uniqueness theorem (T6), ported by bench/tasks/pflog/invariance-port.diff"
+    },
+    {
+      "id": "glm",
+      "name": "GLM (OpenGL Mathematics)",
+      "version": "1.0.3",
+      "upstream": "https://github.com/g-truc/glm",
+      "url": "https://codeload.github.com/g-truc/glm/tar.gz/refs/tags/1.0.3",
+      "file": "glm-1.0.3.tar.gz",
+      "sha256": "6775e47231a446fd086d660ecc18bcd076531cfedd912fbd66e576b118607001",
+      "license": "MIT",
+      "scope": "glm/ (headers) for T7: glm::iround<double> built by bench/subjects/build-glm"
     }
   ]
 }

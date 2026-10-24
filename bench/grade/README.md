@@ -1,0 +1,17 @@
+# Grading graded runs (rubric M1–M10)
+
+Per run `R` = `~/.cache/fva-bench/runs/<arm>-<task>-<i>` (its input dir = `~/.cache/fva-bench/inputs/…` as launched):
+
+1. `bench/grade/archive R bench/runs/<arm>-<task>-<i>` — record: result.json, metadata.json, gzipped events, the agent's created/changed files.
+2. `bench/grade/rebuild <input dir> bench/runs/<…> <scratch dir>` — the project outside the sandbox.
+3. M1: list every theorem VERIFICATION.md claims (MAIN reads it); `bench/grade/check-lean <scratch dir> <module> <theorem>…` per module → build, axioms ⊆ {propext, Classical.choice, Quot.sound}, comment-stripped scan for `sorry`/`admit`/`native_decide`/`implemented_by`/`extern`/`debug.skipKernelTC`/`axiom`, leanchecker + con-leche replay. Frama-C/Verus claims: rerun the run's own command with the tool (`bench/tools/frama-c --check-wp …`, `bench/tools/verus …`). Score = valid / claimed.
+4. M2: (a) statements about the hash-pinned shipped bytes (fva: `Lifted.lean` + `fva trust` link check; certificates: the output blobs); (b) a hand-written model → fidelity vs wasmtime on 2,000 cases (T5: model factors vs both producers' outputs); (c) nothing executable.
+5. M3 + M6 (fresh `reviewer` per arm, given README, the official format/edgeR/TMM docs, theorem statements + every definition they use, VERIFICATION.md; calibrated on `prototype/bench/verdicts*.md`) → per requirement `faithful` | `weaker` | `not proven, reported` | `missing` | `false claim`; over-claim sentences. MAIN rechecks every non-`faithful` verdict.
+6. M4 (T1, T4, T5, T6, T7): the defect outcome class, from the run's evidence (MAIN; confirm a "machine-checked counterexample" by its M1 result).
+7. M5: trusted surface at equal M3 — (i) requirement statement, (ii) link + model, (iii) checker code the agent wrote; fva arm = `fva trust`'s review surface (FVA's base counted apart).
+8. M7: `result.json` (wall_ms, tokens, status; `cpu_*`, `load1_*` = idle-window evidence).
+9. M8: `bench/grade/inject <scratch dir> <lean file> <main theorem> <artifact> '<the run's own check command>' <out dir>` → per cheat rc + named; confirm each catch's cause in its log.
+10. M9 (fresh `reviewer`, domain-reader persona: bioinformatician for T4–T6, systems programmer for T1–T3, T7 by subject): per requirement statement `readable` | `readable with effort` | `not readable` + line count read.
+11. M10: any machine-checked statement about the shipped artifact (M2 (a)).
+
+Invalid runs (rubric): a model-usage-limit stop (rerun after reset); a read of this repository in `stdout.jsonl` (`zcat stdout.jsonl.gz | grep -c "$(git rev-parse --show-toplevel)"` on the archive; rerun).

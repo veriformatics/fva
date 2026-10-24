@@ -1,0 +1,13 @@
+--- a/Invariance/Basic.lean
++++ b/Invariance/Basic.lean
+@@ -767,10 +767,6 @@
+     intro h
+     have hc := congrArg (fun v : Fin 3 -> ℝ => v (⟨0, by norm_num⟩ : Fin 3)) h
+     norm_num [T, clr, basis, Fin.sum_univ_three] at hc
+-    have h20 : (2 : Fin 3) ≠ 0 := by
+-      decide
+-    simp [h20] at hc
+-    norm_num at hc
+ 
+ /-- A positive scalar multiple of the identity is rank-monotone. -/
+ lemma positive_smul_id_rank_monotone_fin3 {a : ℝ} (ha : 0 < a) :

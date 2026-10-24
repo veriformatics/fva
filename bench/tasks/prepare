@@ -3,10 +3,10 @@
 # CHECK.md, its artifacts and sources from the pinned downloads (scripts/fetch-bench), and a Lake
 # project on the shared read-only Mathlib (FVA_BENCH_PACKAGES, default
 # ~/.cache/fva-bench/packages-v4.35.0: packagesDir points there, so nothing is copied or
-# fetched). Arm fva: the project is `fva init`'s layout (FVA vendored in fva/, prebuilt from
-# FVA_BENCH_FVA_BUILD, default this checkout's .lake/build); other arms: a project requiring
-# Mathlib alone. FVA_BENCH_FVA_BIN = the `fva` whose package is vendored (default this
-# checkout's). No symlinks: the harness refuses them.
+# fetched; built + verified by bench/tasks/make-packages). Arm fva: the project is `fva init`'s
+# layout (FVA vendored in fva/, prebuilt from FVA_BENCH_FVA_BUILD, default this checkout's
+# .lake/build); other arms: a project requiring Mathlib alone. FVA_BENCH_FVA_BIN = the `fva` whose
+# package is vendored (default this checkout's). No symlinks: the harness refuses them.
 set -euo pipefail
 [[ $# == 3 ]] || {
 	echo 'Usage: bench/tasks/prepare TASK ARM OUTDIR' >&2
@@ -31,6 +31,15 @@ if [[ $arm == fva ]]; then
 	"$fva" init "$out" --lib Proofs >/dev/null
 	mkdir -p "$out/fva/.lake"
 	cp -a "$fvabuild" "$out/fva/.lake/build"
+	# the pinned kernel canaries (scripts/fetch-canaries needs the network the arms lack); no
+	# cached verdicts: the arm's `fva trust` runs every canary itself
+	canaries=$(dirname -- "$(dirname -- "$fvabuild")")/.cache/canaries
+	[[ -d $canaries/arena ]] || {
+		echo "prepare: no fetched canaries at $canaries (run scripts/fetch-canaries)" >&2
+		exit 2
+	}
+	mkdir -p "$out/fva/.cache"
+	rsync -a --exclude=results --exclude='*.tar.gz' "$canaries/" "$out/fva/.cache/canaries/"
 else
 	mkdir -p "$out"
 	cp "$root/lean-toolchain" "$out/"
@@ -54,6 +63,9 @@ TOML
 fi
 jq --arg d "$pkgs" '.packagesDir = $d' "$out/lake-manifest.json" >"$out/.m" &&
 	mv "$out/.m" "$out/lake-manifest.json"
+# the same directory in the lakefile, so Lake does not report the manifest as out of date
+sed -i "/^allowNonModules = true\$/a packagesDir = \"$pkgs\"" "$out/lakefile.toml"
+grep -q '^packagesDir = ' "$out/lakefile.toml"
 cp "$root/bench/tasks/CHECK.md" "$root/bench/tasks/$task/README.md" "$out/"
 case $task in
 lz4-wasm)
@@ -72,6 +84,65 @@ edger-cpm)
 	tar -xOzf "$t" edgeR/R/filterByExpr.R >"$out/R/filterByExpr.R"
 	tar -xOzf "$t" edgeR/man/cpm.Rd >"$out/man/cpm.Rd"
 	tar -xOzf "$t" edgeR/man/filterByExpr.Rd >"$out/man/filterByExpr.Rd"
+	;;
+lz4-c | lz4-rust)
+	"$root/scripts/fetch-bench" lz4 lz4-flex lz4-block-doc >/dev/null
+	cp "$dl/lz4-block-doc/lz4_Block_format.md" "$root/bench/tasks/$task/build.sh" "$out/"
+	if [[ $task == lz4-c ]]; then
+		cp "$root/bench/subjects/wasm/lz4-c.wasm" "$out/"
+		mkdir -p "$out/src"
+		tar -xOzf "$dl/lz4/lz4-1.10.0.tar.gz" lz4-1.10.0/lib/lz4.c >"$out/src/lz4.c"
+		tar -xOzf "$dl/lz4/lz4-1.10.0.tar.gz" lz4-1.10.0/lib/lz4.h >"$out/src/lz4.h"
+		cp "$root/bench/subjects/c-memory.h" "$root/bench/subjects/c-memory.c" "$out/src/"
+	else
+		cp "$root/bench/subjects/wasm/lz4-flex.wasm" "$out/"
+		mkdir -p "$out/shim/vendor"
+		cp -R "$root/bench/subjects/lz4-flex-shim/." "$out/shim/"
+		tar -xzf "$dl/lz4-flex/lz4_flex-0.14.0.crate" -C "$out/shim/vendor"
+		mv "$out/shim/vendor/lz4_flex-0.14.0" "$out/shim/vendor/lz4_flex"
+	fi
+	;;
+pflog)
+	"$root/scripts/fetch-bench" runorm bhgp-2022 >/dev/null
+	cp "$root/bench/subjects/wasm-pflog/runorm-pflog.wasm" "$root/bench/tasks/pflog/build.sh" \
+		"$root/bench/tasks/pflog/invariance-port.diff" "$out/"
+	mkdir -p "$out/shim/vendor"
+	cp -R "$root/bench/subjects/runorm-shim/." "$out/shim/"
+	tar -xzf "$dl/runorm/runorm-9429aa0.tar.gz" -C "$out/shim/vendor"
+	mv "$out/shim/vendor/runorm-9429aa00784a972fdeae64e0ca050ea08f3c5bc9" "$out/shim/vendor/runorm"
+	lab=BHGP_2022-ddb3602120f7bc422cf68bd0e13cded6c1a2b0dc
+	tar -xzf "$dl/bhgp-2022/BHGP_2022-ddb3602.tar.gz" -C "$out" \
+		"$lab/LICENSE" "$lab/lean/Invariance.lean" "$lab/lean/Invariance"
+	mv "$out/$lab/lean/Invariance.lean" "$out/$lab/lean/Invariance" "$out/"
+	mv "$out/$lab/LICENSE" "$out/LICENSE-Invariance"
+	rm -rf "${out:?}/$lab"
+	patch -s -p1 -d "$out" <"$root/bench/tasks/pflog/invariance-port.diff"
+	printf '\n[[lean_lib]]\nname = "Invariance"\n' >>"$out/lakefile.toml"
+	;;
+tmm)
+	"$root/scripts/fetch-bench" edger-source rnanorm >/dev/null
+	cp "$root/bench/tasks/tmm/"{counts.tsv,edger-factors.txt,rnanorm-factors.txt} \
+		"$root/bench/tasks/tmm/"{edger-factors.R,rnanorm-factors.py} "$out/"
+	mkdir -p "$out/edgeR/R" "$out/edgeR/man" "$out/rnanorm"
+	t=$dl/edger-source/edgeR_4.99.10.tar.gz
+	tar -xOzf "$t" edgeR/R/normLibSizes.R >"$out/edgeR/R/normLibSizes.R"
+	tar -xOzf "$t" edgeR/R/calcNormFactors.R >"$out/edgeR/R/calcNormFactors.R"
+	tar -xOzf "$t" edgeR/man/calcNormFactors.Rd >"$out/edgeR/man/calcNormFactors.Rd"
+	tar -xOzf "$t" edgeR/DESCRIPTION >"$out/edgeR/DESCRIPTION"
+	t=$dl/rnanorm/rnanorm-2.2.0.tar.gz
+	for f in between_sample.py utils.py; do
+		tar -xOzf "$t" "rnanorm-2.2.0/src/rnanorm/methods/$f" >"$out/rnanorm/$f"
+	done
+	tar -xOzf "$t" rnanorm-2.2.0/LICENSE >"$out/rnanorm/LICENSE"
+	;;
+glm-iround)
+	"$root/scripts/fetch-bench" glm >/dev/null
+	cp "$root/bench/subjects/wasm-glm/glm-iround.wasm" "$root/bench/subjects/glm-shim/iround.cpp" \
+		"$root/bench/tasks/glm-iround/build.sh" "$out/"
+	tar -xzf "$dl/glm/glm-1.0.3.tar.gz" -C "$out" glm-1.0.3/glm glm-1.0.3/copying.txt
+	mv "$out/glm-1.0.3/glm" "$out/glm"
+	mv "$out/glm-1.0.3/copying.txt" "$out/glm/copying.txt"
+	rmdir "$out/glm-1.0.3"
 	;;
 *)
 	echo "prepare: no inputs defined for task $task" >&2

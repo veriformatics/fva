@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Serves bench/tools/broker-client requests for one benchmark run, outside the Codex sandbox:
+# request = argv file (NUL-separated: tool name, client working directory, tool arguments).
+# The tool must be in TOOL...; the client directory and the tool's WORKDIR argument must resolve
+# inside WORK (the container mounts WORKDIR read-write, nothing else of the host); arguments
+# reach the real wrapper bench/tools/<tool> as an array, never through a shell. Runs until
+# killed (bench/harness/run-session stops it with the run).
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+[[ $# -ge 3 ]] || {
+	echo 'Usage: bench/tools/tool-broker WORK SPOOL TOOL...' >&2
+	exit 2
+}
+work=$(realpath -e -- "$1")
+spool=$2
+shift 2
+tools=("$@")
+mkdir -p "$spool"
+trap 'kill $(jobs -p) 2>/dev/null; exit 0' TERM INT
+inside() {
+	local p
+	p=$(realpath -e -- "$1" 2>/dev/null) || return 1
+	[[ $p == "$work" || $p == "$work/"* ]]
+}
+serve() {
+	set +e
+	local req=$1 argv tool dir rc=2
+	mapfile -d '' -t argv <"$req/argv"
+	tool=${argv[0]:-} dir=${argv[1]:-}
+	local args=("${argv[@]:2}") workdir=${argv[2]:-}
+	[[ $workdir == --check-wp ]] && workdir=${argv[3]:-}
+	if [[ " ${tools[*]} " != *" $tool "* ]]; then
+		echo "tool-broker: $tool is not served for this run" >"$req/stderr"
+	elif ! inside "$dir" || ! (cd -- "$dir" && inside "$workdir"); then
+		echo "$tool: WORKDIR must be a directory inside the task directory" >"$req/stderr"
+	else
+		(cd -- "$dir" && "$root/bench/tools/$tool" "${args[@]}") >"$req/stdout" 2>"$req/stderr"
+		rc=$?
+	fi
+	[[ -e $req/stdout ]] || : >"$req/stdout"
+	echo "$rc" >"$req/rc"
+	: >"$req/done"
+}
+while [[ -d $work ]]; do
+	for ready in "$spool"/req.*/ready; do
+		[[ -e $ready ]] || continue
+		mv -- "$ready" "${ready%/ready}/taken" 2>/dev/null || continue
+		serve "${ready%/ready}" &
+	done
+	sleep 0.2
+done
