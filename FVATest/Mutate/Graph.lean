@@ -54,13 +54,15 @@ def Graph.build (root : System.FilePath) (srcRoots : List String) (exclude : Lis
 
 /-- `m` and every package module it imports transitively, sorted. -/
 partial def Graph.upstream (g : Graph) (m : Name) : Array Name :=
-  let rec go (todo : List Name) (seen : NameSet) : NameSet :=
+  (go [m] {}).toArray.qsort Name.lt
+where
+  /-- Depth-first walk over `todo`, accumulating `seen`. -/
+  go (todo : List Name) (seen : NameSet) : NameSet :=
     match todo with
     | [] => seen
     | x :: rest =>
       if seen.contains x then go rest seen
       else go ((g.imports.getD x #[]).toList ++ rest) (seen.insert x)
-  (go [m] {}).toArray.qsort Name.lt
 
 /-- The union of the upstream closures of `roots`. -/
 def Graph.closure (g : Graph) (roots : Array Name) : NameSet :=

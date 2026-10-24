@@ -1,11 +1,6 @@
 import FVA.Tool.Explain
 
-/-!
-# `fva explain` pure parts (U10; built by `scripts/test-trust`, beside its explain run)
-
-Outside `FVATest.Main` like `FVATest.Trust`: the files of `fvatest`'s dispatch enter every U12
-test-kill digest.
--/
+/-! # `fva explain` pure parts (U10; built with `fvatest`, so `lake test` runs them) -/
 
 namespace FVA.Tool.Explain.Check
 

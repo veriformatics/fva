@@ -31,12 +31,19 @@ unsafe def sitesMain (args : List String) : IO UInt32 := do
 
 /-- Command-line options of a run. -/
 structure Opts where
+  /-- `check`, `update`, `fresh` or `list`. -/
   mode : String := "check"
+  /-- Configuration file. -/
   config : String := "FVATest/Mutate/config.json"
+  /-- Ad-hoc scope: only mutants of these files (S4). -/
   files : List String := []
+  /-- Ad-hoc scope: only mutants of these declarations (S4). -/
   decls : List String := []
+  /-- Ad-hoc stage list in place of each group's (S4). -/
   stages : Option (List String) := none
+  /-- Worker count in place of the configured one. -/
   workers : Option Nat := none
+  /-- Spot-check count in place of the configured one. -/
   spot : Option Nat := none
 
 /-- Parse run options. -/
@@ -161,6 +168,7 @@ def depFiles (ctx : Ctx) (expand : List String → Array String) (key : String) 
 
 /-- Memoized dependency digests by (stage line, dependency key). -/
 structure Digests where
+  /-- Digest by stage line + dependency key. -/
   memo : Std.HashMap String String := {}
 
 /-- Dependency digest of an outcome of `j`. -/
