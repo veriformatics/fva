@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Codex usage of the signed-in account (`codex app-server`, `account/rateLimits/read`), one JSON
+# line: plan, each window's used percent + length + reset time (UTC), credit balance. Read after
+# each graded batch (rubric addendum 2026-10-24); `codex exec --json` reports no rate limits.
+set -euo pipefail
+reply=$({
+	printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"fva-bench","version":"0.1.0"}}}'
+	sleep 1
+	printf '%s\n' '{"jsonrpc":"2.0","method":"initialized"}'
+	printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"account/rateLimits/read","params":{"excludeResetCreditDetails":true}}'
+	sleep 5
+} | timeout 30 codex app-server 2>/dev/null | jq -c 'select(.id == 2)')
+[[ -n $reply ]] || {
+	echo "codex-quota: no reply from codex app-server" >&2
+	exit 2
+}
+jq -c '.result.rateLimits as $r | {
+	at: (now | todate), plan: $r.planType, allowed: .result.ordinaryUsageAllowed,
+	windows: ([$r.primary, $r.secondary] | map(select(. != null) |
+		{usedPercent, minutes: .windowDurationMins, resetsAt: (.resetsAt | todate)})),
+	credits: $r.credits.balance }' <<<"$reply"
