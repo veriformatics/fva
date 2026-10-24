@@ -27,4 +27,4 @@ FVA = Lean 4.35 + Mathlib v4.35.0 package: proofs about the compiled WebAssembly
 
 ## What a PASS rests on
 
-FVA's specs (Wasm syntax, binary grammar, execution semantics, numerics, claim forms, certificate relations, verdict rules; reviewed once), FVA's verified implementation (decoder, stepper, float operators, instantiation, verdict function, certificate checkers: proven against the specs), trusted glue (fact collection, link checks, orchestration, external kernels, each canaried), residual trust (the Lean kernel cross-checked by an independent kernel, the Lean compiler, Mathlib at the pinned revision).
+FVA's specs (Wasm syntax, binary grammar, execution semantics, numerics, claim forms, certificate relations, verdict rules; reviewed once), FVA's verified implementation (decoder, stepper, float operators, instantiation, validator + type soundness, verdict function, certificate checkers: proven against the specs), trusted glue (fact collection, link checks, orchestration, external kernels, each canaried), residual trust (the Lean kernel cross-checked by an independent kernel, the Lean compiler, Mathlib at the pinned revision).

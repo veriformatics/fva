@@ -102,8 +102,9 @@ def boundary : List (String × String) :=
       "integer + IEEE-754 numerics, claim forms, certificate relations, the verdict rules " ++
       "(FVA/Spec/**)"),
    ("verified implementation", "the decoder (sound + complete for the profile), the reference " ++
-      "stepper, the float operators, instantiation, the verdict function, the certificate " ++
-      "checkers (FVA.Self: fva trust on FVA itself)"),
+      "stepper, the float operators, instantiation, the validator (validated modules never get " ++
+      "stuck), the verdict function, the certificate checkers (FVA.Self: fva trust on FVA " ++
+      "itself)"),
    ("trusted glue", "fact collection from the environment, the link and surface checks (a " ++
       "certificate's files included), process orchestration, the external kernels (each " ++
       "canaried)"),
