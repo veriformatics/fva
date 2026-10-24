@@ -77,7 +77,9 @@ def relative (p : String) : Bool :=
 def main (argv : List String) : IO UInt32 := do
   let o ← match parse {} argv with
     | .ok o => pure o
-    | .error e => IO.eprintln s!"fva certify: {e}"; return 2
+    | .error e =>
+      IO.eprintln s!"fva certify: {e}. Run \"fva certify --help\" to see the options."
+      return 2
   let known := builtins.find? (·.1 == o.relation)
   let some relMod := o.relationModule <|> known.map (·.2.1)
     | IO.eprintln s!"fva certify: give --relation-module for {o.relation}"; return 2

@@ -8,6 +8,8 @@ FVA is a Lean 4 package. An AI agent writes the claims and the proofs; FVA makes
 - It does not trust one proof checker. Each proof is checked again by an independent kernel, and each kernel is first tested on known false proofs.
 - It links the proofs to the artifact. A changed byte in the `.wasm` file, or in a certified output file, makes the check fail.
 
+Run `fva help` to see the commands, and `fva <command> --help` to see the arguments and options of one command.
+
 ## Requirements
 
 - Lean 4.35.0 and Lake (`elan` installs them from `lean-toolchain`).

@@ -1,6 +1,6 @@
 # FVA agent guide
 
-FVA = Lean 4.35 + Mathlib v4.35.0 package: proofs about the compiled WebAssembly artifact (`.wasm` bytes, not a model of the source) + per-output certificates for programs FVA cannot verify as code. The verdict = `fva trust`; its review surface (code lines a person must read) is the metric to keep small.
+FVA = Lean 4.35 + Mathlib v4.35.0 package: proofs about the compiled WebAssembly artifact (`.wasm` bytes, not a model of the source) + per-output certificates for programs FVA cannot verify as code. The verdict = `fva trust`; its review surface (code lines a person must read) is the metric to keep small. Commands: `fva help`; arguments + options of one: `fva <command> --help`.
 
 ## Program verification (C, C++, Rust, Zig, … → core wasm)
 
