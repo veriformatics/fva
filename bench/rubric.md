@@ -95,3 +95,7 @@ Per task, median and spread over n runs per cell; no significance claims at n = 
 ## Addendum 2026-10-26 (before the T1 replacement runs)
 
 - Provider capacity errors (`error`/`turn.failed` "Selected model is at capacity") are infrastructure failures, like the usage-limit stops the protocol already treats as invalid: the run is discarded, counted per arm in `results.md`, and replaced by the next run index (the safety-classifier rule of addendum 2026-10-25). The seed-3 T1 batch had two (fva 1, fva 2; 0 completed turns each).
+
+## Addendum 2026-10-26 (2) (before the T5 batch; user ruling)
+
+- T5 R1/R2 (each output is the documented TMM factor within a stated tolerance): the documentation (Robinson & Oshlack 2010, `calcNormFactors.Rd`, RNAnorm's `TMM` docstring) does not fix how tied genes are trimmed. On the T5 matrix each output reproduces its own float64 algorithm bit for bit, while exact-arithmetic TMM with average-rank ties differs from both by up to 1.96%. A claim is `faithful` when the arm states its tie policy and tolerance and the claim holds under them, whether it reproduces the float algorithm or uses exact ties; a claim false under its own stated policy is a `false claim`; an arm that reports the tie ambiguity has it noted under M4/M6. R3 (RNAnorm's factors equal edgeR's to 10 decimal places) is false on this matrix under either policy.
