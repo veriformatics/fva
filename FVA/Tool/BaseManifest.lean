@@ -5,7 +5,7 @@ namespace FVA.Tool
 /-- `(path, sha256)` of every FVA library source but this file. -/
 def baseManifest : List (String × String) := [
   ("FVA.lean",
-    "839ad293c67c22ffa875b91db84c5109249f4273548a4cf6136370ed2db8f2a1"),
+    "f289e0292366a3eed0f954115f31eeaaf2cb36eeeab9f08a37cef2279d19e382"),
   ("FVA/Cli.lean",
     "5ec751906502b3e537bdc685d69fde331287a98ec8da63a2f6fae7362477f87e"),
   ("FVA/Explain.lean",
@@ -48,6 +48,8 @@ def baseManifest : List (String × String) := [
     "70b126567218c479b792c17c5c022636f86098ea48c3a890e4c760fa7e69719f"),
   ("FVA/Proof/Decode/Reader.lean",
     "ba9d3015f3bf4050393530ef5957a4c49c6b6c2d7124757571cbcf2e11668bb5"),
+  ("FVA/Proof/Exec/Choice.lean",
+    "e58315a418402220401fddab35b887c108b8dff65329cc914f592c960631abca"),
   ("FVA/Proof/Exec/Det.lean",
     "51a9ab7c1662af86111815ceb0132c447beb3bd2d3d2bbaf26dd84dcc42cc4db"),
   ("FVA/Proof/Exec/DetLemmas.lean",
