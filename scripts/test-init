@@ -12,6 +12,13 @@ fva=$PWD/.lake/build/bin/fva
 scripts/fetch-canaries || exit 2
 tmp=$(mktemp -d "$PWD/.lake/test-init.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
+# a project named like the package it requires cannot build: init refuses it before writing
+"$fva" init "$tmp/fva" --lib Demo >/dev/null 2>&1
+rc=$?
+if ((rc != 2)) || [[ -e $tmp/fva ]]; then
+	echo "test-init: init into a directory named fva → rc $rc, pinned 2 with nothing written"
+	exit 1
+fi
 p=$tmp/demo
 "$fva" init "$p" --lib Demo --wasm FVATest/Examples/Toy/toy.wasm >/dev/null || exit 2
 ex=FVATest/Examples/Toy
