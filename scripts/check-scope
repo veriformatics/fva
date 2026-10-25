@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Mutation-scope shape (U12): fvamut's site lister reads command-level declarations, so a
+# definition wrapped in `<command> in` (`open … in`, `set_option … in`, …) is never mutated (two
+# certificate checkers were missed that way). Scope files (config.json group dirs + FVA/Spec, the
+# helpers' modules) open namespaces and set options at section level instead. rc 1 = such a
+# command in a scope file; rc 2 = a scope path is missing.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+mapfile -t scope < <(jq -r '.groups[].dirs[]' FVATest/Mutate/config.json) || exit 2
+scope+=(FVA/Spec)
+for f in "${scope[@]}"; do
+	[[ -e $f ]] || {
+		echo "check-scope: scope path $f does not exist" >&2
+		exit 2
+	}
+done
+hits=$(grep -rnE --include='*.lean' '^(open|set_option|variable|universe|attribute|omit|include) .* in$' "${scope[@]}")
+[[ -z $hits ]] && exit 0
+echo "check-scope: \`open … in\` in a mutation-scope file (fvamut skips the wrapped declaration):"
+echo "$hits"
+exit 1

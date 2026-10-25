@@ -104,7 +104,9 @@ def toyBody (m : Module) : Option (List Instr) :=
 
 end Impl
 
-open Impl in
+section
+open Impl
+
 /-- The input is an expression's text and a line feed, the output a valid `toyModule` whose
 body evaluates symbolically to that expression. -/
 def Compiled.check (i o : Blob) : Bool :=
@@ -127,5 +129,7 @@ def Compiled.check (i o : Blob) : Bool :=
       else false
     | _ => false
   | none => false
+
+end
 
 end FVA.Cert

@@ -91,12 +91,16 @@ def printsAs : List Int → (n v : Nat) → Bool
 
 end Impl
 
-open Impl in
+section
+open Impl
+
 /-- Both blobs are `IntLines`, and the output's integers are the input's, sorted. -/
 def SortedPerm.check (i o : Blob) : Bool :=
   match parseInts i.len i.bytes false 0 0 [], parseInts o.len o.bytes false 0 0 [] with
   | some xs, some ys =>
     printsAs xs i.len i.bytes && printsAs ys o.len o.bytes && listEq (isort xs []) ys
   | _, _ => false
+
+end
 
 end FVA.Cert
