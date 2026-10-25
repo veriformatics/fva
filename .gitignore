@@ -10,6 +10,7 @@ __pycache__/
 !bench/subjects/wasm-glm/*.wasm
 !FVATest/Cheats/*.wasm
 !FVATest/Examples/**/*.wasm
+!FVATest/Subjects/**/*.wasm
 !FVATest/Certs/**/*.wasm
 # local state
 .scratch/

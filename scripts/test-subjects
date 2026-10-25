@@ -12,10 +12,12 @@ fail=0
 
 # subject: root module, spec module, subject (lifted) module, pinned surface line count
 subjects=(
-	"FVATest.Subjects.Lz4Wasm FVATest.Subjects.Lz4Wasm.Spec FVATest.Subjects.Lz4Wasm.Lifted 46"
+	"FVATest.Subjects.Lz4Wasm FVATest.Subjects.Lz4Wasm.Spec FVATest.Subjects.Lz4Wasm.Lifted 48"
+	"FVATest.Subjects.GlmIround FVATest.Subjects.GlmIround.Spec FVATest.Subjects.GlmIround.Lifted 10"
 )
 # the Neg roots are no default target; build them by module name, expecting failure
-negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte)
+negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
+	FVATest.Subjects.GlmIround.Neg.Ret)
 
 roots=(fva FVA)
 for s in "${subjects[@]}"; do
