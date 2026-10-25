@@ -128,3 +128,11 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | A4 + A10 | block/label/frame results (A4 major, A10 blocker; one root) | finding (exact results rejected `unreachable; select` in a funcref block, which wasm-tools accepts, and falsified Preservation at `Step.invoke`; kernel witness) | accepted → fixed: `SeqT`/`ASeqT` output subsumption (`sub`); acceptance re-review: A4 + A10 pass |
 | R1 (register) | wg-2.0 declarative boundary rules lack the bottom-result matching its algorithm allows | note | accepted: recorded in the `SeqT` docstring |
 | S2 (prover-2) | module validity vs §2.2.5 vector bounds | finding (a valid module with a 2^32-byte data segment had untypable `initCode`; kernel witness) | accepted → fixed: `ModuleValid.elemLengths`/`dataLengths`; `InstantiateBounds.lean` proves the witness invalid |
+
+## U12 joined-groups survivors (reviewer-9, check set = per-mutant observable equivalence + governing-contract coverage + evidence integrity, target b42f4cb)
+
+| row | check | verdict | ruling |
+|---|---|---|---|
+| S1–S18 | 18 cert-parser + validator survivors (`parseInts`, `parseNat`, `parseArith`, `Check.memArg` LIT:0) | equivalent | accepted: reprint-and-compare rejects every input where a parser widening differs, so no certificate verdict changes; arguments + Lean probes per row in `FVATest/Mutate/rulings.tsv` |
+| S19–S20 | `parseNat` ROR:2 (rejects digit 9), `parseArith` AOR:0 (rejects a root constant) | unspecified | accepted: U9 C1 "Both are sound and intentionally incomplete: a rejection gives no certificate, never a refutation" (`docs/contracts/U9-certify.md@94b60f122e2be4cb`, MAIN rematch `rg -Fc` = 1); the three compiler fixtures still accept |
+| REG-1 (major, outside the set) | scope coverage | finding: `fvamut sites` skipped `SortedPerm.check` + `Compiled.check` (`open Impl in` wrapped them; the lister does not descend into `<command> in`) | accepted → fixed: both moved to section-level `open Impl` (+41 mutants, 3,359 total); `scripts/check-scope` (gate) fails on any `<command> in` line in a scope file, planted inputs in test-checks |

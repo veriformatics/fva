@@ -47,5 +47,19 @@ if ! (cd "$d" && scripts/check-format && scripts/check-pins) >/dev/null; then
 	echo "test-checks: clean copy failed"
 	fail=1
 fi
+# check-scope: a scope file with an `open … in` command fails; the clean scope passes
+d=$tmp/scope && mkdir -p "$d/scripts" "$d/FVATest/Mutate" "$d/FVA/Spec" "$d/FVA/Impl/X"
+cp scripts/check-scope "$d/scripts/" && cp FVATest/Mutate/config.json "$d/FVATest/Mutate/"
+jq '.groups |= map(.dirs |= if length > 0 then ["FVA/Impl/X"] else . end)' \
+	FVATest/Mutate/config.json >"$d/FVATest/Mutate/config.json"
+printf 'open Nat in\ndef y : Nat := succ 0\n' >"$d/FVA/Impl/X/A.lean"
+expect_fail "open-in in a scope file" "$d" scripts/check-scope
+printf 'set_option maxRecDepth 100 in\ndef y : Nat := 0\n' >"$d/FVA/Impl/X/A.lean"
+expect_fail "set_option-in in a scope file" "$d" scripts/check-scope
+printf 'section\nopen Nat\ndef y : Nat := succ 0\nend\n' >"$d/FVA/Impl/X/A.lean"
+if ! (cd "$d" && scripts/check-scope) >/dev/null; then
+	echo "test-checks: check-scope failed a clean scope"
+	fail=1
+fi
 scripts/test-mutation-fixture || fail=1
 exit "$fail"
