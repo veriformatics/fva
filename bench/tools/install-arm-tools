@@ -19,6 +19,12 @@ for d in verus rustup cargo; do
 	rm -rf "${tools:?}/$d"
 	cp -a --reflink=auto "$root/.tools/$d" "$tools/$d"
 done
+# the Rust homes' env scripts name the checkout they were installed in: name the copies instead
+grep -rlIZF "$root" "$tools" | xargs -0 -r sed -i "s|$root/.tools|$tools|g; s|$root|$tools|g"
+if grep -rlIqF "$root" "$tools"; then
+	echo "install-arm-tools: $tools names $root" >&2
+	exit 1
+fi
 cat >"$bin/verus" <<EOF
 #!/usr/bin/env bash
 export RUSTUP_HOME=$tools/rustup CARGO_HOME=$tools/cargo

@@ -31,6 +31,13 @@ if [[ $arm == fva ]]; then
 	"$fva" init "$out" --lib Proofs >/dev/null
 	mkdir -p "$out/fva/.lake"
 	cp -a "$fvabuild" "$out/fva/.lake/build"
+	# Lake metadata (traces, setup files, response files) records the absolute paths of the
+	# checkout the build was made in; arms that read it found this repository (T1 runs), so it
+	# names this copy and the package store instead
+	src=$(cd -- "$(dirname -- "$fvabuild")/.." && pwd -P)
+	find "$out/fva/.lake/build" -type f \( -name '*.trace' -o -name '*.json' -o -name '*.rsp' \) \
+		-exec grep -lZF "$root" {} + | xargs -0 -r sed -i \
+		"s|$root/.lake/packages|$pkgs|g; s|$src|$out/fva|g; s|$root|$out/fva|g"
 	# the pinned kernel canaries (scripts/fetch-canaries needs the network the arms lack); no
 	# cached verdicts: the arm's `fva trust` runs every canary itself
 	canaries=$(dirname -- "$(dirname -- "$fvabuild")")/.cache/canaries
@@ -150,3 +157,8 @@ glm-iround)
 	;;
 esac
 [[ -z $(find "$out" -type l -print -quit) ]]
+# no input may name this repository: the arms are not told where it is
+if grep -rlqF "$root" "$out"; then
+	echo "prepare: $out names $root: $(grep -rlF "$root" "$out" | head -3 | tr '\n' ' ')" >&2
+	exit 1
+fi
