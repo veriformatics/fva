@@ -112,7 +112,7 @@ def boundary : List (String × String) :=
       "compiler that built fva, Mathlib at the pinned revision, the specs")]
 
 /-- Project-derived text for the plain report: control and bidirectional-override characters
-escaped, so a declaration name or file path cannot forge report lines. -/
+escaped, so a declaration name or file path cannot add report lines of its own. -/
 def clean (s : String) : String :=
   s.foldl (init := "") fun acc c =>
     let n := c.toNat

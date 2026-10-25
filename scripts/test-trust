@@ -15,7 +15,7 @@ printf 'leanchecker\tarena/good/tutorial/001_basicDef\tplanted\ncon-leche\tarena
 # a canary whose pinned sha256 its file misses: never run
 grep -P '^arena/bad/bugs/constlevels\t' "$set" | sed 's/\t[0-9a-f]\{64\}\t/\t'"$(printf '0%.0s' {1..64})"'\t/' >"$tmp/altered.tsv"
 # Lean's kernel accepts the #15704 export by design: covered by con-leche's reject when known
-grep -P '^prelude-15704/exploit\t' "$set" >"$tmp/prelude.tsv"
+grep -P '^prelude-15704/replaced-prelude\t' "$set" >"$tmp/prelude.tsv"
 for f in good altered prelude; do [[ -s $tmp/$f.tsv ]] || exit 2; done
 # project, wanted tag set, extra `fva trust` arguments
 pinned="Clean PASS

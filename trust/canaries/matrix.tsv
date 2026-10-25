@@ -192,7 +192,7 @@ con-leche	arena/good/tutorial/128_quotLiftType	good	accept
 con-leche	arena/good/tutorial/129_quotSoundType	good	accept
 con-leche	arena/good/tutorial/130_quotLiftReduction	good	accept
 con-leche	arena/good/tutorial/131_quotIndReduction	good	accept
-con-leche	prelude-15704/exploit	bad	reject
+con-leche	prelude-15704/replaced-prelude	bad	reject
 con-ron	arena/bad/bugs/constlevels	bad	reject
 con-ron	arena/bad/bugs/ctor-num-fields	bad	reject
 con-ron	arena/bad/bugs/k-rec-conv	bad	reject
@@ -386,7 +386,7 @@ con-ron	arena/good/tutorial/128_quotLiftType	good	accept
 con-ron	arena/good/tutorial/129_quotSoundType	good	accept
 con-ron	arena/good/tutorial/130_quotLiftReduction	good	accept
 con-ron	arena/good/tutorial/131_quotIndReduction	good	accept
-con-ron	prelude-15704/exploit	bad	reject
+con-ron	prelude-15704/replaced-prelude	bad	reject
 lean4lean	arena/bad/bugs/constlevels	bad	reject
 lean4lean	arena/bad/bugs/ctor-num-fields	bad	reject
 lean4lean	arena/bad/bugs/k-rec-conv	bad	reject
@@ -580,7 +580,7 @@ lean4lean	arena/good/tutorial/128_quotLiftType	good	accept
 lean4lean	arena/good/tutorial/129_quotSoundType	good	accept
 lean4lean	arena/good/tutorial/130_quotLiftReduction	good	accept
 lean4lean	arena/good/tutorial/131_quotIndReduction	good	accept
-lean4lean	prelude-15704/exploit	bad	accept
+lean4lean	prelude-15704/replaced-prelude	bad	accept
 leanchecker	arena/bad/bugs/constlevels	bad	reject
 leanchecker	arena/bad/bugs/ctor-num-fields	bad	reject
 leanchecker	arena/bad/bugs/k-rec-conv	bad	reject
@@ -967,8 +967,8 @@ leanchecker-paranoid	arena/good/tutorial/128_quotLiftType	good	accept
 leanchecker-paranoid	arena/good/tutorial/129_quotSoundType	good	accept
 leanchecker-paranoid	arena/good/tutorial/130_quotLiftReduction	good	accept
 leanchecker-paranoid	arena/good/tutorial/131_quotIndReduction	good	accept
-leanchecker-paranoid	prelude-15704/exploit	bad	accept
-leanchecker	prelude-15704/exploit	bad	accept
+leanchecker-paranoid	prelude-15704/replaced-prelude	bad	accept
+leanchecker	prelude-15704/replaced-prelude	bad	accept
 nanoda	arena/bad/bugs/constlevels	bad	crash
 nanoda	arena/bad/bugs/ctor-num-fields	bad	crash
 nanoda	arena/bad/bugs/k-rec-conv	bad	crash
@@ -1162,4 +1162,4 @@ nanoda	arena/good/tutorial/128_quotLiftType	good	accept
 nanoda	arena/good/tutorial/129_quotSoundType	good	accept
 nanoda	arena/good/tutorial/130_quotLiftReduction	good	accept
 nanoda	arena/good/tutorial/131_quotIndReduction	good	accept
-nanoda	prelude-15704/exploit	bad	reject
+nanoda	prelude-15704/replaced-prelude	bad	reject

@@ -19,7 +19,7 @@ namespace FVA.Trust
 
 /-- One pinned canary. -/
 structure Canary where
-  /-- `arena/bad/bugs/constlevels`, `prelude-15704/exploit`, … (path without `.ndjson`). -/
+  /-- `arena/bad/bugs/constlevels`, `prelude-15704/replaced-prelude`, … (path without `.ndjson`). -/
   name : String
   /-- sha256 of the file. -/
   sha256 : String

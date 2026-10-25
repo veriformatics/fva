@@ -1,3 +1,3 @@
-leanchecker	prelude-15704/exploit	Lean's kernel assumes the official prelude (lean4#15704 ruling); [prelude] + an independent kernel guard it
-leanchecker-paranoid	prelude-15704/exploit	same kernel family as leanchecker (lean4#15704)
-lean4lean	prelude-15704/exploit	port of Lean's kernel, same prelude assumption (lean4#15704)
+leanchecker	prelude-15704/replaced-prelude	Lean's kernel assumes the official prelude (lean4#15704 ruling); [prelude] + an independent kernel guard it
+leanchecker-paranoid	prelude-15704/replaced-prelude	same kernel family as leanchecker (lean4#15704)
+lean4lean	prelude-15704/replaced-prelude	port of Lean's kernel, same prelude assumption (lean4#15704)
