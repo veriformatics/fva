@@ -137,3 +137,22 @@ done
 expect_rc 1 "$root/bench/harness/run-session" bare "mock-$$" 1 "$cpus" "$tmp/prompt" "$tmp/inputs"
 grep -q 'run already exists' "$tmp/last.log"
 echo 'harness: dry-run, auth-only home/cleanup, config exclusion, env isolation, jail, overwrite refusal → pass'
+
+# archive refuses a run whose event log or agent files hold a secret of the auth file
+fake=$tmp/fake-run
+mkdir -p "$fake/work"
+printf '{"status":"completed"}\n' >"$fake/result.json"
+printf '{}\n' >"$fake/metadata.json"
+: >"$fake/inputs.sha256"
+printf 'agent proof\n' >"$fake/work/Proof.lean"
+printf '{"tokens":{"access_token":"fixture-secret-0123456789abcdefghij"}}\n' >"$tmp/fake-auth.json"
+printf '{"type":"item.completed","item":{"aggregated_output":"no secret"}}\n' >"$fake/stdout.jsonl"
+expect_rc 0 env FVA_BENCH_AUTH_FILE="$tmp/fake-auth.json" "$root/bench/grade/archive" "$fake" \
+	"$tmp/arch-clean"
+[[ -f $tmp/arch-clean/work/Proof.lean && -f $tmp/arch-clean/stdout.jsonl.gz ]]
+printf '{"item":{"aggregated_output":"fixture-secret-0123456789abcdefghij"}}\n' >>"$fake/stdout.jsonl"
+expect_rc 1 env FVA_BENCH_AUTH_FILE="$tmp/fake-auth.json" "$root/bench/grade/archive" "$fake" \
+	"$tmp/arch-leak"
+grep -q 'refusing to archive' "$tmp/last.log"
+[[ ! -e $tmp/arch-leak ]]
+echo 'archive: clean run archived, run holding an auth secret refused → pass'

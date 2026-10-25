@@ -16,6 +16,20 @@ run=$(realpath -e -- "$1") out=$2
 	echo "archive: $out exists" >&2
 	exit 2
 }
+# The run could read its copy of the Codex auth file (inside the run directory); a secret in the
+# event log or the agent's files would reach the repo inside a .gz, which gitleaks does not open.
+auth=${FVA_BENCH_AUTH_FILE:-$HOME/.codex/auth.json}
+[[ -f $auth ]] || {
+	echo "archive: no auth file $auth to screen against (set FVA_BENCH_AUTH_FILE)" >&2
+	exit 2
+}
+while IFS= read -r secret; do
+	if grep -rqF --exclude-dir=.lake --exclude-dir=.git --exclude-dir=target -- "${secret:0:24}" \
+		"$run/stdout.jsonl" "$run/work" 2>/dev/null; then
+		echo "archive: $run holds a secret of $auth; refusing to archive" >&2
+		exit 1
+	fi
+done < <(jq -r '.. | strings | select(length >= 24)' "$auth")
 mkdir -p "$out/work"
 cp "$run/result.json" "$run/metadata.json" "$out/"
 gzip -9 -c "$run/stdout.jsonl" >"$out/stdout.jsonl.gz"
