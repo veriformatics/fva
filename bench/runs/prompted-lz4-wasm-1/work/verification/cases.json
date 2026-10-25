@@ -1,0 +1,6 @@
+{
+  "encodeInput": "abcdeabcdWXYZ",
+  "encodedHex": "5061626364650500405758595a",
+  "validHex": "13410100503132333435",
+  "decodedText": "AAAAAAAA12345"
+}

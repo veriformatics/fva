@@ -1,0 +1,30 @@
+;; Imported functions execute the original shipped binary.
+(module
+  (import "codec" "memory" (memory 1))
+  (import "codec" "lz4BlockEncode" (func $encode (param i32 i32 i32) (result i32)))
+  (func (export "run") (result i32) (local $p i32)
+    (if (i32.ne (memory.grow (i32.const 4)) (i32.const 1)) (then unreachable))
+    ;; Initialize all 65,536 hash words to -65536 as required by the interface.
+    (loop $init
+      (i32.store (local.get $p) (i32.const -65536))
+      (local.set $p (i32.add (local.get $p) (i32.const 4)))
+      (br_if $init (i32.lt_u (local.get $p) (i32.const 262144))))
+    ;; Input: "ababababababc" (13 bytes), immediately after the table.
+    (i64.store (i32.const 262144) (i64.const 0x6261626162616261))
+    (i32.store (i32.const 262152) (i32.const 0x62616261))
+    (i32.store8 (i32.const 262156) (i32.const 99))
+    (call $encode (i32.const 262144) (i32.const 13) (i32.const 262208)))
+  (func (export "byte") (param $i i32) (result i32)
+    (i32.load8_u (i32.add (i32.const 262208) (local.get $i)))))
+(assert_return (invoke "run") (i32.const 11))
+(assert_return (invoke "byte" (i32.const 0)) (i32.const 34))
+(assert_return (invoke "byte" (i32.const 1)) (i32.const 97))
+(assert_return (invoke "byte" (i32.const 2)) (i32.const 98))
+(assert_return (invoke "byte" (i32.const 3)) (i32.const 2))
+(assert_return (invoke "byte" (i32.const 4)) (i32.const 0))
+(assert_return (invoke "byte" (i32.const 5)) (i32.const 80))
+(assert_return (invoke "byte" (i32.const 6)) (i32.const 97))
+(assert_return (invoke "byte" (i32.const 7)) (i32.const 98))
+(assert_return (invoke "byte" (i32.const 8)) (i32.const 97))
+(assert_return (invoke "byte" (i32.const 9)) (i32.const 98))
+(assert_return (invoke "byte" (i32.const 10)) (i32.const 99))
