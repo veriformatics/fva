@@ -39,7 +39,8 @@ case $FVA_BENCH_EFFORT in none | minimal | low | medium | high | xhigh) ;; *) ex
 auth=$(realpath -e -- "$FVA_BENCH_AUTH_FILE")
 [[ -f $auth ]] || exit 2
 home=$(realpath -e -- "$HOME")
-run=$home/.cache/fva-bench/runs/$arm-$task-$index
+base=$home/.cache/fva-bench
+run=$base/runs/$arm-$task-$index
 [[ $run != "$inputs" && $run != "$inputs/"* ]] || {
 	echo 'run-session: input directory contains the destination' >&2
 	exit 2
@@ -55,6 +56,10 @@ run=$home/.cache/fva-bench/runs/$arm-$task-$index
 }
 codex=$(command -v codex)
 codex=$(realpath -e -- "$codex")
+command -v bwrap >/dev/null || {
+	echo 'run-session: bubblewrap (bwrap) is required' >&2
+	exit 2
+}
 effective=$(taskset -c "$cpus" awk "/^Cpus_allowed_list:/ { print \$2 }" /proc/self/status)
 jq -ne --arg requested "$cpus" --arg effective "$effective" '
   def cpus: split(",") | map(split("-") | map(tonumber) |
@@ -73,6 +78,22 @@ public_env=("HOME=$run/home" "CODEX_HOME=$run/codex"
 # bench/tools/tool-broker; the arm calls them by name via bench/tools/broker-client.
 read -ra tools <<<"${FVA_BENCH_TOOLS:-}"
 ((${#tools[@]} == 0)) || public_env+=("FVA_TOOL_SPOOL=$run/tmp/fva-tool")
+# Codex's workspace-write sandbox limits writes alone, and agents look for AGENTS.md in parent
+# directories ⇒ the run sees the system, its own directory, the arm tools, the Mathlib store and
+# the PATH entries under $HOME; the rest of $HOME (this repo, other runs, ~/AGENTS.md), /tmp, the
+# journal and the host's processes stay hidden.
+jail=(bwrap --ro-bind / / --dev /dev --proc /proc --unshare-pid --die-with-parent)
+for d in /home "$home" /tmp /var/tmp /run/user /var/log /mnt /srv /media; do
+	[[ ! -d $d ]] || jail+=(--tmpfs "$d")
+done
+IFS=: read -ra path_dirs <<<"${FVA_BENCH_PATH:-/usr/local/bin:/usr/bin:/bin}"
+visible=()
+for d in "${path_dirs[@]}" "$base/tools" "${FVA_BENCH_PACKAGES:-$base/packages-v4.35.0}" \
+	"${codex%/*}"; do
+	[[ $d != "$home/"* || ! -d $d ]] || visible+=("$d")
+done
+for d in "${visible[@]}"; do jail+=(--ro-bind "$d" "$d"); done
+jail+=(--bind "$run" "$run" --chdir "$run/work" --)
 args=(exec -C "$run/work" -s workspace-write --json --color never --ephemeral
 	--ignore-user-config --ignore-rules -m "$FVA_BENCH_MODEL"
 	-c "model_reasoning_effort=\"$FVA_BENCH_EFFORT\""
@@ -87,8 +108,8 @@ print_command() {
 	((${#tools[@]} == 0)) || printf '%q %q %q%s &\n' "$root/bench/tools/tool-broker" "$run/work" \
 		"$run/tmp/fva-tool" "$(printf ' %q' "${tools[@]}")"
 	printf 'cd %q\n' "$run/work"
-	printf 'env -i'
-	printf ' %q' "${public_env[@]}" "${command[@]}"
+	printf '%q' "${jail[0]}"
+	printf ' %q' "${jail[@]:1}" env -i "${public_env[@]}" "${command[@]}"
 	printf " \"\$(cat -- %q)\" < /dev/null > %q 2> %q\n" \
 		"$run/prompt.txt" "$run/stdout.jsonl" "$run/stderr.log"
 }
@@ -97,7 +118,7 @@ if $dry; then
 	exit 0
 fi
 umask 077
-mkdir -p "$home/.cache/fva-bench/runs"
+mkdir -p "$base/runs"
 mkdir "$run"
 mkdir "$run/work" "$run/home" "$run/codex" "$run/tmp"
 trap 'rm -f -- "$run/codex/auth.json"' EXIT
@@ -117,13 +138,19 @@ input_sha=${input_sha%% *}
 exe_sha=$(sha256sum "$codex")
 exe_sha=${exe_sha%% *}
 version=$(env -i "${public_env[@]}" "$codex" --version)
+harness=$(git -C "$root" rev-parse HEAD 2>/dev/null || echo unknown)
+[[ -z $(git -C "$root" status --porcelain -- bench/harness bench/prompts bench/tasks bench/tools \
+	2>/dev/null) ]] || harness+=-dirty
 jq -n --arg arm "$arm" --arg task "$task" --argjson index "$index" \
 	--arg cpus "$effective" --arg model "$FVA_BENCH_MODEL" --arg effort "$FVA_BENCH_EFFORT" \
 	--argjson seconds "$FVA_BENCH_SECONDS" --arg prompt_sha "$prompt_sha" \
 	--arg input_sha "$input_sha" --arg codex_sha "$exe_sha" --arg codex "$codex" --arg version "$version" \
-	'{arm:$arm,task:$task,index:$index,cpus:$cpus,model:$model,effort:$effort,
+	--arg harness "$harness" --arg bwrap "$(bwrap --version)" \
+	--args '{arm:$arm,task:$task,index:$index,cpus:$cpus,model:$model,effort:$effort,
     limit_seconds:$seconds,prompt_sha256:$prompt_sha,input_manifest_sha256:$input_sha,
-    codex_executable:$codex,codex_executable_sha256:$codex_sha,codex_version:$version}' >"$run/metadata.json"
+    codex_executable:$codex,codex_executable_sha256:$codex_sha,codex_version:$version,
+    harness_commit:$harness,jail:{tool:$bwrap,visible:$ARGS.positional}}' \
+	"${visible[@]}" >"$run/metadata.json"
 prompt_text=$(<"$run/prompt.txt")
 broker=
 if ((${#tools[@]} > 0)); then
@@ -134,7 +161,7 @@ fi
 load_start=$(cut -d" " -f1 /proc/loadavg)
 start=$(date +%s%3N)
 set +e
-(cd "$run/work" && env -i "${public_env[@]}" "${command[@]}" "$prompt_text" \
+(cd "$run/work" && "${jail[@]}" env -i "${public_env[@]}" "${command[@]}" "$prompt_text" \
 	</dev/null >"$run/stdout.jsonl" 2>"$run/stderr.log")
 rc=$?
 set -e

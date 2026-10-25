@@ -10,6 +10,8 @@ fi
 [[ ! -e AGENTS.md && ! -e AGENTS.override.md && ! -e .codex && ! -e .agents ]]
 [[ ! -e CLAUDE.md && ! -e .claude && ! -e .mcp.json ]]
 [[ -f input.txt && -d .git && -z $(cat) ]]
+# run-session's jail: own process table, empty /tmp, nothing of $HOME beside the bound paths
+[[ $(</proc/1/comm) == bwrap && -z $(ls -A /tmp) && ! -e ${0%/*}/../jail-sentinel ]]
 args=("$@")
 has() {
 	local a

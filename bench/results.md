@@ -31,6 +31,7 @@ One run per arm on T1 and T4 (the rubric's pilot), model `gpt-6.1-sol`, reasonin
 - Subject content in the package: one comment in `FVA/Lifted.lean` names lz4 C (a decoder timing note); `scripts/fetch-canaries` keeps the upstream file name of one canary in its URL. The package holds no specification or proof of a bench subject.
 - Graded set = T1, T4, T5, T2, T3, T7: T6 (pflog) and the S-link sentence (H3) were dropped before any graded run (rubric addendum 2026-10-24 (2)).
 - A first T1 batch (15 runs, `bench-v2`) was superseded before grading (rubric addendum 2026-10-25): a package-name collision in its fva inputs, two repository reads through Lake metadata paths, one provider safety-classifier stop.
+- A second T1 batch (15 runs, seed 2, `bench-v2.1`) was superseded before grading (rubric addendum 2026-10-25 (2)): agents read outside their run directories (two prompted runs read the host user's global `AGENTS.md`; seven runs listed other runs' file names, no contents read). Safety-classifier stops: bare 1, prompted 0, fva 2. Every later run starts in a bubblewrap jail.
 - Order: `bench/harness/run-batch TASK SEED ARM…`; each batch's seed and order are listed with its results. Safety-classifier stops are counted per arm.
 
 <details><summary>fva-arm package files, bench-v2.1 (sha256, path)</summary>
