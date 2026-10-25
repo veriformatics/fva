@@ -22,7 +22,7 @@ if [[ ! -e $dir/.ok-$sha ]]; then
 	tar -xzf "$tgz" -C "$dir"
 	touch "$dir/.ok-$sha"
 fi
-pre=.cache/canaries/prelude-15704/exploit.ndjson
+pre=.cache/canaries/prelude-15704/replaced-prelude.ndjson
 presha=cccb9cb57613d5c262688e14db16e10da36d636472295b187b2ea4b8c8fb7d46
 if [[ ! -e $pre ]] || ! echo "$presha  $pre" | sha256sum -c --quiet - 2>/dev/null; then
 	mkdir -p "$(dirname "$pre")"
