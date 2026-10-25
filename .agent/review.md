@@ -2,7 +2,7 @@
 
 Rows stay until ruled; the phase closes with no open row. Verdict source = the fixed check set of each review; teammate claims are leads, MAIN's ruling decides.
 
-## U2 reviewed binary-format spec vs Wasm 2.0 (reviewer-1, check set R1–R10, target 6bbfb4a)
+## U2 reviewed binary-format spec vs Wasm 2.0 (reviewer-1, check set R1–R10, target 3b4fcd7)
 
 | row | check | verdict | ruling |
 |---|---|---|---|
@@ -17,7 +17,7 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | R9 | over-/under-acceptance | pass | accepted (static review; T1/T2 bind the decoder to the transcription, not the transcription to the spec) |
 | R10 | profile exclusions (note N10: memory count / data memidx left to validation) | pass | accepted: validation = U6 by contract (C3/D2 ruling) |
 
-## U3 reviewed numerics spec vs Wasm 2.0 §2.2.3 + §4.3 (reviewer-2, check set F1–F24 I1–I8 X1–X2, target 4c74e9a)
+## U3 reviewed numerics spec vs Wasm 2.0 §2.2.3 + §4.3 (reviewer-2, check set F1–F24 I1–I8 X1–X2, target 8ae9577)
 
 | row | check | verdict | ruling |
 |---|---|---|---|
@@ -29,7 +29,7 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | X2 | no Lean-core edge semantics leak into a spec definition | pass | accepted |
 | R1 (register) | contract N1 wording forbade all core `BitVec` ops in the spec; the spec uses `BitVec.ofNat/ofInt` + pointwise `&&&`/`|||`/`^^^`, faithful to the text | note | accepted: contract N1 narrowed (arithmetic/shift/division shortcuts stay proof-only; representation constructors + pointwise bitwise ops allowed) |
 
-## U4 reviewed execution spec vs Wasm 2.0 §4.2/§4.4/§4.5.5 (reviewer-3, check set E1–E20 X1–X3, target 17c93e7)
+## U4 reviewed execution spec vs Wasm 2.0 §4.2/§4.4/§4.5.5 (reviewer-3, check set E1–E20 X1–X3, target 901f653)
 
 | row | check | verdict | ruling |
 |---|---|---|---|
@@ -41,7 +41,7 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | R1 (register) | §4.4.7 bulk-op prose asserts `d+1 < 2^32` after the range check; false at 65536 pages | note | accepted: the transcription wraps only the next zero-count iteration's pointer; every access stays exact; no change |
 | R2 (register) | validity (`ValidHost`, store typing) not yet stated | note | accepted: contract S4/S5 + U6 interface (slices 2–3) |
 
-## U4 re-audit: Instantiate.lean + Host.lean + F1/F2 fixes (reviewer-4, check set I1–I7 X1, target af3ca99)
+## U4 re-audit: Instantiate.lean + Host.lean + F1/F2 fixes (reviewer-4, check set I1–I7 X1, target 5e6e4d0)
 
 | row | check | verdict | ruling |
 |---|---|---|---|
@@ -53,7 +53,7 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | R2 (register) | upstream: §4.5.4 prose runs all active segments before declarative drops; the equations interleave by segment index | note | accepted: the transcription follows the equations (FVA's convention) |
 | R3 (register) | upstream: appendix extension keeps the table/memory type unchanged while growth updates its min | note | accepted: growth-compatible reading (same element type/maximum, size non-decreasing) |
 
-## U4 LoaderReady / RunsExport (b119c25) — open for the U4/phase closing review
+## U4 LoaderReady / RunsExport (6f2d83b) — open for the U4/phase closing review
 
 | row | check | verdict | ruling |
 |---|---|---|---|

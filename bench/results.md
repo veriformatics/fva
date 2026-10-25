@@ -27,7 +27,7 @@ One run per arm on T1 and T4 (the rubric's pilot), model `gpt-6.1-sol`, reasonin
 
 ## Graded runs
 
-- FVA = tag `bench-v2` (13120e5), built once in a frozen worktree (`.scratch/worktrees/bench-v2`). The fva arm's package = `bench/tasks/prepare <task> fva <dir>` with `FVA_BENCH_FVA_BIN` and `FVA_BENCH_FVA_BUILD` set to that worktree's build: `fva init`'s vendored package (140 files, listed below; sha256 of the list = `d0e122c3cb5fc14562185ea42d964418f1888715c8480c9b6704abc61383d2a3`), its prebuilt `.lake/build`, and the 195 fetched kernel-canary files (no cached verdicts). Each run's `inputs.sha256` records the same files again.
+- FVA = tag `bench-v2` (a87fd9a), built once in a frozen worktree (`.scratch/worktrees/bench-v2`). The fva arm's package = `bench/tasks/prepare <task> fva <dir>` with `FVA_BENCH_FVA_BIN` and `FVA_BENCH_FVA_BUILD` set to that worktree's build: `fva init`'s vendored package (140 files, listed below; sha256 of the list = `d0e122c3cb5fc14562185ea42d964418f1888715c8480c9b6704abc61383d2a3`), its prebuilt `.lake/build`, and the 195 fetched kernel-canary files (no cached verdicts). Each run's `inputs.sha256` records the same files again.
 - Subject content in the package: one comment in `FVA/Lifted.lean` names lz4 C (a decoder timing note). The package holds no specification or proof of a bench subject.
 - Graded set = T1, T4, T5, T2, T3, T7: T6 (pflog) and the S-link sentence (H3) were dropped before any graded run (rubric addendum 2026-10-24 (2)).
 - Order: `bench/harness/run-batch TASK SEED ARM…`; each batch's seed and order are listed with its results.
