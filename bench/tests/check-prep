@@ -61,6 +61,7 @@ printf '{}\n' >"$tmp/inputs/.claude/settings.json"
 printf '{}\n' >"$tmp/inputs/.mcp.json"
 printf 'model = "contamination"\n' >"$tmp/inputs/.codex/config.toml"
 printf '{"fixture":"fixture-auth-value"}\n' >"$tmp/auth.json"
+: >"$tmp/jail-sentinel" # beside the mock's bound directory: the jail must hide it
 export PATH=$tmp/bin:$PATH FVA_BENCH_MODEL=fixture-model FVA_BENCH_EFFORT=low
 export FVA_BENCH_SECONDS=10 FVA_BENCH_AUTH_FILE=$tmp/auth.json
 # Inert sentinels prove env -i does not inherit provider/model routing.
@@ -74,6 +75,7 @@ expect_rc 0 "$root/bench/harness/run-session" --dry-run bare "mock-$$" 1 "$cpus"
 [[ ! -e $run_prefix-1 ]]
 grep -q -- '--ignore-user-config' "$tmp/last.log"
 grep -q -- '< /dev/null' "$tmp/last.log"
+grep -q -- '--unshare-pid' "$tmp/last.log"
 if grep -q fixture-auth-value "$tmp/last.log"; then exit 1; fi
 index=0
 for scenario in success agent-error malformed process-error timeout incomplete bad-usage partial-error; do
@@ -112,9 +114,11 @@ for scenario in success agent-error malformed process-error timeout incomplete b
 	expect_rc "$expected" "$root/bench/harness/run-session" bare "mock-$$" "$index" \
 		"$cpus" "$tmp/prompt" "$tmp/inputs"
 	[[ -f $run/work/mock-invoked.txt && ! -e $run/codex/auth.json ]]
-	jq -e --arg status "$status" --argjson rc "$expected" \
+	jq -e --arg status "$status" --argjson rc "$expected" --arg bin "$tmp/bin" \
 		'.status == $status and .exit_code == $rc and .wall_ms >= 0 and
-      .duration_ms == .wall_ms and .codex_version == "codex-cli mock-1"' "$run/result.json" >/dev/null
+      .duration_ms == .wall_ms and .codex_version == "codex-cli mock-1" and
+      (.jail.tool | startswith("bubblewrap")) and (.jail.visible | index($bin)) != null and
+      (.harness_commit | length) >= 40' "$run/result.json" >/dev/null
 	if [[ $scenario == success || $scenario == partial-error ]]; then
 		jq -e '.usage.input_tokens == 123 and .usage.output_tokens == 45 and
       .usage.cache_write_input_tokens == 6 and .usage.cache_read_input_tokens == 7 and
@@ -132,4 +136,4 @@ for scenario in success agent-error malformed process-error timeout incomplete b
 done
 expect_rc 1 "$root/bench/harness/run-session" bare "mock-$$" 1 "$cpus" "$tmp/prompt" "$tmp/inputs"
 grep -q 'run already exists' "$tmp/last.log"
-echo 'harness: dry-run, auth-only home/cleanup, config exclusion, env isolation, overwrite refusal → pass'
+echo 'harness: dry-run, auth-only home/cleanup, config exclusion, env isolation, jail, overwrite refusal → pass'
