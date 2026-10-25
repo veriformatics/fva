@@ -27,20 +27,21 @@ One run per arm on T1 and T4 (the rubric's pilot), model `gpt-6.1-sol`, reasonin
 
 ## Graded runs
 
-- FVA = tag `bench-v2` (a87fd9a), built once in a frozen worktree (`.scratch/worktrees/bench-v2`). The fva arm's package = `bench/tasks/prepare <task> fva <dir>` with `FVA_BENCH_FVA_BIN` and `FVA_BENCH_FVA_BUILD` set to that worktree's build: `fva init`'s vendored package (140 files, listed below; sha256 of the list = `d0e122c3cb5fc14562185ea42d964418f1888715c8480c9b6704abc61383d2a3`), its prebuilt `.lake/build`, and the 195 fetched kernel-canary files (no cached verdicts). Each run's `inputs.sha256` records the same files again.
-- Subject content in the package: one comment in `FVA/Lifted.lean` names lz4 C (a decoder timing note). The package holds no specification or proof of a bench subject.
+- FVA = tag `bench-v2.1` (bcf006c), built once in a frozen worktree. The fva arm's package = `bench/tasks/prepare <task> fva <dir>` with `FVA_BENCH_FVA_BIN` and `FVA_BENCH_FVA_BUILD` set to that worktree's build: `fva init`'s vendored package (140 files, listed below; sha256 of the list = `fe9a8f6ca5e681f4fd3b5b9e1e66502fd68b3fe26c6118c7d5607386ecf6b073`), its prebuilt `.lake/build` (orphaned artifacts of removed modules pruned; Lake metadata names the copy), and the 195 fetched kernel-canary files (no cached verdicts). Each run's `inputs.sha256` records the same files again. No input names this repository (`prepare` checks it).
+- Subject content in the package: one comment in `FVA/Lifted.lean` names lz4 C (a decoder timing note); `scripts/fetch-canaries` keeps the upstream file name of one canary in its URL. The package holds no specification or proof of a bench subject.
 - Graded set = T1, T4, T5, T2, T3, T7: T6 (pflog) and the S-link sentence (H3) were dropped before any graded run (rubric addendum 2026-10-24 (2)).
-- Order: `bench/harness/run-batch TASK SEED ARM…`; each batch's seed and order are listed with its results.
+- A first T1 batch (15 runs, `bench-v2`) was superseded before grading (rubric addendum 2026-10-25): a package-name collision in its fva inputs, two repository reads through Lake metadata paths, one provider safety-classifier stop.
+- Order: `bench/harness/run-batch TASK SEED ARM…`; each batch's seed and order are listed with its results. Safety-classifier stops are counted per arm.
 
-<details><summary>fva-arm package files (sha256, path)</summary>
+<details><summary>fva-arm package files, bench-v2.1 (sha256, path)</summary>
 
 ```text
-a90cc06c92430da59efe2c79a3e17386bbcd9fef85b5da2f8b235d3870818701  ./AGENT.md
+dc121824ad821957743613022e6186820f9575753fe7cf8c5449612c70d54bef  ./AGENT.md
 839ad293c67c22ffa875b91db84c5109249f4273548a4cf6136370ed2db8f2a1  ./FVA.lean
 5ec751906502b3e537bdc685d69fde331287a98ec8da63a2f6fae7362477f87e  ./FVA/Cli.lean
 ab37a11fdf66f98bb39d5dc9ce32771c38c0752aa031a3050564f1d004c5c584  ./FVA/Explain.lean
-c800f9d416c285649f6b3a1ee47af0917b9913662466ec5706d5ef53160a48c1  ./FVA/Impl/Cert/Compile.lean
-ecd8583fabdde27fe1d6c48dfe8f7d93b824b3d7d05070500cbfb790bc5f9f92  ./FVA/Impl/Cert/Sort.lean
+e7d231a97ba75f4da5188cc989b41609f8978f9ad54d67b78119ae9ad58c99d1  ./FVA/Impl/Cert/Compile.lean
+dfe997bcf7fed424fa79e079b7bedac718f10171a884a34ae3aae52bd5059e15  ./FVA/Impl/Cert/Sort.lean
 42f2d1b831b9c9b7cbc9c06d3aef31a003125e8b44a50e790477bfc3a9e29b7b  ./FVA/Impl/Decode.lean
 1af09e9d7230685dc3974a98db12858432e2b737814665824ec470720d9c9821  ./FVA/Impl/Decode/Instr.lean
 9acdb9236ef35bc7a3c65b53147a1a9964c8e1650a30befe2e402671b3df8546  ./FVA/Impl/Decode/Module.lean
@@ -146,7 +147,7 @@ f2dace6609d1a973af70379aa89b13a1ffc8353005b2b35e06599461608b0fa1  ./FVA/Spec/Rel
 dd1e718bd22c687bb9e30b7cd7abf8be03979824610a16cdc8064c39d52b6ce1  ./FVA/Spec/Valid/Module.lean
 a0325dd968a4688889f31f98de2e837196ee3e6a6fc09e7a3843cdd6acc424cd  ./FVA/Spec/Valid/Runtime.lean
 e482b5d36b557fedc1218eb9fbdc6c15c5403bb4790ef37053fefea0aa44fd97  ./FVA/Spec/Valid/Soundness.lean
-5f17f08072b28f80d5bb8b9026e1035429ba6bc0f2d2b9485b133f678c430a34  ./FVA/Tool/BaseManifest.lean
+74ee3670445de955879b648b572c26933bd72b756cdeeb3e290167a581e114df  ./FVA/Tool/BaseManifest.lean
 81d253934be12c05b76d9f8de4afb4a670b68efc4d74d7dcdc30f0fc910812d2  ./FVA/Tool/Blob.lean
 12263db45de00dcb673fc15cd12b5f8ee136944380c28198bbda3fac9b456e54  ./FVA/Tool/Certify.lean
 0536b3da4465b1bde47df5c4817f172de5c29eb15beb6885a3069b72011765fb  ./FVA/Tool/Codex.lean
@@ -154,12 +155,12 @@ cbd4005f74a91fbbd36b0fbeecdc9336307272bce4eb2efff93360f776bcf0aa  ./FVA/Tool/Dec
 c670d58d934af5bc32e8f6e5e7793bb9a1fe7f1c6ee314c69302736e7c3867cf  ./FVA/Tool/Difftest.lean
 2204a2c5494a70e36065417adf14e88f34ed3257ba5a82f3ae048b39601f2aee  ./FVA/Tool/Encode.lean
 1efafa46887dc0ca9186c08dbd9258e5361d145e39d4d7a07c57d38fc6561960  ./FVA/Tool/Explain.lean
-c5980b099568a5c09bd9582b0cdc6f3634cfe61e3790245aa9995ae63c81223a  ./FVA/Tool/Init.lean
+b6072b38aa7ae04a34e484077aba46e726669215bc63ec6395a1211d817c8e30  ./FVA/Tool/Init.lean
 f1af92412d057febdf930b96b4430beef66f41cecd266d95e2647e256c76b7db  ./FVA/Tool/Lift.lean
 c0d7fea682c1b880d071b7d1094e6e7416c13f6027feb2c73f506d758fae915a  ./FVA/Tool/Pack.lean
-33d4f0c22e654a26e2566444a4ef898224b6b05b87c641a4657d0d62a0f6e2ea  ./FVA/Tool/Trust.lean
+775e74a3c6e8f43092ef88c8ffe565368c68db846d49b3a09200423cc53fa435  ./FVA/Tool/Trust.lean
 e936fbd3ef1ce10116e56a380d1665c899a0c99095d63d819131066df91e8fa1  ./FVA/Tool/Wast.lean
-2c279c9bcf3230c97a5c672686e93cbd8a20aedb3a82f97988b7575cfd154949  ./FVA/Trust/Canary.lean
+bd759f0ce37f8a4ea318a490690712a1f45774830ac92cd0b5edeec11df6e8d3  ./FVA/Trust/Canary.lean
 32757aafc29ed5178d7bc451061ba750cb3dd55bb3bf6e7defa7bf7500646a9b  ./FVA/Trust/Collect.lean
 dbd4461ba6257c156937ecae4908cb26d4ad2a20c2b91cc76b11382dbbb676c5  ./FVA/Trust/Replay.lean
 de30d1fd2b687b96cb0265d46f2b7736a61f21e219f7d95865321484f787009e  ./FVA/Trust/Verdict.lean
@@ -170,11 +171,11 @@ c796e9be2f5416bc65b5dedb5d086c328257b882f9cef948dc8a3f5a8c343dfc  ./README.md
 b008fc34c70509baa5255ad8d9c768b6de2971985efd1522da91c07de4ecff3f  ./lake-manifest.json
 e3dd7c14c3db879ffef632252233895ee6560133e65fc0ddd0bfc76e8b6e4daf  ./lakefile.toml
 ca5f1f601d34c49079e38d7e7041eb0f2a9c227fbc1df0f404820069a052330c  ./lean-toolchain
-dc0bafd53501f6000ea17c244632ae39b05c4de44eec1a2a14a0e614ca81a78c  ./scripts/fetch-canaries
+7e95d3bc596f887e46c64fd432b5a992ab60e15240facedb779e8399d52404a6  ./scripts/fetch-canaries
 c75088cadad567e1accab8a7613a38f030666da28331345ce4d258ce56831007  ./scripts/fetch-tools
-1b815edb499b142ceb297e05215b803bf4da08c149d4babaa9040f6345294a61  ./trust/canaries/known.tsv
-9a41c5145c9429b09a773c7599a1f5b7e08b8d319e269efb63bc70a18c8d55fb  ./trust/canaries/matrix.tsv
-6a6a6ee63cad5e97629cc38d24ea930919a88ce88f1fbb149dfd60c1797b48b9  ./trust/canaries/set.tsv
+207046a3d9473c1dbf554a25e94c77be2b3729a35af674da61dabd65e40a3bdf  ./trust/canaries/known.tsv
+19c48a2418daef2296061140bd5e0b2a0c4457829bc3c355ff8df12de9d173e3  ./trust/canaries/matrix.tsv
+73f9e219e0d99fd1c70670e2699d6e21bbfa1686532b3a35db0395e4e518c116  ./trust/canaries/set.tsv
 ```
 
 </details>

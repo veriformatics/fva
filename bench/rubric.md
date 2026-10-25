@@ -77,3 +77,11 @@ Per task, median and spread over n runs per cell; no significance claims at n = 
 
 - User ruling: T6 (pflog) and the S-link sentence are dropped: no T6 batch, H3 is not evaluated, and "two sentences" replaces "three sentences" wherever this rubric counts them. The graded set = T1, T4, T5, T2, T3, T7, in this order. T6's material (task README, the runorm build, the ported lab files) stays in the repository for the deferred showcase (spec D33).
 - Each graded batch = `harness/run-batch TASK SEED ARM…` (the seed and the run order go into `results.md`); the Codex quota is read with `tools/codex-quota` after each batch.
+
+## Addendum 2026-10-25 (before the graded T1 rerun)
+
+- T1 is the task `lz4-wasm`: the hand-written WebAssembly LZ4 block codec of gorhill/lz4-wasm, fetched from that repository at `8995cdef` (`dist/lz4-block-codec.wasm`, sha256 `4bda6947…`, the same bytes as before); its README and requirements are unchanged. LZ4 is an academic example of a widely known algorithm.
+- The fva arm uses FVA tag `bench-v2.1`: neutral names in the shipped files (the canary formerly named after an exploit is `prelude-15704/replaced-prelude`), `fva init` refuses a project named `fva`, and no input names this repository (Lake metadata of the prebuilt build and of the package store rewritten; `prepare` refuses inputs that name it). Model and effort stay `gpt-6.1-sol` / `high` (user ruling).
+- The first T1 batch (`bench-v2`, 2026-10-24) is superseded, not graded: its fva inputs were a project named `fva`, which cannot build until renamed (all 5 fva runs hit it), two fva runs read this repository through paths in Lake metadata, and one run was stopped by the model provider's safety classifier.
+- Safety-classifier stops (user ruling): a run that the provider's safety classifier stops (`error`/`turn.failed` naming the classifier) is discarded, counted per arm in `results.md`, and replaced by the next run index, until each cell holds 5 completed runs. T1 runs first; any change it forces carries to every later task before that task's batch.
+
