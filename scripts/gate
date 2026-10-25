@@ -43,6 +43,8 @@ lean_lane() {
 	if ((! fast)); then run trust scripts/test-trust; fi
 	# fva init end to end (a consumer project + its trust run): full gate only
 	if ((! fast)); then run init scripts/test-init; fi
+	# U14 subject demonstrations (fva trust per subject + planted negatives): full gate only
+	if ((! fast)); then run subjects scripts/test-subjects; fi
 	if ((fast)); then run mutation scripts/test-mutation --fast; else run mutation scripts/test-mutation; fi
 	wait
 }
