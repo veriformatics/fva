@@ -99,6 +99,12 @@ def main (fvaRoot : System.FilePath) (argv : List String) : IO UInt32 := do
     IO.eprintln s!"fva init: --lib must be a module name such as Verified, got {o.lib}"
     return 2
   let dir : System.FilePath := o.dir
+  let name := (dir.fileName.getD "project").toLower.map fun c => if c.isAlphanum then c else '_'
+  -- the project requires the vendored package `fva`; a project of the same name cannot
+  if name == "fva" then
+    IO.eprintln s!"fva init: a project in a directory named {dir.fileName.getD ""} would have \
+      the package name of the FVA package it requires. Choose another directory name."
+    return 2
   if ← dir.pathExists then
     unless (← dir.readDir).isEmpty do
       IO.eprintln s!"fva init: {dir} exists and is not empty"
@@ -107,7 +113,6 @@ def main (fvaRoot : System.FilePath) (argv : List String) : IO UInt32 := do
     let src := fvaRoot / f
     if ← src.pathExists then copyTree src (dir / "fva" / f)
   IO.FS.writeFile (dir / "fva" / "lakefile.toml") fvaLakefile
-  let name := (dir.fileName.getD "project").toLower.map fun c => if c.isAlphanum then c else '_'
   IO.FS.writeFile (dir / "lakefile.toml") (projectLakefile name o.lib)
   IO.FS.writeFile (dir / "lean-toolchain") (← IO.FS.readFile (fvaRoot / "lean-toolchain"))
   let fm ← IO.ofExcept (Json.parse (← IO.FS.readFile (fvaRoot / "lake-manifest.json")))

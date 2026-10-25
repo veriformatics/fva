@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # One graded batch (rubric addendum 2026-10-24): every arm of TASK × runs 1..N, in an order
 # shuffled from SEED (recorded), one run per CPU of FVA_BENCH_CPUS at a time. Inputs are
-# prepared once per arm (bench/tasks/prepare) under ~/.cache/fva-bench/inputs/TASK/ARM; the fva
-# arm vendors the FVA of FVA_BENCH_FVA_BIN/FVA_BENCH_FVA_BUILD (the bench tag's build). Needs the
+# prepared once per arm (bench/tasks/prepare) under ~/.cache/fva-bench/inputs/TASK/ARM-TASK
+# (`fva init` names the project after its directory, and a project named `fva` cannot require
+# the package of that name); the fva arm vendors the FVA of FVA_BENCH_FVA_BIN/FVA_BENCH_FVA_BUILD
+# (the bench tag's build). Needs the
 # run-session variables (FVA_BENCH_MODEL, _EFFORT, _SECONDS, _AUTH_FILE). Prints one TSV row per
 # run: arm, index, cpu, status, wall s, cpu s, load at start.
 set -euo pipefail
@@ -31,7 +33,7 @@ prompt_of() { # arm → prompt file + container tools
 }
 for arm in "${arms[@]}"; do
 	prompt_of "$arm" >/dev/null
-	in=$base/inputs/$task/$arm
+	in=$base/inputs/$task/$arm-$task
 	[[ -d $in ]] || "$root/bench/tasks/prepare" "$task" "$arm" "$in"
 done
 mkdir -p "$base/batches" "$base/harness-logs"
@@ -45,7 +47,7 @@ launch() { # arm index cpu
 	local p tools
 	read -r p tools <<<"$(prompt_of "$1")"
 	FVA_BENCH_TOOLS=$tools "$root/bench/harness/run-session" "$1" "$task" "$2" "$3" \
-		"$root/bench/prompts/$p" "$base/inputs/$task/$1" >"$base/harness-logs/$1-$task-$2.log" 2>&1 &
+		"$root/bench/prompts/$p" "$base/inputs/$task/$1-$task" >"$base/harness-logs/$1-$task-$2.log" 2>&1 &
 	busy[$3]=$!
 }
 while read -r arm i; do
