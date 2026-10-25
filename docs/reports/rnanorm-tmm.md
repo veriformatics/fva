@@ -35,4 +35,6 @@ In matrices with many low counts, many genes have tied A-values. The 5 % trim on
 
 ## Suggested fix
 
-Compute the A-values as edgeR does, `(np.log2(r) + np.log2(r_ref)) / 2`. Alternatively, weaken the documented claim.
+To match edgeR, compute the A-values as edgeR does: `(np.log2(r) + np.log2(r_ref)) / 2`. On the attached matrix, this one change makes the factors equal to edgeR's. Alternatively, weaken the documented claim.
+
+This change restores agreement with edgeR. It does not make the factors exact at tied genes. Floating-point rounding can also split exactly tied genes in edgeR's own TMM, and this effect is already documented ([brisc](https://brisc.run/pseudobulk/library_size), [jaxQTL](https://mancusolab.github.io/jaxqtl/reference/compute-pcs/)).
