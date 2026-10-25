@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# U14 subject demonstrations (E1/E2, full gate): each subject package under FVATest/Subjects/
+# is `fva trust` PASS with its review surface pinned, claims about the lifted subject (link check
+# against the committed .wasm); each FVATest/Subjects/<Subj>/Neg/* module must fail to build (a
+# mutated expected byte or weakened spec clause). rc 0 = all as pinned.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+fva=.lake/build/bin/fva
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+fail=0
+
+# subject: root module, spec module, subject (lifted) module, pinned surface line count
+subjects=(
+	"FVATest.Subjects.Lz4Wasm FVATest.Subjects.Lz4Wasm.Spec FVATest.Subjects.Lz4Wasm.Lifted 46"
+)
+# the Neg roots are no default target; build them by module name, expecting failure
+negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte)
+
+roots=(fva FVA)
+for s in "${subjects[@]}"; do
+	read -r root _ _ _ <<<"$s"
+	roots+=("$root")
+done
+if ! lake --wfail build "${roots[@]}" >"$tmp/build" 2>&1; then
+	echo "test-subjects: subject build failed"
+	grep '^error' "$tmp/build" | head -5
+	exit 2
+fi
+
+for s in "${subjects[@]}"; do
+	read -r root spec subject surface <<<"$s"
+	log=$tmp/trust-$root
+	"$fva" trust . --spec-module "$spec" --root-module "$root" --subject "$subject" >"$log" 2>&1
+	rc=$?
+	if ((rc != 0)); then
+		echo "test-subjects: $root trust rc $rc"
+		grep -E '^fva trust|^  \[' "$log" | head -8
+		fail=1
+	elif ! grep -q "^Read these: $surface code lines$" "$log"; then
+		echo "test-subjects: $root surface ≠ pinned $surface lines"
+		grep -E 'Read these|: [0-9]+ lines' "$log" | head -6
+		fail=1
+	fi
+done
+
+for neg in "${negs[@]}"; do
+	if lake build "$neg" >"$tmp/neg" 2>&1; then
+		echo "test-subjects: $neg built, but the mutated claim must not prove"
+		fail=1
+	fi
+done
+
+((fail)) || echo "test-subjects: ${#subjects[@]} subject(s) PASS with pinned surface + ${#negs[@]} planted negatives checked"
+exit "$fail"

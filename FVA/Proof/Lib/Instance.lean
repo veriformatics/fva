@@ -56,6 +56,18 @@ theorem instantiable_alloc {m : Module} (hi : m.imports = []) (hg : m.globals = 
   · rw [he]; exact .nil
   · rw [hc, List.map_nil]
 
+/-- The canonical fresh instance of a module without imports, globals, segments or start
+function: its allocation in the empty store. Exposes the witness `instantiable_alloc` hides, so a
+`Prepared` existence clause can name it. -/
+theorem instance_alloc_self {m : Module} (H : HostSem) (hi : m.imports = [])
+    (hg : m.globals = []) (he : m.elems = []) (hd : m.datas = []) (hs : m.start = none) :
+    Instance m H (allocModule {} m [] [] []).1 (allocModule {} m [] [] []).2 := by
+  have hc : initCode m = [] := by simp [initCode, he, hd, hs]
+  refine ⟨by simp [ImportsMatch, hi], [], [], (allocModule {} m [] [] []).1, rfl, ?_, ?_, ?_⟩
+  · rw [hg]; exact .nil
+  · rw [he]; exact .nil
+  · rw [hc, List.map_nil]
+
 theorem vals_inj {vs ws : List Val} : vals vs = vals ws ↔ vs = ws := by
   constructor
   · intro h
@@ -92,5 +104,34 @@ theorem must_returned_of_runDet {H : HostSem} {P : Store → List Val → Prop} 
     subst hs
     exact hp
   · exact absurd hv (vals_ne_trap vs)
+
+/-- A deterministic run whose final configuration (reached by `runDet`, kept as `Option.get` so
+the kernel can evaluate it) returns `vs` with a final store satisfying `P` proves the call
+returns. Lets a long run close by `decide +kernel` on the concrete final configuration, without
+writing the store out. -/
+theorem must_returned_of_runDet_get {H : HostSem} {P : Store → List Val → Prop} {n : Nat}
+    {c : Config} {vs : List Val} (hsome : (runDet n c).isSome)
+    (hi : ((runDet n c).get hsome).instrs = vals vs)
+    (hp : P ((runDet n c).get hsome).store vs) :
+    Must H (fun | .returned s vs' => vs' = vs ∧ P s vs' | .trapped _ => False) c := by
+  refine runDet_must (Option.some_get hsome).symm ?_
+  rintro (⟨s'', ws⟩ | s'') ⟨hs, hv⟩
+  · obtain rfl := vals_inj.mp (hv.symm.trans hi)
+    subst hs
+    exact ⟨rfl, hp⟩
+  · exact absurd (hi.symm.trans hv) (vals_ne_trap vs)
+
+/-- The trap analogue of `must_returned_of_runDet_get`: a deterministic run that ends in a trap,
+with a final store satisfying `P`, proves the call traps. -/
+theorem must_trapped_of_runDet_get {H : HostSem} {P : Store → Prop} {n : Nat}
+    {c : Config} (hsome : (runDet n c).isSome)
+    (hi : ((runDet n c).get hsome).instrs = [.trap])
+    (hp : P ((runDet n c).get hsome).store) :
+    Must H (fun | .returned _ _ => False | .trapped s => P s) c := by
+  refine runDet_must (Option.some_get hsome).symm ?_
+  rintro (⟨s'', ws⟩ | s'') ⟨hs, hv⟩
+  · exact absurd (hv.symm.trans hi) (vals_ne_trap ws)
+  · subst hs
+    exact hp
 
 end FVA.Wasm.Exec
