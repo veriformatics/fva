@@ -17,6 +17,8 @@ task=$1 seed=$2
 shift 2
 arms=("$@")
 n=${FVA_BENCH_N:-5}
+# replacement runs (a safety-classifier stop) continue the numbering: FVA_BENCH_FIRST=6, N=1, …
+first=${FVA_BENCH_FIRST:-1}
 read -ra cpus <<<"${FVA_BENCH_CPUS:-2 3 4 5 6 7}"
 base=$HOME/.cache/fva-bench
 export FVA_BENCH_PATH=${FVA_BENCH_PATH:-$base/bin:/usr/local/bin:/usr/bin:/bin}
@@ -37,9 +39,9 @@ for arm in "${arms[@]}"; do
 	[[ -d $in ]] || "$root/bench/tasks/prepare" "$task" "$arm" "$in"
 done
 mkdir -p "$base/batches" "$base/harness-logs"
-order=$base/batches/$task-seed$seed.order
+order=$base/batches/$task-seed$seed-from$first.order
 for arm in "${arms[@]}"; do
-	for i in $(seq "$n"); do printf '%s %s\n' "$arm" "$i"; done
+	for i in $(seq "$first" $((first + n - 1))); do printf '%s %s\n' "$arm" "$i"; done
 done | shuf --random-source=<(openssl enc -aes-256-ctr -pass "pass:$seed" -nosalt -pbkdf2 \
 	</dev/zero 2>/dev/null) >"$order"
 declare -A busy=()
