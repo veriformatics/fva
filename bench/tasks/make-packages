@@ -28,7 +28,15 @@ if [[ ! -e $dst ]]; then
 		fi
 		printf '%s' "$p" >"$f"
 	done < <(find "$dst" -path '*/.lake/build/*' -name '*.hash' -size -16c -print0)
+	# Lake metadata records the checkout's absolute paths; the store names itself instead, so an
+	# arm reading it never finds this repository
+	find "$dst" -path '*/.lake/build/*' -type f \( -name '*.trace' -o -name '*.json' -o -name '*.rsp' \) \
+		-exec grep -lZF "$root" {} + | xargs -0 -r sed -i "s|$root/.lake/packages|$dst|g; s|$root|$dst|g"
 	chmod -R a-w "$dst"
+fi
+if grep -rlqF "$root" "$dst"; then
+	echo "make-packages: $dst names $root: $(grep -rlF "$root" "$dst" | head -3 | tr '\n' ' ')" >&2
+	exit 1
 fi
 [[ -z $(find "$dst" -path '*/.lake/build/*' -name '*.hash' -size -16c -print -quit) ]] || {
 	echo "make-packages: unpadded hash files remain in $dst" >&2
