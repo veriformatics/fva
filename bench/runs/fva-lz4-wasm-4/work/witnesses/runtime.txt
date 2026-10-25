@@ -1,0 +1,6 @@
+r1: 1 (expected)
+r2: 1 (expected)
+r3_zero: 0 (expected)
+r3_one: 4 (expected)
+boundary: out-of-bounds read at 65536 (expected)
+All artifact counterexamples reproduced.
