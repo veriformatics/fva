@@ -10,15 +10,20 @@ set -euo pipefail
 	echo 'Usage: bench/grade/inject PROJECT LEAN_FILE THEOREM ARTIFACT CMD OUT_DIR' >&2
 	exit 2
 }
-proj=$(realpath -e -- "$1") lean=$2 thm=${3##*.} artifact=$4 cmd=$5 out=$6
+proj=$(realpath -e -- "$1") lean=$2 artifact=$4 cmd=$5 out=$6
+# the declaration may spell its last one or two name components (`lemma LogCert.sound`)
+thm=${3##*.}
+two=${3%.*}
+two=${two##*.}.$thm
+[[ $3 == *.*.* || $3 == *.* ]] || two=$thm
 limit=${FVA_BENCH_INJECT_SECONDS:-3600}
 mkdir -p "$out"
 plant() { # file theorem pre proof
-	awk -v thm="$2" -v pre="$3" -v proof="$4" '
+	awk -v thm="$2" -v two="$two" -v pre="$3" -v proof="$4" '
 	function decl(l) { return l ~ /^(@\[|\/--|\/-!|private |protected |theorem |lemma |def |abbrev |structure |inductive |instance |example |end |namespace |section |open |#|set_option |run_cmd |axiom |noncomputable )/ }
 	{ line[NR] = $0 }
 	END {
-		for (i = 1; i <= NR; i++) if (line[i] ~ ("^(private |protected )?(theorem|lemma) " thm "([ :({[]|$)")) { t = i; break }
+		for (i = 1; i <= NR; i++) if (line[i] ~ ("^(private |protected )?(theorem|lemma) (" thm "|" two ")([ :({[]|$)")) { t = i; break }
 		if (!t) { print "inject: no theorem " thm > "/dev/stderr"; exit 2 }
 		s = t; while (s > 1 && line[s - 1] ~ /^(@\[|\/--)/) s--
 		e = NR + 1; for (j = t + 1; j <= NR; j++) if (decl(line[j])) { e = j; break }
