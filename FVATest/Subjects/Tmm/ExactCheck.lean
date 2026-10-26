@@ -219,7 +219,8 @@ theorem profile_of {rows : List (List Nat)} {k : Nat} (h : profileB rows k = tru
     exact ⟨this.1.1, this.1.2, this.2⟩
 
 /-- edgeR's A cutoff (`Acutoff = -1e10`) drops no gene of a `Profile` matrix: a counted gene's
-`A = (log₂ (o / nO) + log₂ (r / nR)) / 2` is at least −53 when both libraries are below 2⁵³ reads. -/
+`A = (log₂ (o / nO) + log₂ (r / nR)) / 2` is at least −53 when both libraries are below 2⁵³
+reads. -/
 theorem acutoff_inactive {nO nR : Nat} (hO : nO < 2 ^ 53) (hR : nR < 2 ^ 53) {x : Nat × Nat}
     (hx1 : 0 < x.1) (hx2 : 0 < x.2) :
     -10 ^ 10 < (Real.logb 2 (x.1 / nO) + Real.logb 2 (x.2 / nR)) / 2 := by
