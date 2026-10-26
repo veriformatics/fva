@@ -81,7 +81,7 @@ noncomputable def decCfg : Config :=
   invokeConfig decStore 3 [.i32 (BitVec.ofNat 32 lastByte), .i32 1, .i32 0]
 theorem decRunSome : (runDet 200 decCfg).isSome := by decide +kernel
 
-theorem decode_breaks_r3_holds : Subjects.Lz4Wasm.decode_breaks_r3 := by
+theorem decode_traps_valid_holds : Subjects.Lz4Wasm.decode_traps_valid := by
   refine ⟨empty_block_valid, fun H => ⟨decStore, alloc.2, alloc.1,
     instance_alloc_self H rfl rfl rfl rfl rfl, decStore_eq⟩, ?_⟩
   rintro H s inst ⟨s₀, hinst, hprep⟩

@@ -53,12 +53,10 @@ def encode_breaks_r1 : Prop :=
 /-- The last address of the module's initial memory (1 page = 65536 bytes). -/
 def lastByte : Nat := 65535
 
-/-- R3 is false for the shipped decoder: the empty block `00` is a valid LZ4 block (it decodes to
-nothing, End-of-block condition 2's special case), but written as the last byte of memory and
-decoded with `lz4BlockDecode lastByte 1 0`, the decoder reads past its one input byte — off the
-end of memory — and traps. R3 asks that the decoder read no byte outside the given block; a decoder
-that obeyed it would return 0 here, as it does at any lower address. -/
-def decode_breaks_r3 : Prop :=
+/-- R2 is false for the shipped decoder: the empty block `00` is a valid block (its content is
+empty), yet, placed as the last byte of the initial memory, decoding it traps instead of returning
+the content. The statement records the trap alone, not its cause. -/
+def decode_traps_valid : Prop :=
   Lz4.Valid [0x00] [] ∧
     TrapsAfter Lifted.module [.write lastByte [0x00]] "lz4BlockDecode"
       [.i32 (BitVec.ofNat 32 lastByte), .i32 1, .i32 0]

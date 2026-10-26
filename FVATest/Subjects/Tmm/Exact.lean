@@ -106,7 +106,8 @@ def WithinRel (ε : ℚ) (xs : List ℝ) (ys : List ℚ) : Prop :=
 
 /-- The output `o` (a factor file) does not hold the exact average-rank TMM factors of the count
 matrix `i` to relative 10⁻³: `i` is a `Profile` count matrix and `o` a decimal file, and under
-every reading some factor misses its exact value by more than 10⁻³ of it. -/
+every reading `o` has the wrong number of factors or some factor misses its exact value by more
+than 10⁻³ of it. -/
 def RefutesExactAverageTMM (i o : List UInt8) : Prop :=
   (∃ rows k xs, i = countsText rows ∧ Profile rows k ∧ o = decFile xs) ∧
     ∀ rows k xs, i = countsText rows → Profile rows k → o = decFile xs →
