@@ -15,10 +15,12 @@ subjects=(
 	"FVATest.Subjects.Lz4Wasm FVATest.Subjects.Lz4Wasm.Spec FVATest.Subjects.Lz4Wasm.Lifted 48"
 	"FVATest.Subjects.GlmIround FVATest.Subjects.GlmIround.Spec FVATest.Subjects.GlmIround.Lifted 10"
 	"FVATest.Subjects.Tmm.R3 FVATest.Subjects.Tmm.R3.Spec - 22"
+	"FVATest.Subjects.Tmm.EdgeR FVATest.Subjects.Tmm.EdgeR.Spec - 77"
+	"FVATest.Subjects.Tmm.RNAnorm FVATest.Subjects.Tmm.RNAnorm.Spec - 77"
 )
 # the Neg roots are no default target; build them by module name, expecting failure
 negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
-	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same)
+	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same FVATest.Subjects.Tmm.Neg.Exact)
 
 roots=(fva FVA)
 for s in "${subjects[@]}"; do
