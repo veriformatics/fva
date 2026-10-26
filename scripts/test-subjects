@@ -10,14 +10,15 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 fail=0
 
-# subject: root module, spec module, subject (lifted) module, pinned surface line count
+# subject: root module, spec module, subject (lifted) module or - (a certificate), pinned surface
 subjects=(
 	"FVATest.Subjects.Lz4Wasm FVATest.Subjects.Lz4Wasm.Spec FVATest.Subjects.Lz4Wasm.Lifted 48"
 	"FVATest.Subjects.GlmIround FVATest.Subjects.GlmIround.Spec FVATest.Subjects.GlmIround.Lifted 10"
+	"FVATest.Subjects.Tmm.R3 FVATest.Subjects.Tmm.R3.Spec - 22"
 )
 # the Neg roots are no default target; build them by module name, expecting failure
 negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
-	FVATest.Subjects.GlmIround.Neg.Ret)
+	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same)
 
 roots=(fva FVA)
 for s in "${subjects[@]}"; do
@@ -33,7 +34,9 @@ fi
 for s in "${subjects[@]}"; do
 	read -r root spec subject surface <<<"$s"
 	log=$tmp/trust-$root
-	"$fva" trust . --spec-module "$spec" --root-module "$root" --subject "$subject" >"$log" 2>&1
+	sub=()
+	[[ $subject == - ]] || sub=(--subject "$subject")
+	"$fva" trust . --spec-module "$spec" --root-module "$root" "${sub[@]}" >"$log" 2>&1
 	rc=$?
 	if ((rc != 0)); then
 		echo "test-subjects: $root trust rc $rc"

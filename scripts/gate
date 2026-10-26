@@ -22,7 +22,7 @@ run() { # name cmd... -> logs/name.{out,rc,sec}
 
 # bash scripts by shebang (scripts/ also holds data such as Batteries' nolints.json)
 mapfile -t shells < <(
-	git ls-files -co --exclude-standard -- 'scripts/*' 'bench/*' | while IFS= read -r f; do
+	git ls-files -co --exclude-standard -- 'scripts/*' 'bench/*' ':!:bench/runs/**' | while IFS= read -r f; do
 		head -n1 -- "$f" | grep -qx '#!/usr/bin/env bash' && printf '%s\n' "$f"
 	done
 )
