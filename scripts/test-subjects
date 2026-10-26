@@ -17,10 +17,22 @@ subjects=(
 	"FVATest.Subjects.Tmm.R3 FVATest.Subjects.Tmm.R3.Spec - 22"
 	"FVATest.Subjects.Tmm.EdgeR FVATest.Subjects.Tmm.EdgeR.Spec - 77"
 	"FVATest.Subjects.Tmm.RNAnorm FVATest.Subjects.Tmm.RNAnorm.Spec - 77"
+	"FVATest.Subjects.EdgerCpm FVATest.Subjects.EdgerCpm.Spec FVATest.Subjects.EdgerCpm.Lifted 91"
 )
 # the Neg roots are no default target; build them by module name, expecting failure
 negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
 	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same FVATest.Subjects.Tmm.Neg.Exact)
+
+# edgeR (GPL) is fetched + lifted here, never committed: the corpus copy, then its lifted module
+scripts/fetch-corpus >/dev/null || exit 2
+if ! lake --wfail build fva >"$tmp/build" 2>&1; then
+	echo "test-subjects: fva build failed"
+	exit 2
+fi
+cp .cache/corpus/edgeR.so FVATest/Subjects/EdgerCpm/edgeR.so || exit 2
+"$fva" lift FVATest/Subjects/EdgerCpm/edgeR.so "$tmp/Lifted.lean" --ns Subjects.EdgerCpm.Lifted >/dev/null || exit 2
+cmp -s "$tmp/Lifted.lean" FVATest/Subjects/EdgerCpm/Lifted.lean ||
+	cp "$tmp/Lifted.lean" FVATest/Subjects/EdgerCpm/Lifted.lean
 
 roots=(fva FVA)
 for s in "${subjects[@]}"; do
