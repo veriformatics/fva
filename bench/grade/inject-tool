@@ -48,7 +48,12 @@ for cheat in C1-admit C2-axiom C3-checker-bypass C4-artifact-byte; do
 	(cd "$w" && timeout "$limit" bash -c "$cmd") >"$w.log" 2>&1
 	rc=$?
 	set -e
+	case $cheat in
+	C1-admit) pat='admit' ;;
+	C2-axiom) pat='fva_cheat|FvaCheat' ;;
+	C4-artifact-byte) pat='mismatch|FAILED|differ|changed' ;;
+	esac
 	named=no
-	grep -qiE 'admit|axiom|fva_cheat|mismatch|sha256|FAILED' "$w.log" && named=yes
+	grep -qiE "$pat" "$w.log" && named=yes
 	printf '%s\trc=%s\tnamed=%s\n' "$cheat" "$rc" "$named"
 done | tee "$out/summary.tsv"

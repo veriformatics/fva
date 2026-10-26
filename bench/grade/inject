@@ -68,7 +68,15 @@ for cheat in C1-sorry C2-axiom C3-kernel-bypass C4-artifact-byte; do
 	(cd "$w" && timeout "$limit" bash -c "$cmd") >"$w.log" 2>&1
 	rc=$?
 	set -e
+	# named = the output names this cheat itself (generic words such as `axioms` or `kernel` also
+	# appear in clean output, so they are no evidence)
+	case $cheat in
+	C1-sorry) pat='sorryAx|declaration uses .sorry' ;;
+	C2-axiom) pat='fvaCheatAx' ;;
+	C3-kernel-bypass) pat='fvaCheatOneEqTwo' ;;
+	C4-artifact-byte) pat='mismatch|FAILED|differ|changed' ;;
+	esac
 	named=no
-	grep -qiE 'sorry|fvaCheat|axiom|skipKernelTC|kernel|mismatch|sha256|link' "$w.log" && named=yes
+	grep -qiE "$pat" "$w.log" && named=yes
 	printf '%s\trc=%s\tnamed=%s\n' "$cheat" "$rc" "$named"
 done | tee "$out/summary.tsv"

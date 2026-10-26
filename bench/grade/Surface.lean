@@ -6,7 +6,8 @@ structure fields, never through proofs, with its source lines. Run-authored = it
 `.lean` file sits in the project outside `fva/` and `.lake/` and is not `fva lift` / `fva blob`
 output (generated subject bytes stop the walk, as in `fva trust`). Theorems count their statement
 lines alone (up to the proof's `:=`); a declaration whose source spans more than 200 lines with
-mostly numerals is reported as data. Output (TSV): `decl` rows, then `total`, then `shared` =
+mostly numerals is reported as data. Output (TSV): `decl` rows (physical lines, then code
+lines: outside comments and docstrings), then `total`, then `shared` =
 constants outside the project the closure reaches, by top-level namespace. -/
 
 open Lean
@@ -40,6 +41,30 @@ def proofLine (lines : Array String) (start stop : Nat) : Nat := Id.run do
       if first.isNone then first := some i
       if p.isEmpty || p.startsWith "by" then return i
   return first.getD stop
+
+/-- Lines of `ls` with a character outside comments (`--` to the line end, nested `/- … -/`
+blocks, docstrings included); `ls` starts outside any comment. -/
+def codeLines (ls : List String) : Nat := Id.run do
+  let mut depth := 0
+  let mut n := 0
+  for l in ls do
+    let cs := l.toList.toArray
+    let mut i := 0
+    let mut code := false
+    while i < cs.size do
+      let c := cs[i]!
+      let c2 := cs.getD (i + 1) ' '
+      if depth > 0 then
+        if c == '/' && c2 == '-' then depth := depth + 1; i := i + 2
+        else if c == '-' && c2 == '/' then depth := depth - 1; i := i + 2
+        else i := i + 1
+      else if c == '/' && c2 == '-' then depth := 1; i := i + 2
+      else if c == '-' && c2 == '-' then i := cs.size
+      else
+        if !c.isWhitespace then code := true
+        i := i + 1
+    if code then n := n + 1
+  return n
 
 def main (args : List String) : IO UInt32 := do
   let root :: modName :: thms := args | do
@@ -75,7 +100,7 @@ def main (args : List String) : IO UInt32 := do
   let ctx : Core.Context := { fileName := "<surface>", fileMap := default }
   let (found, _) ← (seen.toList.mapM fun c => return (c, ← findDeclarationRanges? c) :
     CoreM _).toIO ctx { env }
-  let mut rows : Array (String × Nat × Nat × String × String) := #[]
+  let mut rows : Array (String × Nat × Nat × String × String × Nat) := #[]
   let mut ranges : Std.HashSet (String × Nat) := {}
   let mut files : Std.HashMap String (Array String) := {}
   for (c, r?) in found do
@@ -100,14 +125,19 @@ def main (args : List String) : IO UInt32 := do
     let body := String.intercalate "\n" ((src.extract (s - 1) e).toList)
     let digits := body.foldl (fun n ch => if ch.isDigit then n + 1 else n) 0
     let kind := if e + 1 - s > 200 && digits * 2 > body.length then "data" else kind
-    rows := rows.push (m.toString, s, e, c.toString, kind)
+    rows := rows.push (m.toString, s, e, c.toString, kind, codeLines (src.extract (s - 1) e).toList)
   let mut total := 0
+  let mut code := 0
   let mut data := 0
-  for (m, s, e, c, kind) in rows.qsort (fun a b => a.1 < b.1 || (a.1 == b.1 && a.2.1 < b.2.1)) do
+  for (m, s, e, c, kind, k) in rows.qsort (fun a b => a.1 < b.1 || (a.1 == b.1 && a.2.1 < b.2.1)) do
     let n := e + 1 - s
-    if kind == "data" then data := data + n else total := total + n
-    IO.println s!"decl\t{m}\t{c}\t{kind}\t{s}\t{e}\t{n}"
-  IO.println s!"total\t{total}\tlines\t{rows.size}\tranges\tdata {data}"
+    if kind == "data" then
+      data := data + n
+    else
+      total := total + n
+      code := code + k
+    IO.println s!"decl\t{m}\t{c}\t{kind}\t{s}\t{e}\t{n}\t{k}"
+  IO.println s!"total\t{total}\tlines\t{rows.size}\tranges\tdata {data}\tcode {code}"
   let mut shared : Std.HashMap String Nat := {}
   for c in frontier.toList do
     let top := match modOf c with
