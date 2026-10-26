@@ -1,6 +1,7 @@
 {
   "srcRoots": ["FVA", "FVATest", "Main.lean", "FVA.lean"],
-  "exclude": ["FVATest/Mutate", "FVATest/Cheats", "FVATest/Examples", "FVATest/Certs/Neg"],
+  "exclude": ["FVATest/Mutate", "FVATest/Cheats", "FVATest/Examples", "FVATest/Certs/Neg",
+              "FVATest/Subjects"],
   "exeRoots": ["Main", "FVATest.Main"],
   "proofRoots": ["FVA", "FVATest.Certs"],
   "exes": ["fva", "fvatest"],
