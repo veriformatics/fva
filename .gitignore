@@ -21,3 +21,7 @@ CLAUDE.local.md
 
 # FVA tool binaries (scripts/fetch-tools)
 .tools
+# GPL subject (edgeR, U14 S4): the binary and its lifted module are fetched + generated
+# (scripts/fetch-corpus, fva lift), never committed
+FVATest/Subjects/EdgerCpm/edgeR.so
+FVATest/Subjects/EdgerCpm/Lifted.lean
