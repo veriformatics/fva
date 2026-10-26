@@ -5,8 +5,8 @@ declaration the named theorems' statements reach, through definition bodies, con
 structure fields, never through proofs, with its source lines. Run-authored = its module's
 `.lean` file sits in the project outside `fva/` and `.lake/` and is not `fva lift` / `fva blob`
 output (generated subject bytes stop the walk, as in `fva trust`). Theorems count their statement
-lines alone (up to the proof's `:=`); a declaration whose source spans more than 200 lines with
-mostly numerals is reported as data. Output (TSV): `decl` rows (physical lines, then code
+lines alone (up to the proof's `:=`); a declaration of more than 20 lines whose text is 90 % digits
+and separators (a literal table) is reported as data. Output (TSV): `decl` rows (physical lines, then code
 lines: outside comments and docstrings), then `total`, then `shared` =
 constants outside the project the closure reaches, by top-level namespace. -/
 
@@ -123,8 +123,11 @@ def main (args : List String) : IO UInt32 := do
     if ranges.contains (file, s) then continue
     ranges := ranges.insert (file, s)
     let body := String.intercalate "\n" ((src.extract (s - 1) e).toList)
-    let digits := body.foldl (fun n ch => if ch.isDigit then n + 1 else n) 0
-    let kind := if e + 1 - s > 200 && digits * 2 > body.length then "data" else kind
+    -- a literal table (digits and separators alone) is input or output data, not definitions
+    let dataish := body.foldl (fun n ch =>
+      if ch.isDigit || ch.isWhitespace || ",;[](){}.:/-_⟨⟩#'\"".toList.contains ch then n + 1
+      else n) 0
+    let kind := if e + 1 - s > 20 && dataish * 10 > body.length * 9 then "data" else kind
     rows := rows.push (m.toString, s, e, c.toString, kind, codeLines (src.extract (s - 1) e).toList)
   let mut total := 0
   let mut code := 0
