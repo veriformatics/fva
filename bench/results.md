@@ -183,3 +183,88 @@ c75088cadad567e1accab8a7613a38f030666da28331345ce4d258ce56831007  ./scripts/fetc
 ```
 
 </details>
+
+## T1 — lz4-wasm (seed 3; bare 1–5, prompted 1–5, fva 3–7)
+
+Medians over 5 runs per arm, with [min–max] where the spread matters. Every arm reported every
+defect of the codec (encoder End-of-block condition 3 on `abaaaaaaaaaba`, the decoder on the
+empty block): no arm claimed that the codec meets its requirements.
+
+| metric | bare | prompted | fva |
+|---|---|---|---|
+| M1 theorems valid / claimed | 43 / 43 | 27 / 27 | 26 / 26 |
+| M2 link to the artifact | (c) 5 | (c) 4, (a) 1 (run 3: bytes extracted by an unverified Python script, run-written Wasm semantics) | (a) 5 (`fva lift`, link checked by `fva trust`) |
+| M3 requirements (3 per run) | 15 not proven, reported | 15 not proven, reported | 15 not proven, reported |
+| M4 defect evidence | executed reproducer 5 (Lean theorems about the format only) | executed reproducer 4, machine-checked on the extracted artifact 1 | machine-checked counterexample on the artifact 5 |
+| M5 surface, code lines: statement + link/model (checker scripts apart) | 67 [60–73]: 65 + 3 (86) | 40 [12–196]: 39 + 1 (213) | 40 [27–75]: 7 + 33 (80); `fva trust` surface 40 [29–80] |
+| M6 over-claims | 0 | 0 | 0 |
+| M7 wall time, s; input tokens (uncached) | 393 [382–599]; 0.52 M (35 k) | 1,158 [615–1,383]; 1.68 M (54 k) | 670 [630–1,630]; 2.73 M (83 k) |
+| M8 cheats caught / planted | 13 / 20 | 20 / 20 | 20 / 20 |
+| M9 statements readable / with effort / no formal statement | 0 / 14 / 1 | 6 / 9 / 0 | 2 / 13 / 0 |
+| M10 machine-checked statement about the shipped bytes | 0 / 5 | 1 / 5 | 5 / 5 |
+
+- M5 counts the run-written declarations that the claimed theorems' statements reach
+  (`bench/grade/Surface.lean`: definition bodies, never proofs; code lines without comments and
+  docstrings). Statement = theorem statements, the LZ4 format definitions and plain witness
+  inputs; link/model = observed artifact outputs, artifact setup, run-written Wasm semantics and
+  claims whose text is mostly an artifact call (split by declaration-name rules,
+  `.scratch/u15/grade/m5-split-t1.py`). The fva arm counts FVA's reviewed-once base apart, as
+  the other arms count Lean and Mathlib apart. Checker scripts = non-blank lines of the
+  run-written `.sh`/`.py`/`.mjs`/`.R` files.
+- M8, bare arm: C1 and C2 were caught by name only (the check prints `#print axioms` and exits
+  0); no bare check caught C3 (a theorem added with the kernel bypassed); bare-1's check never
+  reads the artifact (C4 missed), bare-5's missed C2. fva-4's documented check fails on a clean
+  copy (it copies the arena canaries but not `prelude-15704`), so its 4 catches count by name.
+- M3/M6 rulings: a sound refutation of a false requirement is `not proven, reported`; reviewer-12's
+  `weaker` on fva-7 R3 (a machine-checked trap, attributed by disclosed code inspection) was set
+  to `not proven, reported`, and its M6 finding to none (same convention for every arm).
+  prompted-3's `.verification/SorryControl.lean` is a deliberate negative control outside its
+  `Proofs` library and does not count against M1.
+
+## T4 — edger-cpm (seed 1; bare, prompted, fva, tool 1–5)
+
+Every arm reported both defects (R1: `calc_cpm_raw` overflows to infinity for finite counts and
+libraries near 2¹⁰²³; R2: a median-library sample with exactly `min.count` reads fails
+`filterByExpr`): no arm claimed that edgeR meets its requirements.
+
+| metric | bare | prompted | fva | tool (Frama-C WP) |
+|---|---|---|---|---|
+| M1 theorems valid / claimed | 43 / 43 | 17 / 17 | 20 / 20 | 5 / 5 runs, every WP goal proved |
+| M2 link to the artifact | (b) 1 (Lean `Float.Model` model, 2,000 / 2,000 cases equal to the artifact), (c) 4 | (c) 5 | (a) 5 | (b) 5, point models (C expressions without inputs, compared with the artifact by the run's reproducer) |
+| M3 requirements (2 per run) | 10 not proven, reported | 10 not proven, reported | 10 not proven, reported | 10 not proven, reported |
+| M4 defect evidence | executed reproducer 5 (Lean theorems about binary64 rounding) | executed reproducer 5 (same) | R1 machine-checked on the artifact 5; R2 machine-checked 4, executed reproducer 1 | executed reproducer 5 (WP proofs of the witness arithmetic) |
+| M5 surface, code lines: statement + link/model (checker scripts apart) | 41 [37–46]: 28 + 12 (154) | 22 [11–28]: 17 + 3 (270) | 45 [34–78]: 3 + 42 (159); `fva trust` surface 47 [37–85] | 41 [37–58]: 10 + 32 (150) |
+| M6 over-claims | 0 | 0 | 0 | 0 |
+| M7 wall time, s; input tokens (uncached) | 410 [406–666]; 1.46 M (60 k) | 817 [669–1,049]; 3.12 M (98 k) | 908 [615–1,988]; 4.70 M (111 k) | 435 [328–529]; 1.53 M (60 k) |
+| M8 cheats caught / planted | 15 / 20 | 20 / 20 | 20 / 20 | 9 / 15 (C3 not applicable) |
+| M9 statements readable / with effort / no formal statement | 0 / 10 / 0 | 2 / 8 / 0 | 0 / 9 / 1 | 2 / 8 / 0 |
+| M10 machine-checked statement about the shipped bytes | 0 / 5 | 0 / 5 | 5 / 5 | 0 / 5 |
+
+- M5 statement/link split: grader-1 (general-purpose teammate) classified each of the 182
+  declarations (`statement` = theorem statements, exact-arithmetic CPM and filter definitions,
+  plain witness inputs; `link-model` = binary64 encodings and rounding models, artifact
+  instruction order, R-expression models, Wasm store/instance setup, artifact calls); MAIN
+  checked 8 rows against the source and excluded prompted-1's positive control
+  `Controls.valid`. Tool arm: the WP C files' lines split the same way (other lines =
+  comments, blank lines, braces).
+- M8: the bare arm caught C1 and C2 by name only (printed axiom lists, exit 0) and no C3; the
+  tool arm caught C1 (`admit ensures`) and C2 (a false global axiom) only in runs 3 and 5,
+  whose checks pin their own WP source by hash; every tool check caught C4. All 20 clean
+  baselines exit 0.
+- M7: the fva arm's median wall time is 2.2 × the bare arm's (1.1 × the prompted arm's); its
+  sessions also ran `fva trust` kernel replays (CPU 251–691 s per run against 25–143 s bare).
+- Register (reviewer-19): README R2 ("exactly when … `min.count`") omits `filterByExpr`'s
+  `min.total.count` guard; every run's witness satisfies it, so no grade changes.
+
+### The two outcome sentences after T1 and T4
+
+- Bug finding ("a bare agent 'verified' X; FVA showed the shipped binary is wrong"): not shown.
+  On both tasks every arm, bare included, found and reported every defect. The difference is the
+  evidence: only the fva arm (5 / 5 runs on each task, plus prompted-3 on T1) stated its
+  counterexamples about the shipped bytes, machine-checked; the other runs executed the binary
+  and proved facts about the format or about binary64 arithmetic apart from it. T7 targets
+  this sentence.
+- Readability ("a ~25-line spec a biologist can read, proven about the real binary"): not shown.
+  The fva arm's T4 statements are proven about the real binary, but they take 34–78 code lines
+  and the domain reader rated them "readable with effort" (9 of 10). The U14 S4 subject
+  (`calc_cpm_raw` for every input) is the reference attempt for this sentence.
