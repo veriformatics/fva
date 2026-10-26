@@ -1,0 +1,2 @@
+PASS: exact artifact returns CPM=10 for (10,1000000), +inf for (2^1020,2^1020); reference=1000000
+PASS: all four CPM cells of R2 boundary input agree bit-for-bit with verification/artifact_cpm.R

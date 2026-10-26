@@ -1,0 +1,10 @@
+import Proofs.Counterexamples
+
+#print axioms EdgeRVerification.r1_positive_input
+#print axioms EdgeRVerification.r1_ideal
+#print axioms EdgeRVerification.r1_intermediate_exceeds_overflow_midpoint
+#print axioms EdgeRVerification.r2_encodings
+#print axioms EdgeRVerification.r2_rounding_cells
+#print axioms EdgeRVerification.r2_one_ulp_gap
+#print axioms EdgeRVerification.r2_boundary_counterexample
+#print axioms EdgeRVerification.r2_literal_iff_counterexample

@@ -1,0 +1,37 @@
+README.md: OK
+CHECK.md: OK
+edgeR.so: OK
+src/compute_cpm.c: OK
+src/edgeR.h: OK
+R/cpm.R: OK
+R/filterByExpr.R: OK
+man/cpm.Rd: OK
+man/filterByExpr.Rd: OK
+verification/certificates.c: OK
+verification/artifact.cjs: OK
+verification/filter_witness.R: OK
+verification/check.sh: OK
+R1: c=L=1e308, actual=Infinity, exact CPM=1000000
+R2: actual CPM bits=4023fff43420d831,4023fff43420d831, cutoff bits=4023fff43420d832
+ARTIFACT COUNTEREXAMPLES PASS
+R2: counts=(10,10), libraries=(1000009,1000009), required samples=2, total=20
+R2: documented count condition=TRUE, filterByExpr=FALSE
+R FILTER COUNTEREXAMPLE PASS
+[kernel] Parsing verification/certificates.c (with preprocessing)
+[wp] Running WP plugin...
+[wp] Warning: Skipped RTE guards: unaligned pointers (\aligned not supported)
+[wp] Warning: Skipped RTE guards: invalid function pointer calls (\valid_function not supported)
+[rte:annot] annotating function cutoff_div_numerator
+[rte:annot] annotating function cutoff_mul_numerator
+[rte:annot] annotating function r1_reference_and_overflow
+[rte:annot] annotating function r2_counterexample
+[rte:annot] annotating function r2_documented_keep
+[rte:annot] annotating function r2_rounded_keep
+[rte:annot] annotating function raw_numerator
+[wp] 48 goals scheduled
+[wp] Proved goals:   58 / 58
+  Terminating:       5
+  Unreachable:       5
+  Qed:              42 (0.56ms-0.10ms-1ms)
+  Alt-Ergo 2.5.4:    6 (12ms-20ms)
+ALL VERIFICATION CHECKS PASS

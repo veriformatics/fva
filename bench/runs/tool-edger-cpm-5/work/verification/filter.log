@@ -1,0 +1,4 @@
+No group or design set. Assuming all samples belong to one group.
+R2: actual=FALSE,FALSE; documented count criterion=TRUE,FALSE
+CPM=555555.5555555555; cutoff=555555.55555555562; gene 1 total=20 >= 15
+Shipped R checks passed

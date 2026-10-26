@@ -1,0 +1,7 @@
+✔ [2/5] Built Proofs.Controls (664ms)
+ℹ [3/5] Built Proofs.Counterexamples (1.0s)
+info: Proofs/Counterexamples.lean:39:0: 'Evidence.r1_witness' does not depend on any axioms
+info: Proofs/Counterexamples.lean:40:0: 'Evidence.r2_boundary_witness' does not depend on any axioms
+info: Proofs/Counterexamples.lean:41:0: 'Evidence.r2_tolerance_witness' does not depend on any axioms
+✔ [4/5] Built Proofs (523ms)
+Build completed successfully (5 jobs).

@@ -1,0 +1,3 @@
+PASS: sample condition true, total count 10 < 15, filter returns FALSE
+No group or design set. Assuming all samples belong to one group.
+PASS: c=10, L=36: CPM=277777.77777777775 < cutoff=277777.77777777781; two qualifying counts, total=20, filter returns FALSE

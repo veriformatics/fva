@@ -1,0 +1,27 @@
+(module
+  (import "env" "memory" (memory 16))
+  (import "edgeR" "calc_cpm_raw" (func $raw (param i32 i32 i32 i32)))
+  (import "edgeR" "__wasm_apply_data_relocs" (func $relocate))
+  (start $relocate)
+  ;; cmx fields: dmat, imat, nrow, ncol, type, isint, pnrow, rowsel.
+  ;; Type 0 is a full double matrix. All fields start at zero.
+  (func $matrix (param $p i32) (param $data i32)
+    (i32.store (local.get $p) (local.get $data))
+    (i32.store offset=8 (local.get $p) (i32.const 1))
+    (i32.store offset=12 (local.get $p) (i32.const 1))
+    (i32.store offset=24 (local.get $p) (i32.const 1)))
+  (func (export "cpm_bits") (param $count i64) (param $library i64) (result i64)
+    (memory.fill (i32.const 196608) (i32.const 0) (i32.const 128))
+    (call $matrix (i32.const 196608) (i32.const 196704))
+    (call $matrix (i32.const 196640) (i32.const 196712))
+    (i64.store (i32.const 196704) (local.get $count))
+    (i64.store (i32.const 196712) (local.get $library))
+    ;; calc_cpm_raw scales its caller-owned output buffer in place.
+    (i64.store (i32.const 196720) (local.get $count))
+    (i64.store (i32.const 196728) (i64.const 0x1122334455667788))
+    (call $raw (i32.const 196608) (i32.const 196640) (i32.const 196720) (i32.const 1))
+    (if (i64.ne (i64.load (i32.const 196704)) (local.get $count)) (then unreachable))
+    (if (i64.ne (i64.load (i32.const 196712)) (local.get $library)) (then unreachable))
+    (if (i64.ne (i64.load (i32.const 196728)) (i64.const 0x1122334455667788))
+      (then unreachable))
+    (i64.load (i32.const 196720))))

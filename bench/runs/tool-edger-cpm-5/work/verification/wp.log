@@ -1,0 +1,18 @@
+[kernel] Parsing verification/counterexamples.c (with preprocessing)
+[kernel:parser:decimal-float] verification/counterexamples.c:35: Warning: 
+  Floating-point constant 1e-14 is not represented exactly. Will use 0x1.6849b86a12b9bp-47.
+  (warn-once: no further messages from category 'parser:decimal-float' will be emitted)
+[wp] Running WP plugin...
+[wp] Warning: Skipped RTE guards: unaligned pointers (\aligned not supported)
+[wp] Warning: Skipped RTE guards: invalid function pointer calls (\valid_function not supported)
+[rte:annot] annotating function documented_cutoff_at_boundary
+[rte:annot] annotating function ideal_boundary_gene_meets_threshold
+[rte:annot] annotating function overflow_witness_real_arithmetic
+[rte:annot] annotating function rejects_boundary_gene
+[rte:annot] annotating function shipped_cpm_at_boundary
+[wp] 32 goals scheduled
+[wp] Proved goals:   42 / 42
+  Terminating:       5
+  Unreachable:       5
+  Qed:              19 (0.77ms-0.58ms-4ms)
+  Alt-Ergo 2.5.4:   13 (15ms-71ms-97ms)

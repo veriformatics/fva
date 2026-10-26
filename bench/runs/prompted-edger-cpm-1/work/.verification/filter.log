@@ -1,0 +1,3 @@
+No group or design set. Assuming all samples belong to one group.
+R2 boundary: CPM=555555.5555555555 cutoff=555555.55555555562 keep=FALSE (expected TRUE for first gene)
+R2 tolerance: qualifying=1 required=1.0000000000000009 keep=TRUE (exact rule FALSE)
