@@ -14,7 +14,8 @@ cd "$proj"
 bin=$(lean --print-prefix)/bin
 tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT
-lake build >"$tmp/build.log" 2>&1 || {
+# the module may sit outside the default target (a control or witness file no root imports)
+{ lake build && lake build "$module"; } >"$tmp/build.log" 2>&1 || {
 	tail -20 "$tmp/build.log" >&2
 	echo 'check-lean: build failed' >&2
 	exit 1

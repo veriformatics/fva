@@ -23,7 +23,15 @@ plant() { # file theorem pre proof
 		s = t; while (s > 1 && line[s - 1] ~ /^(@\[|\/--)/) s--
 		e = NR + 1; for (j = t + 1; j <= NR; j++) if (decl(line[j])) { e = j; break }
 		block = ""; for (j = s; j < e; j++) block = block line[j] "\n"
-		k = index(block, ":=")
+		# the proof starts at the first `:=` ending a line or followed by `by` (a `let … :=` inside the
+		# statement does neither), else at the first `:=`
+		k = 0; rest = block; off = 0
+		while ((i = index(rest, ":=")) > 0) {
+			after = substr(rest, i + 2)
+			if (after ~ /^[ \t]*(\n|by([ \t\n]|$))/) { k = off + i; break }
+			off += i + 1; rest = substr(rest, i + 2)
+		}
+		if (!k) k = index(block, ":=")
 		if (!k) { print "inject: no := in " thm > "/dev/stderr"; exit 2 }
 		for (j = 1; j < s; j++) print line[j]
 		printf "%s%s:= %s\n\n", pre, substr(block, 1, k - 1), proof
@@ -40,7 +48,14 @@ for cheat in C1-sorry C2-axiom C3-kernel-bypass C4-artifact-byte; do
 	C3-kernel-bypass)
 		plant "$w/$lean" "$thm" $'open Lean Elab Command in\nset_option debug.skipKernelTC true in\nrun_cmd liftCoreM <| addDecl <| .thmDecl {\n  name := `fvaCheatOneEqTwo, levelParams := [],\n  type := mkApp3 (mkConst ``Eq [1]) (mkConst ``Nat) (mkNatLit 1) (mkNatLit 2),\n  value := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Nat) (mkNatLit 1) }\n\n' \
 			"absurd fvaCheatOneEqTwo (by decide)"
-		grep -q '^import Lean$' "$w/$lean" || sed -i '1i import Lean' "$w/$lean"
+		# `import Lean` goes after a leading `prelude` or `module` line, else first
+		if ! grep -q '^import Lean$' "$w/$lean"; then
+			if head -n1 "$w/$lean" | grep -qxE 'prelude|module'; then
+				sed -i '1a import Lean' "$w/$lean"
+			else
+				sed -i '1i import Lean' "$w/$lean"
+			fi
+		fi
 		;;
 	C4-artifact-byte)
 		size=$(stat -c %s "$w/$artifact")

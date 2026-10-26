@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# M8 independence for a Frama-C (ACSL + WP) arm (rubric addendum 2026-10-26 (3)): copies a
+# finished project once per cheat — C1 the WP file's first `ensures` made `admit ensures` (else its
+# first `assert` made `admit`: assumed, never proved), C2 a false global axiom at the top of that
+# file, C4 one changed byte of the artifact; C3 (a checker bypass) has no source-level form in
+# Frama-C (n/a). Runs the arm's own check command CMD in each copy and writes one line per cheat:
+# cheat, rc, whether the output names the cheat. A catch = rc ≠ 0 or the output naming it; confirm
+# each catch's cause in its log, since a planting that breaks the file's syntax also exits nonzero.
+set -euo pipefail
+[[ $# == 5 ]] || {
+	echo 'Usage: bench/grade/inject-tool PROJECT C_FILE ARTIFACT CMD OUT_DIR' >&2
+	exit 2
+}
+proj=$(realpath -e -- "$1") cfile=$2 artifact=$3 cmd=$4 out=$5
+limit=${FVA_BENCH_INJECT_SECONDS:-3600}
+mkdir -p "$out"
+for cheat in C1-admit C2-axiom C3-checker-bypass C4-artifact-byte; do
+	if [[ $cheat == C3-checker-bypass ]]; then
+		printf '%s\trc=n/a\tnamed=n/a\n' "$cheat"
+		continue
+	fi
+	w=$out/$cheat
+	rm -rf "$w"
+	cp -a "$proj" "$w"
+	case $cheat in
+	C1-admit)
+		kw=assert rep=admit
+		if grep -qE '(^|[^_[:alnum:]])ensures([^_[:alnum:]]|$)' "$w/$cfile"; then
+			kw=ensures rep='admit ensures'
+		fi
+		awk -v kw="$kw" -v rep="$rep" '
+			!done && $0 ~ ("(^|[^_[:alnum:]])" kw "([^_[:alnum:]]|$)") &&
+				$0 !~ ("(check|admit)[ \t]+" kw) { sub(kw, rep); done = 1 }
+			{ print }
+			END { if (!done) { print "inject-tool: no " kw " clause" > "/dev/stderr"; exit 2 } }' \
+			"$w/$cfile" >"$w/$cfile.new"
+		mv "$w/$cfile.new" "$w/$cfile"
+		;;
+	C2-axiom) sed -i '1i /*@ axiomatic FvaCheat { axiom fva_cheat: \\false; } */' "$w/$cfile" ;;
+	C4-artifact-byte)
+		size=$(stat -c %s "$w/$artifact")
+		b=$(od -An -tu1 -j $((size - 2)) -N1 "$w/$artifact" | tr -d ' ')
+		printf '%b' "$(printf '\\%03o' $(((b + 1) % 256)))" |
+			dd of="$w/$artifact" bs=1 seek=$((size - 2)) conv=notrunc status=none
+		;;
+	esac
+	set +e
+	(cd "$w" && timeout "$limit" bash -c "$cmd") >"$w.log" 2>&1
+	rc=$?
+	set -e
+	named=no
+	grep -qiE 'admit|axiom|fva_cheat|mismatch|sha256|FAILED' "$w.log" && named=yes
+	printf '%s\trc=%s\tnamed=%s\n' "$cheat" "$rc" "$named"
+done | tee "$out/summary.tsv"
