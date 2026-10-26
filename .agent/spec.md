@@ -79,7 +79,7 @@ Proof writing alone is not what FVA adds: a capable agent can already write and 
 - [x] f0d4b92 U13 bench prep (data): rubric v2 fixed before runs (outcomes + protocol rulings; faithfulness judged by MAIN vs requirement prose + official LZ4 / edgeR docs, fresh `reviewer` per arm); pinned subjects; Frama-C 33.0 + Verus baselines; harness (arms per `.claude/rules/fva-bench.md`: fresh `codex exec` sessions outside the repo; pinned CPUs, usage capture); pilot sets the cap. Starts parallel after U1.
 - [x] 750d2d5 U14 subject demonstrations (disclosed; after the bench tag, outside the fva-arm export): S1 LZ4 block spec, S2 lz4-wasm counterexamples, S3 TMM relation + certificates (R3 parity, exact-average refutations), S4 edgeR `calc_cpm_raw` all-input claim (loader-prepared, allocator contract), S5 GLM `iround`; stretch subjects → D39, the filterByExpr corollary → D40.
 - [ ] U15 bench runs + grading + results (n = 5 × 4 arms × subjects; MAIN re-checks every claim; surface split + spread).
-- [ ] U17 upstream report drafts after the runs (user posts): RNAnorm TMM parity claim, Wasm spec `fmul` zero sign (equations give `±0·q = +0`; IEEE + official tests give the XOR sign; `docs/contracts/U3-numerics.md`).
+- [x] d642de2 U17 upstream report drafts (the user posts): `docs/reports/rnanorm-tmm.md` (RNAnorm TMM parity claim), `docs/reports/wasm-spec-fmul.md` (the spec's `fmul` prose says infinity where its equations say zero; upstream main unchanged at the last check).
 - [ ] U18 close: README current; prototype retired (`git tag prototype-link-reach`, `git rm -r prototype/`); closing-diff reviewers per lens + MAIN security lens; `.agent/review.md` no open row; Phase → MAINTAIN.
 - See `.agent/deferred.md` for the deferral queue.
 
