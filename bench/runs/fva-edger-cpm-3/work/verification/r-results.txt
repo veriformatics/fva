@@ -1,0 +1,7 @@
+R1 through shipped cpm.default: finite c=L=2^1023 produces Inf.
+R2 total-count witness: count=10, L=1e6, required samples=1: FALSE (total=10 < 15).
+No group or design set. Assuming all samples belong to one group.
+R2 rounding witness: counts=[10,10], libraries=[18,18], required samples=2: FALSE.
+Actual CPM=555555.5555555555; cutoff=555555.55555555562; total count=20 >= 15.
+No group or design set. Assuming all samples belong to one group.
+All R assertions and their unchanged-artifact CPM checks passed.

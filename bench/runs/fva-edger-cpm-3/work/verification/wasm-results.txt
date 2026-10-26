@@ -1,0 +1,4 @@
+Artifact SHA256: e39434314a9eb0399edf943c6a0475d34ff9d0d7ec0bb4a1b8ba726b4a6a88fb
+R1: c = L = 2^1023: artifact returns +infinity; c/L*10^6 = 1000000 exactly.
+R2 rounding: c=10, L=18: artifact CPM bits = 0x4120f4471c71c71c
+All unchanged-artifact Wasmtime assertions passed.

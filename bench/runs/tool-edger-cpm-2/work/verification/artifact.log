@@ -1,0 +1,3 @@
+R1: c=L=2^1023; artifact=Infinity (0x7ff0000000000000); target=1000000 exactly
+R2: counts=[10,10], lib.size=[18,18]; artifact=555555.5555555555 (0x4120f4471c71c71c); cutoff=555555.5555555556 (0x4120f4471c71c71d)
+ARTIFACT COUNTEREXAMPLES PASS

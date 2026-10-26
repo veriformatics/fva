@@ -1,0 +1,40 @@
+README.md: OK
+CHECK.md: OK
+edgeR.so: OK
+src/compute_cpm.c: OK
+src/edgeR.h: OK
+R/cpm.R: OK
+R/filterByExpr.R: OK
+man/cpm.Rd: OK
+man/filterByExpr.Rd: OK
+calc_cpm_raw(c=10, L=1000000) = 10.0; bits=4024000000000000
+calc_cpm_raw(c=10, L=18) = 555555.5555555555; bits=4120f4471c71c71c
+calc_cpm_raw(c=1e308, L=1e308) = inf; bits=7ff0000000000000
+PASS: original artifact hash, control case, R2 boundary, R1 overflow witness
+No group or design set. Assuming all samples belong to one group.
+R2: cpm=555555.5555555555, cutoff=555555.55555555562, keep=FALSE; scaled-count rule expects TRUE
+R2: all defaults, column-sum libraries 18,18; target row counts 10,10 dropped
+No group or design set. Assuming all samples belong to one group.
+Control: target row counts 10,10 with libraries 10,10 is kept
+PASS: shipped R functions executed with original calc_cpm_raw via Wasmtime
+[kernel] Parsing verification/witnesses.c (with preprocessing)
+[kernel:parser:decimal-float] verification/witnesses.c:31: Warning: 
+  Floating-point constant 1e-14 is not represented exactly. Will use 0x1.6849b86a12b9bp-47.
+  (warn-once: no further messages from category 'parser:decimal-float' will be emitted)
+[wp] Running WP plugin...
+[wp] Warning: Skipped RTE guards: unaligned pointers (\aligned not supported)
+[wp] Warning: Skipped RTE guards: invalid function pointer calls (\valid_function not supported)
+[rte:annot] annotating function cutoff_boundary
+[rte:annot] annotating function exact_reference
+[rte:annot] annotating function filter_boundary
+[rte:annot] annotating function overflow_reference
+[rte:annot] annotating function r2_disagreement
+[rte:annot] annotating function raw_boundary
+[rte:annot] annotating function specification_boundary
+[wp] 54 goals scheduled
+[wp] Proved goals:   64 / 64
+  Terminating:       5
+  Unreachable:       5
+  Qed:              44 (0.95ms-0.20ms-4ms)
+  Alt-Ergo 2.5.4:   10 (41ms-48ms-69ms)
+PASS: all counterexample replays and all WP goals checked

@@ -1,0 +1,117 @@
+✔ [3156/3158] Built Main (2.0s)
+✔ [3158/3158] Built fva:exe (1.3s)
+Build completed successfully (3158 jobs).
+fva trust: PASS
+
+Claims
+  Proofs.artifact_binding — about Proofs.Lifted (artifact)
+    proved by Proofs.artifact_binding_holds (axioms: propext)
+  Proofs.r2_rounding_gap — about Proofs.Lifted (artifact)
+    proved by Proofs.r2_rounding_gap_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.r2_cpm_bits — about Proofs.Lifted (artifact)
+    proved by Proofs.r2_cpm_bits_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.r1_overflow — about Proofs.Lifted (artifact)
+    proved by Proofs.r1_overflow_holds (axioms: propext, Classical.choice, Quot.sound)
+
+Kernel replay
+  leanchecker (lean): accepted (158 s)
+  con-leche (con): accepted (136 s)
+
+Canaries (72 known-false exports, /home/eturkes/.cache/fva-bench/runs/fva-edger-cpm-3/tmp/edger-fva-verifier-sLPKpE/trust/canaries/set.tsv; known acceptances /home/eturkes/.cache/fva-bench/runs/fva-edger-cpm-3/tmp/edger-fva-verifier-sLPKpE/trust/canaries/known.tsv)
+  leanchecker: 71 rejected, 0 declined, 0 crashed or timed out, 1 accepted
+  con-leche: 69 rejected, 3 declined, 0 crashed or timed out, 0 accepted
+
+Links
+  Proofs.Lifted (edgeR.so) [lifted]: matches
+
+Read these: 80 code lines
+  Proofs.Spec: 35 lines
+  Proofs.Fixture: 45 lines
+
+Names the claims use from outside the project (their meaning = their docs)
+  And (core): `And a b`, or `a ∧ b`, is the conjunction of propositions. It can be
+  BitVec (core): A bitvector of the specified width.
+  Bool (core): The Boolean values, `true` and `false`.
+  Eq (core): The equality relation. It has one introduction rule, `Eq.refl`.
+  False (core): `False` is the empty proposition. Thus, it has no introduction rules.
+  Int (core): The integers.
+  List (core): Linked lists: ordered lists, in which each element has a reference to the next element.
+  Nat (core): The natural numbers, starting at zero.
+  Option (core): Optional values, which are either `some` around a value from the underlying type or `none`.
+  Prod (core): The product type, usually written `α × β`. Product types are also called pair or tuple types.
+  Real (mathlib): The type `ℝ` of real numbers constructed as equivalence classes of Cauchy sequences of rational
+  UInt8 (core): Unsigned 8-bit integers.
+  ite (core): `if c then t else e` is notation for `ite c t e`, "if-then-else", which decides to
+  DivInvMonoid.toDiv (mathlib)
+  GetElem?.getElem? (core): The syntax `arr[i]?` gets the `i`'th element of the collection `arr`,
+  HAdd.hAdd (core): `a + b` computes the sum of `a` and `b`.
+  HDiv.hDiv (core): `a / b` computes the result of dividing `a` by `b`.
+  HMul.hMul (core): `a * b` computes the product of `a` and `b`.
+  HPow.hPow (core): `a ^ b` computes `a` to the power of `b`.
+  HSub.hSub (core): `a - b` computes the difference of `a` and `b`.
+  LT.lt (core): The less-than relation: `x < y` 
+  List.contains (core): Checks whether `a` is an element of `as`, using `==` to compare elements.
+  List.filter (core): Returns the list of elements in `l` for which `p` returns `true`.
+  List.length (core): The length of a list.
+  List.map (core): Applies a function to each element of the list, returning the resulting list of values.
+  List.range (core): Returns a list of the numbers from `0` to `n` exclusive, in increasing order.
+  Monoid.toNPow (mathlib)
+  NPow.toPow (mathlib)
+  Nat.AtLeastTwo (mathlib): A type class for natural numbers which are greater than or equal to `2`.
+  Nat.hasNotBit (core): Asserts that the `(n+1)`th least significant bit of `m` is not set.
+  Nat.land (core): Bitwise and. Usually accessed via the `&&&` operator.
+  Nat.ne_of_beq_eq_false (core)
+  Nat.shiftRight (core): Shifts the binary representation of a value right by the specified number of bits. Usually accessed
+  OfNat.ofNat (core): The `OfNat.ofNat` function is automatically inserted by the parser when
+  One.toOfNat1 (core)
+  Option.getD (core): Gets an optional value, returning a given default on `none`.
+  Option.map (core): Apply a function to an optional value, if present.
+  Zero.toOfNat0 (core)
+  FVA.Wasm.Export (base): Exports.
+  FVA.Wasm.Func (base): Functions: type index, declared locals, body.
+  FVA.Wasm.FuncType (base): Function types: parameter and result value types.
+  FVA.Wasm.GlobalType (base): Global types.
+  FVA.Wasm.Import (base): Imports.
+  FVA.Wasm.ImportDesc (base): Import descriptions.
+  FVA.Wasm.Instr (base): Instructions of the profile (spec §2.4); structured control carries nested bodies.
+  FVA.Wasm.Limits (base): Limits of a memory (in pages) or a table (in elements).
+  FVA.Wasm.TableType (base): Table types.
+  FVA.Wasm.ValType (base): Value types.
+  FVA.Wasm.Exec.AInstr (base): Administrative instructions (§4.2.13) over plain instructions.
+  FVA.Wasm.Exec.CallReturns (base): The call always returns, with final store and results satisfying `P` (never traps).
+  FVA.Wasm.Exec.Config (base): Configurations (§4.2.14): store, current frame, instruction sequence.
+  FVA.Wasm.Exec.DataInst (base): Data instances (§4.2.10); a dropped segment has no bytes.
+  FVA.Wasm.Exec.ElemInst (base): Element instances (§4.2.10); a dropped segment has no elements.
+  FVA.Wasm.Exec.ExportInst (base): Export instances (§4.2.10).
+  FVA.Wasm.Exec.FuncInst (base): Function instances (§4.2.6): module code closed over its instance, or a host function named
+  FVA.Wasm.Exec.GlobalInst (base): Global instances (§4.2.9).
+  FVA.Wasm.Exec.HostSem (base): Host semantics: the outcomes a host function (by `HostId`) may produce on a store and
+  FVA.Wasm.Exec.MemInst (base): Memory instances (§4.2.8): `pages · 65536` bytes.
+  FVA.Wasm.Exec.ModuleInst (base): Module instances (§4.2.5): the module's types and the store address of every entity.
+  FVA.Wasm.Exec.Must (base): Total correctness: from `c`, every execution finishes, with an outcome satisfying `Q`.
+  FVA.Wasm.Exec.Outcome (base): The outcome of a finished execution: values or a trap, with the final store.
+  FVA.Wasm.Exec.Store (base): The store (§4.2.3).
+  FVA.Wasm.Exec.TableInst (base): Table instances (§4.2.7).
+  FVA.Wasm.Exec.Val (base): Values (§4.2.1); floats as their bit patterns (§4.3.1).
+  FVA.Wasm.Func.type (base): Type index.
+  FVA.Wasm.Import.desc (base): Description.
+  FVA.Wasm.ImportDesc.ctorIdx (base)
+  FVA.Wasm.Module.exports (base): Exports.
+  FVA.Wasm.Module.funcs (base): Functions defined by the module.
+  FVA.Wasm.Module.imports (base): Imports.
+  FVA.Wasm.Module.types (base): Function types.
+  FVA.Wasm.Num.FVal (base): Floating-point values (spec §2.2.3): a sign (`true` = negative) and a magnitude.
+  FVA.Wasm.Num.f64fmt (base): `f64`: `M = 52`, `E = 11`.
+  FVA.Wasm.Num.ofBits (base): `fbits_N⁻¹`: the value a bit pattern represents.
+  FVA.Wasm.Exec.MemInst.read (base): The little-endian number in the `k` bytes at `ea` (`bytes_N⁻¹`, §4.3.1).
+  FVA.Wasm.Exec.MemInst.write (base): Store the `k` little-endian bytes of `v` at `ea` (`data[ea : k] = bytes_N(v)`).
+  FVA.Wasm.Exec.Outcome.casesOn (base)
+  FVA.Wasm.Exec.Store.mems (base): Memory instances.
+  FVA.Wasm.Num.FVal.toReal (base): The exact value of a number (spec §2.2.3); `0` for infinities and NaNs.
+  FVA.Wasm.Num.FloatFormat.N (base): Total bit width `N = 1 + E + M`.
+
+What a PASS rests on
+  reviewed once: FVA's specs: Wasm syntax + binary grammar, execution semantics, integer + IEEE-754 numerics, claim forms, certificate relations, the verdict rules (FVA/Spec/**)
+  verified implementation: the decoder (sound + complete for the profile), the reference stepper, the float operators, instantiation, the validator (validated modules never get stuck), the verdict function, the certificate checkers (FVA.Self: fva trust on FVA itself)
+  trusted glue: fact collection from the environment, the link and surface checks (a certificate's files included), process orchestration, the external kernels (each canaried)
+  residual trust: the Lean kernel cross-checked by an independent kernel, the Lean compiler that built fva, Mathlib at the pinned revision, the specs

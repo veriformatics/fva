@@ -1,0 +1,4 @@
+R1 COUNTEREXAMPLE: c=L=2^1020; artifact=Inf; required=1000000
+R2 COUNTEREXAMPLE: y=[10,10], lib.size=[36,36], required.samples=2, total=20
+  artifact CPM=277777.77777777775 (0x1.0f4471c71c71cp+18); cutoff=277777.77777777781 (0x1.0f4471c71c71dp+18); keep=FALSE
+All counterexample assertions passed.

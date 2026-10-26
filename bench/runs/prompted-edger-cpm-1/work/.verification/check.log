@@ -1,0 +1,36 @@
+PASS: original artifact/source/documentation hashes
+PASS: Node + Wasmtime zero: 0000000000000000
+PASS: Node + Wasmtime ordinary: 4034000000000000
+PASS: Node + Wasmtime boundary: 4120f4471c71c71c
+PASS: Node + Wasmtime overflow: 7ff0000000000000
+No group or design set. Assuming all samples belong to one group.
+R2 boundary: CPM=555555.5555555555 cutoff=555555.55555555562 keep=FALSE (expected TRUE for first gene)
+R2 tolerance: qualifying=1 required=1.0000000000000009 keep=TRUE (exact rule FALSE)
+✔ [2/5] Built Proofs.Controls (664ms)
+ℹ [3/5] Built Proofs.Counterexamples (1.0s)
+info: Proofs/Counterexamples.lean:39:0: 'Evidence.r1_witness' does not depend on any axioms
+info: Proofs/Counterexamples.lean:40:0: 'Evidence.r2_boundary_witness' does not depend on any axioms
+info: Proofs/Counterexamples.lean:41:0: 'Evidence.r2_tolerance_witness' does not depend on any axioms
+✔ [4/5] Built Proofs (523ms)
+Build completed successfully (5 jobs).
+PASS: Lean default kernel accepts evidence.ndjson
+PASS: Lean default kernel accepts controls.ndjson
+PASS: con-ron Rust kernel accepts evidence.ndjson
+PASS: con-ron Rust kernel accepts controls.ndjson
+PASS: Nanoda Rust kernel accepts evidence.ndjson
+PASS: Nanoda Rust kernel accepts controls.ndjson
+PASS: Lean default kernel rejects falseEquality.ndjson
+PASS: con-ron Rust kernel rejects falseEquality.ndjson
+PASS: Nanoda Rust kernel rejects falseEquality.ndjson
+PASS: Lean default kernel rejects falseOrder.ndjson
+PASS: con-ron Rust kernel rejects falseOrder.ndjson
+PASS: Nanoda Rust kernel rejects falseOrder.ndjson
+Proof closure: 191 declaration records; 409225 bytes
+Review size Proofs/Counterexamples.lean: 41 lines, 1633 bytes
+Review size Proofs/Controls.lean: 8 lines, 317 bytes
+Review size verify/check.py: 178 lines, 8744 bytes
+Review size verify/runtime.mjs: 42 lines, 2146 bytes
+Review size verify/driver.wat: 17 lines, 736 bytes
+Review size verify/filter.R: 37 lines, 2018 bytes
+Review size verify/artifacts.json: 11 lines, 774 bytes
+VERIFICATION PASS: both requirements refuted; all three kernels accepted the certificates and rejected both false proofs.

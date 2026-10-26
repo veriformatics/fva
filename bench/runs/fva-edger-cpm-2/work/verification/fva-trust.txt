@@ -1,0 +1,92 @@
+fva trust: PASS
+
+Claims
+  Proofs.overflow_witness — about Proofs.Lifted (artifact)
+    proved by Proofs.overflow_witness_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.threshold_witness — about Proofs.Lifted (artifact)
+    proved by Proofs.threshold_witness_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.artifact_arithmetic — about Proofs.Lifted (artifact)
+    proved by Proofs.artifact_arithmetic_holds (axioms: propext)
+
+Kernel replay
+  leanchecker (lean): accepted (65 s)
+  con-leche (con): accepted (71 s)
+
+Canaries (72 known-false exports, /tmp/edger-fva-checker-bqfqacgi/fva/trust/canaries/set.tsv; known acceptances /tmp/edger-fva-checker-bqfqacgi/fva/trust/canaries/known.tsv)
+  leanchecker: 71 rejected, 0 declined, 0 crashed or timed out, 1 accepted
+  con-leche: 69 rejected, 3 declined, 0 crashed or timed out, 0 accepted
+
+Links
+  Proofs.Lifted (edgeR.so) [lifted]: matches
+
+Read these: 47 code lines
+  Proofs.Spec: 47 lines
+
+Names the claims use from outside the project (their meaning = their docs)
+  And (core): `And a b`, or `a ∧ b`, is the conjunction of propositions. It can be
+  Bool (core): The Boolean values, `true` and `false`.
+  Eq (core): The equality relation. It has one introduction rule, `Eq.refl`.
+  List (core): Linked lists: ordered lists, in which each element has a reference to the next element.
+  Nat (core): The natural numbers, starting at zero.
+  Option (core): Optional values, which are either `some` around a value from the underlying type or `none`.
+  PUnit (core): The canonical universe-polymorphic type with just one element.
+  Real (mathlib): The type `ℝ` of real numbers constructed as equivalence classes of Cauchy sequences of rational
+  Set (mathlib): A set is a collection of elements of some type `α`.
+  ite (core): `if c then t else e` is notation for `ite c t e`, "if-then-else", which decides to
+  BitVec.ofNat (core): The bitvector with value `i mod 2^n`.
+  DivInvMonoid.toDiv (mathlib)
+  GetElem?.getElem? (core): The syntax `arr[i]?` gets the `i`'th element of the collection `arr`,
+  HAdd.hAdd (core): `a + b` computes the sum of `a` and `b`.
+  HDiv.hDiv (core): `a / b` computes the result of dividing `a` by `b`.
+  HMul.hMul (core): `a * b` computes the product of `a` and `b`.
+  LT.lt (core): The less-than relation: `x < y` 
+  List.length (core): The length of a list.
+  List.take (core): Extracts the first `n` elements of `xs`, or the whole list if `n` is greater than `xs.length`.
+  Membership.mem (core): The membership relation `a ∈ s : Prop` where `a : α`, `s : γ`. 
+  Nat.AtLeastTwo (mathlib): A type class for natural numbers which are greater than or equal to `2`.
+  Nat.hasNotBit (core): Asserts that the `(n+1)`th least significant bit of `m` is not set.
+  Nat.land (core): Bitwise and. Usually accessed via the `&&&` operator.
+  Nat.ne_of_beq_eq_false (core)
+  Nat.shiftRight (core): Shifts the binary representation of a value right by the specified number of bits. Usually accessed
+  OfNat.ofNat (core): The `OfNat.ofNat` function is automatically inserted by the parser when
+  Option.ctorIdx (core)
+  Option.getD (core): Gets an optional value, returning a given default on `none`.
+  Option.map (core): Apply a function to an optional value, if present.
+  Singleton.singleton (core): `singleton x` is a collection with the single element `x` (notation: `{x}`). 
+  Zero.toOfNat0 (core)
+  FVA.Wasm.BlockType (base): Block types: no result, one value type, or a function type index.
+  FVA.Wasm.CvtOp (base): Conversion operators (spec §2.4.1 `cvtop`), with source and target widths where needed.
+  FVA.Wasm.Export (base): Exports.
+  FVA.Wasm.Expr (base): Expressions: instruction sequences (the trailing `end` is implicit).
+  FVA.Wasm.FBinOp (base): Float binary operators.
+  FVA.Wasm.FRelOp (base): Float relational operators.
+  FVA.Wasm.FUnOp (base): Float unary operators.
+  FVA.Wasm.Func (base): Functions: type index, declared locals, body.
+  FVA.Wasm.IBinOp (base): Integer binary operators.
+  FVA.Wasm.IRelOp (base): Integer relational operators.
+  FVA.Wasm.IUnOp (base): Integer unary operators (`clz`, `ctz`, `popcnt`, sign extension of the low 8/16/32 bits).
+  FVA.Wasm.Instr (base): Instructions of the profile (spec §2.4); structured control carries nested bodies.
+  FVA.Wasm.MemArg (base): Memory operand immediates: alignment exponent and byte offset.
+  FVA.Wasm.NumType (base): Number types.
+  FVA.Wasm.PackSize (base): Packed memory access sizes for integer loads and stores.
+  FVA.Wasm.RefType (base): Reference types.
+  FVA.Wasm.Sx (base): Signedness of integer operations.
+  FVA.Wasm.ValType (base): Value types.
+  FVA.Wasm.Width (base): Integer and float widths used by numeric instruction families.
+  FVA.Wasm.Func.body (base): Body.
+  FVA.Wasm.Instr.ctorIdx (base)
+  FVA.Wasm.Module.exports (base): Exports.
+  FVA.Wasm.Module.funcs (base): Functions defined by the module.
+  FVA.Wasm.Num.FVal (base): Floating-point values (spec §2.2.3): a sign (`true` = negative) and a magnitude.
+  FVA.Wasm.Num.f64fmt (base): `f64`: `M = 52`, `E = 11`.
+  FVA.Wasm.Num.fdiv (base): `fdiv_N(z₁, z₂)`.
+  FVA.Wasm.Num.fmul (base): `fmul_N(z₁, z₂)`. A zero times a number has the XOR sign, per IEEE 754 §6.3 and the official
+  FVA.Wasm.Num.ofBits (base): `fbits_N⁻¹`: the value a bit pattern represents.
+  FVA.Wasm.Num.FVal.IsNum (base): A number: neither a NaN nor an infinity.
+  FVA.Wasm.Num.FVal.toReal (base): The exact value of a number (spec §2.2.3); `0` for infinities and NaNs.
+
+What a PASS rests on
+  reviewed once: FVA's specs: Wasm syntax + binary grammar, execution semantics, integer + IEEE-754 numerics, claim forms, certificate relations, the verdict rules (FVA/Spec/**)
+  verified implementation: the decoder (sound + complete for the profile), the reference stepper, the float operators, instantiation, the validator (validated modules never get stuck), the verdict function, the certificate checkers (FVA.Self: fva trust on FVA itself)
+  trusted glue: fact collection from the environment, the link and surface checks (a certificate's files included), process orchestration, the external kernels (each canaried)
+  residual trust: the Lean kernel cross-checked by an independent kernel, the Lean compiler that built fva, Mathlib at the pinned revision, the specs
