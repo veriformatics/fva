@@ -10,7 +10,7 @@ Per run `R` = `~/.cache/fva-bench/runs/<arm>-<task>-<i>` (its input dir = `~/.ca
 6. M4 (T1, T4, T5, T6, T7): the defect outcome class, from the run's evidence (MAIN; confirm a "machine-checked counterexample" by its M1 result).
 7. M5: trusted surface at equal M3 — (i) requirement statement, (ii) link + model, (iii) checker code the agent wrote; fva arm = `fva trust`'s review surface (FVA's base counted apart).
 8. M7: `result.json` (wall_ms, tokens, status; `cpu_*`, `load1_*` = idle-window evidence).
-9. M8: `bench/grade/inject <scratch dir> <lean file> <main theorem> <artifact> '<the run's own check command>' <out dir>` → per cheat rc + named; confirm each catch's cause in its log.
+9. M8: `bench/grade/inject <scratch dir> <lean file> <main theorem> <artifact> '<the run's own check command>' <out dir>` → per cheat rc + named; confirm each catch's cause in its log. Tool arms: `bench/grade/inject-tool <scratch dir> <file.c | file.rs> <artifact> '<cmd>' <out dir> [FN]` (Verus: FN = the main proof function; the command names the wrapper by path, e.g. `bench/tools/verus`, since the arm's PATH entry is absent outside its run).
 10. M9 (fresh `reviewer`, domain-reader persona: bioinformatician for T4–T6, systems programmer for T1–T3, T7 by subject): per requirement statement `readable` | `readable with effort` | `not readable` + line count read.
 11. M10: any machine-checked statement about the shipped artifact (M2 (a)).
 
