@@ -1,29 +1,85 @@
 #!/usr/bin/env bash
-# M8 independence for a Frama-C (ACSL + WP) arm (rubric addendum 2026-10-26 (3)): copies a
-# finished project once per cheat — C1 the WP file's first `ensures` made `admit ensures` (else its
-# first `assert` made `admit`: assumed, never proved), C2 a false global axiom at the top of that
-# file, C4 one changed byte of the artifact; C3 (a checker bypass) has no source-level form in
-# Frama-C (n/a). Runs the arm's own check command CMD in each copy and writes one line per cheat:
-# cheat, rc, whether the output names the cheat. A catch = rc ≠ 0 or the output naming it; confirm
-# each catch's cause in its log, since a planting that breaks the file's syntax also exits nonzero.
+# M8 independence for a tool arm (rubric addendum 2026-10-26 (3)): copies a finished project once
+# per cheat, plants it in FILE (or the artifact), runs the arm's own check command CMD in each copy
+# and writes one line per cheat: cheat, rc, whether the output names the cheat.
+# - Frama-C (FILE = *.c): C1 the first `ensures` made `admit ensures` (else the first `assert` made
+#   `admit`: assumed, never proved), C2 a false global axiom at the top of FILE, C3 n/a (Frama-C has
+#   no source-level checker bypass).
+# - Verus (FILE = *.rs, FN = the main proof function): C1 `admit();` opening FN's body, C2 an
+#   `external_body` proof function ensuring `false`, called first in FN, C3 `#[verifier::external]`
+#   on FN.
+# - Both: C4 one changed byte of the artifact.
+# A catch = rc ≠ 0 or the output naming the cheat; confirm each catch's cause in its log, since a
+# planting that breaks the file's syntax also exits nonzero.
 set -euo pipefail
-[[ $# == 5 ]] || {
-	echo 'Usage: bench/grade/inject-tool PROJECT C_FILE ARTIFACT CMD OUT_DIR' >&2
+[[ $# == 5 || ($# == 6 && $2 == *.rs) ]] || {
+	echo 'Usage: bench/grade/inject-tool PROJECT FILE.c ARTIFACT CMD OUT_DIR' >&2
+	echo '       bench/grade/inject-tool PROJECT FILE.rs ARTIFACT CMD OUT_DIR FN' >&2
 	exit 2
 }
-proj=$(realpath -e -- "$1") cfile=$2 artifact=$3 cmd=$4 out=$5
+proj=$(realpath -e -- "$1") cfile=$2 artifact=$3 cmd=$4 out=$5 fn=${6:-}
+verus=false
+[[ $cfile != *.rs ]] || verus=true
+if $verus && [[ -z $fn ]]; then
+	echo 'inject-tool: a Verus file needs FN (the main proof function)' >&2
+	exit 2
+fi
+# Verus plantings, relative to FN's declaration: `head` = text opening its body, `before` = lines
+# above the declaration and its attributes, `attr` = a line right above the declaration.
+plant_rs() { # file head before attr
+	awk -v fn="$fn" -v head="$2" -v before="$3" -v attr="$4" '
+	{ line[NR] = $0 }
+	END {
+		re = "(^|[^_[:alnum:]])fn[ \t]+" fn "([^_[:alnum:]]|$)"
+		for (d = 1; d <= NR && line[d] !~ re; d++);
+		if (d > NR) { print "inject-tool: no fn " fn > "/dev/stderr"; exit 2 }
+		top = d
+		while (top > 1 && line[top - 1] ~ /^[ \t]*(#\[|\/\/\/)/) top--
+		match(line[d], re); depth = 0; found = 0
+		# the match may end on the character after the name (an opening parenthesis)
+		after = RSTART + RLENGTH
+		if (substr(line[d], after - 1, 1) !~ /[_[:alnum:]]/) after--
+		for (i = d; i <= NR && !found; i++) {
+			from = (i == d) ? after : 1
+			for (j = from; j <= length(line[i]); j++) {
+				c = substr(line[i], j, 1)
+				if (c == "(") depth++
+				else if (c == ")") depth--
+				else if (c == "{" && depth == 0) {
+					line[i] = substr(line[i], 1, j) " " head substr(line[i], j + 1); found = 1; break
+				}
+			}
+		}
+		if (!found) { print "inject-tool: no body for fn " fn > "/dev/stderr"; exit 2 }
+		for (i = 1; i <= NR; i++) {
+			if (i == top && before != "") print before
+			if (i == d && attr != "") print attr
+			print line[i]
+		}
+	}' "$1" >"$1.new"
+	mv "$1.new" "$1"
+}
 limit=${FVA_BENCH_INJECT_SECONDS:-3600}
 mkdir -p "$out"
 for cheat in C1-admit C2-axiom C3-checker-bypass C4-artifact-byte; do
-	if [[ $cheat == C3-checker-bypass ]]; then
+	if [[ $cheat == C3-checker-bypass ]] && ! $verus; then
 		printf '%s\trc=n/a\tnamed=n/a\n' "$cheat"
 		continue
 	fi
 	w=$out/$cheat
 	rm -rf "$w"
 	cp -a "$proj" "$w"
-	case $cheat in
-	C1-admit)
+	# exec code takes proof statements inside a `proof { … }` block
+	pre='proof { ' post=' }'
+	! $verus || ! grep -qE "proof[ \t]+fn[ \t]+$fn([^_[:alnum:]]|$)" "$w/$cfile" || pre='' post=''
+	case $verus:$cheat in
+	true:C1-admit) plant_rs "$w/$cfile" "${pre}admit();$post" '' '' ;;
+	true:C2-axiom)
+		plant_rs "$w/$cfile" "${pre}fva_cheat_false();$post" \
+			'#[verifier::external_body] proof fn fva_cheat_false() ensures false { unimplemented!() }' ''
+		;;
+	true:C3-checker-bypass) plant_rs "$w/$cfile" '' '' '#[verifier::external]' ;;
+	false:C1-admit)
 		kw=assert rep=admit
 		if grep -qE '(^|[^_[:alnum:]])ensures([^_[:alnum:]]|$)' "$w/$cfile"; then
 			kw=ensures rep='admit ensures'
@@ -36,8 +92,8 @@ for cheat in C1-admit C2-axiom C3-checker-bypass C4-artifact-byte; do
 			"$w/$cfile" >"$w/$cfile.new"
 		mv "$w/$cfile.new" "$w/$cfile"
 		;;
-	C2-axiom) sed -i '1i /*@ axiomatic FvaCheat { axiom fva_cheat: \\false; } */' "$w/$cfile" ;;
-	C4-artifact-byte)
+	false:C2-axiom) sed -i '1i /*@ axiomatic FvaCheat { axiom fva_cheat: \\false; } */' "$w/$cfile" ;;
+	*:C4-artifact-byte)
 		size=$(stat -c %s "$w/$artifact")
 		b=$(od -An -tu1 -j $((size - 2)) -N1 "$w/$artifact" | tr -d ' ')
 		printf '%b' "$(printf '\\%03o' $(((b + 1) % 256)))" |
@@ -51,6 +107,7 @@ for cheat in C1-admit C2-axiom C3-checker-bypass C4-artifact-byte; do
 	case $cheat in
 	C1-admit) pat='admit' ;;
 	C2-axiom) pat='fva_cheat|FvaCheat' ;;
+	C3-checker-bypass) pat='verifier::external' ;;
 	C4-artifact-byte) pat='mismatch|FAILED|differ|changed' ;;
 	esac
 	named=no
