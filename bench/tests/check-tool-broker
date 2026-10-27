@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# By hand (podman + the pinned Frama-C image, ≈ 30 s): the tool arm's container lifecycle (rubric
+# addendum 2026-10-28, D41). A container runs pinned + memory-capped; a killed wrapper and a killed
+# broker each leave no container; a request over the memory cap fails inside the run.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+mkdir -p "$root/.cache/bench/tests"
+tmp=$(mktemp -d "$root/.cache/bench/tests/broker.XXXXXXXX")
+label=fva-bench-test=$$
+pids=()
+cleanup() {
+	for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; done
+	podman ps -q --filter "label=$label" | xargs -r podman kill >/dev/null 2>&1 || true
+	rm -rf -- "$tmp"
+}
+trap cleanup EXIT
+fail() {
+	echo "check-tool-broker: $*" >&2
+	exit 1
+}
+mkdir -p "$tmp/work" "$tmp/bin"
+# alt-ergo cannot settle x² = 2y², so WP runs until its timeout: a request that stays alive
+cat >"$tmp/work/slow.c" <<'EOF'
+/*@ requires 0 < x < 100000 && 0 < y < 100000;
+    ensures \result == 0; */
+int f(int x, int y) { return x * x == 2 * y * y; }
+EOF
+slow=(-wp -wp-prover alt-ergo -wp-timeout 60 -wp-par 1 slow.c)
+cp "$root/bench/tools/broker-client" "$tmp/bin/frama-c"
+cpu=$(($(nproc) - 1))
+container() { # wait up to 20 s for the labelled container; print its id
+	local id
+	for _ in $(seq 100); do
+		id=$(podman ps -q --filter "label=$label")
+		[[ -z $id ]] || {
+			echo "$id"
+			return 0
+		}
+		sleep 0.2
+	done
+	return 1
+}
+gone() { # wait up to 10 s for no labelled container
+	for _ in $(seq 50); do
+		[[ -n $(podman ps -q --filter "label=$label") ]] || return 0
+		sleep 0.2
+	done
+	return 1
+}
+
+# 1. the wrapper alone: TERM → container killed, rc 143
+FVA_TOOL_LABEL=$label "$root/bench/tools/frama-c" "$tmp/work" "${slow[@]}" >"$tmp/wrapper.log" 2>&1 &
+wrapper=$!
+pids+=("$wrapper")
+container >/dev/null || fail 'wrapper: no container appeared'
+kill "$wrapper"
+rc=0
+wait "$wrapper" || rc=$?
+((rc == 143)) || fail "wrapper: rc $rc after TERM, expected 143"
+gone || fail 'wrapper: container still running after TERM'
+echo 'wrapper: TERM stops its container → pass'
+
+# 2. the broker: limits applied; TERM → the run's container killed
+spool=$tmp/spool2
+FVA_TOOL_CPUS=$cpu FVA_TOOL_LABEL=$label "$root/bench/tools/tool-broker" "$tmp/work" "$spool" \
+	frama-c >"$tmp/broker2.log" 2>&1 &
+broker=$!
+pids+=("$broker")
+sleep 0.5
+(cd "$tmp/work" && FVA_TOOL_SPOOL=$spool "$tmp/bin/frama-c" "$tmp/work" "${slow[@]}") \
+	>"$tmp/client2.log" 2>&1 &
+pids+=("$!")
+id=$(container) || fail 'broker: no container appeared'
+limits=$(podman inspect --format '{{.HostConfig.CpusetCpus}} {{.HostConfig.Memory}} {{.HostConfig.MemorySwap}}' "$id")
+[[ $limits == "$cpu 17179869184 17179869184" ]] || fail "broker: container limits '$limits'"
+kill "$broker"
+wait "$broker" || true
+gone || fail 'broker: container still running after the broker stopped'
+echo "broker: container pinned to CPU $cpu, 16 GiB without swap; TERM stops it → pass"
+
+# 3. over the memory cap: the request fails inside the run (the client gets the rc)
+spool=$tmp/spool3
+FVA_TOOL_MEMORY=48m FVA_TOOL_LABEL=$label "$root/bench/tools/tool-broker" "$tmp/work" "$spool" \
+	frama-c >"$tmp/broker3.log" 2>&1 &
+broker=$!
+pids+=("$broker")
+sleep 0.5
+rc=0
+(cd "$tmp/work" && FVA_TOOL_SPOOL=$spool timeout 120 "$tmp/bin/frama-c" "$tmp/work" -wp \
+	-wp-timeout 5 slow.c) >"$tmp/client3.log" 2>&1 || rc=$?
+((rc == 137)) || fail "cap: client rc $rc, expected 137 (killed at the memory cap)"
+echo 'cap: a request over the memory cap fails inside the run (rc 137) → pass'
