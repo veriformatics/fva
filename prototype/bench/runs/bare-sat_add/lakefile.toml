@@ -1,8 +1,0 @@
-name = "sat_add_verification"
-version = "1.0.0"
-defaultTargets = ["SatAdd"]
-
-[[lean_lib]]
-name = "SatAdd"
-roots = ["SatAdd", "Wasm", "Artifacts", "Audit"]
-

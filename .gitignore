@@ -4,7 +4,6 @@ __pycache__/
 *.pyc
 .venv/
 *.wasm
-!prototype/fva/examples/**/*.wasm
 !bench/subjects/wasm/*.wasm
 !bench/subjects/wasm-pflog/*.wasm
 !bench/subjects/wasm-glm/*.wasm
@@ -17,7 +16,6 @@ __pycache__/
 .cache/
 .claude/settings.local.json
 CLAUDE.local.md
-!prototype/bench/tasks/**/*.wasm
 
 # FVA tool binaries (scripts/fetch-tools)
 .tools

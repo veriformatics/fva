@@ -1,3 +1,0 @@
-Original C + README + WASM pinned; README build is byte-identical.
-Lean elaboration passed; proof axiom whitelist passed: Classical.choice, Quot.sound, propext
-FAIL: proofs-lean-kernel: exit 1; inspect /tmp/fva-bench/m8/prompted-avg_floor/C3-kernel-bypass/.verification/proofs-lean-kernel.log
