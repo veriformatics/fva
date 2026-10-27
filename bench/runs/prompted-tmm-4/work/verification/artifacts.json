@@ -1,0 +1,19 @@
+{
+  "CHECK.md": "aba7a0ca513f6b4473abff323da5dd4ddcf9cd021c015ee4fcb9138fc0d0d44e",
+  "README.md": "d81e882efbf98329beda5892cbf7b57f97b48f34f5a27b8d021363ace120e69f",
+  "counts.tsv": "aa9abeaf77b5c06ca3200a374b82834c06ed59d4564eb69dcb18d1dcf0b112e5",
+  "edgeR/DESCRIPTION": "7835cb26598131d1dbb26ec37260c2f49fb713be10ba879644186d234dff23eb",
+  "edgeR/R/calcNormFactors.R": "ca1027ed9385d5c8f7f044e2826e2a4d9f46ddf2bfcf4971db67fae562f3016c",
+  "edgeR/R/normLibSizes.R": "90f26fc387d04a75570f89c9cf6252be1223f6ef0ede24746bc46c0e26f35030",
+  "edgeR/man/calcNormFactors.Rd": "7b063175833f43aec136fa3eadab25a0a054b1cddcb97a45c1892f4dc018a86b",
+  "edger-factors.R": "b8fa5c20ece745e663002755aa7672b36f754abbec07ce803000d3f8f013d2b3",
+  "edger-factors.txt": "df500dba78cc7349d9c9959204de5c230343c6cb41c4efb753a8536d757df943",
+  "lake-manifest.json": "1da64c0ba787ff539472175e282f55df8b19ce37c7b2cd5804388670ae22cd37",
+  "lakefile.toml": "aefb62528bb4dad8b0783bdf4a1060a649f3a9761bd626def244e62fc01aa1f7",
+  "lean-toolchain": "ca5f1f601d34c49079e38d7e7041eb0f2a9c227fbc1df0f404820069a052330c",
+  "rnanorm-factors.py": "fbf7376020766bf9fb81841f1be575dee797eac04197066a1e9817d68c290570",
+  "rnanorm-factors.txt": "62fc3bea0957d7d91e676ba5a791c03ffff0bc94ebdd61b1de5e0f93f8a97d6d",
+  "rnanorm/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  "rnanorm/between_sample.py": "f8e91ea07b234bce455a75aa4cd2d8ffe36322931f03f6add0d3b203e8016337",
+  "rnanorm/utils.py": "2a16b6c0fe0af9cae2beba5c70051da298bc1e69cf9de134a3fe33157775d51a"
+}

@@ -1,0 +1,63 @@
++ sha256sum -c verification/inputs.sha256
+README.md: OK
+CHECK.md: OK
+counts.tsv: OK
+edger-factors.txt: OK
+rnanorm-factors.txt: OK
+edger-factors.R: OK
+rnanorm-factors.py: OK
+edgeR/R/normLibSizes.R: OK
+edgeR/R/calcNormFactors.R: OK
+edgeR/man/calcNormFactors.Rd: OK
+rnanorm/between_sample.py: OK
+rnanorm/utils.py: OK
+lean-toolchain: OK
+lakefile.toml: OK
+lake-manifest.json: OK
++ python3 verification/generate.py --check
+Certificate regeneration: PASS
++ lake clean proofs
++ lake build
+✔ [3246/3252] Built Proofs.LogBounds (3.0s)
+✔ [3247/3252] Built Proofs.Model (2.6s)
+✔ [3248/3252] Built Proofs.Artifacts (3.9s)
+✔ [3249/3252] Built Proofs.Certificates (120s)
+ℹ [3250/3252] Built Proofs.Results (5.5s)
+info: Proofs/Results.lean:166:0: 'Verification.R1_at_0023' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ artifact_numeric_bounds._native.native_decide.ax_1_1,
+ certificates_valid._native.native_decide.ax_1_1,
+ endpoints_valid._native.native_decide.ax_1_1,
+ forms_match._native.native_decide.ax_1_1,
+ numeric_enclosures._native.native_decide.ax_1_1]
+info: Proofs/Results.lean:167:0: 'Verification.R2_at_0021' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ artifact_numeric_bounds._native.native_decide.ax_1_1,
+ certificates_valid._native.native_decide.ax_1_1,
+ endpoints_valid._native.native_decide.ax_1_1,
+ forms_match._native.native_decide.ax_1_1,
+ numeric_enclosures._native.native_decide.ax_1_1]
+info: Proofs/Results.lean:168:0: 'Verification.fine_tolerance_failure' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ certificates_valid._native.native_decide.ax_1_1,
+ endpoints_valid._native.native_decide.ax_1_1,
+ first_values_lower._native.native_decide.ax_1_1,
+ forms_match._native.native_decide.ax_1_1,
+ numeric_enclosures._native.native_decide.ax_1_1]
+info: Proofs/Results.lean:169:0: 'Verification.R3_counterexample' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ R3_counterexample._native.native_decide.ax_1_1]
+info: Proofs/Results.lean:170:0: 'Verification.R3_decimal_witness' depends on axioms: [propext, Classical.choice, Quot.sound]
+✔ [3251/3252] Built Proofs (1.6s)
+Build completed successfully (3252 jobs).
++ Rscript verification/replay_edger.R
+edgeR source replay, exact output bytes: PASS
+Rows 163,355: sum-of-logs A ranks = 233 232 ; log-of-product A ranks = 232.5 232.5 
++ python3 verification/replay_rnanorm.py
+RNAnorm extracted-method replay with dependency substitutes: PASS (max abs error 0)
+Reference sample (1-based): 4
+ALL VERIFICATION CHECKS PASSED (R3 is refuted; see VERIFICATION.md).

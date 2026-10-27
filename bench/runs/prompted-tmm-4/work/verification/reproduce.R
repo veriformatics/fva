@@ -1,0 +1,8 @@
+source('edgeR/R/calcNormFactors.R')
+source('edgeR/R/normLibSizes.R')
+x <- as.matrix(read.table('counts.tsv', sep='\t'))
+f <- normLibSizes(x, method='TMM')
+got <- paste0(paste(sprintf('%.17g', f), collapse='\n'), '\n')
+want <- paste0(readLines('edger-factors.txt'), '\n', collapse='')
+stopifnot(identical(got, want))
+cat('edgeR source replay: exact shipped decimal bytes reproduced\n')

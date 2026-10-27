@@ -1,0 +1,5 @@
+Lean default kernel rejects the solution: while replaying declaration 'forgedArithmetic':
+(kernel) declaration type mismatch, 'forgedArithmetic' has type
+  Eq 1 1
+but it is expected to have type
+  Eq 1 0

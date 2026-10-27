@@ -1,0 +1,6 @@
+'Artifacts.artifact_values' depends on axioms: [propext]
+'Artifacts.r1_necessary_conditions' depends on axioms: [propext, Quot.sound]
+'Artifacts.r2_necessary_conditions' depends on axioms: [propext, Quot.sound]
+'Artifacts.r3_all_samples_fail' depends on axioms: [propext]
+'Artifacts.r3_sample1_gap' depends on axioms: [propext]
+'Artifacts.r3_failure_of_artifact' depends on axioms: [propext]

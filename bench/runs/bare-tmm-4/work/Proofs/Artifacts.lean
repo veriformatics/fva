@@ -1,0 +1,20 @@
+-- Exact decimal text and rational parsing of the shipped factor files.
+import Proofs.Parsing
+set_option maxRecDepth 1000000
+namespace Verification
+def edgeBytes : String := "0.99099942459293067\n1.2772984068792248\n1.1253076397204775\n0.95358597286325431\n0.81337534218434382\n0.92968280356711641\n0.97359269251916547\n"
+def edgeValues : Fin 7 → ℚ :=
+  ![(99099942459293067 / 100000000000000000), (1596623008599031 / 1250000000000000), (450123055888191 / 400000000000000), (95358597286325431 / 100000000000000000), (40668767109217191 / 50000000000000000), (92968280356711641 / 100000000000000000), (97359269251916547 / 100000000000000000)]
+def rnaBytes : String := "0.9816880015656044\n1.2793096928626835\n1.1270795948647565\n0.9550875280917844\n0.8146561160553638\n0.9311467198937998\n0.9751257511415794\n"
+def rnaValues : Fin 7 → ℚ :=
+  ![(2454220003914011 / 2500000000000000), (2558619385725367 / 2000000000000000), (2254159189729513 / 2000000000000000), (2387718820229461 / 2500000000000000), (4073280580276819 / 5000000000000000), (4655733599468999 / 5000000000000000), (4875628755707897 / 5000000000000000)]
+theorem edge_parses : parseFactors edgeBytes =
+    some (List.ofFn edgeValues) := by decide +kernel
+theorem rna_parses : parseFactors rnaBytes =
+    some (List.ofFn rnaValues) := by decide +kernel
+def round10 (q : ℚ) : ℤ := ⌊q * 10^10 + 1/2⌋
+theorem R3_gap : ∀ i : Fin 7, (1/1000 : ℚ) < |edgeValues i - rnaValues i| := by
+  intro i; fin_cases i <;> norm_num [edgeValues, rnaValues]
+theorem R3_rounding : ∀ i : Fin 7, round10 (edgeValues i) ≠ round10 (rnaValues i) := by
+  decide +kernel
+end Verification

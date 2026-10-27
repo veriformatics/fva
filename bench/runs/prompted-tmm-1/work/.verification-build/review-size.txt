@@ -1,0 +1,9 @@
+Proofs/Artifacts.lean: 83 lines, 3027 bytes
+Proofs.lean: 1 lines, 24 bytes
+verification/check.py: 156 lines, 8047 bytes
+check.sh: 4 lines, 74 bytes
+verification/replay.R: 25 lines, 1362 bytes
+verification/replay.py: 100 lines, 3845 bytes
+verification/ForgedFalse.lean: 13 lines, 378 bytes
+verification/ForgedArithmetic.lean: 12 lines, 371 bytes
+verification/AdmittedFalse.lean: 3 lines, 107 bytes

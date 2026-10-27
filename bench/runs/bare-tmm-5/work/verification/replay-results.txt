@@ -1,0 +1,9 @@
+All shipped input, artifact, source, and documentation byte identities passed.
+edgeR shipped source: factors reproduced byte for byte; masks match Lean data.
+RNAnorm shipped class methods with dependency shims: abs error < 2e-15; masks match Lean data.
+Selected gene counts:
+  ideal [63, 79, 76, 283, 89, 95, 79]
+  edgeR [65, 79, 77, 283, 89, 95, 81]
+  RNAnorm [64, 79, 77, 283, 89, 95, 81]
+R3 counterexample differences: [0.00931142302732627, 0.0020112859834587, 0.001771955144279, 0.00150155522853009, 0.00128077387101998, 0.00146391632668339, 0.00153305862241393]
+All replay checks passed. Run lake build and the Lean axiom audit for the formal results.

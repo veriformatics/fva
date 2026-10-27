@@ -1,0 +1,13 @@
+import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Tactic.NormNum
+import Mathlib.Tactic.Linarith
+#check List.sum_le_sum
+#check List.sum_map_add
+#check Rat.cast_sum
+#check Rat.cast_list_sum
+#check Rat.cast_le
+#check List.ofFn
+#check Real.exp_sub
+#check div_le_div_iff₀
+#check String.toNat!
+#check Lean.ofReduceBool

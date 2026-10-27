@@ -1,0 +1,17 @@
+{
+  "declarations": {
+    "inductive": 708,
+    "def": 6284,
+    "thm": 19560,
+    "axiom": 3,
+    "quot": 4,
+    "opaque": 22
+  },
+  "axioms": [
+    "propext",
+    "Quot.sound",
+    "Classical.choice"
+  ],
+  "roots": 17,
+  "export_bytes": 156889089
+}
