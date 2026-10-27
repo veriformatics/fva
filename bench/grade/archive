@@ -37,7 +37,7 @@ declare -A input
 while read -r sha path; do input[$path]=$sha; done <"$run/inputs.sha256"
 # derived outputs stay out: build trees, caches, kernel exports (each rerun regenerates them)
 (cd "$run/work" && find . \( -path ./.lake -o -path ./fva/.lake -o -path '*/target' -o \
-	-path ./.git -o -name __pycache__ -o -name .cache -o -name .lake \) -prune -o -type f \
+	-path ./.git -o -path '*/.frama-c/wp/cache' -o -name __pycache__ -o -name .cache -o -name .lake \) -prune -o -type f \
 	! -name '*.olean' ! -name '*.ilean' ! -name '*.olean.hash' ! -name '*.ilean.hash' \
 	! -name '*.trace' ! -name '*.ndjson' ! -name '*.export' -print0) |
 	while IFS= read -r -d '' f; do
