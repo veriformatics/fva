@@ -145,7 +145,7 @@ printf '{"status":"completed"}\n' >"$fake/result.json"
 printf '{}\n' >"$fake/metadata.json"
 : >"$fake/inputs.sha256"
 printf 'agent proof\n' >"$fake/work/Proof.lean"
-printf '{"tokens":{"access_token":"fixture-secret-0123456789abcdefghij"}}\n' >"$tmp/fake-auth.json"
+printf '{"tokens":{"access_token":"fixture-secret-0123456789abcdefghij"}}\n' >"$tmp/fake-auth.json" # gitleaks:allow (fixture)
 printf '{"type":"item.completed","item":{"aggregated_output":"no secret"}}\n' >"$fake/stdout.jsonl"
 expect_rc 0 env FVA_BENCH_AUTH_FILE="$tmp/fake-auth.json" "$root/bench/grade/archive" "$fake" \
 	"$tmp/arch-clean"
