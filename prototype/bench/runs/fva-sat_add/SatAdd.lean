@@ -1,1 +1,0 @@
-import SatAdd.Proof

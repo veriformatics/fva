@@ -1,13 +1,12 @@
 ---
 paths:
-  - "prototype/bench/**"
   - "bench/**"
 ---
 
 # Agent benchmark law
 
 - Rubric first: `rubric.md` (or a dated addendum) is committed before any run it grades; scoring follows it as written, a deviation = a new addendum + a note in `results.md`.
-- Arms run as fresh `codex exec` sessions in dirs outside this repo (own `git init`), because teammates inherit this repo's `CLAUDE.md` + `spec.md` (FVA's whole approach) and a copy of the repo leaks the rubric + planted-bug commit messages; the fva arm gets a history-free copy of the FVA package (v1: `git archive` of `prototype/fva`; v2: `fva init`'s vendored package, prebuilt, + the fetched canaries, assembled by `bench/tasks/prepare` from the bench tag's frozen worktree). `codex exec` needs `< /dev/null`, else it blocks on stdin.
+- Arms run as fresh `codex exec` sessions in dirs outside this repo (own `git init`), because teammates inherit this repo's `CLAUDE.md` + `spec.md` (FVA's whole approach) and a copy of the repo leaks the rubric + planted-bug commit messages; the fva arm gets a history-free copy of the FVA package (`fva init`'s vendored package, prebuilt, + the fetched canaries, assembled by `bench/tasks/prepare` from the bench tag's frozen worktree). `codex exec` needs `< /dev/null`, else it blocks on stdin.
 - Bench root = `$HOME/.cache/fva-bench` (runs, inputs, batches, grading, arm tools, package store), named so in bench docs, rules + the rubric — user ruling on the `CLAUDE.md` `Authoring` portability clause: `$HOME`-derived ⇒ the same path on every host; outside the repo by the isolation law above ⇒ no repo-relative form.
 - `bench/harness/run-session` jails every run (bubblewrap; visible = system, own run dir, arm tools, package store, `PATH` entries under `$HOME`), since Codex's workspace-write sandbox limits writes alone and agents read ancestor `AGENTS.md` files; a graded run's `result.json` carries `jail.visible` + a clean `harness_commit`. `bench/tests/check-prep` (by hand, mock Codex) asserts the jail.
 - Every agent claim is rechecked by MAIN: clean build, axiom audit, `leanexport` → `lake check --from-export` kernel replay (outside the agent sandbox; nested `bwrap` fails inside it, D19); judged metrics (M3/M4/M6) go to a fresh `reviewer` per arm, calibrated on the earlier `verdicts.md`.
