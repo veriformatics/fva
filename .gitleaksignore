@@ -1,0 +1,2 @@
+# Deliberate fixture secret of bench/tests/check-prep (the archive-refusal test), as committed before its inline gitleaks:allow.
+0408e1c3b1138d9bdec22ea14d1291de6a4d39b5:bench/tests/check-prep:generic-api-key:148

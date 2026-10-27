@@ -6,9 +6,9 @@ structure fields, never through proofs, with its source lines. Run-authored = it
 `.lean` file sits in the project outside `fva/` and `.lake/` and is not `fva lift` / `fva blob`
 output (generated subject bytes stop the walk, as in `fva trust`). Theorems count their statement
 lines alone (up to the proof's `:=`); a declaration of more than 20 lines whose text is 90 % digits
-and separators (a literal table) is reported as data. Output (TSV): `decl` rows (physical lines, then code
-lines: outside comments and docstrings), then `total`, then `shared` =
-constants outside the project the closure reaches, by top-level namespace. -/
+and separators (a literal table) is reported as data. Output (TSV): `decl` rows (physical lines,
+then code lines: outside comments and docstrings), then `total`, then `shared` = constants outside
+the project the closure reaches, by top-level namespace. -/
 
 open Lean
 
