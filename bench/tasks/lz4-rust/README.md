@@ -6,13 +6,13 @@
 
 The module exports its memory (2 MiB, fixed size) and two functions. All values are `i32`, and addresses are byte offsets in the exported memory. The module keeps its stack and data below address 131072, so the caller places buffers at addresses 131072 to 2097151.
 
-- `lz4_decompress(src, dst, n, cap)` decodes the block of `n` bytes at `src` into the buffer of `cap` bytes at `dst` with `lz4_flex::block::decompress_into`, and returns the number of bytes written, or -1 when the block is invalid or does not fit (`shim/src/lib.rs`).
+- `lz4_decompress(src, dst, n, cap)` decodes the block of `n` bytes at `src` into the buffer of `cap` bytes at `dst` with `lz4_flex::block::decompress_into`, and returns the number of bytes written on success, or -1 when `decompress_into` reports an error (`shim/src/lib.rs`).
 - `lz4_compress(src, dst, n, cap)` encodes a block. It is not part of the requirements.
 
 ## Requirements
 
-In each requirement, the two buffers do not overlap and both lie at addresses 131072 to 2097151.
+In each requirement, `n` and `cap` are non-negative, the buffers `src[0 .. n)` and `dst[0 .. cap)` do not overlap, and both lie at addresses 131072 to 2097151.
 
-- R1: `lz4_decompress` reads no byte outside `src[0 .. n)` and writes no byte outside `dst[0 .. cap)` at those addresses, whatever the bytes at `src` are.
-- R2: If the `n` bytes at `src` are a valid block of the LZ4 block format, as `lz4_Block_format.md` defines it, and its decoded content fits in `cap` bytes, then `lz4_decompress` writes exactly that content at `dst` and returns its length.
-- R3: If `lz4_decompress` returns a value `r` that is not negative, then `r ≤ cap`, the `n` bytes at `src` are a sequence of LZ4 sequences as the format defines them, and `r` and the `r` bytes written at `dst` are their decoded length and content. A block that breaks only the end-of-block conditions may decode, because the format allows a decoder to accept it.
+- R1: Among the addresses 131072 to 2097151, `lz4_decompress` reads only bytes of `src[0 .. n)` and `dst[0 .. cap)`, and writes only bytes of `dst[0 .. cap)`, whatever the bytes at `src` are.
+- R2: If the `n` bytes at `src` are a valid independent block of the LZ4 block format, as `lz4_Block_format.md` defines it: a block whose matches refer only to bytes already decoded from this block (`lz4_decompress` takes no dictionary and no previous block), and its decoded content fits in `cap` bytes, then `lz4_decompress` returns the length `r` of the decoded content, and afterwards `dst[0 .. r)` holds that content.
+- R3: If `lz4_decompress` returns a value `r` that is not negative, then `r ≤ cap`, the `n` bytes at `src` split into LZ4 sequences as the format defines them, each match offset between 1 and the number of bytes decoded before that match, and `dst[0 .. r)` holds their decoded content, of length `r`. A block that breaks only the end-of-block conditions may decode, because the format allows a decoder to accept it.
