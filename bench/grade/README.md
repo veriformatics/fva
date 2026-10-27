@@ -15,3 +15,11 @@ Per run `R` = `~/.cache/fva-bench/runs/<arm>-<task>-<i>` (its input dir = `~/.ca
 11. M10: any machine-checked statement about the shipped artifact (M2 (a)).
 
 Invalid runs (rubric): a model-usage-limit stop (rerun after reset); a read of this repository in `stdout.jsonl` (`zcat stdout.jsonl.gz | grep -c "$(git rev-parse --show-toplevel)"` on the archive; rerun).
+
+## Grading rulings (apply to every arm and task)
+
+- M1: a module export that mixes invalid theorems (`native_decide`, `sorry`) with clean ones can make an independent kernel reject the whole export: recheck the clean theorems alone (`check-lean PROJECT MODULE THEOREM…`). Negative-control files that hold forbidden constructs and are imported by nothing do not count against M1 (prove "imported by nothing" with an import search and a positive control).
+- M2 (b): a model that takes inputs = fidelity against the shipped artifact on 2,000 cases (seeded generator, the artifact run by its own harness); an executable model without inputs (a point computation) = (b), point model, checked by the run's own reproducer.
+- M3: a statement over a replay-supplied intermediate (for example the kept genes copied from a float run) whose relation to the documented method is unproved = `weaker`; a sound refutation of a false requirement = `not proven, reported`.
+- M5 + M9: input and output literal tables (count matrices, copied factor values) are data, counted apart from code lines (`bench/grade/Surface.lean`: more than 20 lines of 90 % digits and separators), as FVA blobs are.
+- M8: the cheat goes into the first theorem the report cites outside a lifted module; where that theorem is a support lemma the run's own check never covers, also plant at the first Spec-claim proof and report both; a catch needs rc ≠ 0 from the cheat (not a syntax error) or a cheat-specific token, and every documented check gets a clean baseline (`C0`).
