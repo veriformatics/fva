@@ -1,0 +1,13 @@
+✔ [3245/3257] Built Proofs.Intervals (9.6s)
+✔ [3246/3257] Built Proofs.Logs (32s)
+✔ [3247/3257] Built Proofs.Data (32s)
+✔ [3248/3257] Built Proofs.Counterexample (12s)
+✔ [3249/3257] Built Proofs.Model (15s)
+✔ [3250/3257] Built Proofs.Parsing (38s)
+✔ [3251/3257] Built Proofs.IdealCertificates (180s)
+✔ [3252/3257] Built Proofs.RnaCertificates (180s)
+✔ [3253/3257] Built Proofs.EdgeCertificates (180s)
+✔ [3254/3257] Built Proofs.Certificates (9.9s)
+✔ [3255/3257] Built Proofs.Requirements (9.8s)
+✔ [3256/3257] Built Proofs (7.2s)
+Build completed successfully (3257 jobs).

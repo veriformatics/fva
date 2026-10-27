@@ -1,0 +1,48 @@
+{
+  "arm": "prompted",
+  "task": "tmm",
+  "index": 5,
+  "cpus": "4",
+  "model": "gpt-6.1-sol",
+  "effort": "high",
+  "limit_seconds": 5400,
+  "prompt_sha256": "353f7ef67ba12cd5cd7bedd37d81273ea07cdd52f213c6534fe97a58010554e2",
+  "input_manifest_sha256": "32c956cd5af6cbd6cc9053176697fc005a02a869fe04c46b0fe573cf05ed13b4",
+  "codex_executable": "/opt/openai-codex/bin/codex",
+  "codex_executable_sha256": "399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215",
+  "codex_version": "codex-cli 0.163.0",
+  "harness_commit": "fba0b947b4b4b923e6dfba8c7f01b4757923a498",
+  "jail": {
+    "tool": "bubblewrap 0.13.1",
+    "visible": [
+      "/home/eturkes/.cache/fva-bench/bin",
+      "/home/eturkes/.cache/fva-bench/tools",
+      "/home/eturkes/.cache/fva-bench/packages-v4.35.0"
+    ]
+  },
+  "status": "completed",
+  "thread_id": "01a176be-d13f-7c82-8d5c-181e26c79eeb",
+  "turns_started": 1,
+  "turns_completed": 1,
+  "turns_failed": 0,
+  "error_events": 0,
+  "usage_complete": true,
+  "usage": {
+    "input_tokens": 6506454,
+    "output_tokens": 38056,
+    "cache_read_input_tokens": 6396672,
+    "cache_write_input_tokens": 0,
+    "reasoning_output_tokens": 16779,
+    "cost_usd": null,
+    "duration_api_ms": null
+  },
+  "exit_code": 0,
+  "agent_exit_code": 0,
+  "wall_ms": 1418494,
+  "duration_ms": 1418494,
+  "cpu_user_s": 607.51,
+  "cpu_sys_s": 100.42,
+  "max_rss_kb": 4291000,
+  "load1_start": 28.38,
+  "load1_end": 15.46
+}

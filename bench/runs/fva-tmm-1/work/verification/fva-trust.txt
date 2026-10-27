@@ -1,0 +1,93 @@
+fva trust: PASS
+
+Claims
+  Proofs.tightAccuracyFails — about Proofs.Counts, Proofs.Edger, Proofs.Rnanorm (accepted output)
+    proved by Proofs.tightAccuracyFails_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.R2 — about Proofs.Counts, Proofs.Rnanorm (accepted output)
+    proved by Proofs.R2_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.R1 — about Proofs.Counts, Proofs.Edger (accepted output)
+    proved by Proofs.R1_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.R3Fails — about Proofs.Edger, Proofs.Rnanorm (accepted output)
+    proved by Proofs.R3Fails_holds (axioms: propext, Classical.choice, Quot.sound)
+
+Kernel replay
+  leanchecker (lean): accepted (692 s)
+  con-leche (con): accepted (444 s)
+
+Canaries (72 known-false exports, /tmp/tmm-fva-verifier.N2X1OP/trust/canaries/set.tsv; known acceptances /tmp/tmm-fva-verifier.N2X1OP/trust/canaries/known.tsv)
+  leanchecker: 71 rejected, 0 declined, 0 crashed or timed out, 1 accepted
+  con-leche: 69 rejected, 3 declined, 0 crashed or timed out, 0 accepted
+
+Links
+  Proofs.Edger (edger-factors.txt) [blob]: matches
+  Proofs.Counts (counts.tsv) [blob]: matches
+  Proofs.Rnanorm (rnanorm-factors.txt) [blob]: matches
+
+Read these: 89 code lines
+  Proofs.Spec: 25 lines
+  Proofs.Model: 64 lines
+
+Names the claims use from outside the project (their meaning = their docs)
+  And (core): `And a b`, or `a ∧ b`, is the conjunction of propositions. It can be
+  Bool (core): The Boolean values, `true` and `false`.
+  Eq (core): The equality relation. It has one introduction rule, `Eq.refl`.
+  Exists (core): Existential quantification. If `p : α → Prop` is a predicate, then `∃ x : α, p x`
+  List (core): Linked lists: ordered lists, in which each element has a reference to the next element.
+  Nat (core): The natural numbers, starting at zero.
+  Ne (core): `a ≠ b`, or `Ne a b` is defined as `¬ (a = b)` or `a = b → False`,
+  Prod (core): The product type, usually written `α × β`. Product types are also called pair or tuple types.
+  Rat (core): Rational numbers, implemented as a pair of integers `num / den` such that the
+  Real (mathlib): The type `ℝ` of real numbers constructed as equivalence classes of Cauchy sequences of rational
+  UInt8 (core): Unsigned 8-bit integers.
+  abs (mathlib): `abs a`, denoted `|a|`, is the absolute value of `a`
+  bne (core): `x != y` is boolean not-equal. It is the negation of `x == y` which is supplied by
+  Bool.and (core): Boolean “and”, also known as conjunction. `and x y` can be written `x && y`.
+  Decidable.decide (core): Converts a decidable proposition into a `Bool`.
+  DivInvMonoid.toDiv (mathlib)
+  GT.gt (core): `a > b` is an abbreviation for `b < a`. 
+  GetElem?.getElem! (core): The syntax `arr[i]!` gets the `i`'th element of the collection `arr`,
+  HAdd.hAdd (core): `a + b` computes the sum of `a` and `b`.
+  HAppend.hAppend (core): `a ++ b` is the result of concatenation of `a` and `b`, usually read "append".
+  HDiv.hDiv (core): `a / b` computes the result of dividing `a` by `b`.
+  HMod.hMod (core): `a % b` computes the remainder upon dividing `a` by `b`.
+  HMul.hMul (core): `a * b` computes the product of `a` and `b`.
+  HPow.hPow (core): `a ^ b` computes `a` to the power of `b`.
+  HSub.hSub (core): `a - b` computes the difference of `a` and `b`.
+  LE.le (core): The less-equal relation: `x ≤ y` 
+  LT.lt (core): The less-than relation: `x < y` 
+  List.any (core): Returns `true` if `p` returns `true` for any element of `l`.
+  List.filter (core): Returns the list of elements in `l` for which `p` returns `true`.
+  List.flatMap (core): Applies a function that returns a list to each element of a list, and concatenates the resulting
+  List.intercalate (core): Alternates the lists in `xs` with the separator `sep`, appending them. The resulting list is
+  List.length (core): The length of a list.
+  List.map (core): Applies a function to each element of the list, returning the resulting list of values.
+  List.mergeSort (core): A stable merge sort.
+  List.range (core): Returns a list of the numbers from `0` to `n` exclusive, in increasing order.
+  List.replicate (core): Creates a list that contains `n` copies of `a`.
+  List.sum (core): Computes the sum of the elements of a list.
+  Membership.mem (core): The membership relation `a ∈ s : Prop` where `a : α`, `s : γ`. 
+  Monoid.toNPow (mathlib)
+  MulZeroClass.toZero (mathlib)
+  NPow.toPow (mathlib)
+  Nat.AtLeastTwo (mathlib): A type class for natural numbers which are greater than or equal to `2`.
+  Nat.cast (core): The canonical homomorphism `Nat → R`. In most use cases, the target type will have a (semi)ring
+  Nat.decLe (core): A decision procedure for non-strict inequality of natural numbers, usually accessed via the
+  Neg.neg (core): `-a` computes the negative or opposite of `a`.
+  OfNat.ofNat (core): The `OfNat.ofNat` function is automatically inserted by the parser when
+  One.toOfNat1 (core)
+  Prod.fst (core): The first element of a pair.
+  Prod.snd (core): The second element of a pair.
+  Rat.addGroup (mathlib)
+  Rat.cast (mathlib): Canonical homomorphism from `Rat` to a division ring `K`.
+  Rat.semiring (mathlib)
+  Real.exp (mathlib): The real exponential function, defined as the real part of the complex exponential
+  Real.lattice (mathlib)
+  Real.log (mathlib): The real logarithm function, equal to the inverse of the exponential for `x > 0`,
+  FVA.Cert.decimal (base): The decimal digits of `n`, most significant first, as ASCII bytes (`0` = byte 48); zero is
+  FVA.Cert.Blob.data (base): The blob's bytes in file order.
+
+What a PASS rests on
+  reviewed once: FVA's specs: Wasm syntax + binary grammar, execution semantics, integer + IEEE-754 numerics, claim forms, certificate relations, the verdict rules (FVA/Spec/**)
+  verified implementation: the decoder (sound + complete for the profile), the reference stepper, the float operators, instantiation, the validator (validated modules never get stuck), the verdict function, the certificate checkers (FVA.Self: fva trust on FVA itself)
+  trusted glue: fact collection from the environment, the link and surface checks (a certificate's files included), process orchestration, the external kernels (each canaried)
+  residual trust: the Lean kernel cross-checked by an independent kernel, the Lean compiler that built fva, Mathlib at the pinned revision, the specs

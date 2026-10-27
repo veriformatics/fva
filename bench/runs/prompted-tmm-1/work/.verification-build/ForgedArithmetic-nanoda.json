@@ -1,0 +1,13 @@
+{
+  "export_file_path": "/home/eturkes/.cache/fva-bench/runs/prompted-tmm-1/work/.verification-build/ForgedArithmetic.ndjson",
+  "permitted_axioms": [
+    "Quot.sound",
+    "propext"
+  ],
+  "unpermitted_axiom_hard_error": true,
+  "nat_extension": true,
+  "string_extension": true,
+  "pp_declars": [],
+  "pp_to_stdout": false,
+  "print_success_message": true
+}

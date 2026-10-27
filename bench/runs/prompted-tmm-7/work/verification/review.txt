@@ -1,0 +1,205 @@
+-- Proofs/Bounds.lean:7
+def z (q : ℚ) : ℚ := (q - 1) / (q + 1)
+
+-- Proofs/Bounds.lean:8
+def poly (t : ℚ) : ℚ := t + t^3/3 + t^5/5 + t^7/7
+
+-- Proofs/Bounds.lean:9
+def err (t : ℚ) : ℚ := |t|^9 / (1 - t^2)
+
+-- Proofs/Bounds.lean:10
+def logLo (q : ℚ) : ℚ := 2 * (poly (z q) - err (z q))
+
+-- Proofs/Bounds.lean:11
+def logHi (q : ℚ) : ℚ := 2 * (poly (z q) + err (z q))
+
+-- Proofs/Bounds.lean:32
+abbrev Term := ℚ × ℚ -- ratio, inverse variance (including multiplicity)
+
+-- Proofs/Bounds.lean:33
+abbrev Cert := ℚ × ℚ -- rounded contributions relative to two target bounds
+
+-- Proofs/Bounds.lean:35
+def leaf (t : Term) (a b : ℚ) (c : Cert) : Prop :=
+  0 < t.1 ∧ 0 ≤ t.2 ∧ |z t.1| < 1 ∧
+  c.1 ≤ t.2 * (logLo t.1 - a) ∧ t.2 * (logHi t.1 - b) ≤ c.2
+
+-- Proofs/Bounds.lean:39
+def leaves : List Term → ℚ → ℚ → List Cert → Prop
+  | [], _, _, [] => True
+  | t::ts, a, b, c::cs => leaf t a b c ∧ leaves ts a b cs
+  | _, _, _, _ => False
+
+-- Proofs/Bounds.lean:50
+def weight (ts : List Term) : ℚ := (ts.map Prod.snd).sum
+
+-- Proofs/Bounds.lean:51
+noncomputable def weightedLog (ts : List Term) : ℝ :=
+  (ts.map fun t => (t.2 : ℝ) * Real.log (t.1 : ℝ)).sum
+
+-- Proofs/Bounds.lean:53
+noncomputable def meanLog (ts : List Term) : ℝ := weightedLog ts / (weight ts : ℝ)
+
+-- Proofs/Spec.lean:7
+def digits (bs : List ℕ) : Option ℕ :=
+  if bs.isEmpty then none else
+    bs.foldlM (fun n b => if 48 ≤ b && b ≤ 57 then some (10*n + b-48) else none) 0
+
+-- Proofs/Spec.lean:11
+def decimal (bs : List ℕ) : Option ℚ := do
+  match bs.splitOn 46 with
+  | [a, b] =>
+    let n ← digits a
+    let m ← digits b
+    some ((n : ℚ) + (m : ℚ) / (10 ^ b.length : ℚ))
+  | _ => none
+
+-- Proofs/Spec.lean:19
+def lines (bs : List ℕ) : List (List ℕ) := (bs.splitOn 10).dropLast
+
+-- Proofs/Spec.lean:20
+def factors (bs : List ℕ) : Option (List ℚ) := (lines bs).mapM decimal
+
+-- Proofs/Spec.lean:21
+def matrix : List (List ℕ) := (lines countsBytes).map fun s =>
+  (s.splitOn 9).map fun t => (digits t).getD 0
+
+-- Proofs/Spec.lean:24
+def lib (i : ℕ) : ℕ := (matrix.map fun r => r[i]!).sum
+
+-- Proofs/Spec.lean:26
+def pairs (i : ℕ) : List (ℕ × ℕ) :=
+  (matrix.map fun r => (r[i]!, r[3]!)).filter fun p => p.1 > 0 && p.2 > 0
+
+-- Proofs/Spec.lean:29
+def rankM (ps : List (ℕ × ℕ)) (p : ℕ × ℕ) : ℕ :=
+  2 * (ps.countP fun q => q.1 * p.2 < p.1 * q.2) +
+    (ps.countP fun q => q.1 * p.2 == p.1 * q.2) + 1
+
+-- Proofs/Spec.lean:32
+def rankA (ps : List (ℕ × ℕ)) (p : ℕ × ℕ) : ℕ :=
+  2 * (ps.countP fun q => q.1 * q.2 < p.1 * p.2) +
+    (ps.countP fun q => q.1 * q.2 == p.1 * p.2) + 1
+
+-- Proofs/Spec.lean:36
+def kept (i : ℕ) (aNum aDen : ℕ) : List (ℕ × ℕ) :=
+  let ps := pairs i
+  let ml := ps.length * 3 / 10 + 1
+  let al := ps.length * aNum / aDen + 1
+  ps.eraseDups.filter fun p =>
+    2*ml ≤ rankM ps p && rankM ps p ≤ 2*(ps.length+1-ml) &&
+    2*al ≤ rankA ps p && rankA ps p ≤ 2*(ps.length+1-al)
+
+-- Proofs/Spec.lean:45
+def terms (i aNum aDen : ℕ) : List Term :=
+  let ps := kept i aNum aDen
+  ps.map fun p =>
+    (((p.1 * lib 3 : ℕ) : ℚ) / ((p.2 * lib i : ℕ) : ℚ),
+      ((pairs i).count p : ℚ) /
+        (1/(p.1 : ℚ) + 1/(p.2 : ℚ) - 1/(lib i : ℚ) - 1/(lib 3 : ℚ)))
+
+-- Proofs/Spec.lean:53
+noncomputable def rawLog (aNum aDen i : ℕ) : ℝ := meanLog (terms i aNum aDen)
+
+-- Proofs/Spec.lean:54
+noncomputable def normLog (aNum aDen i : ℕ) : ℝ :=
+  rawLog aNum aDen i - ((List.range 7).map (rawLog aNum aDen)).sum / 7
+
+-- Proofs/Spec.lean:56
+noncomputable def tmm (aNum aDen i : ℕ) : ℝ := Real.exp (normLog aNum aDen i)
+
+-- Proofs/Spec.lean:58
+def tolerance : ℚ := 1 / 10000000000
+
+-- Proofs/Spec.lean:60
+def agrees (s : List ℕ) : Prop := ∃ es rs : List ℚ,
+  factors edgeBytes = some es ∧ factors s = some rs ∧ es.length = 7 ∧ rs.length = 7 ∧
+  ∀ i < 7, |rs[i]! - es[i]!| ≤ tolerance
+
+-- Proofs/Spec.lean:67
+def edgeFactors : List ℚ := (factors edgeBytes).getD []
+
+-- Proofs/Spec.lean:68
+def rnaFactors : List ℚ := (factors rnaBytes).getD []
+
+-- Proofs/Conformance.lean:8
+def quartile (i : ℕ) : ℚ :=
+  let xs := (matrix.map fun r => r[i]!).insertionSort (· ≤ ·)
+  ((xs[339]! : ℚ) + 3 * (xs[340]! : ℚ)) / 4
+
+-- Proofs/Conformance.lean:12
+def quartileDistance (i : ℕ) : ℚ :=
+  let qs := (List.range 7).map fun j => quartile j / (lib j : ℚ)
+  |qs[i]! - qs.sum / 7|
+
+-- Proofs/Conformance.lean:16
+theorem reference_is_fourth : ∀ i ∈ List.range 7,
+    i ≠ 3 → quartileDistance 3 < quartileDistance i
+
+-- Proofs/Conformance.lean:21
+theorem libraries_bounded : ∀ i < 7, 0 < lib i ∧ lib i ≤ 2000
+
+-- Proofs/Conformance.lean:25
+theorem positive_fraction {o n : ℕ} (ho : 0 < o) (hn : 0 < n) (hn' : n ≤ 2000) :
+    (1/2000 : ℝ) ≤ (o : ℝ) / (n : ℝ)
+
+-- Proofs/Conformance.lean:34
+theorem cutoff_inactive (q r : ℝ) (hq : 1/2000 ≤ q) (hr : 1/2000 ≤ r) :
+    (-10000000000 : ℝ) < (Real.log q + Real.log r) / (2 * Real.log 2)
+
+-- Proofs/Conformance.lean:67
+theorem sample3_gt : (113/100 : ℝ) < tmm 1 20 2
+
+-- Proofs/Conformance.lean:86
+def factorLower : List ℚ := [974/1000,1279/1000,1146/1000,955/1000,814/1000,931/1000,956/1000]
+
+-- Proofs/Conformance.lean:87
+def factorUpper : List ℚ := [977/1000,1284/1000,1150/1000,959/1000,817/1000,934/1000,960/1000]
+
+-- Proofs/Conformance.lean:89
+theorem factor_intervals : ∀ i < 7,
+    ((factorLower[i]! : ℚ) : ℝ) ≤ tmm 1 20 i ∧ tmm 1 20 i ≤ ((factorUpper[i]! : ℚ) : ℝ)
+
+-- Proofs/Conformance.lean:99
+def within (actual : List ℚ) (tol : ℚ) : Prop :=
+  actual.length = 7 ∧ ∀ i < 7, |((actual[i]! : ℚ) : ℝ) - tmm 1 20 i| ≤ (tol : ℝ)
+
+-- Proofs/Conformance.lean:102
+theorem r1_coarse : within edgeFactors (1/40)
+
+-- Proofs/Conformance.lean:110
+theorem r2_coarse : within rnaFactors (1/40)
+
+-- Proofs/Conformance.lean:118
+theorem r1_fine_counterexample :
+    |((edgeFactors[2]! : ℚ) : ℝ) - tmm 1 20 2| > (tolerance : ℝ)
+
+-- Proofs/Conformance.lean:126
+theorem r2_fine_counterexample :
+    |((rnaFactors[2]! : ℚ) : ℝ) - tmm 1 20 2| > (tolerance : ℝ)
+
+-- Proofs/Conformance.lean:134
+theorem r2_literal_counterexample :
+    tmm 3 10 1 - ((rnaFactors[1]! : ℚ) : ℝ) > (1/40 : ℝ)
+
+-- Proofs/Results.lean:6
+theorem input_encoding :
+    ((lines countsBytes).mapM fun (r : List ℕ) => (r.splitOn 9).mapM digits).isSome ∧
+    countsBytes.getLast? = some 10 ∧ edgeBytes.getLast? = some 10 ∧ rnaBytes.getLast? = some 10
+
+-- Proofs/Results.lean:16
+theorem first_difference :
+    edgeFactors[0]! - rnaFactors[0]! = (931142302732627 / 100000000000000000 : ℚ)
+
+-- Proofs/Results.lean:19
+theorem r3_counterexample : |rnaFactors[0]! - edgeFactors[0]!| > tolerance
+
+-- Proofs/Results.lean:21
+theorem r3_fails : ¬ agrees rnaBytes
+
+-- Proofs/Certificates.lean:8
+theorem matrix_shape : matrix.length = 454 ∧ (∀ r ∈ matrix, r.length = 7 ∧ r.any (· > 0))
+
+-- Proofs/Certificates.lean:10
+theorem libraries : (List.range 7).map lib = [1261,621,755,1097,1916,1136,1219]
+

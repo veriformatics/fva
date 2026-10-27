@@ -1,0 +1,13 @@
+{
+  "counts": {
+    "axiom": 2,
+    "def": 684,
+    "opaque": 1,
+    "thm": 644
+  },
+  "axioms": [
+    "Quot.sound",
+    "propext"
+  ],
+  "export_bytes": 4244311
+}

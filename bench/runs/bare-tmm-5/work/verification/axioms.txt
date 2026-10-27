@@ -1,0 +1,25 @@
+'TMM.counts_bytes' depends on axioms: [propext, TMM.counts_bytes._native.native_decide.ax_1_1]
+'TMM.matrix_shape' depends on axioms: [TMM.matrix_shape._native.native_decide.ax_1_1]
+'TMM.library_sizes' depends on axioms: [propext, TMM.library_sizes._native.native_decide.ax_1_1]
+'TMM.quartile_fallback_inactive' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ TMM.quartile_fallback_inactive._native.native_decide.ax_1_1]
+'TMM.edge_decimals_checked' depends on axioms: [propext, Classical.choice, Quot.sound]
+'TMM.rna_decimals_checked' depends on axioms: [propext, Classical.choice, Quot.sound]
+'TMM.default_reference' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ TMM.default_reference._native.native_decide.ax_1_1]
+'TMM.exact_trimming' depends on axioms: [propext, TMM.exact_trimming._native.native_decide.ax_1_1]
+'TMM.r1_source_mask_model' depends on axioms: [propext, Classical.choice, Quot.sound]
+'TMM.r2_source_mask_model' depends on axioms: [propext, Classical.choice, Quot.sound]
+'TMM.ideal_enclosed' depends on axioms: [propext, Classical.choice, Quot.sound]
+'TMM.r1_exact_rank_counterexample' depends on axioms: [propext, Classical.choice, Quot.sound]
+'TMM.r2_exact_rank_counterexample' depends on axioms: [propext, Classical.choice, Quot.sound]
+'TMM.r3_all_samples_fail' depends on axioms: [propext, Classical.choice, Quot.sound]
+'TMM.r3_rounded_decimals_fail' depends on axioms: [propext, Classical.choice, Quot.sound]
+'TMM.cutoff_inactive' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ TMM.all_eligible_supported._native.native_decide.ax_1_1]

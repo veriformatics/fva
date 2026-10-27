@@ -1,0 +1,13 @@
+name = "proofs"
+defaultTargets = ["Proofs"]
+allowNonModules = true
+packagesDir = "/home/eturkes/.cache/fva-bench/packages-v4.35.0"
+
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "v4.35.0"
+
+[[lean_lib]]
+name = "Proofs"
+moreLeanArgs = ["-j2"]

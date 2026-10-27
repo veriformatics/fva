@@ -269,3 +269,43 @@ libraries near 2¹⁰²³; R2: a median-library sample with exactly `min.count` 
   The fva arm's T4 statements are proven about the real binary, but they take 34–78 code lines
   and the domain reader rated them "readable with effort" (9 of 10). The U14 S4 subject
   (`calc_cpm_raw` for every input) is the reference attempt for this sentence.
+
+## T5 — tmm (seed 1; bare 2–6, prompted 1, 2, 5–7, fva 1–5)
+
+The certification task: R1/R2 ask whether each producer's factor file holds the documented TMM
+factors within a tolerance the arm states; R3 is RNAnorm's claim of parity with edgeR to 10
+decimal places, false on this matrix. Every arm refuted R3 (15 / 15 runs).
+
+| metric | bare | prompted | fva |
+|---|---|---|---|
+| M1 theorems valid / claimed | 38 / 78 (`native_decide` in runs 2, 3, 5, 6) | 59 / 59 | 53 / 53 |
+| M2 link to the output bytes | read by Lean (`include_str`) 4, literal copies checked by the run's script 1 | read by Lean 1, literal copies 4 | certified per output (`fva certify` blobs, link checked by `fva trust`) 5 |
+| M3 requirements (3 per run) | 2 faithful, 2 weaker, 11 not proven, reported | 2 faithful, 13 not proven, reported | 6 faithful, 9 not proven, reported |
+| M4 R3 evidence | machine-checked 4 (run 2: `native_decide` only) | machine-checked 5 | machine-checked on the certified bytes 5 |
+| M5 surface, code lines (data literals apart) | 113 [84–2,406] | 66 [46–95] | 115 [89–203] |
+| M6 over-claims | 0 | 0 | 0 |
+| M7 wall time, s (not idle-window); input tokens (uncached) | 1,164 [900–3,407]; 3.76 M (86 k) | 1,418 [1,159–3,802]; 6.51 M (110 k) | 2,881 [1,872–5,162]; 11.43 M (110 k) |
+| M8 cheats caught / planted | 14 / 20 | 20 / 20 | 16 / 20 (20 / 20 when planted in the Spec claims' proofs) |
+| M9 statements readable / with effort | 5 / 10 | 7 / 8 | 5 / 10 |
+| M10 valid machine-checked statement about the output bytes | 3 / 5 | 1 / 5 | 5 / 5 |
+
+- M3: `faithful` = an exact-tie policy with a stated tolerance of 2.3–2.5 % that holds (the exact
+  average-rank factors differ from edgeR's file by at most 1.95 % and from RNAnorm's by 1.80 %:
+  fva 1, 2, 4; bare 6; prompted 7); `not proven, reported` = a sound refutation at a tighter
+  tolerance or of R3; bare-4's R1/R2 = `weaker`: its theorem is about a gene selection copied
+  from the float runs, whose relation to TMM's documented trim it leaves unproved.
+- M1: `native_decide` theorems carry the compiler-trust axiom and are invalid; con-leche
+  rejected whole-module exports that mixed them with clean theorems, so the clean ones were
+  rechecked alone (bare-3 R3, bare-5 requirement theorems, bare-6's decimal witness: valid;
+  bare-5's two file-byte theorems: leanchecker rejected their own export, counted invalid).
+  Negative-control files that hold `sorry`/kernel bypasses (prompted 1, 2, 6) are imported by
+  nothing and do not count against M1.
+- M8: the cheat goes into the first theorem a report cites (the convention of T1 and T4). In
+  fva-3 and fva-5 that theorem is a support lemma their `fva trust` run never checks (only the
+  Spec claims are claims), so C2 and C3 went unnoticed there; planted in a Spec claim's proof,
+  all 8 were caught. bare caught C1 and C2 mostly by name (printed axiom lists, exit 0) and C3
+  in one run of five.
+- M5 counts count matrices and copied factor values as data, apart from the code lines (as FVA
+  blobs are apart): bare-4's 2,406 code lines are proof-support tables its statements reach.
+- M7: see the T5 batch note above (host not idle); tokens and CPU are the comparable cost: the
+  fva arm used 3.0 × the bare arm's input tokens and 1.8 × its output tokens.
