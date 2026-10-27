@@ -160,3 +160,13 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | G1 | T3 interface "−1 when the block is invalid" contradicts R3's end-condition allowance (`316162610100506161616261` → 13); both reviewers | major | accepted → fixed: −1 = an error `decompress_into` reports; re-review accepted |
 | G2 | rubric task table + the 2026-10-24 R3 note still state the old T2/T3 rules | register | accepted → rubric addendum 2026-10-28 names the READMEs as replacing them |
 | R2 (register) | MAIN's `reqcheck.py` asserts the pre-narrowing R2 and observes writes only through unchanged bytes (reads unobserved) | note | accepted: its logs' 62 failures are exactly the capacity-0 case R2 now names; reads = the reviewers' instrumented probes |
+
+## U18 closing review (MAIN-led, build in context; lenses Correctness, Cleanup, Altitude + MAIN security lens; target = the trust glue `FVA/Trust/*` + `FVA/Tool/{Trust,Codex,Explain,Certify,Blob,Lift,Init}.lean` + the bench tooling changed after the U14 ledger rows)
+
+| row | finding | verdict | ruling |
+|---|---|---|---|
+| SEC-1 | Mathlib origin trusts a pinned checkout's contents by `.git/HEAD` text alone (U7 F2): an in-place definition edit with rebuilt `.olean`s stays `mathlib`, outside the surface | register (inside F2 as written) | deferred D48 with its acceptance check |
+| SEC-2 | FVA base classified by *source* sha256 while replay reads the `.olean`s the project's own build wrote (D12 class) | register | deferred D49 with its acceptance check |
+| SEC-3 | users were not told that `fva trust` / `fva explain` build + run the project's code (D12 tracks the sandbox) | finding (docs) | accepted → fixed: README Limits line (9477294) |
+| SEC-4 | `codex app-server` thread = `sandbox: read-only`: the model can still run read-only shell commands over the whole disk, and project text (identifiers, literals, claim docstrings) reaches its prompt ⇒ an injected instruction can copy local files into the saved `fva-explain.json` | open | fix after the mutation run lands (FVA/** frozen): `features.shell_tool=false` (key present in the pinned codex binary), red/green by a prompt that asks for a planted file's contents |
+| L1 | bench tooling since U14 (`inject` two-component match, `Surface.lean` data heuristic, `archive` WP-cache prune, `inject-tool` Verus mode, D41 harness) | pass | self-reviewed per lens at each commit; checks in the commit bodies |
