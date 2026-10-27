@@ -154,7 +154,8 @@ jq -n --arg arm "$arm" --arg task "$task" --argjson index "$index" \
 prompt_text=$(<"$run/prompt.txt")
 broker=
 if ((${#tools[@]} > 0)); then
-	"$root/bench/tools/tool-broker" "$run/work" "$run/tmp/fva-tool" "${tools[@]}" \
+	FVA_TOOL_CPUS=$cpus FVA_TOOL_LABEL=fva-bench-run=${run##*/} taskset -c "$cpus" \
+		"$root/bench/tools/tool-broker" "$run/work" "$run/tmp/fva-tool" "${tools[@]}" \
 		>"$run/broker.log" 2>&1 &
 	broker=$!
 fi

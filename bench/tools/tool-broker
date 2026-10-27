@@ -16,7 +16,18 @@ spool=$2
 shift 2
 tools=("$@")
 mkdir -p "$spool"
-trap 'kill $(jobs -p) 2>/dev/null; exit 0' TERM INT
+# A request's container outlives its killed client (bench/tools/frama-c): stop the run's
+# containers by the label the wrapper sets from FVA_TOOL_LABEL.
+stop() {
+	local pids
+	pids=$(jobs -p)
+	# shellcheck disable=SC2086 # one PID per word
+	[[ -z $pids ]] || kill $pids 2>/dev/null || true
+	[[ -z ${FVA_TOOL_LABEL:-} ]] || podman ps -q --filter "label=$FVA_TOOL_LABEL" |
+		xargs -r podman kill >/dev/null 2>&1 || true
+}
+trap stop EXIT
+trap 'exit 0' TERM INT
 inside() {
 	local p
 	p=$(realpath -e -- "$1" 2>/dev/null) || return 1
