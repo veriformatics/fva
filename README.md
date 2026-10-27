@@ -80,12 +80,14 @@ Your review covers the claims in your specification files only. FVA's own files 
 
 - `FVATest/Examples/Toy`, `Mem`, `Rust`: C and Rust functions with loops, memory buffers, calls and `br_table`, proved on the compiled binaries.
 - `FVATest/Certs`: certificates for the same sorted output from Python, R, Java and TypeScript programs, and for a toy compiler; files that must fail show what FVA rejects.
+- `FVATest/Subjects`: results about published software, each checked by `fva trust`. They include counterexamples for a hand-written LZ4 codec in WebAssembly, measured against a reviewed specification of the LZ4 block format. They also include a proof for every input of edgeR's counts-per-million function in its shipped WebAssembly build, certificates that refute RNAnorm's claim that its TMM factors match edgeR's to 10 decimal places, and a counterexample for GLM's `iround`.
 
 ## Limits
 
 - FVA verifies core WebAssembly 2.0 without SIMD, threads, exceptions or garbage-collected types.
 - Programs that read files or the network through WASI are not modeled; certify their outputs instead.
 - A proof shows that the binary meets the claims. It is your task to check that the claims say what you want.
+- `fva trust` and `fva explain` build the project and run its Lean code with your permissions. If you do not trust a project, run them inside a container or a virtual machine.
 
 ## License
 
