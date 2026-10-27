@@ -8,4 +8,4 @@ The module exports `iround(x)`: `x` is an `f64` value and the result is an `i32`
 
 ## Requirements
 
-- R1: For every finite `x` with `0 ≤ x ≤ 2147483647`, `iround(x)` returns the integer nearest to `x`. When `x` lies exactly halfway between two integers, either of them is accepted.
+- R1: For every finite `x` with `0 ≤ x ≤ 2147483647`, `iround(x)` returns the integer nearest to `x`. When `x` lies exactly halfway between two integers, either of them is accepted. (The lower bound is the documented precondition; the upper bound keeps the nearest integer within the `i32` result.)
