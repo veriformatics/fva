@@ -6,11 +6,17 @@
 # the package of that name); the fva arm vendors the FVA of FVA_BENCH_FVA_BIN/FVA_BENCH_FVA_BUILD
 # (the bench tag's build). Needs the
 # run-session variables (FVA_BENCH_MODEL, _EFFORT, _SECONDS, _AUTH_FILE). Prints one TSV row per
-# run: arm, index, cpu, status, wall s, cpu s, load at start.
+# run: arm, index, cpu, status, wall s, cpu s, load at start. `--order-only` writes the order file
+# alone (its path on stdout) for bench/harness/run-order.
 set -euo pipefail
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+order_only=false
+if [[ ${1:-} == --order-only ]]; then
+	order_only=true
+	shift
+fi
 [[ $# -ge 3 && $2 =~ ^[0-9]+$ ]] || {
-	echo 'Usage: bench/harness/run-batch TASK SEED ARM...' >&2
+	echo 'Usage: bench/harness/run-batch [--order-only] TASK SEED ARM...' >&2
 	exit 2
 }
 task=$1 seed=$2
@@ -36,7 +42,7 @@ prompt_of() { # arm → prompt file + container tools
 for arm in "${arms[@]}"; do
 	prompt_of "$arm" >/dev/null
 	in=$base/inputs/$task/$arm-$task
-	[[ -d $in ]] || "$root/bench/tasks/prepare" "$task" "$arm" "$in"
+	[[ -d $in ]] || $order_only || "$root/bench/tasks/prepare" "$task" "$arm" "$in"
 done
 mkdir -p "$base/batches" "$base/harness-logs"
 order=$base/batches/$task-seed$seed-from$first.order
@@ -44,6 +50,10 @@ for arm in "${arms[@]}"; do
 	for i in $(seq "$first" $((first + n - 1))); do printf '%s %s\n' "$arm" "$i"; done
 done | shuf --random-source=<(openssl enc -aes-256-ctr -pass "pass:$seed" -nosalt -pbkdf2 \
 	</dev/zero 2>/dev/null) >"$order"
+if $order_only; then
+	echo "$order"
+	exit 0
+fi
 declare -A busy=()
 launch() { # arm index cpu
 	local p tools

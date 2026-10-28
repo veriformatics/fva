@@ -12,6 +12,7 @@ fi
 [[ -f input.txt && -d .git && -z $(cat) ]]
 # run-session's jail: own process table, empty /tmp, nothing of $HOME beside the bound paths
 [[ $(</proc/1/comm) == bwrap && -z $(ls -A /tmp) && ! -e ${0%/*}/../jail-sentinel ]]
+printf 'scratch\n' >/tmp/mock-tmp-sentinel # check-prep: /tmp = the run's jail-tmp on disk
 args=("$@")
 has() {
 	local a

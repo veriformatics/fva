@@ -80,10 +80,11 @@ read -ra tools <<<"${FVA_BENCH_TOOLS:-}"
 ((${#tools[@]} == 0)) || public_env+=("FVA_TOOL_SPOOL=$run/tmp/fva-tool")
 # Codex's workspace-write sandbox limits writes alone, and agents look for AGENTS.md in parent
 # directories ⇒ the run sees the system, its own directory, the arm tools, the Mathlib store and
-# the PATH entries under $HOME; the rest of $HOME (this repo, other runs, ~/AGENTS.md), /tmp, the
-# journal and the host's processes stay hidden.
+# the PATH entries under $HOME; the rest of $HOME (this repo, other runs, ~/AGENTS.md), the host's
+# /tmp, the journal and the host's processes stay hidden. /tmp and /var/tmp = the run's own
+# `jail-tmp` on disk: a tmpfs keeps an agent's scratch files (Lean exports reach GBs) in RAM.
 jail=(bwrap --ro-bind / / --dev /dev --proc /proc --unshare-pid --die-with-parent)
-for d in /home "$home" /tmp /var/tmp /run/user /var/log /mnt /srv /media; do
+for d in /home "$home" /run/user /var/log /mnt /srv /media; do
 	[[ ! -d $d ]] || jail+=(--tmpfs "$d")
 done
 IFS=: read -ra path_dirs <<<"${FVA_BENCH_PATH:-/usr/local/bin:/usr/bin:/bin}"
@@ -93,7 +94,8 @@ for d in "${path_dirs[@]}" "$base/tools" "${FVA_BENCH_PACKAGES:-$base/packages-v
 	[[ $d != "$home/"* || ! -d $d ]] || visible+=("$d")
 done
 for d in "${visible[@]}"; do jail+=(--ro-bind "$d" "$d"); done
-jail+=(--bind "$run" "$run" --chdir "$run/work" --)
+jail+=(--bind "$run" "$run" --bind "$run/jail-tmp" /tmp --bind "$run/jail-tmp" /var/tmp
+	--chdir "$run/work" --)
 args=(exec -C "$run/work" -s workspace-write --json --color never --ephemeral
 	--ignore-user-config --ignore-rules -m "$FVA_BENCH_MODEL"
 	-c "model_reasoning_effort=\"$FVA_BENCH_EFFORT\""
@@ -120,7 +122,7 @@ fi
 umask 077
 mkdir -p "$base/runs"
 mkdir "$run"
-mkdir "$run/work" "$run/home" "$run/codex" "$run/tmp"
+mkdir "$run/work" "$run/home" "$run/codex" "$run/tmp" "$run/jail-tmp"
 trap 'rm -f -- "$run/codex/auth.json"' EXIT
 cp -- "$prompt" "$run/prompt.txt"
 install -m 600 -- "$auth" "$run/codex/auth.json"
