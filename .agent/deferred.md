@@ -2,7 +2,6 @@
 
 One row each: finding → acceptance check.
 
-- D1 Semantics subset too small for real code: no linear memory, `call`, globals, `br_table`, multi-value/typed blocks, `clz`/`ctz`/`popcnt`/`rotl`/`rotr`, floats, imports. → `fva lift` + `fva difftest` succeed on a clang `-O2` program exercising each (array sum over memory, recursive call, switch), with 0 mismatches over ≥1000 cases.
 - D4 `lake check` sandbox cannot resolve the `../../lean` path dependency, so replay checks our own export, not a sandboxed build. → FVA Lean package consumable from inside a project (vendored copy or git require); `lake check` rc 0 in `examples/toy` without `--from-export`, rc 1 in `examples/cheat`.
 - D5 `fva explain` intent = spec author's own docstring/name → round trip checks the claim against its author, not the user. → requirements file (user-written or agent-drafted from source/README/issues, user-approved) as pass-2 intent + identifiers renamed neutral in pass 1; a spec whose docstring + name both say "clamp" but whose body returns `x` still gets `different` when the requirement says clamp.
 - D6 Agent packaging absent (Intent: REA-style agent use). → MCP server exposing lift/trust/difftest + an agent skill; an agent session with only the MCP tools verifies a new C function end to end.
