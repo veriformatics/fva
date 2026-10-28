@@ -131,3 +131,7 @@ Per task, median and spread over n runs per cell; no significance claims at n = 
 
 - Run jail: inside each run, `/tmp` and `/var/tmp` are now the run's own `jail-tmp` directory on disk instead of a tmpfs in the host's memory. Agents see the same empty directories; their scratch files (Lean kernel exports can reach gigabytes) take disk space instead of the memory that the user's other work shares (addendum 2026-10-28 (3)). T1, T4, T5 and T2 ran with the tmpfs.
 - A batch's seeded order comes from `harness/run-batch --order-only TASK SEED ARM…` (the same shuffle as before), and `harness/run-order` runs it one run at a time (addendum 2026-10-28 (3)). T3 (`lz4-rust`, seed 1; arms bare, prompted, fva, and tool with Verus) and T7 (`glm-iround`, seed 1; arms bare, prompted, fva) run this way.
+
+## Addendum 2026-10-29 (2) (T2 tool-arm M8; before the T3 tool-arm M8)
+
+- On a tool run whose documented check regenerates the file a cheat is planted in, the cheat is erased before the prover runs. M8 records it as not caught (rc 0, not named) and notes the erasure: the check's verdict on the regenerated file is correct, but it is not a detection. On T2, the checks of tool 2 and tool 4 erased the planted `admit` (their `lift.py` rewrites the planted file); tool 3 and tool 6 kept it, and WP passed: a genuine miss, as on T4.
