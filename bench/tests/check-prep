@@ -9,6 +9,7 @@ runs=()
 cleanup() {
 	rm -rf -- "$tmp"
 	for run in "${runs[@]}"; do rm -rf -- "$run"; done
+	rm -f -- "$(realpath -e -- "$HOME")"/.cache/fva-bench/harness-logs/*-mock-$$-*.log
 }
 trap cleanup EXIT
 expect_rc() {
@@ -137,6 +138,33 @@ done
 expect_rc 1 "$root/bench/harness/run-session" bare "mock-$$" 1 "$cpus" "$tmp/prompt" "$tmp/inputs"
 grep -q 'run already exists' "$tmp/last.log"
 echo 'harness: dry-run, auth-only home/cleanup, config exclusion, env isolation, jail, overwrite refusal → pass'
+
+# run-order (rubric addendum 2026-10-28 (3)): one run at a time in the file's order, memory gate,
+# CHECK lines, run-batch's TSV rows.
+mkdir "$tmp/order-inputs" "$tmp/prompts"
+for arm in bare prompted; do cp -a "$tmp/inputs" "$tmp/order-inputs/$arm-mock-$$"; done
+printf 'timeout' >"$tmp/prompts/prompted.txt" # mock: one event, then 5 s
+printf 'success' >"$tmp/prompts/bare.txt"
+printf 'prompted 21\nbare 22\n' >"$tmp/order"
+order_env=(env FVA_BENCH_CPUS="$cpus" FVA_BENCH_PROMPTS="$tmp/prompts"
+	FVA_BENCH_INPUTS="$tmp/order-inputs" FVA_BENCH_SECONDS=10)
+expect_rc 2 env FVA_BENCH_CPUS="2 3" "$root/bench/harness/run-order" "mock-$$" "$tmp/order"
+expect_rc 0 "${order_env[@]}" "$root/bench/harness/run-order" --dry-run "mock-$$" "$tmp/order"
+[[ $(grep -o 'start: [a-z]* [0-9]*' "$tmp/last.log" | tr '\n' ' ') == 'start: prompted 21 start: bare 22 ' ]]
+[[ ! -e ${run_prefix%/*}/prompted-mock-$$-21 && ! -e $run_prefix-22 ]]
+runs+=("${run_prefix%/*}/prompted-mock-$$-21" "$run_prefix-22" "$run_prefix-23")
+expect_rc 0 "${order_env[@]}" FVA_BENCH_CHECK_FIRST=1 FVA_BENCH_CHECK_EVERY=1 FVA_BENCH_MIN_FREE_GB=0 \
+	"$root/bench/harness/run-order" "mock-$$" "$tmp/order"
+(($(grep -c 'CHECK prompted 21 elapsed=' "$tmp/last.log") >= 2))
+[[ $(grep -o -e 'end: prompted 21' -e 'start: bare 22' "$tmp/last.log" | tr '\n' ' ') == 'end: prompted 21 start: bare 22 ' ]]
+grep -q -P '^prompted\t21\t.*\tincomplete_result\t' "$tmp/last.log"
+grep -q -P '^bare\t22\t.*\tcompleted\t' "$tmp/last.log"
+printf 'bare 23\n' >"$tmp/order-gate"
+expect_rc 124 "${order_env[@]}" FVA_BENCH_MIN_FREE_GB=1000000 timeout 3 \
+	"$root/bench/harness/run-order" "mock-$$" "$tmp/order-gate"
+grep -q 'wait: bare 23' "$tmp/last.log"
+[[ ! -e $run_prefix-23 ]]
+echo 'run-order: one CPU, dry-run order, sequential runs, CHECK lines, TSV rows, memory gate → pass'
 
 # archive refuses a run whose event log or agent files hold a secret of the auth file
 fake=$tmp/fake-run

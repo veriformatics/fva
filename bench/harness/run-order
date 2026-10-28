@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Graded runs one at a time, in the order of ORDER_FILE (lines `ARM INDEX`), beside other work on
+# the host (rubric addendum 2026-10-28 (3)): each run starts once FVA_BENCH_MIN_FREE_GB (16) of
+# memory is available, runs on the single CPU in FVA_BENCH_CPUS, and from FVA_BENCH_CHECK_FIRST
+# seconds (5400) on, every FVA_BENCH_CHECK_EVERY seconds (1800), gets a `CHECK` log line for MAIN's
+# progress check (elapsed, event lines, seconds since the last event, CPU seconds of its live
+# processes); FVA_BENCH_SECONDS = the hard limit. Inputs and prompts as run-batch
+# (FVA_BENCH_INPUTS / FVA_BENCH_PROMPTS override their directories). Prints run-batch's TSV row
+# per run; the log goes to stderr. Needs the run-session variables.
+set -euo pipefail
+root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+dry=()
+if [[ ${1:-} == --dry-run ]]; then
+	dry=(--dry-run)
+	shift
+fi
+[[ $# -eq 2 && -f $2 ]] || {
+	echo 'Usage: bench/harness/run-order [--dry-run] TASK ORDER_FILE' >&2
+	exit 2
+}
+task=$1 order=$2
+base=$HOME/.cache/fva-bench
+read -ra cpus <<<"${FVA_BENCH_CPUS:-2}"
+((${#cpus[@]} == 1)) || {
+	echo 'run-order: FVA_BENCH_CPUS must name one CPU' >&2
+	exit 2
+}
+cpu=${cpus[0]}
+prompts=${FVA_BENCH_PROMPTS:-$root/bench/prompts}
+inputs=${FVA_BENCH_INPUTS:-$base/inputs/$task}
+min_gb=${FVA_BENCH_MIN_FREE_GB:-16}
+first=${FVA_BENCH_CHECK_FIRST:-5400}
+every=${FVA_BENCH_CHECK_EVERY:-1800}
+export FVA_BENCH_PATH=${FVA_BENCH_PATH:-$base/bin:/usr/local/bin:/usr/bin:/bin}
+prompt_of() { # arm → prompt file + container tools (as run-batch)
+	case $1:$task in
+	tool:lz4-c | tool:edger-cpm) echo "tool-framac.txt frama-c" ;;
+	tool:lz4-rust | tool:pflog) echo "tool-verus.txt" ;;
+	tool:*)
+		echo "run-order: no tool arm for $task" >&2
+		exit 2
+		;;
+	*) echo "$1.txt" ;;
+	esac
+}
+log() { printf '%s %s\n' "$(date -Is)" "$*" >&2; }
+free_gb() { awk '/^MemAvailable:/ { print int($2 / 1048576) }' /proc/meminfo; }
+tree_cpu() { # CPU seconds of the live processes below PID $1 (exited children are not counted)
+	ps -eo pid=,ppid=,cputimes= | awk -v root="$1" '{ up[$1] = $2; t[$1] = $3 }
+		END { for (p in up) { q = p; while (q in up && q != root) q = up[q]; if (q == root) s += t[p] }
+			print s + 0 }'
+}
+runs=()
+while read -r arm i _; do
+	[[ -n $arm && $arm != \#* ]] || continue
+	[[ $i =~ ^[0-9]+$ ]] || {
+		echo "run-order: bad line '$arm $i' in $order" >&2
+		exit 2
+	}
+	prompt_of "$arm" >/dev/null
+	[[ -d $inputs/$arm-$task ]] || "$root/bench/tasks/prepare" "$task" "$arm" "$inputs/$arm-$task"
+	runs+=("$arm $i")
+done <"$order"
+mkdir -p "$base/harness-logs"
+for entry in "${runs[@]}"; do
+	read -r arm i <<<"$entry"
+	until (($(free_gb) >= min_gb)); do
+		log "wait: $arm $i (available memory $(free_gb) GB < $min_gb GB)"
+		sleep 60
+	done
+	read -r p tools <<<"$(prompt_of "$arm")"
+	log "start: $arm $i on CPU $cpu"
+	FVA_BENCH_TOOLS=$tools "$root/bench/harness/run-session" "${dry[@]}" "$arm" "$task" "$i" "$cpu" \
+		"$prompts/$p" "$inputs/$arm-$task" </dev/null >"$base/harness-logs/$arm-$task-$i.log" 2>&1 &
+	pid=$! start=$SECONDS next=$first
+	events=$base/runs/$arm-$task-$i/stdout.jsonl
+	while kill -0 "$pid" 2>/dev/null; do
+		sleep 1
+		if ((SECONDS - start >= next)); then
+			n=0 age=0
+			if [[ -f $events ]]; then
+				n=$(wc -l <"$events")
+				age=$(($(date +%s) - $(stat -c %Y "$events")))
+			fi
+			log "CHECK $arm $i elapsed=$((SECONDS - start))s events=$n last_event_age=${age}s cpu=$(tree_cpu "$pid")s"
+			next=$((next + every))
+		fi
+	done
+	rc=0
+	wait "$pid" || rc=$?
+	log "end: $arm $i rc=$rc"
+	r=$base/runs/$arm-$task-$i/result.json
+	if [[ -f $r ]]; then
+		jq -r --arg a "$arm" --arg i "$i" '[$a, $i, .cpus, .status, (.wall_ms / 1000 | floor),
+			((.cpu_user_s + .cpu_sys_s) | floor), .load1_start] | @tsv' "$r"
+	else printf '%s\t%s\t%s\tno result\n' "$arm" "$i" "$cpu"; fi
+done
