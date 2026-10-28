@@ -10,6 +10,7 @@ cleanup() {
 	rm -rf -- "$tmp"
 	for run in "${runs[@]}"; do rm -rf -- "$run"; done
 	rm -f -- "$(realpath -e -- "$HOME")"/.cache/fva-bench/harness-logs/*-mock-$$-*.log
+	rm -f -- "$(realpath -e -- "$HOME")"/.cache/fva-bench/batches/mock-$$-*.order
 }
 trap cleanup EXIT
 expect_rc() {
@@ -114,7 +115,7 @@ for scenario in success agent-error malformed process-error timeout incomplete b
 	runs+=("$run")
 	expect_rc "$expected" "$root/bench/harness/run-session" bare "mock-$$" "$index" \
 		"$cpus" "$tmp/prompt" "$tmp/inputs"
-	[[ -f $run/work/mock-invoked.txt && ! -e $run/codex/auth.json ]]
+	[[ -f $run/work/mock-invoked.txt && ! -e $run/codex/auth.json && -f $run/jail-tmp/mock-tmp-sentinel ]]
 	jq -e --arg status "$status" --argjson rc "$expected" --arg bin "$tmp/bin" \
 		'.status == $status and .exit_code == $rc and .wall_ms >= 0 and
       .duration_ms == .wall_ms and .codex_version == "codex-cli mock-1" and
@@ -165,6 +166,14 @@ expect_rc 124 "${order_env[@]}" FVA_BENCH_MIN_FREE_GB=1000000 timeout 3 \
 grep -q 'wait: bare 23' "$tmp/last.log"
 [[ ! -e $run_prefix-23 ]]
 echo 'run-order: one CPU, dry-run order, sequential runs, CHECK lines, TSV rows, memory gate → pass'
+expect_rc 0 env FVA_BENCH_N=2 "$root/bench/harness/run-batch" --order-only "mock-$$" 7 bare prompted
+order=$(tail -n 1 "$tmp/last.log")
+cp "$order" "$tmp/order-first"
+expect_rc 0 env FVA_BENCH_N=2 "$root/bench/harness/run-batch" --order-only "mock-$$" 7 bare prompted
+cmp "$order" "$tmp/order-first"
+[[ $(sort "$order" | tr '\n' ' ') == 'bare 1 bare 2 prompted 1 prompted 2 ' ]]
+[[ ! -e $(realpath -e -- "$HOME")/.cache/fva-bench/inputs/mock-$$ ]]
+echo 'run-batch --order-only: seeded order reproduced byte for byte, every run once, no inputs prepared → pass'
 
 # archive refuses a run whose event log or agent files hold a secret of the auth file
 fake=$tmp/fake-run
