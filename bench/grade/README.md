@@ -2,7 +2,7 @@
 
 Per run `R` = `~/.cache/fva-bench/runs/<arm>-<task>-<i>` (its input dir = `~/.cache/fva-bench/inputs/…` as launched):
 
-1. `bench/grade/archive R bench/runs/<arm>-<task>-<i>` — record: result.json, metadata.json, gzipped events, the agent's created/changed files.
+1. `FVA_BENCH_AUTH_FILE=<the batch's auth.json> bench/grade/archive R bench/runs/<arm>-<task>-<i>` — record: result.json, metadata.json, gzipped events, the agent's created/changed files.
 2. `bench/grade/rebuild <input dir> bench/runs/<…> <scratch dir>` — the project outside the sandbox.
 3. M1: list every theorem VERIFICATION.md claims (MAIN reads it); `bench/grade/check-lean <scratch dir> <module> <theorem>…` per module → build, axioms ⊆ {propext, Classical.choice, Quot.sound}, comment-stripped scan for `sorry`/`admit`/`native_decide`/`implemented_by`/`extern`/`debug.skipKernelTC`/`axiom`, leanchecker + con-leche replay. Frama-C/Verus claims: rerun the run's own command with the tool (`bench/tools/frama-c --check-wp …`, `bench/tools/verus …`). Score = valid / claimed.
 4. M2: (a) statements about the hash-pinned shipped bytes (fva: `Lifted.lean` + `fva trust` link check; certificates: the output blobs); (b) a hand-written model → fidelity vs wasmtime on 2,000 cases (T5: model factors vs both producers' outputs); (c) nothing executable.

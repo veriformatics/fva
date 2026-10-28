@@ -18,9 +18,11 @@ run=$(realpath -e -- "$1") out=$2
 }
 # The run could read its copy of the Codex auth file (inside the run directory); a secret in the
 # event log or the agent's files would reach the repo inside a .gz, which gitleaks does not open.
-auth=${FVA_BENCH_AUTH_FILE:-$HOME/.codex/auth.json}
-[[ -f $auth ]] || {
-	echo "archive: no auth file $auth to screen against (set FVA_BENCH_AUTH_FILE)" >&2
+# Screen list = the file run-session copied (same variable, no default): a default path could hold
+# another account's secrets and pass a run that leaks the copied ones.
+auth=${FVA_BENCH_AUTH_FILE:-}
+[[ -n $auth && -f $auth ]] || {
+	echo "archive: FVA_BENCH_AUTH_FILE must name the Codex auth.json the batch copied (got '$auth')" >&2
 	exit 2
 }
 while IFS= read -r secret; do

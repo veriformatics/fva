@@ -150,9 +150,15 @@ printf '{"type":"item.completed","item":{"aggregated_output":"no secret"}}\n' >"
 expect_rc 0 env FVA_BENCH_AUTH_FILE="$tmp/fake-auth.json" "$root/bench/grade/archive" "$fake" \
 	"$tmp/arch-clean"
 [[ -f $tmp/arch-clean/work/Proof.lean && -f $tmp/arch-clean/stdout.jsonl.gz ]]
+mkdir -p "$tmp/home/.codex"
+cp -- "$tmp/fake-auth.json" "$tmp/home/.codex/auth.json"
+expect_rc 2 env -u FVA_BENCH_AUTH_FILE HOME="$tmp/home" "$root/bench/grade/archive" "$fake" \
+	"$tmp/arch-unset"
+grep -q 'FVA_BENCH_AUTH_FILE must name' "$tmp/last.log"
+[[ ! -e $tmp/arch-unset ]]
 printf '{"item":{"aggregated_output":"fixture-secret-0123456789abcdefghij"}}\n' >>"$fake/stdout.jsonl"
 expect_rc 1 env FVA_BENCH_AUTH_FILE="$tmp/fake-auth.json" "$root/bench/grade/archive" "$fake" \
 	"$tmp/arch-leak"
 grep -q 'refusing to archive' "$tmp/last.log"
 [[ ! -e $tmp/arch-leak ]]
-echo 'archive: clean run archived, run holding an auth secret refused → pass'
+echo 'archive: clean run archived, unset screen list refused (no home default), run holding an auth secret refused → pass'
