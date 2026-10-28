@@ -1,0 +1,21 @@
+theorem zeroCapacity (m : Memory) (src dst size : Nat)
+    (hsrc : src ≠ 0) (hbound : src < 2097152) :
+    execute decoder m src dst size 0 =
+      some (if size = 1 then (if byte m src = 0 then 0 else word - 1) else word - 1,
+            m, if size = 1 then [src] else [])
+
+theorem zeroInput (m : Memory) (src dst cap : Nat)
+    (hsrc : src ≠ 0) (hcap : cap < 2147483648) (hne : cap ≠ 0) :
+    execute decoder m src dst 0 cap = some (word - 1, m, [])
+
+theorem emptyBlock (m : Memory) (src dst : Nat)
+    (hsrc : src ≠ 0) (hbound : src < 2097152) (hbyte : byte m src = 0) :
+    execute decoder m src dst 1 0 = some (0, m, [src])
+
+theorem zeroCapacityConverse (m finalMemory : Memory) (reads : List Nat)
+    (src dst size r : Nat)
+    (hsrc : src ≠ 0) (hbound : src < 2097152)
+    (hr : r < 2147483648)
+    (hexec : execute decoder m src dst size 0 =
+      some (r, finalMemory, reads)) :
+    size = 1 ∧ byte m src = 0 ∧ r = 0 ∧ finalMemory = m ∧ reads = [src]

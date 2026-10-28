@@ -1,0 +1,4 @@
+Transcript recorded from the first completed run of: node verification/test.js
+The executable JavaScript statements in that run are identical to verification/test.js.
+
+PASS: 82762 artifact executions; 3277 valid-block cases; 9144 nonnegative results checked against sequence semantics; instrumented access checks passed

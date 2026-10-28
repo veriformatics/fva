@@ -1,0 +1,52 @@
+PASS: source digests and annotation-only memory-helper transformation
+[kernel] Parsing verification/memory-annotated.c (with preprocessing)
+[wp] Running WP plugin...
+[wp] Warning: Skipped RTE guards: unaligned pointers (\aligned not supported)
+[wp] Warning: Skipped RTE guards: invalid function pointer calls (\valid_function not supported)
+[rte:annot] annotating function memcpy
+[rte:annot] annotating function memmove
+[rte:annot] annotating function memset
+[wp] 54 goals scheduled
+[wp] Proved goals:   60 / 60
+  Terminating:       3
+  Unreachable:       3
+  Qed:              27 (8ms-7ms-46ms)
+  Alt-Ergo 2.5.4:   27 (69ms-517ms-9s)
+[wp:pedantic-assigns] verification/memory-annotated.c:3: Warning: 
+  No 'assigns \result \from ...' specification for function 'memcpy'returning pointer type.
+  Callers assumptions might be imprecise.
+[wp:pedantic-assigns] verification/memory-annotated.c:16: Warning: 
+  No 'assigns \result \from ...' specification for function 'memmove'returning pointer type.
+  Callers assumptions might be imprecise.
+[wp:pedantic-assigns] verification/memory-annotated.c:43: Warning: 
+  No 'assigns \result \from ...' specification for function 'memset'returning pointer type.
+  Callers assumptions might be imprecise.
+[kernel] Parsing verification/decoder_wp.c (with preprocessing)
+[kernel:parser:unsupported] verification/lz4-sliced.c:1545: Warning: 
+  block-level typedefs currently unsupported;
+  trying to convert it to a global-level typedef.
+  Note that this may lead to incoherent error messages.
+[wp] Running WP plugin...
+[wp] Warning: Skipped RTE guards: unaligned pointers (\aligned not supported)
+[wp] Warning: Skipped RTE guards: invalid function pointer calls (\valid_function not supported)
+[rte:annot] annotating function LZ4_decompress_safe
+[rte:annot] annotating function LZ4_decompress_generic
+[wp] 29 goals scheduled
+[wp] Proved goals:   31 / 31
+  Terminating:       1
+  Unreachable:       1
+  Qed:              26 (21ms-5ms-86ms)
+  Alt-Ergo 2.5.4:    3 (18ms-68ms-107ms)
+[kernel] Parsing verification/literals_model.c (with preprocessing)
+[wp] Running WP plugin...
+[wp] Warning: Skipped RTE guards: unaligned pointers (\aligned not supported)
+[wp] Warning: Skipped RTE guards: invalid function pointer calls (\valid_function not supported)
+[rte:annot] annotating function literal_path
+[wp] 71 goals scheduled
+[wp] Proved goals:   73 / 73
+  Terminating:       1
+  Unreachable:       1
+  Qed:              48 (21ms-14ms-65ms)
+  Alt-Ergo 2.5.4:   23 (16ms-26ms-47ms)
+Checking 3234 cases on exact artifact and instrumented copy (280 guarded instructions).
+PASS: 6468 concrete calls, including 721 required-success cases per module.

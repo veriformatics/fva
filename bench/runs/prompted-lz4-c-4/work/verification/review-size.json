@@ -1,0 +1,38 @@
+{
+  "Proofs/Semantics.lean": {
+    "lines": 93,
+    "bytes": 3297
+  },
+  "Proofs/Artifact.lean": {
+    "lines": 588,
+    "bytes": 15858
+  },
+  "verification/extract.py": {
+    "lines": 149,
+    "bytes": 5171
+  },
+  "verification/check.py": {
+    "lines": 101,
+    "bytes": 5169
+  },
+  "verification/cases.py": {
+    "lines": 117,
+    "bytes": 5459
+  },
+  "verification/runtime.cjs": {
+    "lines": 27,
+    "bytes": 1353
+  },
+  "verification/Forge.lean": {
+    "lines": 15,
+    "bytes": 516
+  },
+  "verification/ForgeEq.lean": {
+    "lines": 16,
+    "bytes": 506
+  },
+  "theorem statements": {
+    "lines": 21,
+    "bytes": 978
+  }
+}

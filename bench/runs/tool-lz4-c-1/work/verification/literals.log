@@ -1,0 +1,11 @@
+[kernel] Parsing verification/literals_model.c (with preprocessing)
+[wp] Running WP plugin...
+[wp] Warning: Skipped RTE guards: unaligned pointers (\aligned not supported)
+[wp] Warning: Skipped RTE guards: invalid function pointer calls (\valid_function not supported)
+[rte:annot] annotating function literal_path
+[wp] 71 goals scheduled
+[wp] Proved goals:   73 / 73
+  Terminating:       1
+  Unreachable:       1
+  Qed:              48 (21ms-14ms-65ms)
+  Alt-Ergo 2.5.4:   23 (16ms-26ms-47ms)

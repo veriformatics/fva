@@ -1,0 +1,22 @@
+[kernel] Parsing verification/memory-annotated.c (with preprocessing)
+[wp] Running WP plugin...
+[wp] Warning: Skipped RTE guards: unaligned pointers (\aligned not supported)
+[wp] Warning: Skipped RTE guards: invalid function pointer calls (\valid_function not supported)
+[rte:annot] annotating function memcpy
+[rte:annot] annotating function memmove
+[rte:annot] annotating function memset
+[wp] 54 goals scheduled
+[wp] Proved goals:   60 / 60
+  Terminating:       3
+  Unreachable:       3
+  Qed:              27 (8ms-7ms-46ms)
+  Alt-Ergo 2.5.4:   27 (69ms-517ms-9s)
+[wp:pedantic-assigns] verification/memory-annotated.c:3: Warning: 
+  No 'assigns \result \from ...' specification for function 'memcpy'returning pointer type.
+  Callers assumptions might be imprecise.
+[wp:pedantic-assigns] verification/memory-annotated.c:16: Warning: 
+  No 'assigns \result \from ...' specification for function 'memmove'returning pointer type.
+  Callers assumptions might be imprecise.
+[wp:pedantic-assigns] verification/memory-annotated.c:43: Warning: 
+  No 'assigns \result \from ...' specification for function 'memset'returning pointer type.
+  Callers assumptions might be imprecise.

@@ -1,0 +1,18 @@
+[kernel] Parsing verification/early.c (with preprocessing)
+[kernel] Parsing verification/memory.c (with preprocessing)
+[wp] Running WP plugin...
+[wp] Warning: Skipped RTE guards: unaligned pointers (\aligned not supported)
+[wp] Warning: Skipped RTE guards: invalid function pointer calls (\valid_function not supported)
+[rte:annot] annotating function f2_early
+[rte:annot] annotating function load16
+[rte:annot] annotating function load32
+[rte:annot] annotating function load8
+[rte:annot] annotating function store32
+[rte:annot] annotating function store8
+[wp] 57 goals scheduled
+[wp] [Cache] updated:14
+[wp] Proved goals:   67 / 67
+  Terminating:       5
+  Unreachable:       5
+  Qed:              43 (1ms-9ms-371ms)
+  Alt-Ergo 2.5.4:   14 (14ms-20ms-30ms)

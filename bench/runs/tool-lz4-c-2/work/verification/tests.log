@@ -1,0 +1,1 @@
+PASS: 12088 cases; 546 R2 checks; 710 successful returns checked for R3; guarded accesses and lifted execution agree.

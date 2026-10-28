@@ -1,0 +1,23 @@
+{
+  "arm": "tool",
+  "task": "lz4-c",
+  "index": 4,
+  "cpus": "2",
+  "model": "gpt-6.1-sol",
+  "effort": "high",
+  "limit_seconds": 14400,
+  "prompt_sha256": "7047c24b763768d04dc6b86561582adabfc08307da62c62589de267c8dc7294f",
+  "input_manifest_sha256": "3d3f1fd1e614748727f973e6150679fd2c5415c86b41976b6265fcc439d7b113",
+  "codex_executable": "/opt/openai-codex-0.163.0/bin/codex",
+  "codex_executable_sha256": "399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215",
+  "codex_version": "codex-cli 0.163.0",
+  "harness_commit": "ba9df34827d13cf7dc4d41e5d29287653aa13e76",
+  "jail": {
+    "tool": "bubblewrap 0.13.1",
+    "visible": [
+      "/home/eturkes/.cache/fva-bench/bin",
+      "/home/eturkes/.cache/fva-bench/tools",
+      "/home/eturkes/.cache/fva-bench/packages-v4.35.0"
+    ]
+  }
+}
