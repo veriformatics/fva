@@ -1,0 +1,5 @@
+Checked 100000 calls
+Checked 200000 calls
+Checked 300000 calls
+Finite artifact checks: PASS (349083 calls; 25949 R2 antecedents; 25982 nonnegative returns)
+Every tested decoder access was monitored; this is not an exhaustive proof of R1, R2, or R3.

@@ -1,0 +1,11 @@
+.lake/
+verification/__pycache__/
+verification/*.ndjson
+verification/*.olean
+verification/*.ilean
+verification/*.wast
+verification/nanoda*.json
+verification/FrontendFalse.lean
+verification/census.json
+verification/sizes.json
+verification/*.log

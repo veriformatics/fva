@@ -1,0 +1,2 @@
+Checking 3234 cases on exact artifact and instrumented copy (280 guarded instructions).
+PASS: 6468 concrete calls, including 721 required-success cases per module.

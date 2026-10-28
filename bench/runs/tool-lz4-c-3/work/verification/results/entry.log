@@ -1,0 +1,17 @@
+[kernel] Parsing verification/entry.c (with preprocessing)
+[wp] Running WP plugin...
+[wp] Warning: Skipped RTE guards: unaligned pointers (\aligned not supported)
+[wp] Warning: Skipped RTE guards: invalid function pointer calls (\valid_function not supported)
+[rte:annot] annotating function verify_zero_capacity
+[rte:annot] annotating function verify_empty_source
+[rte:annot] annotating function entry_read
+[rte:annot] annotating function LZ4_decompress_generic
+[kernel:annot:missing-spec] verification/entry_prefix.c:28: Warning: 
+  Neither code nor explicit assigns for function omitted_decoder_tail,
+  generating default clauses. See -generated-spec-* options for more info.
+[wp] 56 goals scheduled
+[wp] Proved goals:   58 / 58
+  Terminating:       1
+  Unreachable:       1
+  Qed:              45 (4ms-4ms-154ms)
+  Alt-Ergo 2.5.4:   11 (14ms-28ms-83ms)

@@ -1,0 +1,11 @@
+[
+  {"name":"no source", "input":[], "output":[], "cap":1, "result":4294967295, "fuel":40},
+  {"name":"empty with no capacity", "input":[0], "output":[], "cap":0, "result":0, "fuel":40},
+  {"name":"empty with capacity", "input":[0], "output":[], "cap":1, "result":0, "fuel":200},
+  {"name":"one literal", "input":[16,65], "output":[65], "cap":1, "result":1, "fuel":400},
+  {"name":"five literals", "input":[80,65,66,67,68,69], "output":[65,66,67,68,69], "cap":5, "result":5, "fuel":700},
+  {"name":"extended literal length", "input":[240,0,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65], "output":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65], "cap":15, "result":15, "fuel":1500},
+  {"name":"overlapping match", "input":[19,65,1,0,80,66,67,68,69,70], "output":[65,65,65,65,65,65,65,65,66,67,68,69,70], "cap":13, "result":13, "fuel":3000},
+  {"name":"offset zero extension", "input":[15,0,0,1,80,66,67,68,69,70], "output":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66,67,68,69,70], "cap":25, "result":25, "fuel":4000},
+  {"name":"offset before output", "input":[19,65,2,0,80,66,67,68,69,70], "output":[], "cap":13, "result":4294967291, "fuel":2000}
+]

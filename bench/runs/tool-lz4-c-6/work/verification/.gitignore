@@ -1,0 +1,6 @@
+*.annotated.c
+*.instructions
+*.log
+*.wasm
+*.wast
+__pycache__/

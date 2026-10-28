@@ -1,0 +1,18 @@
+{
+  "3": "/*@ requires arena;\n requires readable(v1,v2);\n requires writable(v0,v2);\n assigns mem[v0 .. v0+v2-1];\n ensures \\result == v0;\n*/",
+  "4": "/*@ requires arena;\n requires readable(v1,v2);\n requires writable(v0,v2);\n assigns mem[v0 .. v0+v2-1];\n ensures \\result == v0;\n*/",
+  "3:3": "/*@ loop invariant v3 == \\at(v2,Pre) % 4;\n loop invariant v5 == \\at(v2,Pre) - v3;\n loop invariant v4 < v5;\n loop invariant v4 % 4 == 0;\n loop variant v5-v4;\n*/",
+  "3:4": "/*@ loop invariant 1 <= v3 <= 3;\n loop invariant v3 <= \\at(v2,Pre);\n loop invariant v4 >= v0;\n loop invariant v2 >= v1;\n loop invariant v4 + v3 == v0 + \\at(v2,Pre);\n loop invariant v2 + v3 == v1 + \\at(v2,Pre);\n loop variant v3;\n*/",
+  "4:4": "/*@ loop invariant 1 <= v4 <= 3;\n loop invariant v4 <= v3 <= v2;\n loop invariant v3-v4 == v2-v2%4;\n loop invariant v5 == v1-1;\n loop invariant v6 == v0-1;\n loop variant v4;\n*/",
+  "4:5": "/*@ loop invariant 4 <= v3 <= v2;\n loop invariant v3 % 4 == 0;\n loop invariant v1 == v0-4;\n loop invariant v6 == \\at(v1,Pre)-4;\n loop variant v3;\n*/",
+  "4:7": "/*@ loop invariant v6 == \\at(v2,Pre) % 4;\n loop invariant v2 == \\at(v2,Pre) - v6;\n loop invariant v4 < v2;\n loop invariant v4 % 4 == 0;\n loop variant v2-v4;\n*/",
+  "4:8": "/*@ loop invariant 1 <= v6 <= 3;\n loop invariant v6 <= \\at(v2,Pre);\n loop invariant v4 >= v0;\n loop invariant v3 >= v1;\n loop invariant v4 + v6 == v0 + \\at(v2,Pre);\n loop invariant v3 + v6 == v1 + \\at(v2,Pre);\n loop variant v6;\n*/",
+  "2": "/*@ requires arena;\n requires v0 == sb && v1 == db;\n requires v2 == se-sb && v3 == de-db;\n assigns mem[db .. de-1];\n ensures (\\result < 2147483648) ==> \\result <= de-db;\n*/",
+  "2:6": "/*@ loop invariant sb <= v4 < se;\n loop invariant db <= v3 <= de;\n loop variant se-v4;\n*/",
+  "2:17": "/*@ loop invariant sb < v2 <= v14;\n loop invariant v17 <= 255*(v2-sb);\n loop invariant \\at(v2,LoopEntry) <= v2;\n loop invariant \\at(v4,LoopEntry) < v2;\n loop variant v14-v2+1;\n*/",
+  "2:20": "/*@ loop invariant db <= v3 <= v17;\n loop invariant sb <= v4 <= v18;\n loop invariant v4+v17 == v3+v18;\n loop invariant v17 <= de-12;\n loop invariant v18 <= se-8;\n loop invariant v3 < v17 || v3 == \\at(v3,LoopEntry);\n loop invariant v16 <= 255;\n loop variant v17+8-v3;\n*/",
+  "2:24": "/*@ loop invariant sb < v3 <= v11;\n loop invariant v15 <= 255*(v3-sb);\n loop invariant \\at(v3,LoopEntry) <= v3;\n loop invariant \\at(v4,LoopEntry) < v3;\n loop variant v11-v3+1;\n*/",
+  "2:29": "/*@ loop invariant db <= v17 <= v15;\n loop invariant db <= v15 < v10;\n loop invariant v15-v17 == \\at(v15,LoopEntry)-\\at(v17,LoopEntry);\n loop invariant \\at(v17,LoopEntry) <= v17;\n loop variant v10-v15;\n*/",
+  "2:30": "/*@ loop invariant db <= v2 <= v18;\n loop invariant db <= v18 < v3;\n loop invariant v3 <= de-5;\n loop variant v3-v18;\n*/",
+  "2:31": "/*@ loop invariant db <= v2 <= v17;\n loop invariant db <= v17 < v3;\n loop invariant v3 <= de-12;\n loop variant v3-v17;\n*/"
+}

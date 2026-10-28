@@ -1,0 +1,10 @@
+.lake/
+verification/__pycache__/
+verification/logs/
+verification/*.ndjson
+verification/*.olean*
+verification/*.wast
+verification/cases.json
+verification/positive-nanoda.json
+verification/Forge-nanoda.json
+verification/ForgeEq-nanoda.json

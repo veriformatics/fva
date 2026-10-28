@@ -1,0 +1,326 @@
+[
+  {
+    "name": "empty-capacity",
+    "src": 131072,
+    "dst": 262144,
+    "input": "00",
+    "cap": 0,
+    "expected": "",
+    "valid": true
+  },
+  {
+    "name": "empty-block",
+    "src": 131072,
+    "dst": 262144,
+    "input": "00",
+    "cap": 1,
+    "expected": "",
+    "valid": true
+  },
+  {
+    "name": "empty-source-zero",
+    "src": 131072,
+    "dst": 262144,
+    "input": "",
+    "cap": 0,
+    "expected": null,
+    "valid": false
+  },
+  {
+    "name": "empty-source-positive",
+    "src": 131072,
+    "dst": 262144,
+    "input": "",
+    "cap": 32,
+    "expected": null,
+    "valid": false
+  },
+  {
+    "name": "one-literal",
+    "src": 131072,
+    "dst": 262144,
+    "input": "1061",
+    "cap": 1,
+    "expected": "61",
+    "valid": true
+  },
+  {
+    "name": "fourteen-literals",
+    "src": 131072,
+    "dst": 262144,
+    "input": "e0000102030405060708090a0b0c0d",
+    "cap": 14,
+    "expected": "000102030405060708090a0b0c0d",
+    "valid": true
+  },
+  {
+    "name": "fifteen-literals",
+    "src": 131072,
+    "dst": 262144,
+    "input": "f000000102030405060708090a0b0c0d0e",
+    "cap": 15,
+    "expected": "000102030405060708090a0b0c0d0e",
+    "valid": true
+  },
+  {
+    "name": "sixteen-literals",
+    "src": 131072,
+    "dst": 262144,
+    "input": "f001000102030405060708090a0b0c0d0e0f",
+    "cap": 32,
+    "expected": "000102030405060708090a0b0c0d0e0f",
+    "valid": true
+  },
+  {
+    "name": "offset-1",
+    "src": 131072,
+    "dst": 262144,
+    "input": "17410100507878787878",
+    "cap": 64,
+    "expected": "4141414141414141414141417878787878",
+    "valid": true
+  },
+  {
+    "name": "offset-2",
+    "src": 131072,
+    "dst": 262144,
+    "input": "2641420200507878787878",
+    "cap": 64,
+    "expected": "4142414241424142414241427878787878",
+    "valid": true
+  },
+  {
+    "name": "offset-3",
+    "src": 131072,
+    "dst": 262144,
+    "input": "354142430300507878787878",
+    "cap": 64,
+    "expected": "4142434142434142434142437878787878",
+    "valid": true
+  },
+  {
+    "name": "offset-4",
+    "src": 131072,
+    "dst": 262144,
+    "input": "44414243440400507878787878",
+    "cap": 64,
+    "expected": "4142434441424344414243447878787878",
+    "valid": true
+  },
+  {
+    "name": "offset-5",
+    "src": 131072,
+    "dst": 262144,
+    "input": "5341424344450500507878787878",
+    "cap": 64,
+    "expected": "4142434445414243444541427878787878",
+    "valid": true
+  },
+  {
+    "name": "offset-6",
+    "src": 131072,
+    "dst": 262144,
+    "input": "62414243444546060060787878787878",
+    "cap": 64,
+    "expected": "414243444546414243444546787878787878",
+    "valid": true
+  },
+  {
+    "name": "offset-7",
+    "src": 131072,
+    "dst": 262144,
+    "input": "714142434445464707007078787878787878",
+    "cap": 64,
+    "expected": "41424344454647414243444578787878787878",
+    "valid": true
+  },
+  {
+    "name": "offset-8",
+    "src": 131072,
+    "dst": 262144,
+    "input": "8041424344454647480800807878787878787878",
+    "cap": 64,
+    "expected": "4142434445464748414243447878787878787878",
+    "valid": true
+  },
+  {
+    "name": "short-match-end-relaxation",
+    "src": 131072,
+    "dst": 262144,
+    "input": "10610100504243444546",
+    "cap": 32,
+    "expected": "61616161614243444546",
+    "valid": false
+  },
+  {
+    "name": "long-match",
+    "src": 131072,
+    "dst": 262144,
+    "input": "1f61010000504243444546",
+    "cap": 64,
+    "expected": "61616161616161616161616161616161616161614243444546",
+    "valid": true
+  },
+  {
+    "name": "zero-offset",
+    "src": 131072,
+    "dst": 262144,
+    "input": "030000504243444546",
+    "cap": 32,
+    "expected": "000000000000004243444546",
+    "valid": false
+  },
+  {
+    "name": "zero-offset-extended",
+    "src": 131072,
+    "dst": 262144,
+    "input": "0f000000504243444546",
+    "cap": 64,
+    "expected": "000000000000000000000000000000000000004243444546",
+    "valid": false
+  },
+  {
+    "name": "empty-low-nibble",
+    "src": 131072,
+    "dst": 262144,
+    "input": "0f",
+    "cap": 1,
+    "expected": "",
+    "valid": false
+  },
+  {
+    "name": "incomplete-literal",
+    "src": 131072,
+    "dst": 262144,
+    "input": "10",
+    "cap": 32,
+    "expected": null,
+    "valid": false
+  },
+  {
+    "name": "incomplete-extension",
+    "src": 131072,
+    "dst": 262144,
+    "input": "f0ff",
+    "cap": 32,
+    "expected": null,
+    "valid": false
+  },
+  {
+    "name": "incomplete-offset",
+    "src": 131072,
+    "dst": 262144,
+    "input": "0000",
+    "cap": 32,
+    "expected": null,
+    "valid": false
+  },
+  {
+    "name": "offset-before-output",
+    "src": 131072,
+    "dst": 262144,
+    "input": "000100804243444546474849",
+    "cap": 64,
+    "expected": null,
+    "valid": false
+  },
+  {
+    "name": "undersized-output",
+    "src": 131072,
+    "dst": 262144,
+    "input": "13610100504243444546",
+    "cap": 12,
+    "expected": null,
+    "valid": false
+  },
+  {
+    "name": "zero-capacity-nonzero-token",
+    "src": 131072,
+    "dst": 262144,
+    "input": "01",
+    "cap": 0,
+    "expected": null,
+    "valid": false
+  },
+  {
+    "name": "upper-edge-source",
+    "src": 2097150,
+    "dst": 131072,
+    "input": "1061",
+    "cap": 1,
+    "expected": "61",
+    "valid": true
+  },
+  {
+    "name": "upper-edge-destination",
+    "src": 131072,
+    "dst": 2097151,
+    "input": "1061",
+    "cap": 1,
+    "expected": "61",
+    "valid": true
+  },
+  {
+    "name": "adjacent-buffers",
+    "src": 131072,
+    "dst": 131074,
+    "input": "1061",
+    "cap": 1,
+    "expected": "61",
+    "valid": true
+  },
+  {
+    "name": "continued-literal-length",
+    "src": 131072,
+    "dst": 262144,
+    "input": "f0ff00000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d",
+    "cap": 270,
+    "expected": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d",
+    "valid": true
+  },
+  {
+    "name": "continued-match-length",
+    "src": 131072,
+    "dst": 262144,
+    "input": "1f610100ff00504243444546",
+    "cap": 280,
+    "expected": "61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161614243444546",
+    "valid": true
+  },
+  {
+    "name": "forward-memmove-sixteen",
+    "src": 262144,
+    "dst": 131072,
+    "input": "f001000102030405060708090a0b0c0d0e0f",
+    "cap": 16,
+    "expected": "000102030405060708090a0b0c0d0e0f",
+    "valid": true
+  },
+  {
+    "name": "two-matches",
+    "src": 131072,
+    "dst": 262144,
+    "input": "13610100040800504243444546",
+    "cap": 64,
+    "expected": "616161616161616161616161616161614243444546",
+    "valid": true
+  },
+  {
+    "name": "offset-sixteen",
+    "src": 131072,
+    "dst": 262144,
+    "input": "f001000102030405060708090a0b0c0d0e0f1000806162636465666768",
+    "cap": 64,
+    "expected": "000102030405060708090a0b0c0d0e0f000102036162636465666768",
+    "valid": true
+  },
+  {
+    "name": "destination-before-adjacent-source",
+    "src": 131085,
+    "dst": 131072,
+    "input": "13610100504243444546",
+    "cap": 13,
+    "expected": "61616161616161614243444546",
+    "valid": true
+  }
+]
