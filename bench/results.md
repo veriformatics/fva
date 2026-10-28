@@ -39,6 +39,9 @@ One run per arm on T1 and T4 (the rubric's pilot), model `gpt-6.1-sol`, reasonin
 - Order: `bench/harness/run-batch TASK SEED ARM…`; each batch's seed and order are listed with its results. Safety-classifier stops are counted per arm.
 - Codex CLI: every graded run so far ran codex-cli 0.163.0 (binary sha256 `399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215`). The host's system copy moved to 0.164.0 on 2026-10-27, so the second T2 batch, T3 and T7 run the same 0.163.0 binary from a pinned copy of its package: their `codex_executable` path differs, and their `codex_executable_sha256` is identical.
 - Grading deviation (rubric addendum 2026-10-26 (3)): M8 on the tool arm plants the cheats' closest Frama-C forms (`admit ensures`, a false global axiom; C3 not applicable) with `bench/grade/inject-tool`. T4's tool runs finished before the addendum was written; their M8 was graded after it.
+- Grading deviation (rubric addendum 2026-10-28 (2)): M4 gains the outcome `not reported`, for a run whose report never names the task's known defect. It corrects T4, where three runs had been credited with a defect they never named.
+- Verdict-table rulings: MAIN rules each row it rechecks on a reviewer's M3/M6 table (non-`faithful` M3 verdicts, M6 findings, ratings MAIN changes) after an advisor consult, for every task. T1, T4 and T5 were re-ruled this way after their first grading: every deck was read again, and every quoted anchor was matched again in the archived runs (T1 46, T4 43, T5 32). No M3 or M6 verdict changed. The task notes below give the reasoning; the second reading found the M4 error on T4.
+- Codex quota after each batch (`bench/tools/codex-quota`, percent of the weekly window used; the provider reset the window early several times, so the differences between readings are not per-batch costs): T1 seed 3: 27 % (2026-10-25 15:15 UTC), 27 % after its replacement runs; T4: 32 % (2026-10-25 23:59 UTC); T5: 23 % (2026-10-26 07:14 UTC, after an early reset), 45 % and 48 % after its replacement runs; first T2 batch (superseded): 53 %, then 65 %; before the second T2 batch: 1 % (2026-10-28 09:23 UTC, after an early reset).
 
 <details><summary>fva-arm package files, bench-v2.1 (sha256, path)</summary>
 
@@ -220,22 +223,31 @@ empty block): no arm claimed that the codec meets its requirements.
   copy (it copies the arena canaries but not `prelude-15704`), so its 4 catches count by name.
 - M3/M6 rulings: a sound refutation of a false requirement is `not proven, reported`; reviewer-12's
   `weaker` on fva-7 R3 (a machine-checked trap, attributed by disclosed code inspection) was set
-  to `not proven, reported`, and its M6 finding to none (same convention for every arm).
+  to `not proven, reported`, and its M6 finding to none. The same convention covers every R3
+  refutation that rests on the trap at the end of memory (bare 1, 4; prompted 4, 5; fva 7): each
+  report names the trapping instruction, the load of an offset byte at address 65536, just after
+  the block, by disassembly or by the runtime's trap location, and a decoder that meets R3 never
+  issues that load. FVA's own claim on the same input (`decode_traps_valid` in
+  `FVATest/Subjects/Lz4Wasm`, e89cb22) is labelled R2, because its statement records the trap
+  without its cause: a claim's name must match what its statement proves, while M3 grades a
+  run's whole report.
   prompted-3's `.verification/SorryControl.lean` is a deliberate negative control outside its
   `Proofs` library and does not count against M1.
 
 ## T4 — edger-cpm (seed 1; bare, prompted, fva, tool 1–5)
 
-Every arm reported both defects (R1: `calc_cpm_raw` overflows to infinity for finite counts and
-libraries near 2¹⁰²³; R2: a median-library sample with exactly `min.count` reads fails
-`filterByExpr`): no arm claimed that edgeR meets its requirements.
+No run claimed that edgeR meets its requirements: every run refuted both. R1 fails by overflow:
+`calc_cpm_raw` returns infinity for finite counts and libraries near 2¹⁰²³. The known R2 defect
+(a median-library sample with exactly `min.count` reads fails `filterByExpr`) was reported by 17
+of 20 runs; prompted 3, prompted 4 and fva 4 refuted R2's wording only, through the README's
+omitted total-count condition or the sample-size tolerance.
 
 | metric | bare | prompted | fva | tool (Frama-C WP) |
 |---|---|---|---|---|
 | M1 theorems valid / claimed | 43 / 43 | 17 / 17 | 20 / 20 | 5 / 5 runs, every WP goal proved |
 | M2 link to the artifact | (b) 1 (Lean `Float.Model` model, 2,000 / 2,000 cases equal to the artifact), (c) 4 | (c) 5 | (a) 5 | (b) 5, point models (C expressions without inputs, compared with the artifact by the run's reproducer) |
 | M3 requirements (2 per run) | 10 not proven, reported | 10 not proven, reported | 10 not proven, reported | 10 not proven, reported |
-| M4 defect evidence | executed reproducer 5 (Lean theorems about binary64 rounding) | executed reproducer 5 (same) | R1 machine-checked on the artifact 5; R2 machine-checked 4, executed reproducer 1 | executed reproducer 5 (WP proofs of the witness arithmetic) |
+| M4 defect evidence (known R2 defect) | executed reproducer 5 (Lean theorems about binary64 rounding) | executed reproducer 3 (same), not reported 2 (runs 3, 4) | machine-checked on the artifact 4, not reported 1 (run 4) | executed reproducer 5 (WP proofs of the witness arithmetic) |
 | M5 surface, code lines: statement + link/model (checker scripts apart) | 41 [37–46]: 28 + 12 (154) | 22 [11–28]: 17 + 3 (270) | 45 [34–78]: 3 + 42 (159); `fva trust` surface 47 [37–85] | 41 [37–58]: 10 + 32 (150) |
 | M6 over-claims | 0 | 0 | 0 | 0 |
 | M7 wall time, s; input tokens (uncached) | 410 [406–666]; 1.46 M (60 k) | 817 [669–1,049]; 3.12 M (98 k) | 908 [615–1,988]; 4.70 M (111 k) | 435 [328–529]; 1.53 M (60 k) |
@@ -256,17 +268,31 @@ libraries near 2¹⁰²³; R2: a median-library sample with exactly `min.count` 
   baselines exit 0.
 - M7: the fva arm's median wall time is 2.2 × the bare arm's (1.1 × the prompted arm's); its
   sessions also ran `fva trust` kernel replays (CPU 251–691 s per run against 25–143 s bare).
+- M3: R1 is refuted against its every-input wording ("rounded as double-precision arithmetic
+  allows"): each witness has a representable exact value (10⁶) and an infinite result, while
+  each binary64 operation itself rounds correctly (U14 S4: multiplication by 10⁶, then
+  division). Prompted 3, prompted 4 and fva 4 refute R2's wording only (prompted 4's report says
+  so at its line 42), so their M3 `not proven, reported` and M4 `not reported` describe one
+  result.
+- M4 counts the known R2 defect alone. R1's overflow evidence: fva runs 1, 3 and 4
+  machine-checked the whole function call in a stated store (not from instantiation), runs 2
+  and 5 an instruction fragment of the artifact (the full call executed); the other arms
+  executed the artifact.
 - Register (reviewer-19): README R2 ("exactly when … `min.count`") omits `filterByExpr`'s
-  `min.total.count` guard; every run's witness satisfies it, so no grade changes.
+  `min.total.count` guard. The 17 boundary witnesses satisfy it; prompted 3, prompted 4 and fva 4
+  used the omission or the sample-size tolerance instead (M4 above).
 
 ### The two outcome sentences after T1 and T4
 
 - Bug finding ("a bare agent 'verified' X; FVA showed the shipped binary is wrong"): not shown.
-  On both tasks every arm, bare included, found and reported every defect. The difference is the
-  evidence: only the fva arm (5 / 5 runs on each task, plus prompted-3 on T1) stated its
-  counterexamples about the shipped bytes, machine-checked; the other runs executed the binary
-  and proved facts about the format or about binary64 arithmetic apart from it. T7 targets
-  this sentence.
+  No run claimed a verification that the binary contradicts. On T1 every run reported every
+  defect. On T4 every run refuted both requirements, but the known R2 defect was reported by
+  every bare and tool run and by 3 prompted and 4 fva runs: on T4's known defect the bare arm
+  (5 / 5) did better than the fva arm (4 / 5). The difference is the evidence: only the fva arm
+  stated its counterexamples about the shipped bytes, machine-checked (T1: 5 / 5 runs, and
+  prompted-3; T4: R1 in 5 / 5 runs, two of them on an instruction fragment, and the R2 defect in
+  the 4 runs that reported it); the other runs executed the binary and proved facts about the
+  format or about binary64 arithmetic apart from it. T7 targets this sentence.
 - Readability ("a ~25-line spec a biologist can read, proven about the real binary"): not shown.
   The fva arm's T4 statements are proven about the real binary, but they take 34–78 code lines
   and the domain reader rated them "readable with effort" (9 of 10). The U14 S4 subject
@@ -294,8 +320,14 @@ decimal places, false on this matrix. Every arm refuted R3 (15 / 15 runs).
 - M3: `faithful` = an exact-tie policy with a stated tolerance of 2.3–2.5 % that holds (the exact
   average-rank factors differ from edgeR's file by at most 1.95 % and from RNAnorm's by 1.80 %:
   fva 1, 2, 4; bare 6; prompted 7); `not proven, reported` = a sound refutation at a tighter
-  tolerance or of R3; bare-4's R1/R2 = `weaker`: its theorem is about a gene selection copied
-  from the float runs, whose relation to TMM's documented trim it leaves unproved.
+  tolerance or of R3, or, for prompted 1's R1/R2, no claim attempted (it proved a necessary
+  normalization property and left R1/R2 open); bare-4's R1/R2 = `weaker`: its theorem is about
+  a gene selection copied from the float runs, whose relation to TMM's documented trim it leaves
+  unproved.
+- M3 grades the statements, M1 their proofs. These M3 verdicts rest on `native_decide` proofs,
+  which M1 rejects: bare 2 R1–R3, bare 3 R1/R2, bare 6 R1/R2 (its two `faithful`), and the
+  matrix, reference and trim links of bare 5's R1/R2 counterexamples. The R3 refutations of
+  bare 3, 5 and 6 have valid proofs.
 - M1: `native_decide` theorems carry the compiler-trust axiom and are invalid; con-leche
   rejected whole-module exports that mixed them with clean theorems, so the clean ones were
   rechecked alone (bare-3 R3, bare-5 requirement theorems, bare-6's decimal witness: valid;
