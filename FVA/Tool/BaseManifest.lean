@@ -239,7 +239,7 @@ def baseManifest : List (String × String) := [
   ("FVA/Tool/Encode.lean",
     "2204a2c5494a70e36065417adf14e88f34ed3257ba5a82f3ae048b39601f2aee"),
   ("FVA/Tool/Explain.lean",
-    "1efafa46887dc0ca9186c08dbd9258e5361d145e39d4d7a07c57d38fc6561960"),
+    "d99381301a51b5c2c3dabb2da73a253d400a063c1482495d0ef90c55b3c3414c"),
   ("FVA/Tool/Init.lean",
     "b6072b38aa7ae04a34e484077aba46e726669215bc63ec6395a1211d817c8e30"),
   ("FVA/Tool/Lift.lean",

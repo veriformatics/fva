@@ -7,7 +7,8 @@ namespace Examples.Toy
 
 open FVA.Wasm FVA.Wasm.Exec
 
-/-- `clamp(x, lo, hi)` on signed 32-bit ints: `lo` below `lo`, `hi` above `hi`, else `x`. -/
+/-- `clamp(x, lo, hi)` on signed 32-bit ints: `lo` if `x < lo`, else `hi` if `x > hi`, else `x`
+(tested in this order, so with `lo > hi` the result is `lo` for `x < lo` and `hi` otherwise). -/
 def clamp : Prop :=
   ∀ x lo hi : BitVec 32, Returns Lifted.module "clamp" [.i32 x, .i32 lo, .i32 hi]
     [.i32 (if x.slt lo then lo else if hi.slt x then hi else x)]

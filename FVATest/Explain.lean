@@ -30,6 +30,7 @@ open FVA.Tool.Explain
 #guard num 5 32 == "5"
 #guard signed 255 8 == -1
 #guard modFile "/p" "A.B.Spec" == ("/p/A/B/Spec.lean" : System.FilePath)
+#guard modPath "A.B.Spec" == ("A/B/Spec.lean" : System.FilePath)
 #guard FVA.Trust.stripComments "def x := 1 -- c\n/- d -/def y := \"--s\"" ==
   "def x := 1 \ndef y := \"--s\""
 
