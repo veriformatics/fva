@@ -135,10 +135,13 @@ def parse (o : Opts) : List String → Except String Opts
     else if o.dir.isEmpty then parse { o with dir := a } r
     else .error s!"unexpected argument {a}"
 
-/-- The source file of module `m` under `root`. -/
+/-- The source path of module `m`, relative to its package root. -/
+def modPath (m : String) : System.FilePath :=
+  ("/".intercalate (m.splitOn ".") : System.FilePath).addExtension "lean"
+
+/-- The source file of module `m` in the project at `root`. -/
 def modFile (root : System.FilePath) (m : String) : System.FilePath :=
-  root / ("/".intercalate (m.splitOn "."))
-    |>.addExtension "lean"
+  root / modPath m
 
 /-- Run `cmd` (stdout captured) under `timeout`; `none` = killed at the deadline. -/
 def runTimed (cmd : String) (args : Array String) (cwd : System.FilePath) (secs : Nat) :
@@ -349,23 +352,27 @@ def Trust.ofJson (j : Json) : Except String Trust := do
   let mods ← (← r.getObjValAs? (List Json) "reviewModules").mapM (·.getObjValAs? String "module")
   return { verdict, issues, claims, reviewModules := mods }
 
-/-- The FVA files whose text the prompt carries (claim vocabulary) or the examples rest on. -/
-def fvaFiles (fva : System.FilePath) : List System.FilePath :=
-  [fva / "FVA/Spec/CAbi.lean", fva / "FVA/Spec/Claims.lean", fva / "FVA/Explain.lean"]
+/-- The FVA files (paths inside the FVA package) whose text the prompt carries (claim
+vocabulary) or the examples rest on. -/
+def fvaFiles : List System.FilePath :=
+  ["FVA/Spec/CAbi.lean", "FVA/Spec/Claims.lean", "FVA/Explain.lean"]
 
 /-- sha256 of every input the saved text derives from: model, effort, prompts, schemas, the
-review-surface files, the lifted modules (their numerals are the `.wasm` bytes), FVA's files. -/
+review-surface files, the lifted modules (their numerals are the `.wasm` bytes), FVA's files.
+Each file enters by its path inside the project or the FVA package, so a checkout elsewhere (a
+pool host, CI) finds the same text current. -/
 def inputsSha (o : Opts) (root fva : System.FilePath) (t : Trust) : IO String :=
   IO.FS.withTempDir fun tmp => do
-    let files := (t.reviewModules.map (modFile root) ++
-      (t.claims.flatMap (·.subjects)).eraseDups.map (modFile root)).mergeSort
-      (·.toString ≤ ·.toString) ++ fvaFiles fva
+    let own := (t.reviewModules.map modPath ++
+      (t.claims.flatMap (·.subjects)).eraseDups.map modPath).mergeSort
+      (·.toString ≤ ·.toString)
+    let files := own.map (root, ·) ++ fvaFiles.map (fva, ·)
     let mut payload := toString (toJson [o.model, o.effort, explainPrompt "" "" "",
       comparePrompt "", explainSchema.compress, compareSchema.compress,
       toString fixedInputs, toString maxExamples])
-    for f in files do
+    for (dir, f) in files do
       payload := payload ++ "\x00" ++ f.toString ++ "\x00" ++
-        (← try IO.FS.readFile f catch _ => pure "(missing)")
+        (← try IO.FS.readFile (dir / f) catch _ => pure "(missing)")
     IO.FS.writeFile (tmp / "in") payload
     let r ← IO.Process.output { cmd := "sha256sum", args := #[(tmp / "in").toString] }
     return (r.stdout.splitOn " ").headD ""
@@ -378,8 +385,8 @@ def generate (o : Opts) (root fva : System.FilePath) (t : Trust) : IO (List Row)
   let specText ← t.reviewModules.foldlM (init := "") fun acc m => do
     let src ← try IO.FS.readFile (modFile root m) catch _ => pure ""
     return acc ++ s!"--- {m}\n{FVA.Trust.stripComments src}\n"
-  let vocab ← (fvaFiles fva).take 2 |>.foldlM (init := "") fun acc f => do
-    return acc ++ s!"--- {f.fileName.getD ""}\n{← IO.FS.readFile f}\n"
+  let vocab ← fvaFiles.take 2 |>.foldlM (init := "") fun acc f => do
+    return acc ++ s!"--- {f.fileName.getD ""}\n{← IO.FS.readFile (fva / f)}\n"
   let statements := "\n".intercalate (names.filterMap fun n =>
     (sh.get? n).map fun s => s!"{n} : Prop := {s.statement}")
   let p1 ← Codex.ask (explainPrompt statements specText vocab) explainSchema o.model o.effort
