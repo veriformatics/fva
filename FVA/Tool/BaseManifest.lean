@@ -231,7 +231,7 @@ def baseManifest : List (String × String) := [
   ("FVA/Tool/Certify.lean",
     "12263db45de00dcb673fc15cd12b5f8ee136944380c28198bbda3fac9b456e54"),
   ("FVA/Tool/Codex.lean",
-    "0536b3da4465b1bde47df5c4817f172de5c29eb15beb6885a3069b72011765fb"),
+    "494b20b09fcd313121edbac9d6d4bdd85773989f02695be102b4b050b69bd311"),
   ("FVA/Tool/Decode.lean",
     "cbd4005f74a91fbbd36b0fbeecdc9336307272bce4eb2efff93360f776bcf0aa"),
   ("FVA/Tool/Difftest.lean",

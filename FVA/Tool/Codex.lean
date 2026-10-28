@@ -15,6 +15,14 @@ open Lean
 /-- The model `fva explain` asks unless told otherwise (Decisions: LLM backend). -/
 def defaultModel : String := "gpt-6-luna"
 
+/-- `codex app-server` arguments: no shell, image viewer or MCP tool. A read-only sandbox still
+lets the model read any local file, and project text (identifiers, literals, claim docstrings)
+reaches the prompt, so an injected request could copy a file into the saved explanation. An
+unknown feature name stops the server: a codex that renames one fails closed. -/
+def serverArgs : Array String :=
+  #["app-server", "--disable", "shell_tool", "--disable", "unified_exec", "--disable",
+    "view_image", "-c", "mcp_servers={}"]
+
 /-- One JSON-RPC session with a running `codex app-server`. -/
 structure Session where
   /-- Writes requests. -/
@@ -53,7 +61,7 @@ partial def Session.until (s : Session) (pred : Json → Bool) : IO Json := do
 def ask (prompt : String) (schema : Json) (model effort : String) (timeoutMs : Nat := 600000) :
     IO Json := do
   let child ← IO.Process.spawn
-    { cmd := "codex", args := #["app-server"], stdin := .piped, stdout := .piped,
+    { cmd := "codex", args := serverArgs, stdin := .piped, stdout := .piped,
       stderr := .null }
   -- polls in steps: the process exits only once this task ends, so a cancel must end it soon
   let killer ← IO.asTask (prio := .dedicated) do

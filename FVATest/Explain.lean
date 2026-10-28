@@ -33,4 +33,11 @@ open FVA.Tool.Explain
 #guard FVA.Trust.stripComments "def x := 1 -- c\n/- d -/def y := \"--s\"" ==
   "def x := 1 \ndef y := \"--s\""
 
+-- the explain thread has no shell, image viewer or MCP tool (closing review SEC-4)
+#guard ["shell_tool", "unified_exec", "view_image"].all fun f =>
+  (FVA.Tool.Codex.serverArgs.toList.zip FVA.Tool.Codex.serverArgs.toList.tail).contains
+    ("--disable", f)
+#guard (FVA.Tool.Codex.serverArgs.toList.zip FVA.Tool.Codex.serverArgs.toList.tail).contains
+  ("-c", "mcp_servers={}")
+
 end FVA.Tool.Explain.Check
