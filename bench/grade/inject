@@ -25,7 +25,17 @@ plant() { # file theorem pre proof
 	END {
 		for (i = 1; i <= NR; i++) if (line[i] ~ ("^(private |protected )?(theorem|lemma) (" thm "|" two ")([ :({[]|$)")) { t = i; break }
 		if (!t) { print "inject: no theorem " thm > "/dev/stderr"; exit 2 }
-		s = t; while (s > 1 && line[s - 1] ~ /^(@\[|\/--)/) s--
+		# attributes and the docstring stay above the planted text; a docstring may span lines, so its
+		# closing `-/` line walks back to the `/--` that opens it (a plain `/-` comment stops the walk)
+		s = t
+		while (s > 1) {
+			if (line[s - 1] ~ /^(@\[|\/--)/) { s--; continue }
+			if (line[s - 1] ~ /-\/[ \t]*$/) {
+				for (j = s - 1; j >= 1 && index(line[j], "/-") == 0; j--);
+				if (j >= 1 && line[j] ~ /^\/--/) { s = j; continue }
+			}
+			break
+		}
 		e = NR + 1; for (j = t + 1; j <= NR; j++) if (decl(line[j])) { e = j; break }
 		block = ""; for (j = s; j < e; j++) block = block line[j] "\n"
 		# the proof starts at the first `:=` ending a line or followed by `by` (a `let … :=` inside the
