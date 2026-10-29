@@ -34,7 +34,8 @@ strip='FNR == 1 { depth = 0 } { out = ""; i = 1; n = length($0)
 	print FILENAME ":" FNR ":" out }'
 if find . \( -path ./.lake -o -path ./fva \) -prune -o -name '*.lean' -print0 |
 	xargs -0 -r awk "$strip" |
-	grep -E ':[0-9]+:(.*\b(sorry|admit|native_decide|implemented_by|extern|debug\.skipKernelTC)\b|axiom )' \
+	# a dotted occurrence is an identifier part (Wasm's `.extern` reference constructor), not the construct
+	grep -E ":[0-9]+:(.*(^|[^.[:alnum:]_'])(sorry|admit|native_decide|implemented_by|extern|debug\.skipKernelTC)\b|axiom )" \
 		>"$tmp/forbidden"; then
 	echo 'check-lean: forbidden constructs:' >&2
 	cat "$tmp/forbidden" >&2
