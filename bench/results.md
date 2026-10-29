@@ -2,6 +2,82 @@
 
 Rubric: `rubric.md` (fixed before any graded run, with its dated addenda). FVA was built with the subjects known: the U14 groundwork is listed below, and FVA's library is not frozen against the subjects.
 
+## Summary across the six graded tasks
+
+105 graded runs: six tasks, n = 5 per arm, one model (`gpt-6.1-sol`, reasoning effort `high`) and one
+Codex CLI binary throughout. The arms are bare (the task alone), prompted (the task with FVA's
+principles but without FVA), fva (FVA's package available) and tool (Frama-C on T4 and T2, Verus on
+T3). Medians over five runs, with no significance claims at n = 5.
+
+| task | M10: machine-checked statement about the shipped bytes (bare / prompted / fva / tool) | M3 | M5 surface code lines, statement + link/model (bare / prompted / fva / tool) | M9 rated `readable` (bare / prompted / fva / tool) | fva input tokens ÷ bare / ÷ prompted |
+|---|---|---|---|---|---|
+| T1 lz4-wasm (known defects) | 0 / 1 / 5 / – | equal: every run refuted the requirements | 67 / 40 / 40 / – | 0 / 6 / 2 of 15 each | 5.2 × / 1.6 × |
+| T4 edger-cpm (known defect) | 0 / 0 / 5 / 0 | equal: every run refuted both requirements | 41 / 22 / 45 / 41 | 0 / 2 / 0 / 2 of 10 each | 3.2 × / 1.5 × |
+| T5 tmm (certification) | 3 / 1 / 5 / – | fva higher: 6 `faithful` rows against 2 and 2 | 113 / 66 / 115 / – | 5 / 7 / 5 of 15 each | 3.0 × / 1.8 × |
+| T2 lz4-c (no known defect) | 5 / 5 / 5 / 2 | fva lower: R1 not proven in 4 runs | 306 / 316 / 56 / 47 | 0 / 0 / 5 / 15 of 15 each | 3.1 × / 3.5 × |
+| T3 lz4-rust (no known defect) | 4 / 5 / 5 / 2 | fva lower: R1 not proven in 4 runs; tool 9 `faithful` for its models | 515 / 294 / 48 / 179 | 0 / 0 / 12 / 1 of 15 each | 3.4 × / 2.6 × |
+| T7 glm-iround (known defect) | 0 / 0 / 5 / – | equal: every run refuted R1 | 15 / 12 / 9 / – | 5 / 5 / 5 of 5 each | 11.5 × / 2.5 × |
+
+The rubric's rule: FVA wins a task when its M5 at equal M3 is smaller, or its M4 or M10 is better,
+without an M7 loss beyond 2×. The rule does not name the baseline, so each baseline is reported
+separately. M7 is wall time and tokens on the idle-window tasks (T1, T4) and tokens with CPU
+seconds on the others (rubric addendum 2026-10-28 (3)). The labels describe these samples of five
+runs per arm, not a population; the task sections give the spread.
+
+| task | against bare | against prompted | against tool |
+|---|---|---|---|
+| T1 | not a win: M4 and M10 better, but 5.2 × the input tokens (wall time 1.7 ×) | win: M4 and M10 better at 1.6 × the input tokens and 0.6 × the wall time | – |
+| T4 | not a win: M10 better, but 3.2 × the input tokens and 2.2 × the wall time | win: M4 and M10 better at 1.5 × the input tokens and 1.1 × the wall time | not a win: M10 better, but 3.1 × the input tokens |
+| T5 | not a win: M3 and M10 better, but 3.0 × the input tokens | win: M3 and M10 better at 1.8 × the input tokens (1.0 × uncached) | – |
+| T2 | loss: M3 lower | loss: M3 lower | loss: M3 lower |
+| T3 | loss: M3 lower | loss: M3 lower | loss: M3 lower |
+| T7 | not a win: M4, M10 and M5 better, but 11.5 × the input tokens | not a win: M4, M10 and M5 better, but 2.5 × the input tokens | – |
+
+- Across the six tasks, FVA's clearest gain was a machine-checked statement about the shipped bytes
+  (the artifact, or on T5 the output files): the fva arm reached one in every run of every task (M10
+  30 / 30), on a shared, reviewed decoder and semantics whose link to the file's bytes `fva trust`
+  checks. The other arms reached one in some tasks by writing their own extractor and Wasm semantics
+  (bare and prompted on T2 and T3, tool runs 2 and 4 on T2 and 4 and 6 on T3), which they then had to
+  trust; the bare arm reached none on T1, T4 and T7, and the prompted arm none on T4 and T7: they
+  executed the binary instead. A run without such a statement shows
+  that the agent did not produce one under these conditions, not that none exists.
+- No general saving in time or cost was shown. FVA used more median input tokens than the bare arm
+  on every task (3.0–11.5 ×) and more CPU seconds; against the prompted arm it used 1.5–3.5 × the
+  input tokens and less wall time on T1 and T7. No dollar cost was measured.
+- Spec size and readability: the fva statements were the shortest Lean statements on T1 (tied with
+  the prompted arm), T2, T3 and T7, and the most readable on T3, but on T2 and T3 not at equal M3. On
+  T2 the Frama-C contracts were shorter still and rated readable in all 15 rows; on T4 and T5 the fva
+  statements were longer than the prompted arm's. Each arm had its own domain reader, so ratings compare within an arm better than
+  across arms.
+- On the two LZ4 proof tasks (T2, T3), no arm proved a requirement over the whole domain of the
+  shipped bytes. Three Verus runs proved all three T3 requirements over every input for executable
+  models of the decoder that they wrote (each model agreed with the artifact on 2,000 seeded cases).
+- A gap in FVA itself (deferred as D52): its reviewed C-ABI vocabulary states results after a call
+  and has no claim about the memory accesses during it. On T2 and T3, 2 of 10 fva runs stated the
+  memory-confinement requirement at the access level, both by building the predicate themselves,
+  and both were their arm's largest surfaces.
+
+### The two outcome sentences
+
+- Bug finding ("a bare agent 'verified' X; FVA showed the shipped binary is wrong"; H1): not shown.
+  No run in any arm claimed a verification that its own evidence or the binary contradicts. Every T1
+  and T7 run reported the known defects; on T4 the known boundary defect was reported by 5 / 5 bare,
+  5 / 5 tool, 3 / 5 prompted and 4 / 5 fva runs. FVA's difference was the evidence: the fva runs
+  machine-checked their counterexamples about the shipped bytes (T1 5 / 5, and prompted 3 on bytes it
+  extracted itself; T4: R1 in 5 / 5 runs, two of them on an instruction fragment whose full call was
+  executed, and the R2 defect in the 4 runs that reported it, over FVA's lifted `cpm` code together
+  with the run's own model of R's filter; T7 5 / 5), while the other runs executed the binary and proved facts
+  about the format or about binary64 arithmetic apart from it.
+- Readability ("a ~25-line spec a biologist can read, proven about the real binary"; H2): not shown.
+  On T4 the fva statements refute the requirements, take 34–78 code lines, and their domain reader
+  rated them "readable with effort" (9 of 10). T5 certifies particular output files under a stated
+  tie policy and tolerance. A narrower positive result is T7: every fva run stated the counterexample
+  about the 66-byte GLM artifact in 9–12 lines (a whole `fva trust` review surface of 13–14 lines,
+  FVA's base apart), rated readable. The bare and prompted T7 statements were rated readable too,
+  but they are about the input value, not the binary. T7 is not a biological subject, and a
+  counterexample is not an all-input correctness result.
+- H3 (the Pachter-lab link, T6) was dropped before any graded run (rubric addendum 2026-10-24 (2)).
+
 ## Pilot (2026-10-24; not graded)
 
 One run per arm on T1 and T4 (the rubric's pilot), model `gpt-6.1-sol`, reasoning effort `high`, codex-cli 0.163.0, 4-hour cap, one pinned CPU per run, FVA = the U7–U11 build (`wt/u9` 170bec1).
@@ -212,6 +288,10 @@ empty block): no arm claimed that the codec meets its requirements.
 | M9 statements readable / with effort / no formal statement | 0 / 14 / 1 | 6 / 9 / 0 | 2 / 13 / 0 |
 | M10 machine-checked statement about the shipped bytes | 0 / 5 | 1 / 5 | 5 / 5 |
 
+- Rubric outcome (labelled in the six-task summary): against the prompted arm a win (M4 and M10
+  better at 1.6 × the input tokens and 0.6 × the wall time); against the bare arm not a win (M4 and
+  M10 better, but 5.2 × the input tokens, at 1.7 × the wall time). M3 is equal: every run refuted the
+  requirements.
 - M5 counts the run-written declarations that the claimed theorems' statements reach
   (`bench/grade/Surface.lean`: definition bodies, never proofs; code lines without comments and
   docstrings). Statement = theorem statements, the LZ4 format definitions and plain witness
@@ -258,6 +338,10 @@ omitted total-count condition or the sample-size tolerance.
 | M9 statements readable / with effort / no formal statement | 0 / 10 / 0 | 2 / 8 / 0 | 0 / 9 / 1 | 2 / 8 / 0 |
 | M10 machine-checked statement about the shipped bytes | 0 / 5 | 0 / 5 | 5 / 5 | 0 / 5 |
 
+- Rubric outcome (labelled in the six-task summary): against the prompted arm a win (M4 and M10
+  better at 1.5 × the input tokens and 1.1 × the wall time); against the bare arm not a win (M10
+  better, but 3.2 × the input tokens and 2.2 × the wall time); against the tool arm not a win (M10
+  better, but 3.1 × the input tokens). M3 is equal; the fva surface is the largest (45 code lines).
 - M5 statement/link split: grader-1 (general-purpose teammate) classified each of the 182
   declarations (`statement` = theorem statements, exact-arithmetic CPM and filter definitions,
   plain witness inputs; `link-model` = binary64 encodings and rounding models, artifact
@@ -285,22 +369,6 @@ omitted total-count condition or the sample-size tolerance.
   `min.total.count` guard. The 17 boundary witnesses satisfy it; prompted 3, prompted 4 and fva 4
   used the omission or the sample-size tolerance instead (M4 above).
 
-### The two outcome sentences after T1 and T4
-
-- Bug finding ("a bare agent 'verified' X; FVA showed the shipped binary is wrong"): not shown.
-  No run claimed a verification that the binary contradicts. On T1 every run reported every
-  defect. On T4 every run refuted both requirements, but the known R2 defect was reported by
-  every bare and tool run and by 3 prompted and 4 fva runs: on T4's known defect the bare arm
-  (5 / 5) did better than the fva arm (4 / 5). The difference is the evidence: only the fva arm
-  stated its counterexamples about the shipped bytes, machine-checked (T1: 5 / 5 runs, and
-  prompted-3; T4: R1 in 5 / 5 runs, two of them on an instruction fragment, and the R2 defect in
-  the 4 runs that reported it); the other runs executed the binary and proved facts about the
-  format or about binary64 arithmetic apart from it. T7 targets this sentence.
-- Readability ("a ~25-line spec a biologist can read, proven about the real binary"): not shown.
-  The fva arm's T4 statements are proven about the real binary, but they take 34–78 code lines
-  and the domain reader rated them "readable with effort" (9 of 10). The U14 S4 subject
-  (`calc_cpm_raw` for every input) is the reference attempt for this sentence.
-
 ## T5 — tmm (seed 1; bare 2–6, prompted 1, 2, 5–7, fva 1–5)
 
 The certification task: R1/R2 ask whether each producer's factor file holds the documented TMM
@@ -320,6 +388,10 @@ decimal places, false on this matrix. Every arm refuted R3 (15 / 15 runs).
 | M9 statements readable / with effort | 5 / 10 | 7 / 8 | 5 / 10 |
 | M10 valid machine-checked statement about the output bytes | 3 / 5 | 1 / 5 | 5 / 5 |
 
+- Rubric outcome (labelled in the six-task summary): against the prompted arm a win (M3 and M10
+  better at 1.8 × the input tokens, 1.0 × uncached); against the bare arm not a win (M3 and M10
+  better, but 3.0 × the input tokens). The fva surface is not smaller (115 code lines against 113
+  and 66).
 - M3: `faithful` = an exact-tie policy with a stated tolerance of 2.3–2.5 % that holds (the exact
   average-rank factors differ from edgeR's file by at most 1.95 % and from RNAnorm's by 1.80 %:
   fva 1, 2, 4; bare 6; prompted 7); `not proven, reported` = a sound refutation at a tighter
@@ -349,8 +421,8 @@ decimal places, false on this matrix. Every arm refuted R3 (15 / 15 runs).
 
 ## T2 — lz4-c (seed 2; bare 1, 2, 4–6; prompted 1, 2, 4–6; fva 1–5; tool 1–4, 6)
 
-T2 has no known defect: two requirement audits and a differential test found its corrected
-requirements true of the artifact (table at the end of this section), so a run could prove them.
+T2 has no known defect: two requirement audits and a differential test found no counterexample to
+its corrected requirements (table at the end of this section), so a run could try to prove them.
 No run proved a requirement over its whole domain. Every run proved statements about parts of it
 (fixed blocks, the zero-capacity and empty-source entry paths, short literal-only blocks) and
 reported the rest as open; no report over-claimed.
@@ -488,13 +560,14 @@ every input for an executable model of the decoder that they wrote.
 | M10 machine-checked statement about the shipped bytes | 4 / 5 | 5 / 5 | 5 / 5 | 2 / 5 |
 
 - Rubric outcome: a loss for FVA on T3. Its M3 is lower on R1 (4 runs not proven, where every bare
-  and prompted run proved an access-trace statement and three tool runs a whole-domain statement
-  about their model), and it used 3.4 × the bare arm's input tokens (2.5 × uncached, 1.5 × output,
+  and prompted run stated an access-trace claim, with valid proofs in four bare runs and all five
+  prompted runs, and three tool runs proved a whole-domain statement about their model), and it used 3.4 × the bare arm's input tokens (2.4 × uncached, 1.5 × output,
   6.1 × CPU seconds) and 4.8 × the tool arm's. M10 ties the prompted arm (5 / 5) and is one run above
   the bare arm (bare 1's artifact theorems rest on `native_decide`, which M1 rejects). Its surface is
   the smallest (48 code lines) and its statements the most readable (12 of 15 `readable`), but not
   at equal M3.
-- The tool arm holds the benchmark's first `faithful` rows. Runs 1, 4 and 5 wrote an executable Rust
+- The tool arm holds the benchmark's first `faithful` rows about a program's behaviour (T5's are
+  about output files). Runs 1, 4 and 5 wrote an executable Rust
   decoder in Verus and proved R1–R3 for it over every input: R2 and R3 against their own grammar of
   the format (offset 0 rejected, the final literal run consumes the input, match length at least 4,
   no dictionary), R1 by Verus's verified indexing of a function that reaches caller memory only
@@ -509,11 +582,14 @@ every input for an executable model of the decoder that they wrote.
   a model of the code and none for the shipped bytes; the fva arm's statements are about the shipped
   bytes, on parts of the domain.
 - R1 by arm: an access-trace statement in bare 5 / 5 and prompted 5 / 5 (their own interpreters, on
-  fixed calls and every empty-input call), fva 1 / 5 (fva 3's predicate over every configuration
+  fixed calls and every empty-input call; M3 grades the statements: bare 1's proof rests on
+  `native_decide`, which M1 rejects, and so do bare 6's fixed cases, while its empty-input statement
+  is valid), fva 1 / 5 (fva 3's predicate over every configuration
   FVA's semantics reaches, on fixed calls); fva 1, 2, 4 and 5 proved facts about memory after the
   call only. On T2 and T3 together, 2 of 10 fva runs stated R1 at the access level, both by building
   the predicate themselves, and both are their arm's largest surfaces (T2 fva 5: 99 lines; T3 fva 3:
-  132 against 26–49). That is what the missing reviewed-once access-footprint claim (D52) costs a run.
+  132 against 26–49). That fits D52 (FVA's reviewed vocabulary has no access-footprint claim, so a run
+  that wants one must build it), though these runs do not measure the cost directly.
 - M2 and M10: every bare and prompted run's generated module regenerates byte-identically from the
   pinned file with the run's own script (and fails on a one-digit change); prompted 2's check
   regenerates its generated files instead of comparing them. The (b) fidelity checks ran the three
@@ -574,7 +650,7 @@ The arms differ in the evidence.
 | M4 defect evidence (known defect) | executed reproducer 5 | executed reproducer 5 | machine-checked on the artifact 5 |
 | M5 surface, code lines: statement (checker code) | 15 [9–20] (52 [48–60]) | 12 [8–17] (149 [116–167]) | 9 [9–12] (22 [8–29]); `fva trust` surface 13 [13–14] |
 | M6 over-claims | 0 | 0 | 0 |
-| M7 input tokens (uncached); output tokens; CPU s; wall s | 0.30 M (24 k); 7.5 k; 33; 265 | 1.41 M (83 k); 19 k; 55; 738 | 3.48 M (95 k); 13 k; 342; 628 |
+| M7 input tokens (uncached); output tokens; CPU s; wall s | 0.30 M (24 k); 7.5 k; 33; 265 | 1.41 M (83 k); 19 k; 54; 738 | 3.48 M (95 k); 13 k; 342; 628 |
 | M8 cheats caught / planted | 12 / 20 | 20 / 20 | 20 / 20 |
 | M9 statements readable / with effort / no formal statement | 5 / 0 / 0 | 5 / 0 / 0 | 5 / 0 / 0 |
 | M10 machine-checked statement about the shipped bytes | 0 / 5 | 0 / 5 | 5 / 5 |
