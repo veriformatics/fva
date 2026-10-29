@@ -23,7 +23,8 @@ plant() { # file theorem pre proof
 	function decl(l) { return l ~ /^(@\[|\/--|\/-!|private |protected |theorem |lemma |def |abbrev |structure |inductive |instance |example |end |namespace |section |open |#|set_option |run_cmd |axiom |noncomputable )/ }
 	{ line[NR] = $0 }
 	END {
-		for (i = 1; i <= NR; i++) if (line[i] ~ ("^(private |protected )?(theorem|lemma) (" thm "|" two ")([ :({[]|$)")) { t = i; break }
+		# a declaration may be indented (fva-lz4-rust-5 writes ` theorem emptyBlock_holds`)
+		for (i = 1; i <= NR; i++) if (line[i] ~ ("^[ \t]*(private |protected )?(theorem|lemma) (" thm "|" two ")([ :({[]|$)")) { t = i; break }
 		if (!t) { print "inject: no theorem " thm > "/dev/stderr"; exit 2 }
 		# attributes and the docstring stay above the planted text; a docstring may span lines, so its
 		# closing `-/` line walks back to the `/--` that opens it (a plain `/-` comment stops the walk)
