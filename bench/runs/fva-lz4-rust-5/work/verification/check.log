@@ -1,0 +1,169 @@
+lz4-flex.wasm: OK
+⚠ [1597/1599] Replayed Proofs.Initialization
+warning: Proofs/Initialization.lean:25:22: This simp argument is unused:
+  he
+
+Hint: Omit it from the simp argument list.
+  [apply] simp
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Build completed successfully (1599 jobs).
+⚠ [1597/1599] Replayed Proofs.Initialization
+warning: Proofs/Initialization.lean:25:22: This simp argument is unused:
+  he
+
+Hint: Omit it from the simp argument list.
+  [apply] simp
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Build completed successfully (1599 jobs).
+⚠ [1597/1599] Replayed Proofs.Initialization
+warning: Proofs/Initialization.lean:25:22: This simp argument is unused:
+  he
+
+Hint: Omit it from the simp argument list.
+  [apply] simp
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Build completed successfully (1599 jobs).
+⚠ [1597/1599] Replayed Proofs.Initialization
+warning: Proofs/Initialization.lean:25:22: This simp argument is unused:
+  he
+
+Hint: Omit it from the simp argument list.
+  [apply] simp
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Build completed successfully (1599 jobs).
+⚠ [1597/1599] Replayed Proofs.Initialization
+warning: Proofs/Initialization.lean:25:22: This simp argument is unused:
+  he
+
+Hint: Omit it from the simp argument list.
+  [apply] simp
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Build completed successfully (1599 jobs).
+⚠ [1597/1599] Replayed Proofs.Initialization
+warning: Proofs/Initialization.lean:25:22: This simp argument is unused:
+  he
+
+Hint: Omit it from the simp argument list.
+  [apply] simp
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Build completed successfully (1599 jobs).
+⚠ [1597/1599] Replayed Proofs.Initialization
+warning: Proofs/Initialization.lean:25:22: This simp argument is unused:
+  he
+
+Hint: Omit it from the simp argument list.
+  [apply] simp
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Build completed successfully (1599 jobs).
+⚠ [1604/1615] Replayed Proofs.Initialization
+warning: Proofs/Initialization.lean:25:22: This simp argument is unused:
+  he
+
+Hint: Omit it from the simp argument list.
+  [apply] simp
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Build completed successfully (1615 jobs).
+✔ [3158/3158] Built fva:exe (1.9s)
+Build completed successfully (3158 jobs).
+fva trust: PASS
+
+Claims
+  Proofs.truncatedLength — about Proofs.Lifted (artifact)
+    proved by Proofs.truncatedLength_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.insufficientCapacity — about Proofs.Lifted (artifact)
+    proved by Proofs.insufficientCapacity_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.artifactLayout — about Proofs.Lifted (artifact)
+    proved by Proofs.artifactLayout_holds (axioms: propext)
+  Proofs.literalBlock — about Proofs.Lifted (artifact)
+    proved by Proofs.literalBlock_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.zeroOffset — about Proofs.Lifted (artifact)
+    proved by Proofs.zeroOffset_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.excessiveOffset — about Proofs.Lifted (artifact)
+    proved by Proofs.excessiveOffset_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.overlappingBlock — about Proofs.Lifted (artifact)
+    proved by Proofs.overlappingBlock_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.wasmValid — about Proofs.Lifted (artifact)
+    proved by Proofs.wasmValid_holds (axioms: propext, Quot.sound)
+  Proofs.emptyInputPreservesStore — about Proofs.Lifted (artifact)
+    proved by Proofs.emptyInputPreservesStore_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.emptyBlock — about Proofs.Lifted (artifact)
+    proved by Proofs.emptyBlock_holds (axioms: propext, Classical.choice, Quot.sound)
+
+Kernel replay
+  leanchecker (lean): accepted (663 s)
+  con-leche (con): accepted (516 s)
+
+Canaries (72 known-false exports, /tmp/fva-verifier.vDy6Xc/trust/canaries/set.tsv; known acceptances /tmp/fva-verifier.vDy6Xc/trust/canaries/known.tsv)
+  leanchecker: 71 rejected, 0 declined, 0 crashed or timed out, 1 accepted
+  con-leche: 69 rejected, 3 declined, 0 crashed or timed out, 0 accepted
+
+Links
+  Proofs.Lifted (lz4-flex.wasm) [lifted]: matches
+
+Read these: 44 code lines
+  Proofs.Spec: 44 lines
+
+Names the claims use from outside the project (their meaning = their docs)
+  And (core): `And a b`, or `a ∧ b`, is the conjunction of propositions. It can be
+  BitVec (core): A bitvector of the specified width.
+  Eq (core): The equality relation. It has one introduction rule, `Eq.refl`.
+  Exists (core): Existential quantification. If `p : α → Prop` is a predicate, then `∃ x : α, p x`
+  False (core): `False` is the empty proposition. Thus, it has no introduction rules.
+  List (core): Linked lists: ordered lists, in which each element has a reference to the next element.
+  Nat (core): The natural numbers, starting at zero.
+  Option (core): Optional values, which are either `some` around a value from the underlying type or `none`.
+  UInt8 (core): Unsigned 8-bit integers.
+  BitVec.ofNat (core): The bitvector with value `i mod 2^n`.
+  GetElem?.getElem? (core): The syntax `arr[i]?` gets the `i`'th element of the collection `arr`,
+  HAdd.hAdd (core): `a + b` computes the sum of `a` and `b`.
+  LT.lt (core): The less-than relation: `x < y` 
+  List.length (core): The length of a list.
+  List.map (core): Applies a function to each element of the list, returning the resulting list of values.
+  List.range (core): Returns a list of the numbers from `0` to `n` exclusive, in increasing order.
+  Neg.neg (core): `-a` computes the negative or opposite of `a`.
+  OfNat.ofNat (core): The `OfNat.ofNat` function is automatically inserted by the parser when
+  FVA.Wasm.Export (base): Exports.
+  FVA.Wasm.Func (base): Functions: type index, declared locals, body.
+  FVA.Wasm.FuncType (base): Function types: parameter and result value types.
+  FVA.Wasm.Import (base): Imports.
+  FVA.Wasm.Limits (base): Limits of a memory (in pages) or a table (in elements).
+  FVA.Wasm.ValType (base): Value types.
+  FVA.Wasm.Exec.CallReturns (base): The call always returns, with final store and results satisfying `P` (never traps).
+  FVA.Wasm.Exec.Fits (base): Memory 0 of `s` exists and has room for `n` bytes at address `p`.
+  FVA.Wasm.Exec.FuncInst (base): Function instances (§4.2.6): module code closed over its instance, or a host function named
+  FVA.Wasm.Exec.HostSem (base): Host semantics: the outcomes a host function (by `HostId`) may produce on a store and
+  FVA.Wasm.Exec.Instance (base): A fresh instance of the import-free module `m`: instantiated into the empty store with no
+  FVA.Wasm.Exec.MemInst (base): Memory instances (§4.2.8): `pages · 65536` bytes.
+  FVA.Wasm.Exec.ModuleInst (base): Module instances (§4.2.5): the module's types and the store address of every entity.
+  FVA.Wasm.Exec.Must (base): Total correctness: from `c`, every execution finishes, with an outcome satisfying `Q`.
+  FVA.Wasm.Exec.Outcome (base): The outcome of a finished execution: values or a trap, with the final store.
+  FVA.Wasm.Exec.Store (base): The store (§4.2.3).
+  FVA.Wasm.Exec.Val (base): Values (§4.2.1); floats as their bit patterns (§4.3.1).
+  FVA.Wasm.Exec.invokeConfig (base): The configuration invoking function address `a` on `args` from outside (§4.5.5): an empty
+  FVA.Wasm.Func.type (base): Type index.
+  FVA.Wasm.Module.exports (base): Exports.
+  FVA.Wasm.Module.funcs (base): Functions defined by the module.
+  FVA.Wasm.Module.imports (base): Imports.
+  FVA.Wasm.Module.mems (base): Memories.
+  FVA.Wasm.Module.types (base): Function types.
+  FVA.Wasm.Valid.ModuleValid (base): `⊢ module : it* → et*` (§3.4.10).
+  FVA.Wasm.Exec.MemInst.byte (base): Byte contents.
+  FVA.Wasm.Exec.Outcome.casesOn (base)
+  FVA.Wasm.Exec.Store.funcs (base): Function instances.
+  FVA.Wasm.Exec.Store.mems (base): Memory instances.
+  FVA.Wasm.Exec.Store.withBytes (base): `s` after the caller wrote bytes `bs` into memory 0 at address `p` (a fresh instance's
+
+What a PASS rests on
+  reviewed once: FVA's specs: Wasm syntax + binary grammar, execution semantics, integer + IEEE-754 numerics, claim forms, certificate relations, the verdict rules (FVA/Spec/**)
+  verified implementation: the decoder (sound + complete for the profile), the reference stepper, the float operators, instantiation, the validator (validated modules never get stuck), the verdict function, the certificate checkers (FVA.Self: fva trust on FVA itself)
+  trusted glue: fact collection from the environment, the link and surface checks (a certificate's files included), process orchestration, the external kernels (each canaried)
+  residual trust: the Lean kernel cross-checked by an independent kernel, the Lean compiler that built fva, Mathlib at the pinned revision, the specs
+PASS 343169 original-artifact calls; 61972 nonnegative returns agree with independent parser. This is testing, not universal verification; canaries detect tested writes, not reads.

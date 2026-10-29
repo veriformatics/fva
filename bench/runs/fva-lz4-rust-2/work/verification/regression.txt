@@ -1,0 +1,2 @@
+PASS: 6239 finite Wasmtime cases; return values, successful output bytes, adjacent canaries.
+No universal R1/R2/R3 proof; read confinement is not tested.

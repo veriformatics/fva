@@ -1,0 +1,132 @@
+{
+  "coverage": "partial; universal R1, R2, R3 unresolved",
+  "roots": [
+    "Verification.zero_input",
+    "Verification.buffers_admissible",
+    "Verification.samples_format",
+    "Verification.samples_artifact"
+  ],
+  "export": {
+    "declarations": 16881,
+    "axioms": [
+      "propext"
+    ]
+  },
+  "review_files": [
+    "Proofs/Wasm.lean",
+    "Proofs/Format.lean",
+    "Proofs/Claims.lean",
+    "Proofs/Cases.lean",
+    "verification/extract.py",
+    "verification/export.lean",
+    "verification/samples.py",
+    "verification/check.py",
+    "verification/checkers.py",
+    "verification/runtime.py",
+    "verification/Negative.lean",
+    "verification/KernelNegative.lean",
+    "check.sh",
+    "Proofs.lean"
+  ],
+  "inventory": {
+    "Proofs/Wasm.lean": {
+      "lines": 195,
+      "bytes": 7626,
+      "sha256": "87cf1624bde55b2881c4804eb3ed774cc4514324c1c80295de56f79de4cfa0a5"
+    },
+    "Proofs/Format.lean": {
+      "lines": 64,
+      "bytes": 2278,
+      "sha256": "579531ada195a1c36f674437aa991cca5abc588e763c443335b2be35ee9d3ca0"
+    },
+    "Proofs/Claims.lean": {
+      "lines": 76,
+      "bytes": 3422,
+      "sha256": "c828a65bb4c97095d7af31edc2dcf55493aab8c3fcf1a086497e00025c8527ee"
+    },
+    "Proofs/Cases.lean": {
+      "lines": 14,
+      "bytes": 745,
+      "sha256": "f4c63eb6b258389b2a8c912ed067017249fdfaf4a159ee90ccd2fbca6dc15436"
+    },
+    "verification/extract.py": {
+      "lines": 159,
+      "bytes": 5910,
+      "sha256": "ca93ca6635dc99f59e8635be34bc446938e3d2326c18e13de6ebbfaea8b8bdef"
+    },
+    "verification/export.lean": {
+      "lines": 7,
+      "bytes": 317,
+      "sha256": "0f79b206be2e2216cefe07b22187c283fd79d38e5f95ba3418b50521f0dcc8e7"
+    },
+    "verification/samples.py": {
+      "lines": 23,
+      "bytes": 986,
+      "sha256": "fc6168500ac9e759b5ee98fd983aa4420f710dd0cbbf99dc6bf7060ef923086a"
+    },
+    "verification/check.py": {
+      "lines": 80,
+      "bytes": 4209,
+      "sha256": "e691d74339dde7572089354634919ba81300495bc25ec75944ba457155a26367"
+    },
+    "verification/checkers.py": {
+      "lines": 71,
+      "bytes": 3332,
+      "sha256": "4f457be199c46b54d0cf650edbec5293a67cf1a3a6a5c4f2674a7c8b51bab89b"
+    },
+    "verification/runtime.py": {
+      "lines": 49,
+      "bytes": 2606,
+      "sha256": "eee51867633869e15f7dabc056638808fe53f2029a9ef0fdbe7b5c6b3a1e74fb"
+    },
+    "verification/Negative.lean": {
+      "lines": 7,
+      "bytes": 217,
+      "sha256": "f0e5fd68d18ae2d6fe634265987e66f6caf134b3475d36462f7e38fac0e7e982"
+    },
+    "verification/KernelNegative.lean": {
+      "lines": 14,
+      "bytes": 714,
+      "sha256": "06f7aec5279eae9a64826aa6d9f15b169c482af70f6b014e9f08595fc2ebb0b7"
+    },
+    "check.sh": {
+      "lines": 4,
+      "bytes": 100,
+      "sha256": "9f5caa3ce4a35db87851b942b79be571d6b0da3eba05df0d05b58957185539c0"
+    },
+    "Proofs.lean": {
+      "lines": 1,
+      "bytes": 20,
+      "sha256": "08c49eb4f256732ad951a14a188b61bcd455143bea5105e06949abc22e215729"
+    },
+    "Proofs/Artifact.lean": {
+      "lines": 1970,
+      "bytes": 70158,
+      "sha256": "b42fda11c60d45844321f87cf28aae61b05981e1cc4f787e952c27499e96c144"
+    },
+    "Proofs/Samples.lean": {
+      "lines": 42,
+      "bytes": 5486,
+      "sha256": "872dcc3c405f0a0893c4e277251f5cfb9d651888d63d4f67ad33668b3078cf3e"
+    },
+    "verification/cases.json": {
+      "lines": 1115,
+      "bytes": 12067,
+      "sha256": "de50e0f7c216f13b62e49003fd30c77dca19adb1d1ce384ea765fcf18b9dfef9"
+    },
+    "Proofs/Traces.lean": {
+      "lines": 31790,
+      "bytes": 5572965,
+      "sha256": "aa369726492de87e1c2e41d6c23fdd9eb284294d826baaee0e0029aaf16123b0"
+    },
+    "verification/traces.py": {
+      "lines": 165,
+      "bytes": 7665,
+      "sha256": "a394acf899123a1b480c8a1fe79cfb562f2ead9aa7bf34f12e5a90110f45a39e"
+    }
+  },
+  "kernels": {
+    "con-ron": "6520b33ab22ac86c19d1366c7257fd0c84057addcb1230879a90f64758fb15d5",
+    "nanoda": "954b751721ec1dd1a98932c1d05407136501c1775fe7a0d3809e98e1d34167df"
+  }
+}

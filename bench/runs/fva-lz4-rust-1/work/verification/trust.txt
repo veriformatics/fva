@@ -1,0 +1,67 @@
+fva trust: PASS
+
+Claims
+  Proofs.empty_input_preserves_store — about Proofs.Lifted (artifact)
+    proved by Proofs.empty_input_preserves_store_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.concrete_examples — about Proofs.Lifted (artifact)
+    proved by Proofs.concrete_examples_holds (axioms: propext, Classical.choice, Quot.sound)
+  Proofs.initializes — about Proofs.Lifted (artifact)
+    proved by Proofs.initializes_holds (axioms: propext, Classical.choice, Quot.sound)
+
+Kernel replay
+  leanchecker (lean): accepted (493 s)
+  con-leche (con): accepted (404 s)
+
+Canaries (72 known-false exports, /home/eturkes/.cache/fva-bench/runs/fva-lz4-rust-1/tmp/lz4-verification-wd4niagm/fva/trust/canaries/set.tsv; known acceptances /home/eturkes/.cache/fva-bench/runs/fva-lz4-rust-1/tmp/lz4-verification-wd4niagm/fva/trust/canaries/known.tsv)
+  leanchecker: 71 rejected, 0 declined, 0 crashed or timed out, 1 accepted
+  con-leche: 69 rejected, 3 declined, 0 crashed or timed out, 0 accepted
+
+Links
+  Proofs.Lifted (lz4-flex.wasm) [lifted]: matches
+
+Read these: 51 code lines
+  Proofs.Spec: 51 lines
+
+Names the claims use from outside the project (their meaning = their docs)
+  And (core): `And a b`, or `a ∧ b`, is the conjunction of propositions. It can be
+  BitVec (core): A bitvector of the specified width.
+  Eq (core): The equality relation. It has one introduction rule, `Eq.refl`.
+  Exists (core): Existential quantification. If `p : α → Prop` is a predicate, then `∃ x : α, p x`
+  List (core): Linked lists: ordered lists, in which each element has a reference to the next element.
+  Nat (core): The natural numbers, starting at zero.
+  Option (core): Optional values, which are either `some` around a value from the underlying type or `none`.
+  Prod (core): The product type, usually written `α × β`. Product types are also called pair or tuple types.
+  UInt8 (core): Unsigned 8-bit integers.
+  BitVec.ofNat (core): The bitvector with value `i mod 2^n`.
+  BitVec.toNat (core): Return the underlying `Nat` that represents a bitvector.
+  GetElem?.getElem? (core): The syntax `arr[i]?` gets the `i`'th element of the collection `arr`,
+  HAdd.hAdd (core): `a + b` computes the sum of `a` and `b`.
+  HAppend.hAppend (core): `a ++ b` is the result of concatenation of `a` and `b`, usually read "append".
+  LE.le (core): The less-equal relation: `x ≤ y` 
+  LT.lt (core): The less-than relation: `x < y` 
+  List.length (core): The length of a list.
+  List.map (core): Applies a function to each element of the list, returning the resulting list of values.
+  List.range (core): Returns a list of the numbers from `0` to `n` exclusive, in increasing order.
+  List.replicate (core): Creates a list that contains `n` copies of `a`.
+  Membership.mem (core): The membership relation `a ∈ s : Prop` where `a : α`, `s : γ`. 
+  OfNat.ofNat (core): The `OfNat.ofNat` function is automatically inserted by the parser when
+  Prod.fst (core): The first element of a pair.
+  Prod.snd (core): The second element of a pair.
+  FVA.Wasm.Exec.CallReturns (base): The call always returns, with final store and results satisfying `P` (never traps).
+  FVA.Wasm.Exec.Fits (base): Memory 0 of `s` exists and has room for `n` bytes at address `p`.
+  FVA.Wasm.Exec.HostSem (base): Host semantics: the outcomes a host function (by `HostId`) may produce on a store and
+  FVA.Wasm.Exec.Instance (base): A fresh instance of the import-free module `m`: instantiated into the empty store with no
+  FVA.Wasm.Exec.Instantiable (base): The import-free module `m` has a successfully initialized fresh instance under every host
+  FVA.Wasm.Exec.MemInst (base): Memory instances (§4.2.8): `pages · 65536` bytes.
+  FVA.Wasm.Exec.ModuleInst (base): Module instances (§4.2.5): the module's types and the store address of every entity.
+  FVA.Wasm.Exec.Store (base): The store (§4.2.3).
+  FVA.Wasm.Exec.Val (base): Values (§4.2.1); floats as their bit patterns (§4.3.1).
+  FVA.Wasm.Exec.MemInst.byte (base): Byte contents.
+  FVA.Wasm.Exec.Store.mems (base): Memory instances.
+  FVA.Wasm.Exec.Store.withBytes (base): `s` after the caller wrote bytes `bs` into memory 0 at address `p` (a fresh instance's
+
+What a PASS rests on
+  reviewed once: FVA's specs: Wasm syntax + binary grammar, execution semantics, integer + IEEE-754 numerics, claim forms, certificate relations, the verdict rules (FVA/Spec/**)
+  verified implementation: the decoder (sound + complete for the profile), the reference stepper, the float operators, instantiation, the validator (validated modules never get stuck), the verdict function, the certificate checkers (FVA.Self: fva trust on FVA itself)
+  trusted glue: fact collection from the environment, the link and surface checks (a certificate's files included), process orchestration, the external kernels (each canaried)
+  residual trust: the Lean kernel cross-checked by an independent kernel, the Lean compiler that built fva, Mathlib at the pinned revision, the specs

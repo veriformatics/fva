@@ -1,0 +1,5 @@
+.lake/
+verification/generated/
+verification/*.olean*
+verification/*.ilean
+verification/*.ir

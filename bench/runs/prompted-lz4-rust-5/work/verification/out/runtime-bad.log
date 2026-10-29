@@ -1,0 +1,8 @@
+Error: failed to run main module `/home/eturkes/.cache/fva-bench/runs/prompted-lz4-rust-5/work/verification/out/runtime-bad.wasm`
+
+Caused by:
+    0: failed to invoke `check`
+    1: error while executing at wasm backtrace:
+    0:    0x1c8 - <unknown>!<wasm function 1>
+    2: wasm trap: wasm `unreachable` instruction executed
+

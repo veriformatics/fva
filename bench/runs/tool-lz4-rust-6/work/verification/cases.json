@@ -1,0 +1,799 @@
+[
+  {
+    "name": "empty_input",
+    "input": [],
+    "cap": 0,
+    "expected": null,
+    "result": -1,
+    "pieces": null
+  },
+  {
+    "name": "empty_block",
+    "input": [
+      0
+    ],
+    "cap": 0,
+    "expected": [],
+    "result": 0,
+    "pieces": [
+      {
+        "token": 0,
+        "literal_extension": [],
+        "literals": [],
+        "offset": 0,
+        "match_extension": [],
+        "match_length": 0
+      }
+    ],
+    "end_ok": true
+  },
+  {
+    "name": "one_literal",
+    "input": [
+      16,
+      65
+    ],
+    "cap": 1,
+    "expected": [
+      65
+    ],
+    "result": 1,
+    "pieces": [
+      {
+        "token": 16,
+        "literal_extension": [],
+        "literals": [
+          65
+        ],
+        "offset": 0,
+        "match_extension": [],
+        "match_length": 0
+      }
+    ],
+    "end_ok": true
+  },
+  {
+    "name": "slow_overlap",
+    "input": [
+      19,
+      65,
+      1,
+      0,
+      80,
+      66,
+      67,
+      68,
+      69,
+      70
+    ],
+    "cap": 13,
+    "expected": [
+      65,
+      65,
+      65,
+      65,
+      65,
+      65,
+      65,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70
+    ],
+    "result": 13,
+    "pieces": [
+      {
+        "token": 19,
+        "literal_extension": [],
+        "literals": [
+          65
+        ],
+        "offset": 1,
+        "match_extension": [],
+        "match_length": 7
+      },
+      {
+        "token": 80,
+        "literal_extension": [],
+        "literals": [
+          66,
+          67,
+          68,
+          69,
+          70
+        ],
+        "offset": 0,
+        "match_extension": [],
+        "match_length": 0
+      }
+    ],
+    "end_ok": true
+  },
+  {
+    "name": "hot_overlap",
+    "input": [
+      19,
+      65,
+      1,
+      0,
+      224,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+    ],
+    "cap": 64,
+    "expected": [
+      65,
+      65,
+      65,
+      65,
+      65,
+      65,
+      65,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+    ],
+    "result": 22,
+    "pieces": [
+      {
+        "token": 19,
+        "literal_extension": [],
+        "literals": [
+          65
+        ],
+        "offset": 1,
+        "match_extension": [],
+        "match_length": 7
+      },
+      {
+        "token": 224,
+        "literal_extension": [],
+        "literals": [
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79
+        ],
+        "offset": 0,
+        "match_extension": [],
+        "match_length": 0
+      }
+    ],
+    "end_ok": true
+  },
+  {
+    "name": "hot_snapshot18",
+    "input": [
+      64,
+      65,
+      66,
+      67,
+      68,
+      4,
+      0,
+      224,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83
+    ],
+    "cap": 64,
+    "expected": [
+      65,
+      66,
+      67,
+      68,
+      65,
+      66,
+      67,
+      68,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83
+    ],
+    "result": 22,
+    "pieces": [
+      {
+        "token": 64,
+        "literal_extension": [],
+        "literals": [
+          65,
+          66,
+          67,
+          68
+        ],
+        "offset": 4,
+        "match_extension": [],
+        "match_length": 4
+      },
+      {
+        "token": 224,
+        "literal_extension": [],
+        "literals": [
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          83
+        ],
+        "offset": 0,
+        "match_extension": [],
+        "match_length": 0
+      }
+    ],
+    "end_ok": true
+  },
+  {
+    "name": "slow_snapshot32",
+    "input": [
+      255,
+      4,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      19,
+      0,
+      0,
+      80,
+      90,
+      91,
+      92,
+      93,
+      94
+    ],
+    "cap": 100,
+    "expected": [
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      90,
+      91,
+      92,
+      93,
+      94
+    ],
+    "result": 43,
+    "pieces": [
+      {
+        "token": 255,
+        "literal_extension": [
+          4
+        ],
+        "literals": [
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          83
+        ],
+        "offset": 19,
+        "match_extension": [
+          0
+        ],
+        "match_length": 19
+      },
+      {
+        "token": 80,
+        "literal_extension": [],
+        "literals": [
+          90,
+          91,
+          92,
+          93,
+          94
+        ],
+        "offset": 0,
+        "match_extension": [],
+        "match_length": 0
+      }
+    ],
+    "end_ok": true
+  },
+  {
+    "name": "slow_snapshot64",
+    "input": [
+      255,
+      18,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      33,
+      0,
+      14,
+      80,
+      100,
+      101,
+      102,
+      103,
+      104
+    ],
+    "cap": 110,
+    "expected": [
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      100,
+      101,
+      102,
+      103,
+      104
+    ],
+    "result": 71,
+    "pieces": [
+      {
+        "token": 255,
+        "literal_extension": [
+          18
+        ],
+        "literals": [
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97
+        ],
+        "offset": 33,
+        "match_extension": [
+          14
+        ],
+        "match_length": 33
+      },
+      {
+        "token": 80,
+        "literal_extension": [],
+        "literals": [
+          100,
+          101,
+          102,
+          103,
+          104
+        ],
+        "offset": 0,
+        "match_extension": [],
+        "match_length": 0
+      }
+    ],
+    "end_ok": true
+  },
+  {
+    "name": "extended_literals",
+    "input": [
+      240,
+      1,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80
+    ],
+    "cap": 16,
+    "expected": [
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80
+    ],
+    "result": 16,
+    "pieces": [
+      {
+        "token": 240,
+        "literal_extension": [
+          1
+        ],
+        "literals": [
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80
+        ],
+        "offset": 0,
+        "match_extension": [],
+        "match_length": 0
+      }
+    ],
+    "end_ok": true
+  },
+  {
+    "name": "relaxed_end",
+    "input": [
+      16,
+      65,
+      1,
+      0,
+      0
+    ],
+    "cap": 5,
+    "expected": [
+      65,
+      65,
+      65,
+      65,
+      65
+    ],
+    "result": 5,
+    "pieces": [
+      {
+        "token": 16,
+        "literal_extension": [],
+        "literals": [
+          65
+        ],
+        "offset": 1,
+        "match_extension": [],
+        "match_length": 4
+      },
+      {
+        "token": 0,
+        "literal_extension": [],
+        "literals": [],
+        "offset": 0,
+        "match_extension": [],
+        "match_length": 0
+      }
+    ],
+    "end_ok": false
+  },
+  {
+    "name": "zero_offset",
+    "input": [
+      16,
+      65,
+      0,
+      0,
+      80,
+      66,
+      67,
+      68,
+      69,
+      70
+    ],
+    "cap": 32,
+    "expected": null,
+    "result": -1,
+    "pieces": null
+  },
+  {
+    "name": "offset_beyond_prefix",
+    "input": [
+      0,
+      1,
+      0
+    ],
+    "cap": 64,
+    "expected": null,
+    "result": -1,
+    "pieces": null
+  },
+  {
+    "name": "truncated_literal",
+    "input": [
+      32,
+      65
+    ],
+    "cap": 32,
+    "expected": null,
+    "result": -1,
+    "pieces": null
+  },
+  {
+    "name": "truncated_extension",
+    "input": [
+      240,
+      255
+    ],
+    "cap": 32,
+    "expected": null,
+    "result": -1,
+    "pieces": null
+  },
+  {
+    "name": "truncated_offset",
+    "input": [
+      16,
+      65,
+      1
+    ],
+    "cap": 64,
+    "expected": null,
+    "result": -1,
+    "pieces": null
+  },
+  {
+    "name": "output_too_small",
+    "input": [
+      16,
+      65
+    ],
+    "cap": 0,
+    "expected": null,
+    "result": -1,
+    "pieces": null
+  }
+]
