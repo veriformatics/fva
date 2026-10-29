@@ -1,0 +1,10 @@
+{
+  "use_stdin": true,
+  "permitted_axioms": [],
+  "unpermitted_axiom_hard_error": true,
+  "nat_extension": true,
+  "string_extension": false,
+  "pp_declars": ["Verification.numerator", "Verification.denominator", "Verification.nearest", "Verification.input_encoding", "Verification.r1_counterexample", "Verification.strictly_closer"],
+  "pp_to_stdout": true,
+  "print_success_message": true
+}

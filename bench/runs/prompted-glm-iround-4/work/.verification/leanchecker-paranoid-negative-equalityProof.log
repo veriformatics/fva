@@ -1,0 +1,5 @@
+Lean default kernel rejects the solution: while replaying declaration 'equalityProof':
+(kernel) declaration type mismatch, 'equalityProof' has type
+  Eq.{1} Nat (OfNat.ofNat.{0} Nat 0 (instOfNatNat 0)) (OfNat.ofNat.{0} Nat 0 (instOfNatNat 0))
+but it is expected to have type
+  Eq.{1} Nat (OfNat.ofNat.{0} Nat 0 (instOfNatNat 0)) (OfNat.ofNat.{0} Nat 1 (instOfNatNat 1))

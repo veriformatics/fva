@@ -1,0 +1,51 @@
+fva trust: PASS
+
+Claims
+  Proofs.r1_counterexample — about Proofs.Lifted (artifact)
+    proved by Proofs.r1_counterexample_holds (axioms: propext, Classical.choice, Quot.sound)
+
+Kernel replay
+  leanchecker (lean): accepted (136 s)
+  con-leche (con): accepted (99 s)
+
+Canaries (72 known-false exports, /tmp/fva-glm-iround-checker/trust/canaries/set.tsv; known acceptances /tmp/fva-glm-iround-checker/trust/canaries/known.tsv)
+  leanchecker: 71 rejected, 0 declined, 0 crashed or timed out, 1 accepted
+  con-leche: 69 rejected, 3 declined, 0 crashed or timed out, 0 accepted
+
+Links
+  Proofs.Lifted (glm-iround.wasm) [lifted]: matches
+
+Read these: 13 code lines
+  Proofs.Spec: 13 lines
+
+Names the claims use from outside the project (their meaning = their docs)
+  And (core): `And a b`, or `a ∧ b`, is the conjunction of propositions. It can be
+  BitVec (core): A bitvector of the specified width.
+  Eq (core): The equality relation. It has one introduction rule, `Eq.refl`.
+  Nat (core): The natural numbers, starting at zero.
+  Real (mathlib): The type `ℝ` of real numbers constructed as equivalence classes of Cauchy sequences of rational
+  abs (mathlib): `abs a`, denoted `|a|`, is the absolute value of `a`
+  DivInvMonoid.toDiv (mathlib)
+  HAdd.hAdd (core): `a + b` computes the sum of `a` and `b`.
+  HDiv.hDiv (core): `a / b` computes the result of dividing `a` by `b`.
+  HSub.hSub (core): `a - b` computes the difference of `a` and `b`.
+  LE.le (core): The less-equal relation: `x ≤ y` 
+  LT.lt (core): The less-than relation: `x < y` 
+  Nat.AtLeastTwo (mathlib): A type class for natural numbers which are greater than or equal to `2`.
+  OfNat.ofNat (core): The `OfNat.ofNat` function is automatically inserted by the parser when
+  One.toOfNat1 (core)
+  Real.lattice (mathlib)
+  Zero.toOfNat0 (core)
+  FVA.Wasm.Exec.Returns (base): Export `name` of the import-free module `m`, called on `args` in a fresh instance, returns
+  FVA.Wasm.Exec.Val (base): Values (§4.2.1); floats as their bit patterns (§4.3.1).
+  FVA.Wasm.Num.FVal (base): Floating-point values (spec §2.2.3): a sign (`true` = negative) and a magnitude.
+  FVA.Wasm.Num.f64fmt (base): `f64`: `M = 52`, `E = 11`.
+  FVA.Wasm.Num.ofBits (base): `fbits_N⁻¹`: the value a bit pattern represents.
+  FVA.Wasm.Num.FVal.IsNum (base): A number: neither a NaN nor an infinity.
+  FVA.Wasm.Num.FVal.toReal (base): The exact value of a number (spec §2.2.3); `0` for infinities and NaNs.
+
+What a PASS rests on
+  reviewed once: FVA's specs: Wasm syntax + binary grammar, execution semantics, integer + IEEE-754 numerics, claim forms, certificate relations, the verdict rules (FVA/Spec/**)
+  verified implementation: the decoder (sound + complete for the profile), the reference stepper, the float operators, instantiation, the validator (validated modules never get stuck), the verdict function, the certificate checkers (FVA.Self: fva trust on FVA itself)
+  trusted glue: fact collection from the environment, the link and surface checks (a certificate's files included), process orchestration, the external kernels (each canaried)
+  residual trust: the Lean kernel cross-checked by an independent kernel, the Lean compiler that built fva, Mathlib at the pinned revision, the specs
