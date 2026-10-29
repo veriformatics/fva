@@ -83,6 +83,16 @@ Your review covers the claims in your specification files only. FVA's own files 
 - `FVATest/Certs`: certificates for the same sorted output from Python, R, Java and TypeScript programs, and for a toy compiler; files that must fail show what FVA rejects.
 - `FVATest/Subjects`: results about published software, each checked by `fva trust`. They include counterexamples for a hand-written LZ4 codec in WebAssembly, measured against a reviewed specification of the LZ4 block format. They also include a proof for every input of edgeR's counts-per-million function in its shipped WebAssembly build, certificates that refute RNAnorm's claim that its TMM factors match edgeR's to 10 decimal places, and a counterexample for GLM's `iround`.
 
+## Benchmark
+
+`bench/results.md` compares AI agents that work with FVA, without it, with FVA's principles in the prompt only, and with an established verifier (Frama-C or Verus). There are six tasks and five runs per agent setup. The results are mixed, and the file reports losses as losses:
+
+- In every task, every agent that used FVA produced a machine-checked statement about the shipped binary or output files. The other agents did this only in some tasks, with an extractor and semantics that they wrote themselves and must be trusted.
+- FVA did not save time or cost. Agents with FVA used 3 to 11.5 times as many input tokens as agents with only the task.
+- On two tasks without a known defect (the LZ4 decoders in C and Rust), the agents with FVA proved less about memory access than the other agents. FVA has no reviewed claim form for memory access yet.
+- On the GLM task, every agent found the wrong result for `0.49999999999999994`. Only the agents with FVA proved it about the shipped binary, in a statement of 9 to 12 lines.
+- FVA was developed with these tasks known.
+
 ## Limits
 
 - FVA verifies core WebAssembly 2.0 without SIMD, threads, exceptions or garbage-collected types.
