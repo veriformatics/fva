@@ -1,0 +1,5 @@
+Lean default kernel rejects the solution: while replaying declaration 'equalityProof':
+(kernel) declaration type mismatch, 'equalityProof' has type
+  Eq 0 0
+but it is expected to have type
+  Eq 0 1
