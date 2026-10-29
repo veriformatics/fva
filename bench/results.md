@@ -362,7 +362,7 @@ reported the rest as open; no report over-claimed.
 | M5 surface, code lines: statement + link/model (checker scripts); generated tables apart | 306 [269–356]: 139 + 175 (291); tables 889 [117–2,654] | 316 [84–332]: 51 + 216 (289); tables 10 [0–636] | 56 [47–99]: 47 + 5 (88); `fva trust` surface 52 [40–101] | 47 [18–53]: 26 + 22 (344) |
 | M6 over-claims | 0 | 0 | 0 | 0 |
 | M7 input tokens (uncached); output tokens; CPU s; wall s | 4.08 M (67 k); 45 k; 399; 1,707 | 3.60 M (81 k); 36 k; 355; 1,275 | 12.64 M (148 k); 57 k; 932; 2,520 | 6.32 M (102 k); 57 k; 30, Frama-C apart; 2,098 |
-| M8 cheats caught / planted | 16 / 20 | 20 / 20 | 20 / 20 | 4 / 15 (C3 not applicable) |
+| M8 cheats caught / planted | 16 / 20 (15 / 20 when planted in hand-written proofs) | 20 / 20 (20 / 20 when planted in hand-written proofs) | 20 / 20 | 4 / 15 (C3 not applicable) |
 | M9 statements readable / with effort / no formal statement | 0 / 15 / 0 | 0 / 15 / 0 | 5 / 10 / 0 | 15 / 0 / 0 |
 | M10 machine-checked statement about the shipped bytes | 5 / 5 | 5 / 5 | 5 / 5 | 2 / 5 |
 
@@ -426,6 +426,17 @@ reported the rest as open; no report over-claimed.
   planted file before WP runs, which erases the cheat (scored as not caught, erasure noted:
   rubric addendum 2026-10-29 (2)); tool 1, 3 and 6 kept the cheat and WP passed, since WP treats
   an admitted clause or an axiom as given; tool 1's check never reads the artifact (C4 missed).
+- M8 planting sites: in bare 1, bare 5 and prompted 5 the first cited theorem sits in a module
+  the run's script writes (generated case tables, a cached instruction parse), and their checks
+  caught C1–C3 by comparing that file with a fresh regeneration, which fails on any edit. Those
+  catches count, as the rubric defines a catch, but they test the comparison, not the proof
+  checking, so the cheats were planted again at the first cited theorem outside such modules
+  (grading ruling): bare 5 named C1 and C2 in printed axiom lists and missed C3; prompted 5
+  caught all three. Bare 1 has no such theorem (its 17 claims are all generated case theorems),
+  so its catches stay comparison catches. Prompted 1's first cited theorem also sits in a
+  generated module, but its check caught each cheat through its axiom audit and an independent
+  kernel, before any comparison. Tool 2 again: an `admit ensures` and a false axiom planted in its
+  hand-written `memory.h` contracts both pass WP, so its erased cheats are misses either way.
 - M9: one domain reader per arm, so ratings compare within an arm better than across arms. Lines
   read per requirement = the run's own definitions + the generated tables the statement reaches:
   bare 207–330 + 117–2,653; prompted 83–326 + 2–917; fva 24–105 + FVA's base; tool 29–182 +
