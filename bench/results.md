@@ -37,12 +37,13 @@ One run per arm on T1 and T4 (the rubric's pilot), model `gpt-6.1-sol`, reasonin
 - T5 batch (tmm, seed 1, 15 runs, jailed, 13:49–16:13): 12 completed; provider capacity errors: bare 1, prompted 3, prompted 4 (replaced by bare 6, prompted 6, 7); no repository or other-run reads; harness files identical across the commits the batch spanned. Idle-window deviation (user ruling: report as-is): from 15:07 the host also ran two non-benchmark heavy jobs, and MAIN's proof teammates ran memory-capped Lean checks (one uncapped 10-minute, 19 GB check at about 15:20); run load averages reached 30–47. T5 wall-clock times are therefore no idle-window measurement: M7 for T5 compares tokens and CPU seconds, and reports wall time with this caveat.
 - A first T2 batch (lz4-c, seed 1, harness `c5da57e`, `c31773c`, `7400ae9`) was superseded before grading (rubric addendum 2026-10-28; user ruling). Its requirement text was wrong in three ways: R1 forbade the reads of `dst` that every LZ4 match copy performs, R2 lacked a disjointness condition, and R3 forbade the offset-0 decoding that the format document describes for this decoder (zero bytes). The reports of all 16 completed runs, in every arm, refute the text on these three points (MAIN's count: each report names offset 0, overlapping buffers and destination reads); 6 runs were killed by the host (addendum 2026-10-27) and 4 replacements never started. The corrected T2 and T3 texts were checked against both artifacts before any further run: MAIN's reference-decoder differential (8,000 blocks per artifact) and two independent requirement audits (reviewer-35, reviewer-36; table below the T2 results). T2 runs again in full as seed 2.
 - Second T2 batch (lz4-c, seed 2, 2026-10-28 18:42 – 2026-10-29 04:43 JST): 20 completed. Claude Code's low-memory reaper stopped it at 20:20 with 8 runs complete; its 3 running runs (bare 3, prompted 3, tool 5) are infrastructure failures, replaced by bare 6, prompted 6 and tool 6 (rubric addendum 2026-10-28 (3)). Order: prompted 1, bare 1, tool 1, fva 3, bare 4, tool 3, prompted 2, bare 2 (bare 3, prompted 3, tool 5 stopped), then tool 2, fva 4, fva 5, fva 2, bare 5, prompted 4, fva 1, prompted 5, tool 4, bare 6, prompted 6, tool 6. No provider capacity errors or safety-classifier stops. The first 11 runs ran 3 at a time on CPUs 2–4, the other 12 one at a time on CPU 2 (`bench/harness/run-order`, in a memory-capped systemd user service). Harness commits db48b8e, 4400f79, 845230f, ba9df34: `bench/{prompts,tasks,tools}` and `harness/run-session` identical (the commits add `harness/run-order` only). No repository, other-run or `AGENTS.md` reads in any of the 20 archived runs (positive control: each run's own path). The user's work ran beside the batch: 1-minute load 0.37–18.74 at run start. One run passed the 90-minute progress check: tool 4 (5,733 s; 5 Frama-C containers working at its check).
+- T3 batch (lz4-rust, seed 1, 2026-10-29 04:47 – 15:07 JST, harness e5078d8 and later commits with `bench/{harness,prompts,tasks,tools}` identical): 20 completed, one run at a time on CPU 2. Provider capacity errors ("Selected model is at capacity", no completed turn): bare 2, tool 2, replaced by bare 6 and tool 6 in a replacement wave after the order. No safety-classifier stops; no repository, other-run or `AGENTS.md` reads in the 20 archived runs. Order: fva 1, tool 5, bare 1, bare 3, tool 4, prompted 3, bare 5, prompted 4, fva 4, prompted 5, bare 4, prompted 1, bare 2 (stopped), tool 2 (stopped), fva 3, fva 5, fva 2, prompted 2, tool 3, tool 1, then bare 6, tool 6. No run reached the 90-minute progress check (longest 3,486 s).
 - Order: `bench/harness/run-batch TASK SEED ARM…`; each batch's seed and order are listed with its results. Safety-classifier stops are counted per arm.
 - Codex CLI: every graded run so far ran codex-cli 0.163.0 (binary sha256 `399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215`). The host's system copy moved to 0.164.0 on 2026-10-27, so the second T2 batch, T3 and T7 run the same 0.163.0 binary from a pinned copy of its package: their `codex_executable` path differs, and their `codex_executable_sha256` is identical.
 - Grading deviation (rubric addendum 2026-10-26 (3)): M8 on the tool arm plants the cheats' closest Frama-C forms (`admit ensures`, a false global axiom; C3 not applicable) with `bench/grade/inject-tool`. T4's tool runs finished before the addendum was written; their M8 was graded after it.
 - Grading deviation (rubric addendum 2026-10-28 (2)): M4 gains the outcome `not reported`, for a run whose report never names the task's known defect. It corrects T4, where three runs had been credited with a defect they never named.
 - Verdict-table rulings: MAIN rules each row it rechecks on a reviewer's M3/M6 table (non-`faithful` M3 verdicts, M6 findings, ratings MAIN changes) after an advisor consult, for every task. T1, T4 and T5 were re-ruled this way after their first grading: every deck was read again, and every quoted anchor was matched again in the archived runs (T1 46, T4 43, T5 32). No M3 or M6 verdict changed. The task notes below give the reasoning; the second reading found the M4 error on T4.
-- Codex quota after each batch (`bench/tools/codex-quota`, percent of the weekly window used; the provider reset the window early several times, so the differences between readings are not per-batch costs): T1 seed 3: 27 % (2026-10-25 15:15 UTC), 27 % after its replacement runs; T4: 32 % (2026-10-25 23:59 UTC); T5: 23 % (2026-10-26 07:14 UTC, after an early reset), 45 % and 48 % after its replacement runs; first T2 batch (superseded): 53 %, then 65 %; before the second T2 batch: 1 % (2026-10-28 09:23 UTC, after an early reset); second T2 batch: 3 % after the reaper's stop (11:26 UTC), 7 % after the batch (19:43 UTC).
+- Codex quota after each batch (`bench/tools/codex-quota`, percent of the weekly window used; the provider reset the window early several times, so the differences between readings are not per-batch costs): T1 seed 3: 27 % (2026-10-25 15:15 UTC), 27 % after its replacement runs; T4: 32 % (2026-10-25 23:59 UTC); T5: 23 % (2026-10-26 07:14 UTC, after an early reset), 45 % and 48 % after its replacement runs; first T2 batch (superseded): 53 %, then 65 %; before the second T2 batch: 1 % (2026-10-28 09:23 UTC, after an early reset); second T2 batch: 3 % after the reaper's stop (11:26 UTC), 7 % after the batch (19:43 UTC). T3: 21 % after the order (2026-10-29 05:27 UTC), 22 % after the replacement wave (06:07 UTC).
 
 <details><summary>fva-arm package files, bench-v2.1 (sha256, path)</summary>
 
@@ -463,3 +464,95 @@ accepted in one re-review round before the batch.
 | T3 interface: −1 promised for every invalid block, though R3 allows end-condition violations | found | found | −1 tied to the error that `decompress_into` reports |
 | T7 R1: the integer range lacked its reason | found | — | the documented bound and the `i32` reason stated |
 | other requirements (T2 + T3 scope, R1, R3; T7 R1 false as intended: 0.49999999999999994 → 1) | pass | pass | — |
+
+## T3 — lz4-rust (seed 1; bare 1, 3–6; prompted 1–5; fva 1–5; tool 1, 3–6)
+
+T3 is T2's task on the Rust decoder: `lz4_flex::block::decompress_into` of lz4_flex 0.14.0
+(safe decoder, no dictionary) behind a two-line shim, and its WebAssembly build. It has no known
+defect (the same audits as T2, table above), and the tool arm runs Verus. No run proved a requirement
+about the shipped bytes over its whole domain; three tool runs proved all three requirements over
+every input for an executable model of the decoder that they wrote.
+
+| metric | bare | prompted | fva | tool (Verus) |
+|---|---|---|---|---|
+| M1 theorems valid / claimed | 31 / 37 (`native_decide` in runs 1, 6) | 88 / 88 | 49 / 49 | 5 / 5 runs, every Verus function verified again |
+| M2 link to the artifact | (a) 5: instructions extracted from the hash-pinned bytes by the run's script (runs 1, 3, 5, 6) or decoded in Lean from embedded bytes, checked by the kernel (run 4); run-written Wasm semantics | (a) 5: extracted by the run's script (runs 1, 2, 4, 5) or function bytes decoded by a kernel-checked decoder (run 3); run-written Wasm semantics | (a) 5 (`fva lift`, link checked by `fva trust`) | (b) 3 (runs 1, 4, 5: executable Rust models, 2,000 / 2,000 cases equal to the artifact each); (a) 2 (run 4's entry bytes for `n` = 0; run 6: function 7 extracted from the bytes, run-written Verus semantics); (c) 1 (run 3: specification functions only) |
+| M3 requirements (3 per run) | 15 weaker | 15 weaker | 11 weaker, 4 not proven, reported (R1 of runs 1, 2, 4, 5) | 9 faithful for the run's model (runs 1, 4, 5), 3 weaker (run 6), 3 not proven, reported (run 3) |
+| M4 defect evidence | not applicable (no known defect) | not applicable | not applicable | not applicable |
+| M5 surface, code lines: statement + link/model (checker scripts); generated tables apart | 515 [250–770]: 207 + 236 (247); tables 988 | 294 [255–383]: 114 + 182 (256); tables 5 [1–2,476] | 48 [26–132]: 48 + 0 (89); `fva trust` surface 44 [27–106] | 179 [134–516]: 122 + 70 (291) |
+| M6 over-claims | 0 | 0 | 0 | 0 (one register note) |
+| M7 input tokens (uncached); output tokens; CPU s; wall s | 4.48 M (66 k); 40 k; 210; 1,243 | 5.84 M (123 k); 63 k; 680; 1,980 | 15.41 M (163 k); 59 k; 1,286; 2,355 | 3.19 M (53 k); 35 k; 58; 1,032 |
+| M8 cheats caught / planted | 17 / 20 (15 / 20 when planted in hand-written proofs) | 17 / 20 (20 / 20 when planted in hand-written proofs) | 20 / 20 | 15 / 20 (14 / 20 when planted in hand-written proofs) |
+| M9 statements readable / with effort / no formal statement | 0 / 15 / 0 | 0 / 15 / 0 | 12 / 3 / 0 | 1 / 14 / 0 |
+| M10 machine-checked statement about the shipped bytes | 4 / 5 | 5 / 5 | 5 / 5 | 2 / 5 |
+
+- Rubric outcome: a loss for FVA on T3. Its M3 is lower on R1 (4 runs not proven, where every bare
+  and prompted run proved an access-trace statement and three tool runs a whole-domain statement
+  about their model), and it used 3.4 × the bare arm's input tokens (2.5 × uncached, 1.5 × output,
+  6.1 × CPU seconds) and 4.8 × the tool arm's. M10 ties the prompted arm (5 / 5) and is one run above
+  the bare arm (bare 1's artifact theorems rest on `native_decide`, which M1 rejects). Its surface is
+  the smallest (48 code lines) and its statements the most readable (12 of 15 `readable`), but not
+  at equal M3.
+- The tool arm holds the benchmark's first `faithful` rows. Runs 1, 4 and 5 wrote an executable Rust
+  decoder in Verus and proved R1–R3 for it over every input: R2 and R3 against their own grammar of
+  the format (offset 0 rejected, the final literal run consumes the input, match length at least 4,
+  no dictionary), R1 by Verus's verified indexing of a function that reaches caller memory only
+  through its slice and vector references (safe Rust, no `unsafe`; grading ruling). The snapshot
+  vector two of them allocate to model `copy_within` is their own memory, not caller memory; where
+  it would sit in Wasm memory is M2's question. Each model agrees with the shipped artifact on 2,000
+  seeded cases (valid blocks at exact, larger and smaller capacities, mutated blocks, random bytes;
+  the return value and the `r` output bytes), and each report says the model is not the artifact. Run 3's
+  statements are about a formalization made only of specification functions, which constrains no
+  decoder's output: `not proven, reported` (grading ruling; it changes no earlier cell: T1's format-only
+  theorems were already `not proven, reported`, and T2 had no specification-only run). So on T3 a whole-domain proof exists for
+  a model of the code and none for the shipped bytes; the fva arm's statements are about the shipped
+  bytes, on parts of the domain.
+- R1 by arm: an access-trace statement in bare 5 / 5 and prompted 5 / 5 (their own interpreters, on
+  fixed calls and every empty-input call), fva 1 / 5 (fva 3's predicate over every configuration
+  FVA's semantics reaches, on fixed calls); fva 1, 2, 4 and 5 proved facts about memory after the
+  call only. On T2 and T3 together, 2 of 10 fva runs stated R1 at the access level, both by building
+  the predicate themselves, and both are their arm's largest surfaces (T2 fva 5: 99 lines; T3 fva 3:
+  132 against 26–49). That is what the missing reviewed-once access-footprint claim (D52) costs a run.
+- M2 and M10: every bare and prompted run's generated module regenerates byte-identically from the
+  pinned file with the run's own script (and fails on a one-digit change); prompted 2's check
+  regenerates its generated files instead of comparing them. The (b) fidelity checks ran the three
+  Verus models natively (`verus --compile`) against the artifact in wasmtime; a control with every
+  capacity reduced by one differs in 328 of 2,000 cases. Tool 4's entry prefix and tool 6's extracted
+  program are bound to the bytes by the runs' checks (a planted change fails them).
+- M5: Lean arms as in T2 (`.scratch/u15/grade/m5-split-t3.py`); generated modules apart (extracted
+  programs, embedded bytes, proof-carrying decodes, prompted 5's 510 lines of trace certificates);
+  generated case tables count as statement (witness inputs), as on T2. Tool arm: statement = the
+  readability reader's closure (cited `requires`/`ensures` and the specification functions they
+  reach, the largest of R1–R3 per run); link/model = the executable model bodies and tool 6's
+  run-written Wasm machine (161 lines); tool 6's 3,513-line extracted program apart.
+- M8: the three proof cheats went into a script-written module in bare 1, bare 4, bare 6,
+  prompted 2, prompted 4 and tool 6. Bare 4's check does not compare that module, so its catches (C1
+  and C2 by name) stand. Bare 1, bare 6, prompted 4 and tool 6 caught them by comparing the module
+  with a fresh regeneration; prompted 2's check regenerated it, which erased the cheats (not caught,
+  as T2's tool 2 and 4). Planted again in each run's first hand-written theorem: bare 1 and bare 6
+  named C1 and C2 in printed axiom lists and missed C3 (as bare 3, 4 and 5 did on their first
+  planting); prompted 2 and 4 caught all three; tool 6 caught C1 and C2 and missed C3. Verus with
+  `--no-cheating` rejects the planted `admit()` (C1) and `external_body` (C2) outright; the
+  `#[verifier::external]` bypass (C3) passed every tool check except tool 3's, where a verified caller
+  uses the bypassed function; tool 3 runs without `--no-cheating` and missed C1 and C2. Every clean
+  baseline exits 0.
+- M1: `native_decide` theorems are invalid (bare 1: its artifact-instruction and case theorems; bare
+  6: its 48 case theorems; bare 6's empty-input trace theorem is valid). Negative-control files
+  (prompted 1, 3, 4) are imported by nothing and do not count. Five grading-tool defects surfaced and
+  were fixed, each affected row rechecked: the cheat injector split a two-line docstring from its
+  theorem (3aa5658) and missed an indented theorem (138300f), the forbidden-construct scan flagged
+  Wasm's `.extern` constructor (232e7b5), and the claims scanner (`.scratch/u15/grade/claims.py`)
+  cut Lean names at `?` and listed private support lemmas.
+- M6 register (tool 6, `VERIFICATION.md:154–155`): "Direct artifact execution also checks write
+  confinement for all 16 concrete cases" describes a test that compares bytes outside `dst` after the
+  call, which cannot see a write undone before the end. The reviewer listed it as a minor finding;
+  ruled not an over-claim: it describes a test, and the next sentence and the R1 heading say R1 is
+  unproved.
+- M9: one domain reader per arm; count conventions differ slightly (the fva reader left out blank
+  and comment lines inside declarations; the prompted reader named Lean's core library beside the
+  tables). Tool 6's statements reach its extracted program (3,513 lines), which no row needed to
+  read instruction by instruction.
+- M7: the host was not idle; tokens are primary. Verus runs inside the run's process tree, so tool
+  CPU seconds compare with the other arms' (unlike Frama-C's containers on T2). Ranges: input tokens
+  bare 3.32–8.30 M, prompted 3.92–11.57 M, fva 9.70–18.44 M, tool 1.30–3.76 M; wall time bare
+  1,045–2,776 s, prompted 1,138–3,226 s, fva 1,977–3,486 s, tool 655–1,167 s.
