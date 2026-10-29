@@ -1,0 +1,19 @@
+[
+  {"name": "emptyBlock", "input": [0], "cap": 0, "result": 0, "output": [], "src": 131072, "dst": 196608},
+  {"name": "oneLiteral", "input": [16, 65], "cap": 1, "result": 1, "output": [65], "src": 131072, "dst": 196608},
+  {"name": "fiveLiterals", "input": [80, 104, 101, 108, 108, 111], "cap": 5, "result": 5, "output": [104, 101, 108, 108, 111], "src": 131072, "dst": 196608},
+  {"name": "literalExtension", "input": [240, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "cap": 15, "result": 15, "output": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "src": 131072, "dst": 196608},
+  {"name": "overlapMatch", "input": [19, 65, 1, 0, 80, 66, 67, 68, 69, 70], "cap": 13, "result": 13, "output": [65, 65, 65, 65, 65, 65, 65, 65, 66, 67, 68, 69, 70], "src": 131072, "dst": 196608},
+  {"name": "matchExtension", "input": [31, 65, 1, 0, 0, 80, 66, 67, 68, 69, 70], "cap": 25, "result": 25, "output": [65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 66, 67, 68, 69, 70], "src": 131072, "dst": 196608},
+  {"name": "fastPath", "input": [19, 65, 1, 0, 240, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "cap": 64, "result": 23, "output": [65, 65, 65, 65, 65, 65, 65, 65, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "src": 131072, "dst": 196608},
+  {"name": "nonoverlapMatch", "input": [131, 97, 98, 99, 100, 101, 102, 103, 104, 8, 0, 80, 66, 67, 68, 69, 70], "cap": 64, "result": 20, "output": [97, 98, 99, 100, 101, 102, 103, 104, 97, 98, 99, 100, 101, 102, 103, 66, 67, 68, 69, 70], "src": 131072, "dst": 196608},
+  {"name": "upperBoundary", "input": [16, 65], "cap": 1, "result": 1, "output": [65], "src": 2097150, "dst": 131072},
+  {"name": "emptyInput", "input": [], "cap": 0, "result": -1, "output": [], "src": 131072, "dst": 196608},
+  {"name": "truncatedLength", "input": [240], "cap": 32, "result": -1, "output": [], "src": 131072, "dst": 196608},
+  {"name": "truncatedOffset", "input": [16, 65, 1], "cap": 32, "result": -1, "output": [65], "src": 131072, "dst": 196608},
+  {"name": "zeroOffset", "input": [16, 65, 0, 0, 80, 66, 67, 68, 69, 70], "cap": 16, "result": -1, "output": [65], "src": 131072, "dst": 196608},
+  {"name": "offsetUnderflow", "input": [16, 65, 2, 0, 80, 66, 67, 68, 69, 70], "cap": 16, "result": -1, "output": [65], "src": 131072, "dst": 196608},
+  {"name": "shortLiteralBuffer", "input": [80, 104, 101, 108, 108, 111], "cap": 4, "result": -1, "output": [170, 170, 170, 170], "src": 131072, "dst": 196608},
+  {"name": "shortMatchBuffer", "input": [19, 65, 1, 0, 80, 66, 67, 68, 69, 70], "cap": 7, "result": -1, "output": [65], "src": 131072, "dst": 196608},
+  {"name": "relaxedEnding", "input": [16, 65, 1, 0, 0], "cap": 5, "result": 5, "output": [65, 65, 65, 65, 65], "src": 131072, "dst": 196608}
+]

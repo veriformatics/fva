@@ -1,0 +1,8 @@
+verification/KernelNegative.lean:4:0: error: (kernel) declaration type mismatch, 'ForgedUnequal' has type
+  0 = 0
+but it is expected to have type
+  0 = 1
+verification/KernelNegative.lean:11:0: error: (kernel) declaration type mismatch, 'ForgedFalse' has type
+  0 = 0
+but it is expected to have type
+  False
