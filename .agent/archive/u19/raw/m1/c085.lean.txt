@@ -1,0 +1,16 @@
+/-- The head frame of iteration `j`. -/
+structure Inv (ls : List Val) (inst : ModuleInst) (p lim acc : Nat) (b : Nat → UInt8) (j : Nat)
+    (f : Frame) : Prop where
+  inst : f.inst = inst
+  len : f.locals.length = ls.length
+  others : ∀ i, i ≠ 3 → i ≠ 4 → i ≠ 16 → i ≠ 17 → i ≠ 18 → i ≠ 19 → i ≠ 20 →
+    f.locals[i]? = ls[i]?
+  l18 : f.locals[18]? = some (vI (p + j + 1))
+  l19 : f.locals[19]? = some (vI (run acc b j))
+  l16 : f.locals[16]? = if j = 0 then ls[16]? else some (vI (p + j))
+  l17 : f.locals[17]? = if j = 0 then ls[17]? else some (vI (run acc b j))
+  l20 : f.locals[20]? = if j = 0 then ls[20]? else some (vI (b (j - 1)).toNat)
+  ff : ∀ i < j, b i = 255
+  sums : ∀ i, i + 1 ≤ j → psum acc b i < 2 ^ 31
+  bound : p + j ≤ lim
+

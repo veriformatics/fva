@@ -1,0 +1,8 @@
+/-- The loop as a function: from iteration `j` with accumulator `a`. -/
+def extModel (b : Nat → UInt8) (p lim : Nat) (j a : Nat) : Exit :=
+  if lim < p + j + 1 then .bound j a
+  else if 2147483648 ≤ a + (b j).toNat then .overflow j (a + (b j).toNat) (b j).toNat
+  else if b j = 255 then extModel b p lim (j + 1) (a + (b j).toNat)
+  else .normal j (a + (b j).toNat) (b j).toNat
+termination_by lim - (p + j)
+

@@ -1,0 +1,8 @@
+/-- `f'` = entry locals `ls`, except the listed ones (`none` = unchanged). -/
+def LocalsAt (ls : List Val) (inst : ModuleInst) (f' : Frame) (u : List (Nat × Option Nat)) :
+    Prop :=
+  f'.inst = inst ∧ f'.locals.length = ls.length ∧
+  ∀ i, f'.locals[i]? = match u.lookup i with
+    | some v => v.map vI <|> ls[i]?
+    | none => ls[i]?
+

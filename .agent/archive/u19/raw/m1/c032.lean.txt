@@ -1,0 +1,21 @@
+/-- Checkpoint 1's statement, route D. -/
+theorem ext_l1 : ExtL1 := by
+  intro H C s inst ls ma mem p lim acc h2 h14 h17 hm hmem hpl hlim hsize hacc
+  have hlen17 : 17 < ls.length := (List.getElem?_eq_some_iff.mp h17).1
+  have hinv : Inv ls inst p lim acc (fun i => mem.byte (p + i)) 0 ⟨ls, inst⟩ :=
+    { inst := rfl
+      len := rfl
+      others := fun _ _ _ _ _ => rfl
+      l2 := by simpa using h2
+      l15 := by simp
+      l17 := by simpa [run_zero] using h17
+      ff := fun _ h => absurd h (Nat.not_lt_zero _)
+      sums := fun _ h => absurd h (by omega)
+      bound := by omega }
+  rw [extLoop_eq]
+  simp only [ctx9, Context.fill]
+  wasm_cstepu [extBody]
+  · wasm_within [extBody]
+  simpa only [head, ctx9, Context.fill, extBody, List.map_cons, List.map_nil] using
+    iter H C s inst ls ma mem p lim acc h14 h17 hm hmem hlim hsize hacc _ 0 _ rfl hinv
+

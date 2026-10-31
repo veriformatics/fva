@@ -1,0 +1,7 @@
+theorem iadd_minus_one {q : Nat} (h1 : 1 ≤ q) (h : q < 2 ^ 32) :
+    iadd (BitVec.ofNat 32 q) (BitVec.ofNat 32 4294967295) = BitVec.ofNat 32 (q - 1) := by
+  rw [iadd_ofNat]
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_ofNat]
+  omega
+

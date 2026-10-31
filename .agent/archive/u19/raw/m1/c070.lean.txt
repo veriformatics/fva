@@ -1,0 +1,8 @@
+def extBody : List Instr :=
+  [.localGet 19, .localSet 4, .localGet 18, .localTee 3, .localGet 14, .irelop .w32 (.gt .u),
+    .brIf 1, .localGet 4, .localGet 3, .iconst .w32 4294967295, .ibinop .w32 .add,
+    .loadPacked .w32 .p8 .u ⟨0, 0⟩, .localTee 20, .ibinop .w32 .add, .localTee 4,
+    .iconst .w32 0, .irelop .w32 (.lt .s), .brIf 1, .localGet 3, .iconst .w32 1,
+    .ibinop .w32 .add, .localSet 18, .localGet 4, .localSet 19, .localGet 3, .localSet 16,
+    .localGet 4, .localSet 17, .localGet 20, .iconst .w32 255, .irelop .w32 .eq, .brIf 0, .br 2]
+

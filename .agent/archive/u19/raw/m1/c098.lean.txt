@@ -1,0 +1,4 @@
+/-- The `-O1` loop head. -/
+noncomputable def head (C : Context) (s : Store) (f : Frame) : Config :=
+  (ctx C).fill ⟨s, f, [.label 0 [.loop .empty extBody] (extBody.map .plain)]⟩
+

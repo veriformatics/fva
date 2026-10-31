@@ -1,0 +1,2 @@
+theorem zero_eq : decide ((0 : BitVec 32) = 0) = true := by decide
+

@@ -1,0 +1,2 @@
+/-- `LocalsAt` of an exit frame built by `List.set`s from a head frame: index by
+index, the updated locals by computation, the others from the head frame's. -/

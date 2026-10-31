@@ -1,0 +1,38 @@
+/-- `ExtL1` for the `-O1` loop, route R: the new simulation + the unchanged `model_ok`. -/
+theorem ext_l1 : ExtL1O1 := by
+  intro H C s inst ls ma mem p lim acc h18 h14 h19 h20 hm hmem hpl hlim hsize hacc
+  have hsim0 : Sim ls inst p 0 acc ⟨ls, inst⟩ :=
+    { inst := rfl, len := rfl, others := fun _ _ _ _ _ _ _ _ => rfl, l18 := by simpa using h18,
+      l19 := h19, l16 := by simp, l17 := by simp, l20 := by simp }
+  have hok := model_ok (fun i => mem.byte (p + i)) p lim acc _ 0 acc rfl (by simp)
+    (fun _ h => absurd h (Nat.not_lt_zero _)) (fun _ h => absurd h (by omega))
+  have hrun := sim H C s inst ls ma mem p lim h14 hm hmem hlim hsize h20 _ 0 acc
+    ⟨ls, inst⟩ rfl (by omega) hacc hsim0
+  rw [extLoop_eq]
+  simp only [ctx, Context.fill]
+  wasm_cstepu [extBody]
+  · wasm_within [extBody]
+  refine Until.mono (P := Within (fun m x => m = ma ∧ p ≤ x ∧ x < lim) (fun _ _ => False))
+    (by simpa only [head, ctx, Context.fill, extBody, List.map_cons, List.map_nil] using hrun)
+    (fun _ h => h) ?_
+  intro c hc
+  revert hok hc
+  generalize extModel (fun i => mem.byte (p + i)) p lim 0 acc = e
+  rcases e with ⟨k, a, byte⟩ | ⟨k, a⟩ | ⟨k, a, byte⟩
+  · rintro ⟨hff, h255, hle, hs, rfl, rfl⟩ ⟨f', hl, rfl⟩
+    exact Or.inl ⟨k, f', hff, h255, hle, hs, hl, rfl⟩
+  · rintro ⟨hff, hb, hs, rfl⟩ ⟨f', hl, rfl⟩
+    refine Or.inr (Or.inl ⟨k, f', hff, hb, hs, ?_, rfl⟩)
+    rcases Nat.eq_zero_or_pos k with rfl | hk
+    · simpa using hl
+    · have hk' := Nat.pos_iff_ne_zero.mp hk
+      have hb1 : (mem.byte (p + (k - 1))).toNat = 255 := by
+        have h := hff (k - 1) (by omega); simp only at h; rw [h]; rfl
+      simpa [hk', hb1] using hl
+  · rintro ⟨hff, hle, hs, hov, rfl, rfl⟩ ⟨f', hl, rfl⟩
+    refine Or.inr (Or.inr ⟨k, f', hff, hle, hs, hov, ?_, rfl⟩)
+    rw [psum_sub] at hl
+    rcases Nat.eq_zero_or_pos k with rfl | hk
+    · simpa using hl
+    · simpa [Nat.pos_iff_ne_zero.mp hk] using hl
+

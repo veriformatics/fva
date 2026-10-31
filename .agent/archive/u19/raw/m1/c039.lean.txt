@@ -1,0 +1,5 @@
+inductive Exit where
+  | normal (k a byte : Nat)
+  | bound (k a : Nat)
+  | overflow (k a byte : Nat)
+

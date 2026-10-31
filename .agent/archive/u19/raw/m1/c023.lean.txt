@@ -1,0 +1,4 @@
+theorem run_succ (acc : Nat) (b : Nat → UInt8) (j : Nat) :
+    run acc b (j + 1) = run acc b j + (b j).toNat := by
+  simp [run, List.range_succ, Nat.add_assoc]
+

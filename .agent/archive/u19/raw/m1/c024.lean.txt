@@ -1,0 +1,2 @@
+theorem run_zero (acc : Nat) (b : Nat → UInt8) : run acc b 0 = acc := by simp [run]
+

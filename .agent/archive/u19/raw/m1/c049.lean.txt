@@ -1,0 +1,35 @@
+/-- Checkpoint 1's statement, route R: simulation + the model's exits. -/
+theorem ext_l1 : ExtL1 := by
+  intro H C s inst ls ma mem p lim acc h2 h14 h17 hm hmem hpl hlim hsize hacc
+  have hlen17 : 17 < ls.length := (List.getElem?_eq_some_iff.mp h17).1
+  have hsim0 : Sim ls inst p 0 acc ⟨ls, inst⟩ :=
+    { inst := rfl, len := rfl, others := fun _ _ _ _ _ => rfl, l2 := by simpa using h2,
+      l15 := by simp, l17 := h17 }
+  have hok := model_ok (fun i => mem.byte (p + i)) p lim acc _ 0 acc rfl (by simp)
+    (fun _ h => absurd h (Nat.not_lt_zero _)) (fun _ h => absurd h (by omega))
+  have hrun := sim H C s inst ls ma mem p lim h14 hm hmem hlim hsize hlen17 _ 0 acc
+    ⟨ls, inst⟩ rfl (by omega) hacc hsim0
+  rw [extLoop_eq]
+  simp only [ctx9, Context.fill]
+  wasm_cstepu [extBody]
+  · wasm_within [extBody]
+  refine Until.mono (P := Within (fun m x => m = ma ∧ p ≤ x ∧ x < lim) (fun _ _ => False))
+    (by simpa only [head, ctx9, Context.fill, extBody, List.map_cons, List.map_nil] using hrun)
+    (fun _ h => h) ?_
+  intro c hc
+  revert hok hc
+  generalize extModel (fun i => mem.byte (p + i)) p lim 0 acc = e
+  rcases e with ⟨k, a, byte⟩ | ⟨k, a⟩ | ⟨k, a, byte⟩
+  · rintro ⟨hff, h255, hle, hs, rfl, rfl⟩ ⟨f', hl, rfl⟩
+    exact Or.inl ⟨k, f', hff, h255, hle, hs, hl, rfl⟩
+  · rintro ⟨hff, hb, hs, rfl⟩ ⟨f', ⟨hi, hlen, ho, l2, l4, l15, l17⟩, rfl⟩
+    refine Or.inr (Or.inl ⟨k, f', hff, hb, hs, ⟨hi, hlen, ho, l2, l4, ?_, ?_⟩, rfl⟩)
+    · rw [l15]; split
+      · rfl
+      · rename_i hk; rw [hff (k - 1) (by omega)]; rfl
+    · rw [l17]; split
+      · simp [h17]
+      · rfl
+  · rintro ⟨hff, hle, hs, hov, rfl, rfl⟩ ⟨f', hl, rfl⟩
+    exact Or.inr (Or.inr ⟨k, f', hff, hle, hs, hov, hl, rfl⟩)
+

@@ -1,0 +1,21 @@
+D export wall=8.01 s rss=2663164 KB rc=0
+D export bytes=122550618
+D leanchecker wall=42.37 s rss=2032228 KB rc=0
+D con-leche wall=49.01 s rss=2551068 KB rc=0
+R export wall=8.87 s rss=2664232 KB rc=0
+R export bytes=122853084
+R leanchecker wall=41.65 s rss=2028520 KB rc=0
+R con-leche wall=45.85 s rss=2548668 KB rc=0
+O1D export wall=8.02 s rss=2665568 KB rc=0
+O1D export bytes=122994326
+O1D leanchecker wall=48.77 s rss=2032156 KB rc=0
+O1D con-leche wall=57.13 s rss=2523068 KB rc=0
+O1R export wall=12.91 s rss=2665376 KB rc=0
+O1R export bytes=123268284
+O1R leanchecker wall=49.42 s rss=2031660 KB rc=0
+O1R con-leche wall=92.96 s rss=2529072 KB rc=0
+M3-DONE
+BASE export wall=20.16 s rss=2564772 KB rc=0
+BASE export bytes=45028714
+BASE leanchecker wall=52.38 s rss=175952 KB rc=0
+BASE con-leche wall=31.41 s rss=107836 KB rc=0

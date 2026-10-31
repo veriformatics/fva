@@ -1,0 +1,15 @@
+/-- The `-O1` configuration of each model exit. -/
+def SimExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p : Nat) :
+    Exit → Config → Prop
+  | .normal k a byte, c => ∃ f', LocalsAt ls inst f' [(18, some (p + k + 2)), (19, some a),
+      (4, some a), (3, some (p + k + 1)), (20, some byte), (16, some (p + k + 1)), (17, some a)] ∧
+      c = C.fill ⟨s, f', (b11.drop 2).map .plain⟩
+  | .bound k a, c => ∃ f', LocalsAt ls inst f' [(18, some (p + k + 1)), (19, some a), (4, some a),
+      (3, some (p + k + 1)), (20, if k = 0 then none else some 255),
+      (16, if k = 0 then none else some (p + k)), (17, if k = 0 then none else some a)] ∧
+      c = (Context.label 0 [] ((b11.drop 2).map .plain) C).fill ⟨s, f', (b12.drop 19).map .plain⟩
+  | .overflow k a byte, c => ∃ f', LocalsAt ls inst f' [(18, some (p + k + 1)),
+      (19, some (a - byte)), (4, some a), (3, some (p + k + 1)), (20, some byte),
+      (16, if k = 0 then none else some (p + k)), (17, if k = 0 then none else some (a - byte))] ∧
+      c = (Context.label 0 [] ((b11.drop 2).map .plain) C).fill ⟨s, f', (b12.drop 19).map .plain⟩
+

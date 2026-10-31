@@ -1,0 +1,47 @@
+/-- The model's exit from iteration `j`, accumulator `a` = the sum of the bytes before `j`. -/
+theorem model_ok (b : Nat → UInt8) (p lim acc : Nat) :
+    ∀ n j a, lim - (p + j) = n → a = (if j = 0 then acc else psum acc b (j - 1)) →
+    (∀ i < j, b i = 255) → (∀ i, i + 1 ≤ j → psum acc b i < 2 ^ 31) →
+    ModelOK b p lim acc (extModel b p lim j a) := by
+  intro n
+  induction n with
+  | zero =>
+    intro j a hn ha hff hs
+    rw [extModel]
+    have hb : lim < p + j + 1 := by omega
+    simp only [hb, ite_true]
+    exact ⟨hff, hb, hs, ha⟩
+  | succ n ih =>
+    intro j a hn ha hff hs
+    have hstep : a + (b j).toNat = psum acc b j := by
+      rcases j with _ | j
+      · simp [ha, psum_zero]
+      · simp [ha, psum_succ]
+    rw [extModel]
+    by_cases hb : lim < p + j + 1
+    · simp only [hb, ite_true]; exact ⟨hff, hb, hs, ha⟩
+    simp only [hb, ite_false]
+    by_cases ho : 2147483648 ≤ a + (b j).toNat
+    · simp only [ho, ite_true]
+      exact ⟨hff, by omega, hs, by rw [← hstep]; exact ho, hstep, rfl⟩
+    simp only [ho, ite_false]
+    by_cases h255 : b j = 255
+    · simp only [h255, ite_true]
+      have := ih (j + 1) (a + (b j).toNat) (by omega) (by simp [hstep])
+        (fun i hi => by
+          rcases Nat.lt_succ_iff_lt_or_eq.mp hi with h | rfl
+          · exact hff i h
+          · exact h255)
+        (fun i hi => by
+          rcases Nat.lt_or_ge i j with h | h
+          · exact hs i h
+          · obtain rfl : i = j := by omega
+            rw [← hstep]; omega)
+      rwa [h255] at this
+    · simp only [h255, ite_false]
+      exact ⟨hff, h255, by omega, fun i hi => by
+        rcases Nat.lt_or_ge i j with h | h
+        · exact hs i h
+        · obtain rfl : i = j := by omega
+          rw [← hstep]; omega, hstep, rfl⟩
+

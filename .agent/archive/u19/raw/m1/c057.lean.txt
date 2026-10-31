@@ -1,0 +1,1 @@
+noncomputable def b3 : List Instr := blockCode (b2.getD 0 .nop)

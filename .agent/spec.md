@@ -58,13 +58,12 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
 
 ## Tasks
 
-- [ ] ROUTE: U19 checkpoint 2 + decoder proof scaling → IMPLEMENT (user ruling); Met when: `Phase` holds IMPLEMENT, its scope + the request; MAINTAIN rows moved or ticked; every teammate + started process stopped; the route committed on a clean tree, this row gone
-- [ ] U19 contract: T2 R1–R3 as FVA claims (R1 at the access level, D52's footprint), checkpoints, the route comparison check fixed before either route runs → consultant + scientist + advisor
-- [ ] U19 checkpoint 1: one decoder loop (match copy | length extension) proven with an access-tracking invariant by direct stepping and by refinement to a proof-side model, each measured per the contract
-- [ ] U19 checkpoint 2: the full theorem on the winning route (checkpoint 1 held)
-- [ ] U19 close: results → `Decisions` + contract + archive, gate green
+- [ ] U19 checkpoint 2: the full R1–R3 theorem on `LZ4_decompress_safe` (`FVATest/Subjects/Lz4C`) from the contract inventory (`docs/contracts/U19-decoder-spike.md` Status): I4 `memcpy`/`memmove` contracts + one wildcopy composition first, the I7 main-loop format seam scoped alongside, R1 whole-domain as the first milestone, then R2/R3; proof scaling (D9 block summaries, D52 acceptance, D55) as the inventory demands
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
 
-MAINTAIN — whole product
+IMPLEMENT — lz4 C decoder proof + proof scaling (U19 checkpoint 2)
+> Decoder spike (Recommended)
+> If it is MAINTAIN work then here. If we should route to IMPLEMENT, then that should take place in a fresh session.
+> IMPLEMENT (Recommended)

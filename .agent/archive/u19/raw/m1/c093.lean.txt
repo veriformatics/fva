@@ -1,0 +1,5 @@
+import FVATest.Subjects.Lz4C.ExtRefine
+
+/-! M4 repair, route R: the `-O1` loop simulates the same `extModel`; `model_ok` carries over
+unchanged (proof support; outside the review surface). -/
+

@@ -1,0 +1,175 @@
+/-- One iteration simulates one model step. -/
+theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+    (ma : Nat) (mem : MemInst) (p lim j a : Nat) (f : Frame)
+    (h14 : ls[14]? = some (vI lim)) (hm : inst.mems[0]? = some ma)
+    (hmem : s.mems[ma]? = some mem) (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size)
+    (hlen17 : 17 < ls.length) (hj : p + j ≤ lim) (ha : a < 2 ^ 31) (hi : Sim ls inst p j a f)
+    (hk : p + j + 1 ≤ lim → a + (mem.byte (p + j)).toNat < 2 ^ 31 → ∀ f',
+      Sim ls inst p (j + 1) (a + (mem.byte (p + j)).toNat) f' →
+      Until H (Within (fun m x => m = ma ∧ p ≤ x ∧ x < lim) (fun _ _ => False))
+        (SimExit C s inst ls p (extModel (fun i => mem.byte (p + i)) p lim (j + 1)
+          (a + (mem.byte (p + j)).toNat))) (head C s f')) :
+    Until H (Within (fun m x => m = ma ∧ p ≤ x ∧ x < lim) (fun _ _ => False))
+      (SimExit C s inst ls p (extModel (fun i => mem.byte (p + i)) p lim j a)) (head C s f) := by
+  have hf14 : f.locals[14]? = some (vI lim) := by
+    rw [hi.others 14 (by decide) (by decide) (by decide) (by decide), h14]
+  have hlenf : f.locals.length = ls.length := hi.len
+  have hadd := iadd_ofNat (p + j) 1
+  have hgt := igtU_ofNat (a := p + j + 1) (b := lim) (by omega) (by omega)
+  rw [extModel]
+  unfold head
+  simp only [ctx9, Context.fill]
+  wasm_cstepu [extBody, hi.l2]
+  · wasm_within [extBody]
+  wasm_cstepu [extBody, hi.l2, hadd]
+  · wasm_within [extBody]
+  wasm_cstepu [extBody, hi.l2, hadd]
+  · wasm_within [extBody]
+  wasm_cstepu [extBody, hi.l2, hadd, show 4 < f.locals.length by omega]
+  · wasm_within [extBody]
+  wasm_cstepu [extBody, getElem?_set_of_ne (show (4 : Nat) ≠ 14 by decide), hf14]
+  · wasm_within [extBody]
+  wasm_cstepu [extBody, hgt]
+  · wasm_within [extBody]
+  by_cases hb : lim < p + j + 1
+  · have hc : Num.bool (decide (lim < p + j + 1)) = 1 := by simp [hb, bool_true]
+    wasm_cstepu [extBody, hc, one_ne]
+    · wasm_within [extBody]
+    wasm_cstepu [extBody]
+    · wasm_within [extBody]
+    simp only [hb, ite_true]
+    refine Until.done ⟨⟨f.locals.set 4 (vI (p + j + 1)), f.inst⟩,
+      ⟨hi.inst, by simp [hlenf], fun i h₂ h₄ h₁₅ h₁₇ => ?_, ?_, ?_, ?_, ?_⟩, rfl⟩
+    · rw [getElem?_set_of_ne (Ne.symm h₄)]; exact hi.others i h₂ h₄ h₁₅ h₁₇
+    · rw [getElem?_set_of_ne (by decide)]; exact hi.l2
+    · rw [List.getElem?_set_self (by omega)]
+    · rw [getElem?_set_of_ne (by decide), hi.l15]; split <;> rfl
+    · rw [getElem?_set_of_ne (by decide), hi.l17]; rfl
+  · have hc : Num.bool (decide (lim < p + j + 1)) = 0 := by simp [hb, bool_false]
+    have hle : p + j + 1 ≤ lim := by omega
+    have hm' : f.inst.mems[0]? = some ma := by rw [hi.inst]; exact hm
+    have hpj : (BitVec.ofNat 32 (p + j)).toNat = p + j := ofNat_toNat (by omega)
+    have hblt : decide (mem.size < p + j + 1) = false := by simp; omega
+    have hbyte : (mem.byte (p + j)).toNat < 256 := (mem.byte (p + j)).toNat_lt
+    have hadd2 := iadd_ofNat a (mem.byte (p + j)).toNat
+    have hlt := iltS_zero (a := a + (mem.byte (p + j)).toNat) (by omega)
+    have h15ls : 15 < ls.length := by omega
+    wasm_cstepu [extBody, hc, zero_eq]
+    · wasm_within [extBody]
+    simp only [hb, ite_false]
+    wasm_cstepu [extBody, getElem?_set_of_ne (show (4 : Nat) ≠ 17 by decide), hi.l17]
+    · wasm_within [extBody]
+    wasm_cstepu [extBody, getElem?_set_of_ne (show (4 : Nat) ≠ 2 by decide), hi.l2]
+    · wasm_within [extBody]
+    wasm_cstepu [extBody, hm', hmem, hpj, hblt, read_one, PackSize.bits, packedVal,
+      Nat.add_zero]
+    · wasm_within [extBody, hm', hmem, hpj, hblt, PackSize.bits, Nat.add_zero]
+      exact ⟨fun x h₁ h₂ => ⟨trivial, by omega, by omega⟩, by simp⟩
+    iterate 5 (wasm_cstepu [extBody, List.length_set, hlenf, h15ls, hlen17, hadd2]
+               · wasm_within [extBody])
+    by_cases ho : 2147483648 ≤ a + (mem.byte (p + j)).toNat
+    · have hlt1 : iltS (BitVec.ofNat 32 (a + (mem.byte (p + j)).toNat)) (BitVec.ofNat 32 0) = 1 := by
+        rw [hlt]; simp [ho, bool_true]
+      wasm_cstepu [extBody, hlt1]
+      · wasm_within [extBody]
+      wasm_cstepu [extBody, one_ne]
+      · wasm_within [extBody]
+      wasm_cstepu [extBody]
+      · wasm_within [extBody]
+      simp only [ho, ite_true]
+      refine Until.done ⟨⟨((f.locals.set 4 (vI (p + j + 1))).set 15
+        (vI (mem.byte (p + j)).toNat)).set 17 (vI (a + (mem.byte (p + j)).toNat)), f.inst⟩,
+        ⟨hi.inst, by simp [hlenf], fun i h₂ h₄ h₁₅ h₁₇ => ?_, ?_, ?_, ?_, ?_⟩, rfl⟩
+      · rw [getElem?_set_of_ne (Ne.symm h₁₇), getElem?_set_of_ne (Ne.symm h₁₅),
+          getElem?_set_of_ne (Ne.symm h₄)]; exact hi.others i h₂ h₄ h₁₅ h₁₇
+      · rw [getElem?_set_of_ne (by decide), getElem?_set_of_ne (by decide),
+          getElem?_set_of_ne (by decide)]; exact hi.l2
+      · rw [getElem?_set_of_ne (by decide), getElem?_set_of_ne (by decide),
+          List.getElem?_set_self (by omega)]
+      · rw [getElem?_set_of_ne (by decide), List.getElem?_set_self (by simp; omega)]; rfl
+      · rw [List.getElem?_set_self (by simp; omega)]; rfl
+    · have hlt0 : iltS (BitVec.ofNat 32 (a + (mem.byte (p + j)).toNat)) (BitVec.ofNat 32 0) = 0 := by
+        rw [hlt]; simp [ho, bool_false]
+      have h2ls : 2 < ls.length := by omega
+      have h4ls : 4 < ls.length := by omega
+      simp only [ho, ite_false]
+      wasm_cstepu [extBody, hlt0]
+      · wasm_within [extBody]
+      wasm_cstepu [extBody, zero_eq]
+      · wasm_within [extBody]
+      wasm_cstepu [extBody, getElem?_set_of_ne (show (17 : Nat) ≠ 4 by decide),
+        getElem?_set_of_ne (show (15 : Nat) ≠ 4 by decide), List.getElem?_set_self,
+        List.length_set, hlenf, h4ls]
+      · wasm_within [extBody]
+      wasm_cstepu [extBody, List.length_set, hlenf, h2ls]
+      · wasm_within [extBody]
+      wasm_cstepu [extBody, getElem?_set_of_ne (show (2 : Nat) ≠ 15 by decide),
+        getElem?_set_of_ne (show (17 : Nat) ≠ 15 by decide), List.getElem?_set_self,
+        List.length_set, hlenf, h15ls]
+      · wasm_within [extBody]
+      have hb255 := ieq_ofNat (a := (mem.byte (p + j)).toNat) (b := 255) (by omega) (by decide)
+      by_cases hff : mem.byte (p + j) = 255
+      · have heq1 : ieq (BitVec.ofNat 32 (mem.byte (p + j)).toNat) (BitVec.ofNat 32 255) = 1 := by
+          rw [hb255, hff]; rfl
+        wasm_cstepu [extBody, heq1]
+        · wasm_within [extBody]
+        wasm_cstepu [extBody, one_ne]
+        · wasm_within [extBody]
+        wasm_cstepu [extBody]
+        · wasm_within [extBody]
+        wasm_cstepu [extBody]
+        · wasm_within [extBody]
+        simp only [hff, ite_true]
+        have hsim : Sim ls inst p (j + 1) (a + (mem.byte (p + j)).toNat)
+            ⟨(((f.locals.set 4 (vI (p + j + 1))).set 15 (vI (mem.byte (p + j)).toNat)).set 17
+              (vI (a + (mem.byte (p + j)).toNat))).set 2 (vI (p + j + 1)), f.inst⟩ :=
+          { inst := hi.inst
+            len := by simp [hlenf]
+            others := fun i h₂ h₄ h₁₅ h₁₇ => by
+              simp only
+              rw [getElem?_set_of_ne (Ne.symm h₂), getElem?_set_of_ne (Ne.symm h₁₇),
+                getElem?_set_of_ne (Ne.symm h₁₅), getElem?_set_of_ne (Ne.symm h₄)]
+              exact hi.others i h₂ h₄ h₁₅ h₁₇
+            l2 := by simp only; rw [List.getElem?_set_self (by simp; omega)]; rfl
+            l15 := by
+              simp only [Nat.add_one_ne_zero, ite_false]
+              rw [getElem?_set_of_ne (by decide), getElem?_set_of_ne (by decide),
+                List.getElem?_set_self (by simp; omega), hff]; rfl
+            l17 := by
+              simp only
+              rw [getElem?_set_of_ne (by decide), List.getElem?_set_self (by simp; omega)] }
+        have hnext := hk hle (by omega) _ hsim
+        rw [hff] at hnext
+        simpa only [head, ctx9, Context.fill, extBody, List.map_cons, List.map_nil] using hnext
+      · have heq0 : ieq (BitVec.ofNat 32 (mem.byte (p + j)).toNat) (BitVec.ofNat 32 255) = 0 := by
+          rw [hb255]
+          have : ((mem.byte (p + j)).toNat == 255) = false := by
+            rw [beq_eq_false_iff_ne]; intro h; exact hff (UInt8.toNat_inj.mp (by simpa using h))
+          rw [this]; rfl
+        wasm_cstepu [extBody, heq0]
+        · wasm_within [extBody]
+        wasm_cstepu [extBody, zero_eq]
+        · wasm_within [extBody]
+        wasm_cstepu [extBody]
+        · wasm_within [extBody]
+        wasm_cstepu [extBody]
+        · wasm_within [extBody]
+        simp only [hff, ite_false]
+        refine Until.done ⟨⟨(((f.locals.set 4 (vI (p + j + 1))).set 15
+          (vI (mem.byte (p + j)).toNat)).set 17 (vI (a + (mem.byte (p + j)).toNat))).set 2
+          (vI (p + j + 1)), f.inst⟩, ⟨hi.inst, by simp [hlenf], fun i h₂ h₄ h₁₅ h₁₇ => ?_, ?_, ?_,
+          ?_, ?_⟩, by simp only [ctx8, Context.fill]⟩
+        · simp only
+          rw [getElem?_set_of_ne (Ne.symm h₂), getElem?_set_of_ne (Ne.symm h₁₇),
+            getElem?_set_of_ne (Ne.symm h₁₅), getElem?_set_of_ne (Ne.symm h₄)]
+          exact hi.others i h₂ h₄ h₁₅ h₁₇
+        · simp only; rw [List.getElem?_set_self (by simp; omega)]
+        · simp only
+          rw [getElem?_set_of_ne (by decide), getElem?_set_of_ne (by decide),
+            getElem?_set_of_ne (by decide), List.getElem?_set_self (by omega)]
+        · simp only
+          rw [getElem?_set_of_ne (by decide), getElem?_set_of_ne (by decide),
+            List.getElem?_set_self (by simp; omega)]; rfl
+        · simp only
+          rw [getElem?_set_of_ne (by decide), List.getElem?_set_self (by simp; omega)]; rfl
+

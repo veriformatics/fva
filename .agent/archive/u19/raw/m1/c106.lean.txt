@@ -1,0 +1,6 @@
+theorem psum_sub (acc : Nat) (b : Nat → UInt8) (k : Nat) :
+    psum acc b k - (b k).toNat = if k = 0 then acc else psum acc b (k - 1) := by
+  rcases k with _ | k
+  · simp [psum_zero]
+  · simp [psum_succ]
+

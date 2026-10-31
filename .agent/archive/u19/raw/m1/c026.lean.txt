@@ -1,0 +1,12 @@
+/-- The exit locals' unchanged part, from the head frame's. -/
+theorem locals_of_inv {b : Nat → UInt8} {j : Nat} {f : Frame} (hi : Inv ls inst p lim acc b j f)
+    {l2 l4 : Nat} {v15 v17 : Option Nat} {f' : Frame}
+    (hinst : f'.inst = inst) (hlen : f'.locals.length = f.locals.length)
+    (hother : ∀ i, i ≠ 2 → i ≠ 4 → i ≠ 15 → i ≠ 17 → f'.locals[i]? = f.locals[i]?)
+    (h2 : f'.locals[2]? = some (vI l2)) (h4 : f'.locals[4]? = some (vI l4))
+    (h15 : f'.locals[15]? = (v15.map vI <|> ls[15]?))
+    (h17' : f'.locals[17]? = (v17.map vI <|> ls[17]?)) :
+    Locals ls inst f' l2 l4 v15 v17 :=
+  ⟨hinst, hlen.trans hi.len, fun i h₂ h₄ h₁₅ h₁₇ => (hother i h₂ h₄ h₁₅ h₁₇).trans
+    (hi.others i h₂ h₄ h₁₅ h₁₇), h2, h4, h15, h17'⟩
+

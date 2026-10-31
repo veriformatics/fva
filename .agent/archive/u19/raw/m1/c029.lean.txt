@@ -1,0 +1,7 @@
+/-- The accumulator at a head stays below `2^31`. -/
+theorem run_lt {b : Nat → UInt8} {j : Nat} {f : Frame} (hi : Inv ls inst p lim acc b j f)
+    (hacc : acc < 2 ^ 31) : run acc b j < 2 ^ 31 := by
+  rcases j with _ | j
+  · simpa [run_zero] using hacc
+  · rw [← psum_eq]; exact hi.sums j le_rfl
+

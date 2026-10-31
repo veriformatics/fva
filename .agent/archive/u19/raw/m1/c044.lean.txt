@@ -1,0 +1,20 @@
+/-- The loop simulates the model from every head. -/
+theorem sim (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+    (ma : Nat) (mem : MemInst) (p lim : Nat)
+    (h14 : ls[14]? = some (vI lim)) (hm : inst.mems[0]? = some ma)
+    (hmem : s.mems[ma]? = some mem) (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size)
+    (hlen17 : 17 < ls.length) :
+    ∀ n j a f, lim - (p + j) = n → p + j ≤ lim → a < 2 ^ 31 → Sim ls inst p j a f →
+    Until H (Within (fun m x => m = ma ∧ p ≤ x ∧ x < lim) (fun _ _ => False))
+      (SimExit C s inst ls p (extModel (fun i => mem.byte (p + i)) p lim j a)) (head C s f) := by
+  intro n
+  induction n with
+  | zero =>
+    intro j a f hn hj ha hi
+    exact sim_one H C s inst ls ma mem p lim j a f h14 hm hmem hlim hsize hlen17 hj ha hi
+      (fun hle => absurd hle (by omega))
+  | succ n ih =>
+    intro j a f hn hj ha hi
+    exact sim_one H C s inst ls ma mem p lim j a f h14 hm hmem hlim hsize hlen17 hj ha hi
+      (fun hle ha' f' hi' => ih (j + 1) _ f' (by omega) hle ha' hi')
+

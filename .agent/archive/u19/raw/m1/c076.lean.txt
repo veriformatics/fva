@@ -1,0 +1,11 @@
+/-- `ExtL1` for the `-O1` loop. -/
+def ExtL1O1 : Prop :=
+  ∀ (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
+    (mem : MemInst) (p lim acc : Nat),
+    ls[18]? = some (vI (p + 1)) → ls[14]? = some (vI lim) → ls[19]? = some (vI acc) →
+    20 < ls.length → inst.mems[0]? = some ma → s.mems[ma]? = some mem →
+    p ≤ lim → lim + 1 < 2 ^ 32 → lim ≤ mem.size → acc < 2 ^ 31 →
+    Until H (Within (fun m a => m = ma ∧ p ≤ a ∧ a < lim) (fun _ _ => False))
+      (ExtExit C s inst ls p lim acc fun j => mem.byte (p + j))
+      ((ctx C).fill ⟨s, ⟨ls, inst⟩, [.plain extLoop]⟩)
+

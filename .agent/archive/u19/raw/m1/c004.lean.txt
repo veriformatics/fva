@@ -1,0 +1,4 @@
+/-- The loop head: the loop's label holding its whole body, frame `f`. -/
+noncomputable def head (C : Context) (s : Store) (f : Frame) : Config :=
+  (ctx9 C).fill ⟨s, f, [.label 0 [.loop .empty extBody] (extBody.map .plain)]⟩
+

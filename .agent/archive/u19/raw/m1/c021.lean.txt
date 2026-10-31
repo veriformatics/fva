@@ -1,0 +1,4 @@
+/-- `acc + b 0 + … + b (j − 1)`: the accumulator at the head of iteration `j`. -/
+def run (acc : Nat) (b : Nat → UInt8) (j : Nat) : Nat :=
+  acc + ((List.range j).map fun i => (b i).toNat).sum
+

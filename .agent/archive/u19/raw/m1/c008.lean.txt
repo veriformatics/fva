@@ -1,0 +1,7 @@
+theorem iltS_zero {a : Nat} (ha : a < 2 ^ 32) :
+    iltS (BitVec.ofNat 32 a) (BitVec.ofNat 32 0) = bool (decide (2147483648 ≤ a)) := by
+  simp only [iltS, signed, ofNat_toNat ha, BitVec.toNat_ofNat, Nat.zero_mod]
+  congr 1
+  simp only [decide_eq_decide]
+  split <;> omega
+
