@@ -53,23 +53,6 @@ theorem const_singleton {C : Context} {e : Expr} {t : ValType}
   subst u
   exact ⟨i, rfl, hci, hi⟩
 
-theorem no_step_values {H : HostSem} {s : Store} {f : Frame} {vs : List Val} {c : Config} :
-    ¬Step H ⟨s, f, vals vs⟩ c := by
-  intro hs
-  have hu : Ref.seqUnique s f [] (vals vs ++ []) = true := by
-    rw [Ref.seqUnique_vals]
-    rfl
-  have hc := Ref.seq_complete hs [] [] hu
-  simp [Ref.seq_values] at hc
-
-theorem steps_values {H : HostSem} {s : Store} {f : Frame} {vs : List Val} {c : Config}
-    (h : Steps H ⟨s, f, vals vs⟩ c) : c = ⟨s, f, vals vs⟩ := by
-  induction h with
-  | refl => rfl
-  | tail h hs ih =>
-    subst_vars
-    exact False.elim (no_step_values hs)
-
 theorem value_inj {v w : Val} (h : v.instr = w.instr) : v = w := by
   have hv := congrArg Ref.toVal h
   simpa only [Ref.toVal_instr, Option.some.injEq] using hv
@@ -79,10 +62,10 @@ theorem value_of_step {H : HostSem} {c : Config} {s : Store} {f : Frame} {v w : 
     (h : Steps H c ⟨s, f, [v.instr]⟩) : v = w := by
   rcases h.cases_head with hc | ⟨mid, h₀, hrest⟩
   · subst c
-    exact False.elim (no_step_values (vs := [v]) (Ref.step_sound (H := H) hs))
+    exact False.elim (Ref.no_step_values (vs := [v]) (Ref.step_sound (H := H) hs))
   · have hmid := Ref.step_complete h₀ hs hu
     subst mid
-    have hv := congrArg Config.instrs (steps_values (vs := [w]) hrest)
+    have hv := congrArg Config.instrs (Ref.steps_values (vs := [w]) hrest)
     exact value_inj (List.singleton_inj.mp hv)
 
 /-- Initializer values need only the imported globals and the allocated function addresses;
@@ -104,12 +87,12 @@ theorem constant_value {H : HostSem} {s : Store} {inst : ModuleInst} {C : Contex
     cases w with
     | w32 =>
       let w : Val := .i32 ⟨n, hn⟩
-      have hv := congrArg Config.instrs (steps_values (vs := [w]) steps)
+      have hv := congrArg Config.instrs (Ref.steps_values (vs := [w]) steps)
       have heq : v = w := value_inj (List.singleton_inj.mp hv)
       simpa [heq, w, Val.HasType]
     | w64 =>
       let w : Val := .i64 ⟨n, hn⟩
-      have hv := congrArg Config.instrs (steps_values (vs := [w]) steps)
+      have hv := congrArg Config.instrs (Ref.steps_values (vs := [w]) steps)
       have heq : v = w := value_inj (List.singleton_inj.mp hv)
       simpa [heq, w, Val.HasType]
   case fconst w n =>
@@ -118,17 +101,17 @@ theorem constant_value {H : HostSem} {s : Store} {inst : ModuleInst} {C : Contex
     cases w with
     | w32 =>
       let w : Val := .f32 ⟨n, hn⟩
-      have hv := congrArg Config.instrs (steps_values (vs := [w]) steps)
+      have hv := congrArg Config.instrs (Ref.steps_values (vs := [w]) steps)
       have heq : v = w := value_inj (List.singleton_inj.mp hv)
       simpa [heq, w, Val.HasType]
     | w64 =>
       let w : Val := .f64 ⟨n, hn⟩
-      have hv := congrArg Config.instrs (steps_values (vs := [w]) steps)
+      have hv := congrArg Config.instrs (Ref.steps_values (vs := [w]) steps)
       have heq : v = w := value_inj (List.singleton_inj.mp hv)
       simpa [heq, w, Val.HasType]
   case refNull rt =>
     cases hi
-    have hv := congrArg Config.instrs (steps_values (vs := [.ref (.null rt)]) steps)
+    have hv := congrArg Config.instrs (Ref.steps_values (vs := [.ref (.null rt)]) steps)
     have heq : v = .ref (.null rt) := value_inj (List.singleton_inj.mp hv)
     simp [heq, Val.HasType]
   case refFunc x =>

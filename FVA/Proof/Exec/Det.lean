@@ -496,4 +496,83 @@ theorem runDet_must {H : HostSem} {Q : Outcome → Prop} {n : Nat} {c c' : Confi
             exact Must.done hf (hQ _ hf)
         | _ => simp only [hs, reduceCtorEq] at h
 
+theorem _root_.FVA.Wasm.Exec.Val.instr_inj {v w : Val} : v.instr = w.instr ↔ v = w := by
+  constructor
+  · intro h
+    have := congrArg toVal h
+    rwa [toVal_instr, toVal_instr, Option.some.injEq] at this
+  · rintro rfl; rfl
+
+theorem _root_.FVA.Wasm.Exec.vals_inj {vs ws : List Val} : vals vs = vals ws ↔ vs = ws := by
+  constructor
+  · intro h
+    exact List.map_injective_iff.mpr (fun _ _ h => Val.instr_inj.mp h) h
+  · rintro rfl; rfl
+
+theorem _root_.FVA.Wasm.Exec.vals_ne_trap (vs : List Val) : vals vs ≠ [.trap] := by
+  rcases vs with _ | ⟨v, vs⟩
+  · simp [vals]
+  · intro h
+    have := congrArg List.head? h
+    simp only [vals, List.map_cons, List.head?_cons, Option.some.injEq] at this
+    have hv := congrArg toVal this
+    have ht : toVal AInstr.trap = none := rfl
+    rw [toVal_instr, ht] at hv
+    cases hv
+
+theorem no_step_values {H : HostSem} {s : Store} {f : Frame} {vs : List Val} {c : Config} :
+    ¬Step H ⟨s, f, vals vs⟩ c := by
+  intro hs
+  have hu : seqUnique s f [] (vals vs ++ []) = true := by
+    rw [seqUnique_vals]
+    rfl
+  have hc := seq_complete hs [] [] hu
+  simp [seq_values] at hc
+
+theorem steps_values {H : HostSem} {s : Store} {f : Frame} {vs : List Val} {c : Config}
+    (h : Steps H ⟨s, f, vals vs⟩ c) : c = ⟨s, f, vals vs⟩ := by
+  induction h with
+  | refl => rfl
+  | tail h hs ih =>
+    subst_vars
+    exact False.elim (no_step_values hs)
+
+theorem no_step_trap {H : HostSem} {s : Store} {f : Frame} {c : Config} :
+    ¬Step H ⟨s, f, [.trap]⟩ c := by
+  intro hs
+  obtain ⟨-, -, ht, hsize⟩ := step_traps hs [] rfl
+  rw [List.append_nil] at ht
+  have h0 : seqSize c.instrs = 0 := by simp only [seqSize, adminSize] at hsize; omega
+  rw [(seqSize_zero _).mp h0] at ht
+  exact absurd ht (by decide)
+
+/-- A finished configuration has no successor. -/
+theorem no_step_final {H : HostSem} {c c' : Config} {o : Outcome} (hf : Final c o) :
+    ¬Step H c c' := by
+  obtain ⟨s, f, es⟩ := c
+  cases o with
+  | returned s' vs => obtain ⟨-, rfl⟩ := hf; exact no_step_values
+  | trapped s' => obtain ⟨-, rfl⟩ := hf; exact no_step_trap
+
+theorem final_unique {c : Config} {o o' : Outcome} (h : Final c o) (h' : Final c o') : o = o' := by
+  cases o <;> cases o' <;> obtain ⟨hs, hi⟩ := h <;> obtain ⟨hs', hi'⟩ := h'
+  · rw [← hs, ← hs', vals_inj.mp (hi.symm.trans hi')]
+  · exact absurd (hi.symm.trans hi') (vals_ne_trap _)
+  · exact absurd (hi'.symm.trans hi) (vals_ne_trap _)
+  · rw [← hs, ← hs']
+
+/-- Every finished execution from a `Must` start has an outcome satisfying its postcondition:
+`Must` fixes the outcome of every run, so a run that `Steps` names ends in one of them. -/
+theorem _root_.FVA.Wasm.Exec.Must.outcome {H : HostSem} {Q : Outcome → Prop} {c d : Config}
+    {o : Outcome} (hm : Must H Q c) (hs : Steps H c d) (hf : Final d o) : Q o := by
+  induction hm with
+  | done hc hq =>
+    rcases hs.cases_head with rfl | ⟨_, h, _⟩
+    · exact final_unique hc hf ▸ hq
+    · exact absurd h (no_step_final hc)
+  | @next c₀ hex hnext ih =>
+    rcases hs.cases_head with rfl | ⟨c₁, h, hrest⟩
+    · obtain ⟨_, h⟩ := hex; exact absurd h (no_step_final hf)
+    · exact ih c₁ h hrest
+
 end FVA.Wasm.Exec.Ref

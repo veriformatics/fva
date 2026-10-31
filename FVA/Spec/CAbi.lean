@@ -1,4 +1,5 @@
 import FVA.Spec.Exec.Instantiate
+import FVA.Spec.Exec.Access
 
 /-!
 # Claim vocabulary for compiled exports (reviewed once; contract U8 C1)
@@ -32,6 +33,14 @@ ends, none traps. -/
 def Returns (m : Module) (name : String) (args results : List Val) : Prop :=
   Instantiable m ∧
     ∀ H s inst, Instance m H s inst → CallReturns H s inst name args fun _ vs => vs = results
+
+/-- Export `name` of `inst`, called on `args` in store `s`: the invocation is defined, and every
+configuration of every execution reads only bytes with `R ma a` and writes only bytes with
+`W ma a` (`Within`). A safety statement: termination and results are `CallReturns`'s. -/
+def CallWithin (H : HostSem) (s : Store) (inst : ModuleInst) (name : String) (args : List Val)
+    (R W : Nat → Nat → Prop) : Prop :=
+  ∃ a, inst.exportFunc name = some a ∧ InvokeOK s a args ∧
+    Throughout H (Within R W) (invokeConfig s a args)
 
 /-- Memory 0 of `s` exists and has room for `n` bytes at address `p`. -/
 def Fits (s : Store) (p n : Nat) : Prop :=

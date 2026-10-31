@@ -7,6 +7,7 @@ import FVA.Spec.Numerics.Float
 import FVA.Spec.Exec.Runtime
 import FVA.Spec.Exec.Numeric
 import FVA.Spec.Exec.Step
+import FVA.Spec.Exec.Access
 import FVA.Spec.Exec.Instantiate
 import FVA.Spec.Claims
 import FVA.Spec.Exec.Host
@@ -16,6 +17,7 @@ import FVA.Spec.Valid.Soundness
 import FVA.Impl.Valid
 import FVA.Impl.Numerics.Float
 import FVA.Impl.Exec.Ref
+import FVA.Impl.Exec.Access
 import FVA.Lifted
 import FVA.Proof.Decode.Reader
 import FVA.Proof.Decode.Name
@@ -40,6 +42,7 @@ import FVA.Proof.Exec.SoundLemmas
 import FVA.Proof.Exec.Sound
 import FVA.Proof.Exec.DetLemmas
 import FVA.Proof.Exec.Det
+import FVA.Proof.Exec.Access
 import FVA.Proof.Exec.Choice
 import FVA.Proof.Exec.Spike
 import FVA.Proof.Exec.Instantiate
@@ -51,6 +54,7 @@ import FVA.Proof.Valid.Instantiate
 import FVA.Proof.Valid.Corollary
 import FVA.Proof.Valid.InstantiateBounds
 import FVA.Proof.Lib
+import FVA.Proof.Lib.FootprintExamples
 import FVA.Explain
 import FVA.Spec.Trust
 import FVA.Trust.Verdict

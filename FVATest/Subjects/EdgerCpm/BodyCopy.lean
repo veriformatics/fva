@@ -1,4 +1,5 @@
-import FVATest.Subjects.EdgerCpm.BodyContext
+import FVATest.Subjects.EdgerCpm.BodyMemory
+import FVA.Proof.Lib.Context
 import FVATest.Subjects.EdgerCpm.BodyHeap
 import FVATest.Subjects.EdgerCpm.BodyFrame
 import FVATest.Subjects.EdgerCpm.BodyCode
