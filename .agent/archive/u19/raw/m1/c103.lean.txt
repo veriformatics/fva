@@ -1,0 +1,20 @@
+macro "locals_at" " [" ls:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| (
+  intro i
+  by_cases h₃ : i = 3; · subst h₃; simp [List.getElem?_set, List.lookup, beq_iff_eq, $ls,*]
+  by_cases h₄ : i = 4; · subst h₄; simp [List.getElem?_set, List.lookup, beq_iff_eq, $ls,*]
+  by_cases h₁₆ : i = 16; · subst h₁₆; simp [List.getElem?_set, List.lookup, beq_iff_eq, $ls,*]
+  by_cases h₁₇ : i = 17; · subst h₁₇; simp [List.getElem?_set, List.lookup, beq_iff_eq, $ls,*]
+  by_cases h₁₈ : i = 18; · subst h₁₈; simp [List.getElem?_set, List.lookup, beq_iff_eq, $ls,*]
+  by_cases h₁₉ : i = 19; · subst h₁₉; simp [List.getElem?_set, List.lookup, beq_iff_eq, $ls,*]
+  by_cases h₂₀ : i = 20; · subst h₂₀; simp [List.getElem?_set, List.lookup, beq_iff_eq, $ls,*]
+  have e₃ : (i == 3) = false := by simpa using h₃
+  have e₄ : (i == 4) = false := by simpa using h₄
+  have e₁₆ : (i == 16) = false := by simpa using h₁₆
+  have e₁₇ : (i == 17) = false := by simpa using h₁₇
+  have e₁₈ : (i == 18) = false := by simpa using h₁₈
+  have e₁₉ : (i == 19) = false := by simpa using h₁₉
+  have e₂₀ : (i == 20) = false := by simpa using h₂₀
+  simp [List.getElem?_set, List.lookup, Ne.symm h₃, Ne.symm h₄, Ne.symm h₁₆, Ne.symm h₁₇,
+    Ne.symm h₁₈, Ne.symm h₁₉, Ne.symm h₂₀, h₃, h₄, h₁₆, h₁₇, h₁₈, h₁₉, h₂₀, e₃, e₄, e₁₆, e₁₇, e₁₈,
+    e₁₉, e₂₀, $ls,*]))
+

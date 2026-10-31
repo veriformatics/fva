@@ -1,0 +1,2 @@
+/-- The two blocks around the loop: the one holding it (its error path after it) and the one
+the normal exit leaves; `C` = the rest. -/

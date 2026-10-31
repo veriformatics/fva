@@ -1,0 +1,10 @@
+/-- What a model exit says about the bytes (no wasm here). -/
+def ModelOK (b : Nat → UInt8) (p lim acc : Nat) : Exit → Prop
+  | .normal k a byte => (∀ i < k, b i = 255) ∧ b k ≠ 255 ∧ p + k + 1 ≤ lim ∧
+      (∀ i ≤ k, psum acc b i < 2 ^ 31) ∧ a = psum acc b k ∧ byte = (b k).toNat
+  | .bound k a => (∀ i < k, b i = 255) ∧ lim < p + k + 1 ∧ (∀ i, i + 1 ≤ k → psum acc b i < 2 ^ 31) ∧
+      a = (if k = 0 then acc else psum acc b (k - 1))
+  | .overflow k a byte => (∀ i < k, b i = 255) ∧ p + k + 1 ≤ lim ∧
+      (∀ i, i + 1 ≤ k → psum acc b i < 2 ^ 31) ∧ 2 ^ 31 ≤ psum acc b k ∧ a = psum acc b k ∧
+      byte = (b k).toNat
+

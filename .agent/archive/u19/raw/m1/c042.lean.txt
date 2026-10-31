@@ -1,0 +1,11 @@
+/-- The wasm configuration of each model exit. -/
+def SimExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p : Nat) :
+    Exit → Config → Prop
+  | .normal k a byte, c => ∃ f', Locals ls inst f' (p + k + 1) (p + k + 1) (some byte) (some a) ∧
+      c = (ctx8 C).fill ⟨s, f', (body8.drop 4).map .plain⟩
+  | .bound k a, c => ∃ f', Locals ls inst f' (p + k) (p + k + 1)
+      (if k = 0 then none else some 255) (some a) ∧
+      c = C.fill ⟨s, f', (body2.drop 1).map .plain⟩
+  | .overflow k a byte, c => ∃ f', Locals ls inst f' (p + k) (p + k + 1) (some byte) (some a) ∧
+      c = C.fill ⟨s, f', (body2.drop 1).map .plain⟩
+

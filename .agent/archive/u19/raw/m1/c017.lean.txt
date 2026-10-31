@@ -1,0 +1,6 @@
+import FVATest.Subjects.Lz4C.ExtCommon
+
+/-! Checkpoint 1, route D (direct): `ExtL1` by stepping the loop with an invariant over the loop
+head's frame, by induction on the bytes left before `lim` (proof support; outside the review
+surface). -/
+

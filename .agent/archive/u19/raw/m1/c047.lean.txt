@@ -1,0 +1,4 @@
+theorem psum_succ (acc : Nat) (b : Nat → UInt8) (k : Nat) :
+    psum acc b (k + 1) = psum acc b k + (b (k + 1)).toNat := by
+  simp [psum, List.range_succ, Nat.add_assoc]
+

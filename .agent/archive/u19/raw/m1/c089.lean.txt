@@ -1,0 +1,20 @@
+/-- Every `-O1` iteration, by induction on the bytes left before `lim`. -/
+theorem iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+    (ma : Nat) (mem : MemInst) (p lim acc : Nat)
+    (h14 : ls[14]? = some (vI lim)) (hm : inst.mems[0]? = some ma)
+    (hmem : s.mems[ma]? = some mem) (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size)
+    (h20 : 20 < ls.length) (hacc : acc < 2 ^ 31) :
+    ∀ n j f, lim - (p + j) = n → Inv ls inst p lim acc (fun i => mem.byte (p + i)) j f →
+    Until H (Within (fun m x => m = ma ∧ p ≤ x ∧ x < lim) (fun _ _ => False))
+      (ExtExit C s inst ls p lim acc (fun i => mem.byte (p + i))) (head C s f) := by
+  intro n
+  induction n with
+  | zero =>
+    intro j f hn hi
+    exact one_iter H C s inst ls ma mem p lim acc j f h14 hm hmem hlim hsize h20 hacc hi
+      (fun hle => absurd hle (by have := hi.bound; omega))
+  | succ n ih =>
+    intro j f hn hi
+    exact one_iter H C s inst ls ma mem p lim acc j f h14 hm hmem hlim hsize h20 hacc hi
+      (fun _ f' hi' => ih (j + 1) f' (by omega) hi')
+

@@ -1,0 +1,2 @@
+theorem extLoop_eq : extLoop = .loop .empty extBody := by kernel_rfl
+

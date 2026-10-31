@@ -1,0 +1,9 @@
+/-- The frame at the head of iteration `j` holds the model's state `(p + j, a)`. -/
+structure Sim (ls : List Val) (inst : ModuleInst) (p : Nat) (j a : Nat) (f : Frame) : Prop where
+  inst : f.inst = inst
+  len : f.locals.length = ls.length
+  others : ∀ i, i ≠ 2 → i ≠ 4 → i ≠ 15 → i ≠ 17 → f.locals[i]? = ls[i]?
+  l2 : f.locals[2]? = some (vI (p + j))
+  l15 : f.locals[15]? = if j = 0 then ls[15]? else some (vI 255)
+  l17 : f.locals[17]? = some (vI a)
+

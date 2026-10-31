@@ -1,0 +1,6 @@
+theorem igtU_ofNat {a b : Nat} (ha : a < 2 ^ 32) (hb : b < 2 ^ 32) :
+    igtU (BitVec.ofNat 32 a) (BitVec.ofNat 32 b) = bool (decide (b < a)) := by
+  simp only [igtU, ofNat_toNat ha, ofNat_toNat hb, gt_iff_lt]
+
+-- the literal `2147483648`, never `2 ^ 31`: simp would rewrite the power inside `decide`, leaving
+-- an instance no later lemma matches

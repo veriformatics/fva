@@ -1,0 +1,1 @@
+theorem bool_true : bool true = 1 := rfl

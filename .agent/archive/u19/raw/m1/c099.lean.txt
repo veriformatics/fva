@@ -1,0 +1,2 @@
+/-- The head frame of iteration `j` holds the model's state: `q = p + j + 1`, accumulator `a`,
+and the previous iteration's pointer, sum and byte (entry values at `j = 0`). -/

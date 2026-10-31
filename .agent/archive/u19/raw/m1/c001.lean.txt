@@ -1,0 +1,5 @@
+import FVA.Proof.Lib.Arith
+
+/-! Facts both checkpoint-1 routes step with: the loop head, `i32` arithmetic on `ofNat` values,
+local updates, one-byte reads (proof support; outside the review surface). -/
+

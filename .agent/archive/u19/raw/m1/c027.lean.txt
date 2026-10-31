@@ -1,0 +1,5 @@
+/-- `Inv`'s local 15 as an exit local: unchanged at `j = 0`, the previous byte after. -/
+theorem l15_exit {b : Nat → UInt8} {j : Nat} {f : Frame} (hi : Inv ls inst p lim acc b j f) :
+    f.locals[15]? = ((if j = 0 then none else some (b (j - 1)).toNat).map vI <|> ls[15]?) := by
+  rw [hi.l15]; split <;> rfl
+

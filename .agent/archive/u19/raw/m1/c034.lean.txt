@@ -1,0 +1,6 @@
+import FVATest.Subjects.Lz4C.ExtCommon
+
+/-! Checkpoint 1, route R (refinement): the loop simulates `extModel`, a Lean function of the
+bytes; `ExtL1` follows from the simulation plus facts about the model alone (proof support; outside
+the review surface). -/
+

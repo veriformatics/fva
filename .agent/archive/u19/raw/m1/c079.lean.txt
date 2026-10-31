@@ -1,0 +1,5 @@
+import FVATest.Subjects.Lz4C.ExtDirect
+
+/-! M4 repair, route D: the `-O1` loop with an invariant over the head frame, stating `ExtL1O1`'s
+exits directly (proof support; outside the review surface). -/
+

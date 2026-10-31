@@ -1,0 +1,7 @@
+import FVA.Trust.Collect
+def main : IO Unit := do
+  for i in List.range 109 do
+    let p := s!".scratch/u19/m1/c{if i < 10 then "00" else if i < 100 then "0" else ""}{i}.lean"
+    let t ← IO.FS.readFile p
+    IO.println s!"{i}\t{FVA.Trust.codeLines t}"
+#eval main

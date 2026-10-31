@@ -1,0 +1,3 @@
+theorem psum_zero (acc : Nat) (b : Nat → UInt8) : psum acc b 0 = acc + (b 0).toNat := by
+  simp [psum]
+

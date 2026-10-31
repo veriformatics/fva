@@ -1,0 +1,2 @@
+theorem psum_eq (acc : Nat) (b : Nat → UInt8) (j : Nat) : psum acc b j = run acc b (j + 1) := rfl
+

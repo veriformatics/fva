@@ -1,0 +1,11 @@
+import FVATest.Subjects.Lz4C.Ext
+
+/-!
+# Checkpoint 1, perturbation M4: the same loop in an `-O1` build (contract U19)
+
+`lz4-c-O1.wasm` = `bench/subjects/wasm/lz4-c.wasm`'s sources and flags with `-O1` for `-O2`.
+`ExtL1O1` = `ExtL1`'s statement re-bound to this code: the loop keeps `q = p + 1` (pre-incremented,
+reading `q − 1`), both guards leave the loop's block for an error path that sets local 17 to −1,
+and the normal exit branches past it. Bytes, partial sums, bounds and footprint are `ExtL1`'s.
+-/
+

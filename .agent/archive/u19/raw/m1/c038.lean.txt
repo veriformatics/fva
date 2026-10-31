@@ -1,0 +1,2 @@
+/-- Where the loop leaves: after the `k`-th read with the final accumulator and byte; before the
+`k`-th read with the accumulator then; at the `k`-th read with the overflowing sum and byte. -/

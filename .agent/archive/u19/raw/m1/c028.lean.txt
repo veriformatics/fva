@@ -1,0 +1,11 @@
+/-- `Inv`'s local 17 as an exit local. -/
+theorem l17_exit {b : Nat → UInt8} {j : Nat} {f : Frame} (hi : Inv ls inst p lim acc b j f)
+    (h17 : ls[17]? = some (vI acc)) :
+    f.locals[17]? = ((if j = 0 then none else some (psum acc b (j - 1))).map vI <|> ls[17]?) := by
+  rw [hi.l17]
+  split
+  · subst_vars; simp [run_zero, h17]
+  · rename_i hj
+    obtain ⟨j, rfl⟩ : ∃ k, j = k + 1 := ⟨j - 1, by omega⟩
+    simp [psum_eq]
+

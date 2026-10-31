@@ -1,0 +1,2 @@
+/-- One iteration: locals 18 = `q`, 19 = `acc`, 14 = `lim`; 4 = `acc` then `acc + byte`, 3 = `q`,
+20 = the byte read at `q − 1`, 16/17 = the pointer and sum handed on. -/
