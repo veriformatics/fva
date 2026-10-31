@@ -15,13 +15,6 @@ namespace FVA.Wasm.Exec.Ref
 
 open FVA.Wasm FVA.Wasm.Exec
 
-theorem _root_.FVA.Wasm.Exec.Val.instr_inj {v w : Val} : v.instr = w.instr ↔ v = w := by
-  constructor
-  · intro h
-    have := congrArg toVal h
-    rwa [toVal_instr, toVal_instr, Option.some.injEq] at this
-  · rintro rfl; rfl
-
 /-- `k` unique steps from `c`. -/
 def walk : Nat → Config → Option Config
   | 0, c => some c

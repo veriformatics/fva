@@ -1,8 +1,42 @@
-import FVATest.Subjects.EdgerCpm.BodyMemory
+import FVA.Proof.Lib.Walk
+import FVA.Proof.Exec.Choice
 
-namespace Subjects.EdgerCpm.Body
+/-!
+# Symbolic caller contexts
 
-open FVA.Wasm FVA.Wasm.Exec FVA.Wasm.Exec.Ref
+`C.fill c` = configuration `c` running under the labels and frames of `C`, each with its saved
+instruction tail; a step of `c` is a step of `C.fill c` (`Context.seq`), so a proof steps the
+innermost code while the callers stay symbolic (`wasm_cstep`). `blockCode` & co. name slices of
+a lifted function's code.
+-/
+
+namespace FVA.Wasm
+
+/-- The body of a `block`. -/
+def blockCode : Instr → List Instr
+  | .block _ code => code
+  | _ => []
+
+/-- The body of a `loop`. -/
+def loopCode : Instr → List Instr
+  | .loop _ code => code
+  | _ => []
+
+/-- The `then` branch of an `if`. -/
+def thenCode : Instr → List Instr
+  | .if_ _ code _ => code
+  | _ => []
+
+/-- The `else` branch of an `if`. -/
+def elseCode : Instr → List Instr
+  | .if_ _ _ code => code
+  | _ => []
+
+end FVA.Wasm
+
+namespace FVA.Wasm.Exec.Ref
+
+open FVA.Wasm FVA.Wasm.Exec
 
 /-- Active labels/frames with saved instruction tails. The hole carries its current frame. -/
 inductive Context where
@@ -10,6 +44,7 @@ inductive Context where
   | label (n : Nat) (cont : List Instr) (rest : List AInstr) (outer : Context)
   | frame (n : Nat) (caller : Frame) (rest : List AInstr) (outer : Context)
 
+/-- `c` running under `C`'s labels and frames, each followed by its saved tail. -/
 def Context.fill : Context → Config → Config
   | .hole, c => c
   | .label n cont rest outer, c =>
@@ -121,4 +156,4 @@ theorem must_fbinop_context {H : HostSem} {Q : Outcome → Prop} {s : Store} {f 
   rw [Context.store]
   exact hh
 
-end Subjects.EdgerCpm.Body
+end FVA.Wasm.Exec.Ref

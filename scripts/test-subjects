@@ -19,6 +19,10 @@ subjects=(
 	"FVATest.Subjects.Tmm.RNAnorm FVATest.Subjects.Tmm.RNAnorm.Spec - 77"
 	"FVATest.Subjects.EdgerCpm FVATest.Subjects.EdgerCpm.Spec FVATest.Subjects.EdgerCpm.Lifted 91"
 )
+# proof-only modules (no claims yet): U19 checkpoint 1, the lz4 C extension loop proven by both
+# routes on the shipped -O2 bytes and on the -O1 perturbation; --wfail turns a `sorry` into a failure
+proofs=(FVATest.Subjects.Lz4C.ExtDirect FVATest.Subjects.Lz4C.ExtRefine
+	FVATest.Subjects.Lz4C.O1.ExtDirect FVATest.Subjects.Lz4C.O1.ExtRefine FVATest.Subjects.Lz4C.Instance)
 # the Neg roots are no default target; build them by module name, expecting failure
 negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
 	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same FVATest.Subjects.Tmm.Neg.Exact)
@@ -34,7 +38,7 @@ cp .cache/corpus/edgeR.so FVATest/Subjects/EdgerCpm/edgeR.so || exit 2
 cmp -s "$tmp/Lifted.lean" FVATest/Subjects/EdgerCpm/Lifted.lean ||
 	cp "$tmp/Lifted.lean" FVATest/Subjects/EdgerCpm/Lifted.lean
 
-roots=(fva FVA)
+roots=(fva FVA "${proofs[@]}")
 for s in "${subjects[@]}"; do
 	read -r root _ _ _ <<<"$s"
 	roots+=("$root")
@@ -70,5 +74,5 @@ for neg in "${negs[@]}"; do
 	fi
 done
 
-((fail)) || echo "test-subjects: ${#subjects[@]} subject(s) PASS with pinned surface + ${#negs[@]} planted negatives checked"
+((fail)) || echo "test-subjects: ${#subjects[@]} subject(s) PASS with pinned surface + ${#proofs[@]} proof module(s) built + ${#negs[@]} planted negatives checked"
 exit "$fail"

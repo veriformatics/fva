@@ -1,24 +1,9 @@
 import FVATest.Subjects.EdgerCpm.BodySupport
+import FVA.Proof.Lib.Context
 
 namespace Subjects.EdgerCpm.Body
 
 open FVA.Wasm FVA.Wasm.Exec
-
-def blockCode : Instr → List Instr
-  | .block _ code => code
-  | _ => []
-
-def loopCode : Instr → List Instr
-  | .loop _ code => code
-  | _ => []
-
-def thenCode : Instr → List Instr
-  | .if_ _ code _ => code
-  | _ => []
-
-def elseCode : Instr → List Instr
-  | .if_ _ _ code => code
-  | _ => []
 
 noncomputable def outerLoop : Instr := Lifted.func86.body.getD 14 .nop
 noncomputable def outerCode : List Instr := blockCode ((loopCode outerLoop).getD 0 .nop)

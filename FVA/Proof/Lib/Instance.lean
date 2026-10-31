@@ -68,22 +68,6 @@ theorem instance_alloc_self {m : Module} (H : HostSem) (hi : m.imports = [])
   · rw [he]; exact .nil
   · rw [hc, List.map_nil]
 
-theorem vals_inj {vs ws : List Val} : vals vs = vals ws ↔ vs = ws := by
-  constructor
-  · intro h
-    exact List.map_injective_iff.mpr (fun _ _ h => Val.instr_inj.mp h) h
-  · rintro rfl; rfl
-
-theorem vals_ne_trap (vs : List Val) : vals vs ≠ [.trap] := by
-  rcases vs with _ | ⟨v, vs⟩
-  · simp [vals]
-  · intro h
-    have := congrArg List.head? h
-    simp only [vals, List.map_cons, List.head?_cons, Option.some.injEq] at this
-    have hv := congrArg toVal this
-    rw [toVal_instr, toVal_trap] at hv
-    cases hv
-
 /-- `Must` is monotone in its postcondition. -/
 theorem Must.mono {H : HostSem} {Q Q' : Outcome → Prop} {c : Config} (h : Must H Q c)
     (hq : ∀ o, Q o → Q' o) : Must H Q' c := by
