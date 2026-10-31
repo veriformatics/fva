@@ -6,6 +6,8 @@ Like REA, FVA should be readily usable by an AI agent that requests it, and that
 
 Proof writing alone is not what FVA adds: a capable agent can already write and check proofs when it is asked to verify a project. FVA adds what such an agent does not supply on its own. It keeps the human-reviewable spec small, and it measures that spec as its main result. It does not trust a single checker: it replays proofs through independent kernels and tests each checker against known false proofs. It links the proofs to the real implementation without a rewrite of the source. It verifies the compiled artifact, or, for components that are not practical to verify as programs (compilers, interpreters, code generators, AI pipelines), it certifies each output that they produce.
 
+FVA also uses fvapi, our formal verification API, when the private fvapi library can speed up the work. FVA checks each answer from fvapi itself, and `fva trust` gives the verdict.
+
 ## Artifacts
 
 - Root Lake package `fva` (Lean 4.35.0 + Mathlib v4.35.0, Apache-2.0): specs `FVA/Spec/**` (reviewed once), verified implementation `FVA/Impl/**` + `FVA/Trust/Verdict.lean`, proofs `FVA/Proof/**`, self claims `FVA/Self/*`, trust glue `FVA/Trust/*` + `FVA/Tool/*`; CLI `lake exe fva` (`Main.lean`); tests + harness modules `FVATest/` (cheats, worked examples, certificates, `fvamut`); human entry `README.md`, agent entry `AGENT.md`; unit contracts `docs/contracts/U*.md`.
@@ -51,10 +53,15 @@ Proof writing alone is not what FVA adds: a capable agent can already write and 
 - Managed-language link (consultant ruling under the user's research-first rule): per-output certification (D22) built once, exercised by unchanged Python, R, Java + TypeScript producers; exact-byte binding (decode the original output bytes, never runtime-rounded values); accepted-output theorems reported apart from artifact theorems (the tag marks attachment, not quantifier strength: a compiler-output certificate can prove ∀ inputs for one artifact). Deferred: WasmGC (TeaVM, J2Wasm, p2w), bytecode/AST lifting (CPython, R, JVM), interpreter-in-wasm proofs (Pyodide, webR, QuickJS); Waspy/AssemblyScript = conditional feature-inventory probes on unchanged code only.
 - Review flow (user rulings): review-ledger + attest, pattern-catalog, review-page = kept for a later scope (tags `archive/review-ledger`, `archive/attest`, `archive/pattern-catalog`, `archive/review-page`; D25–D27); predict-quiz + spot-the-mutant = retired (tags `archive/predict-quiz`, `archive/spot-the-mutant`).
 - Mutation check (user rulings, U12): scope = `FVA/Impl/**` + the spec helpers impl definitions reach; results = committed content-keyed table `FVATest/Mutate/results.tsv` (CI + fresh hosts reuse it and spot-check rows; the full gate fails while it is stale); the fast gate runs every stale mutant, no cap; heavy `--update` runs go where the machine's `CLAUDE.local.md` says.
+- Next unit (user ruling on the bench v2 direction, `.agent/archive/maintain-bench-direction.md`): decoder feasibility spike U19 (`docs/contracts/U19-decoder-spike.md`) = an all-input proof about lz4 C `LZ4_decompress_safe` on `bench/subjects/wasm/lz4-c.wasm` against T2's requirements; pass → IMPLEMENT proof scaling (D9, D52, D55) + bench v3; fail → cause recorded, the next direction re-ruled by the user (source-level link | narrower claim).
 - Later scopes: MCP/skill packaging (D6), the review flow (D25–D27).
 
 ## Tasks
 
+- [ ] U19 contract: T2 R1–R3 as FVA claims (R1 at the access level, D52's footprint), checkpoints, the route comparison check fixed before either route runs → consultant + scientist + advisor
+- [ ] U19 checkpoint 1: one decoder loop (match copy | length extension) proven with an access-tracking invariant by direct stepping and by refinement to a proof-side model, each measured per the contract
+- [ ] U19 checkpoint 2: the full theorem on the winning route (checkpoint 1 held)
+- [ ] U19 close: results → `Decisions` + contract + archive, gate green
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
