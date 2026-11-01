@@ -20,9 +20,11 @@ subjects=(
 	"FVATest.Subjects.EdgerCpm FVATest.Subjects.EdgerCpm.Spec FVATest.Subjects.EdgerCpm.Lifted 91"
 )
 # proof-only modules (no claims yet): U19 checkpoint 1, the lz4 C extension loop proven by both
-# routes on the shipped -O2 bytes and on the -O1 perturbation; --wfail turns a `sorry` into a failure
+# routes on the shipped -O2 bytes and on the -O1 perturbation; U20's spike statements (Short imports
+# Copy) + the decoder model and its format proofs (ModelProof imports Model); --wfail turns a `sorry` into a failure
 proofs=(FVATest.Subjects.Lz4C.ExtDirect FVATest.Subjects.Lz4C.ExtRefine
-	FVATest.Subjects.Lz4C.O1.ExtDirect FVATest.Subjects.Lz4C.O1.ExtRefine FVATest.Subjects.Lz4C.Instance)
+	FVATest.Subjects.Lz4C.O1.ExtDirect FVATest.Subjects.Lz4C.O1.ExtRefine FVATest.Subjects.Lz4C.Instance
+	FVATest.Subjects.Lz4C.Short FVATest.Subjects.Lz4C.ModelProof)
 # the Neg roots are no default target; build them by module name, expecting failure
 negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
 	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same FVATest.Subjects.Tmm.Neg.Exact)
