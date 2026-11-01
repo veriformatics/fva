@@ -89,7 +89,7 @@ def SegB : Prop :=
     inst.funcs[4]? = some a4 → st.funcs[a4]? = some (.wasm copyType inst Lifted.func4) →
     inst.mems[0]? = some ma → st.mems[ma]? = some mem →
     131072 ≤ src → 131072 ≤ dst → src + n ≤ mem.size → dst + cap ≤ mem.size →
-    mem.size < 2 ^ 32 → (src + n ≤ dst ∨ dst + cap ≤ src) → src ≤ q → q ≤ src + n →
+    mem.size ≤ 2097152 → (src + n ≤ dst ∨ dst + cap ≤ src) → src ≤ q → q ≤ src + n →
     dst ≤ op → op ≤ dst + cap → len < 2 ^ 31 →
     Until H
       (Within (fun m x => m = ma ∧ (Span ma src n m x ∨ Span ma dst cap m x)) (Span ma dst cap))
@@ -164,7 +164,7 @@ def SegC : Prop :=
     ls[2]? = some (.i32 (BitVec.ofNat 32 o' - BitVec.ofNat 32 off)) →
     inst.mems[0]? = some ma → st.mems[ma]? = some mem →
     131072 ≤ src → 131072 ≤ dst → src + n ≤ mem.size → dst + cap ≤ mem.size →
-    mem.size < 2 ^ 32 → src ≤ j → j ≤ src + n → ml0 < 16 → o' < 2 ^ 31 →
+    mem.size ≤ 2097152 → src ≤ j → j ≤ src + n → ml0 < 16 → o' < 2 ^ 31 →
     Until H
       (Within (fun m x => m = ma ∧ (Span ma src n m x ∨ Span ma dst cap m x)) (Span ma dst cap))
       (fun c => (ml0 < 15 ∧ AtX4 F st inst src dst n cap o' off ml0 j c) ∨
@@ -232,7 +232,7 @@ def SegD : Prop :=
     inst.funcs[3]? = some a → st.funcs[a]? = some (.wasm copyType inst Lifted.func3) →
     inst.mems[0]? = some ma → st.mems[ma]? = some mem →
     131072 ≤ src → 131072 ≤ dst → src + n ≤ mem.size → dst + cap ≤ mem.size →
-    mem.size < 2 ^ 32 → (src + n ≤ dst ∨ dst + cap ≤ src) → src ≤ j → j ≤ src + n →
+    mem.size ≤ 2097152 → (src + n ≤ dst ∨ dst + cap ≤ src) → src ≤ j → j ≤ src + n →
     dst ≤ o' → o' + 8 ≤ dst + cap → off < 65536 → m < 2 ^ 31 → TablesOK mem →
     Until H (Within (ReadSet ma src n dst cap) (Span ma dst cap))
       (fun c => (o' < dst + off ∧ Err F st inst src dst n cap c) ∨
