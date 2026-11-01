@@ -59,13 +59,29 @@ if ! lake --wfail build "${roots[@]}" >"$tmp/build" 2>&1; then
 	exit 2
 fi
 
-for s in "${subjects[@]}"; do
-	read -r root spec subject surface <<<"$s"
-	log=$tmp/trust-$root
-	sub=()
+# trust runs side by side, as many as cores and memory allow (each run checks with ≤ 3 kernels at
+# a time, each loading the whole export); FVA_SUBJECT_JOBS overrides
+mem=$(awk '/^MemAvailable:/ {print int($2 / 12582912)}' /proc/meminfo)
+jobs=${FVA_SUBJECT_JOBS:-$(($(nproc) / 3 < mem ? $(nproc) / 3 : mem))}
+((jobs >= 1)) || jobs=1
+trust() { # root spec subject → $tmp/trust-<root>{,.rc,.s}
+	local root=$1 spec=$2 subject=$3 sub=() t0=$SECONDS
 	[[ $subject == - ]] || sub=(--subject "$subject")
-	"$fva" trust . --spec-module "$spec" --root-module "$root" "${sub[@]}" >"$log" 2>&1
-	rc=$?
+	"$fva" trust . --spec-module "$spec" --root-module "$root" "${sub[@]}" >"$tmp/trust-$root" 2>&1
+	echo $? >"$tmp/trust-$root.rc"
+	echo $((SECONDS - t0)) >"$tmp/trust-$root.s"
+}
+for s in "${subjects[@]}"; do
+	read -r root spec subject _ <<<"$s"
+	while (($(jobs -rp | wc -l) >= jobs)); do wait -n; done
+	trust "$root" "$spec" "$subject" &
+done
+wait
+for s in "${subjects[@]}"; do
+	read -r root _ _ surface <<<"$s"
+	log=$tmp/trust-$root
+	rc=$(<"$log.rc")
+	echo "test-subjects: $root $(<"$log.s") s"
 	if ((rc != 0)); then
 		echo "test-subjects: $root trust rc $rc"
 		grep -E '^fva trust|^  \[' "$log" | head -8
