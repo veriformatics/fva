@@ -178,7 +178,7 @@ Check set fixed before reading: K1 `Spec.lean` R1–R3 = U19 contract Checkpoint
 
 | row | check | verdict | ruling |
 |---|---|---|---|
-| K1 | R1–R3 vs contract Checkpoint 2 | pass (MAIN at merge 10e9ea4: same premises, sets, results; disjointness extended per the user's domain answer) | open: independent `reviewer` at the phase close (kernel tier: the claim = the review surface) + contract text sync once the user's clarification lands |
+| K1 | R1–R3 vs contract Checkpoint 2 | pass (MAIN at merge 10e9ea4; reviewer-1, reviewer, on the factored `Spec` + `Call`: C1–C7 pass — R1–R3 = the contract, `Buffers` = the domain ruling, `OnCall` = the prepared call, docstrings faithful after F1, premises satisfiable incl. both empty-buffer cases, `SpecEq`'s unfactored bodies byte-identical to 27a2d5e's `Spec`, hygiene) | accepted; F1 (R3's docstring dropped "every call terminates with one `i32` result") fixed + re-reviewed; contract domain clause synced |
 | K2 | claim vocabulary reviewed | pass: `fva trust` probe = surface 88 lines (Spec 56 + Lz4.Format 26 + Lz4.Any 6), CAbi = FVA base | accepted |
 | K3 | cutpoint statements | finding: SegA–SegD claimed exits false for memories near 2^32 (overflow guards fire, i32 sums wrap) | accepted → fixed 1e7fbbd + 594ef18 (premise mem.size ≤ 2097152; every use has 2 MiB); remaining statements re-checked by their proofs |
 | K4 | axioms / sorry / roots | pass: r1_of r2_of r3_of entry errRet match_holds = {propext, Classical.choice, Quot.sound}; roots listed | accepted |

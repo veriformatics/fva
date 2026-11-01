@@ -204,4 +204,72 @@ theorem malformed_r1 {H : HostSem} {s : Store} {inst : ModuleInst}
       · exact ⟨-2, h.1⟩
       · exact h)
 
+/-! ## The domain's empty-buffer cases (consultant-10): an empty buffer strictly inside the other,
+where ordered separation fails and `Buffers` holds. -/
+
+/-- An empty input strictly inside the destination's range. -/
+def insideDst : Fixture := { src := 196609, input := [], initDst := [0xCC, 0xCC] }
+
+/-- An empty destination strictly inside the input's range. -/
+def insideSrc : Fixture := { dst := 131073, input := [0x10, 0x61], initDst := [] }
+
+theorem insideDst_domain :
+    Buffers insideDst.src insideDst.dst insideDst.input insideDst.initDst ∧
+      ¬ (insideDst.src + insideDst.input.length ≤ insideDst.dst ∨
+        insideDst.dst + insideDst.initDst.length ≤ insideDst.src) := by
+  simp only [Buffers, insideDst]; decide
+
+theorem insideSrc_domain :
+    Buffers insideSrc.src insideSrc.dst insideSrc.input insideSrc.initDst ∧
+      ¬ (insideSrc.src + insideSrc.input.length ≤ insideSrc.dst ∨
+        insideSrc.dst + insideSrc.initDst.length ≤ insideSrc.src) := by
+  simp only [Buffers, insideSrc]; decide
+
+theorem insideDst_prep : (store0.prep insideDst.prep).isSome := by decide +kernel
+theorem insideSrc_prep : (store0.prep insideSrc.prep).isSome := by decide +kernel
+
+theorem insideDst_invoke : InvokeOK insideDst.store 2 insideDst.args := by
+  refine ⟨.wasm ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩
+    alloc.2 Lifted.func2, by kernel_rfl, ?_⟩
+  exact .cons trivial (.cons trivial (.cons trivial (.cons trivial .nil)))
+
+theorem insideSrc_invoke : InvokeOK insideSrc.store 2 insideSrc.args := by
+  refine ⟨.wasm ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩
+    alloc.2 Lifted.func2, by kernel_rfl, ?_⟩
+  exact .cons trivial (.cons trivial (.cons trivial (.cons trivial .nil)))
+
+theorem insideDst_run : (runDet 1000 insideDst.config).isSome := by decide +kernel
+theorem insideSrc_run : (runDet 1000 insideSrc.config).isSome := by decide +kernel
+
+theorem insideDst_result :
+    ((runDet 1000 insideDst.config).get insideDst_run).instrs = vals [.i32 (-1)] := by kernel_rfl
+theorem insideSrc_result :
+    ((runDet 1000 insideSrc.config).get insideSrc_run).instrs = vals [.i32 (-1)] := by kernel_rfl
+
+/-- R1's one-i32 total-return conclusion with an empty input inside the destination. -/
+theorem insideDst_r1 {H : HostSem} {s : Store} {inst : ModuleInst}
+    (hp : Prepared Lifted.module H insideDst.prep s inst) :
+    CallReturns H s inst "LZ4_decompress_safe" insideDst.args
+      (fun _ vs => ∃ result : BitVec 32, vs = [.i32 result]) := by
+  obtain ⟨rfl, rfl⟩ := insideDst.prepared_eq insideDst_prep hp
+  refine ⟨2, by decide +kernel, insideDst_invoke, ?_⟩
+  exact (must_returned_of_runDet_get (P := fun _ _ => True)
+    insideDst_run insideDst_result trivial).mono (by
+      rintro (⟨s', vs⟩ | s') h
+      · exact ⟨-1, h.1⟩
+      · exact h)
+
+/-- R1's one-i32 total-return conclusion with an empty destination inside the input. -/
+theorem insideSrc_r1 {H : HostSem} {s : Store} {inst : ModuleInst}
+    (hp : Prepared Lifted.module H insideSrc.prep s inst) :
+    CallReturns H s inst "LZ4_decompress_safe" insideSrc.args
+      (fun _ vs => ∃ result : BitVec 32, vs = [.i32 result]) := by
+  obtain ⟨rfl, rfl⟩ := insideSrc.prepared_eq insideSrc_prep hp
+  refine ⟨2, by decide +kernel, insideSrc_invoke, ?_⟩
+  exact (must_returned_of_runDet_get (P := fun _ _ => True)
+    insideSrc_run insideSrc_result trivial).mono (by
+      rintro (⟨s', vs⟩ | s') h
+      · exact ⟨-1, h.1⟩
+      · exact h)
+
 end Subjects.Lz4C.Accept
