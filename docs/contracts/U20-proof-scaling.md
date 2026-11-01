@@ -54,5 +54,16 @@ Purpose: choose how the full R1–R3 proof of `LZ4_decompress_safe` (func 2: 550
 ## Selection policy (refines the rule above; fixed before the first spike)
 - The rule above ranks the copy-level engines; its winner is a provisional engine choice. The method ruling also weighs, explicitly: the interface the engine leaves for the decoder's simulation steps against `Model` (I7 fit), its one-time infrastructure cost against the remaining decoder size (func 2's 550 instructions, 3 wildcopies, 2 extension loops), agent fit (researcher-4), maintainability; it goes to ≥ 5 consultants + the advisor, then to the user with the spec questions. A trade-off without dominance goes to the user as a trade-off.
 
+## Round 1 outcome (S1–S5; M2/M3 pending a quiet host)
+- Proven (MAIN acceptance: `example : <Stmt> := Spike<X>.sk` + frozen sha256s, standard axioms): C (S5 done 12:55:46, `ce5c739`), D+ (13:32:51, `43b3653`); V in progress (S1–S4 `a1c9e63`, S5 open).
+- (a) added code lines per stage (MAIN's count, `codeLines`-like, = the arms' reports ±1): C 511 / 632 / 113 / 26 / 368 = 1650; D+ 505 / 638 / 164 / 34 / 341 = 1682; V 553 / 778 / 335 / 119 / … ≥ 1785. (b) M0 (start → first green): C 33.8 / 43.3 / 5.0 / 1.0 / 34.1 min; D+ 46.8 / 36.2 / 8.9 / 1.4 / 59.5; V 69.3 / 37.0 / 23.9 / 4.5 / … .
+- Rule 3 needs X ≤ Y on (a) total and (a) S5: C loses S5 (368 > 341), D+ loses total (1682 > 1650), V's S1–S4 alone exceed both totals ⇒ no lone dominant arm whatever (b), (c), (e) show ⇒ inconclusive → qualitative ruling. `Sim.lean` composes the frozen cutpoint statements for any engine ⇒ the I7-fit criterion is neutralized; the open criteria = cost on the remaining decoder, agent fit, maintainability.
+
+## Round 2 (frozen before launch; feeds the qualitative ruling, no round 3)
+- Check = `SegC` as stated in `FVATest/Subjects/Lz4C/Seg.lean` (sha256 `ff4cbe5871a98c2adaa946554a44918e6ff93c0120ac93004348fa0cf8077001`): from X3 the match length — the bound check, the first extension byte, the match-length `loop @8` (`read_variable_length`, data-dependent exits), the overflow guard — to X4 or the error epilogue. Chosen: a needed cutpoint of the remaining decoder, of the loop class neither arm has shown (data-dependent exits over symbolic bytes), self-contained.
+- Arms = the eligible finalists C and D+, the same teammates revived (author × engine pairing kept), each on its branch merged with `main` at the amendment commit; V stays ineligible until its S5 and cannot dominate either way.
+- Same per-statement protocol as round 1 (M0 timestamps + tool-call count, M1 split, one commit, report row, a statement-issues section, mechanism boundaries, allowed + forbidden files and constructs); budget 3 h wall-clock each; builds memory-capped; M0 = contended wall time for all arms alike (three concurrent Lean builds on one 8-thread host). No arm sees the other's work or MAIN's hand-stepping notes.
+- Decides nothing alone: its (a)/(b) per arm + the arm's report on reuse of its own S1–S5 infrastructure go with round 1 to the scientist, ≥ 5 consultants, the advisor, then the user.
+
 ## Status
-- Statements frozen + sanity-checked (above). Finalists D+, V, C (above); arms pending the scientist's appraisal of this check.
+- Statements frozen + sanity-checked (above); scientist-1 appraised the round-1 check (repairs adopted). Round 1 harvested for C + D+; round 2 launched for C + D+; V running; M2/M3 after all arms are quiet.
