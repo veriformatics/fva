@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Planted-bad inputs for the purpose-built checks (check-format, check-pins, the mutation check via
-# scripts/test-mutation-fixture): each must fail.
+# scripts/test-mutation-fixture, the subject matrix via scripts/test-subject-matrix): each must fail.
 # Runs on a throwaway copy so the working tree is never touched.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
@@ -62,4 +62,5 @@ if ! (cd "$d" && scripts/check-scope) >/dev/null; then
 	fail=1
 fi
 scripts/test-mutation-fixture || fail=1
+scripts/test-subject-matrix || fail=1
 exit "$fail"

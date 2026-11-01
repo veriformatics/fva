@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# U22: every subject's `fva trust` in default and --paranoid mode (docs/contracts/U22-subject-matrix.md).
+# stdin = subjects table, one `root spec subject surface` per line (subject `-` = a certificate);
+# one result per (root, mode), checked fail-closed. rc 0 = all 2N runs PASS with the pinned surface,
+# 1 = a FAIL (a missing result included), 2 = setup error, 3 = an fva run died by a signal.
+# FVA = the fva binary; FVA_SUBJECT_JOBS caps concurrency.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+fva=${FVA:-.lake/build/bin/fva}
+[[ -x $fva ]] || {
+	echo "subject-matrix: no fva binary at $fva"
+	exit 2
+}
+mapfile -t subjects < <(grep -v '^[[:space:]]*$')
+((${#subjects[@]})) || {
+	echo "subject-matrix: empty subjects table"
+	exit 2
+}
+declare -A seen
+for s in "${subjects[@]}"; do
+	read -r root spec subject surface extra <<<"$s"
+	if [[ -z ${surface:-} || -n ${extra:-} || ! $surface =~ ^[0-9]+$ ]]; then
+		echo "subject-matrix: malformed row: $s"
+		exit 2
+	fi
+	[[ -z ${seen[$root]:-} ]] || {
+		echo "subject-matrix: $root listed twice"
+		exit 2
+	}
+	seen[$root]=1
+done
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+# budget: CPUs (affinity-aware) and GiB of memory (MemAvailable, capped by a cgroup v2 limit);
+# weights per run = kernels side by side (default 2; paranoid 3 at a time incl. nanoda's 4 workers)
+cpus=$(nproc)
+mem=$(awk '/^MemAvailable:/ {print int($2 / 1048576)}' /proc/meminfo)
+cg=/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)
+if [[ -r $cg/memory.max && $(<"$cg/memory.max") != max ]]; then
+	head=$((($(<"$cg/memory.max") - $(<"$cg/memory.current")) / 1073741824))
+	((head < mem)) && mem=$head
+fi
+cap=${FVA_SUBJECT_JOBS:-$cpus}
+declare -A wcpu=([default]=2 [paranoid]=6) wmem=([default]=6 [paranoid]=9) jcpu=() jmem=()
+used_cpu=0 used_mem=0
+
+run() { # root spec subject mode → $tmp/<root>.<mode>.{log,s,rc}; the rc file = the recorded result
+	local root=$1 spec=$2 subject=$3 mode=$4 args=() t0=$SECONDS
+	[[ $subject == - ]] || args+=(--subject "$subject")
+	[[ $mode == default ]] || args+=(--paranoid)
+	"$fva" trust . --spec-module "$spec" --root-module "$root" "${args[@]}" >"$tmp/$root.$mode.log" 2>&1
+	local rc=$?
+	echo $((SECONDS - t0)) >"$tmp/$root.$mode.s"
+	echo "$rc" >"$tmp/$root.$mode.rc"
+}
+reap() {
+	local pid
+	wait -n -p pid
+	used_cpu=$((used_cpu - jcpu[$pid])) used_mem=$((used_mem - jmem[$pid]))
+	unset 'jcpu[$pid]' 'jmem[$pid]'
+}
+for s in "${subjects[@]}"; do
+	read -r root spec subject _ <<<"$s"
+	for mode in default paranoid; do
+		c=${wcpu[$mode]} m=${wmem[$mode]}
+		while ((${#jcpu[@]})) && ((${#jcpu[@]} >= cap || used_cpu + c > cpus || used_mem + m > mem)); do
+			reap
+		done
+		run "$root" "$spec" "$subject" "$mode" &
+		jcpu[$!]=$c jmem[$!]=$m
+		used_cpu=$((used_cpu + c)) used_mem=$((used_mem + m))
+	done
+done
+while ((${#jcpu[@]})); do reap; done
+
+fail=0 crash=0 results=0
+for s in "${subjects[@]}"; do
+	read -r root _ _ surface <<<"$s"
+	for mode in default paranoid; do
+		r=$tmp/$root.$mode
+		rc=$(cat "$r.rc" 2>/dev/null)
+		if [[ ! $rc =~ ^[0-9]+$ ]]; then
+			echo "subject-matrix: missing $root $mode"
+			fail=1
+			continue
+		fi
+		results=$((results + 1))
+		echo "subject-matrix: $root $mode $(<"$r.s") s"
+		if ((rc >= 128)); then
+			echo "subject-matrix: $root $mode crashed, rc $rc"
+			crash=1
+		elif ((rc != 0)); then
+			echo "subject-matrix: $root $mode trust rc $rc"
+			grep -E '^fva trust|^  \[' "$r.log" | head -8
+			fail=1
+		elif ! grep -q "^Read these: $surface code lines$" "$r.log"; then
+			echo "subject-matrix: $root $mode surface ≠ pinned $surface lines"
+			grep -E 'Read these|: [0-9]+ lines' "$r.log" | head -6
+			fail=1
+		fi
+	done
+done
+if ((results != 2 * ${#subjects[@]})); then
+	echo "subject-matrix: $results results for ${#subjects[@]} subjects × 2 modes"
+	fail=1
+fi
+((crash)) && exit 3
+((fail)) && exit 1
+exit 0

@@ -37,10 +37,11 @@ def kernels : List Kernel :=
    { name := "leanchecker-paranoid", lineage := "lean", bin := "leanchecker-paranoid",
      args := ["--silent", "--from-export", "EXPORT"] },
    -- lean4lean (export mode) exits 1 on its own limits, never on a refuted proof: its recursion
-   -- limit (FVA's self export, `instrStep_sound`) and constants it needs before the export
+   -- limit (FVA's self export, `instrStep_sound`), its heartbeat limit (Lz4Wasm's 433-step
+   -- encoder run by `kernel_rfl`; no flag raises it) and constants it needs before the export
    -- introduces them (`Char.ofNat` under a string literal, `Decidable.intro` under `Nat.mod`)
    { name := "lean4lean", lineage := "lean", bin := "lean4lean", args := ["--import", "EXPORT"],
-     declineOn := ["deep recursion detected", "unknown constant"] },
+     declineOn := ["deep recursion detected", "deterministic timeout", "unknown constant"] },
    { name := "nanoda", lineage := "nanoda", bin := "nanoda_bin", args := ["CONFIG"] },
    { name := "con-leche", lineage := "con", bin := "con-leche", args := ["EXPORT"] },
    { name := "con-ron", lineage := "con", bin := "con-ron", args := ["EXPORT"] }]
