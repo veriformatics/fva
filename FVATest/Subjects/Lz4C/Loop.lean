@@ -290,4 +290,111 @@ theorem HeadLocals.of_const {ls : List Val} {src dst n cap op ip : Nat}
   obtain ⟨hl, h0, h1, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩ := h
   exact ⟨hl, h0, h1, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩
 
+/-- One iteration from a good head: a good head further on, or func 2 returned. -/
+theorem iter (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC) (hD : SegD) (hR : ErrRet)
+    {H : HostSem} {st : Store} {inst : ModuleInst} {ls : List Val} {ma src dst n cap op ip : Nat}
+    (hg : Good st inst ma src dst n cap) (hl : HeadLocals ls src dst n cap op ip)
+    (hsip : src ≤ ip) (hipn : ip < src + n) (hop : dst ≤ op) (hopc : op ≤ dst + cap) :
+    Until H (Within (R1R src n dst cap) (R1W dst cap)) (IterExit inst ma src dst n cap ip)
+      (head st inst ls) := by
+  obtain ⟨a, ha, hfa⟩ := hg.a3
+  obtain ⟨mem, hm0, hsz, ht⟩ := hg.mem
+  have hb := hg.srcHi
+  have hb' := hg.dstHi
+  have hd0 := hg.dstLo
+  have hcl := hl.const
+  have hln := hcl.1
+  have hu := hS5 H (ctx2 F0) st inst ls a ma mem src dst n cap op ip hl ha hfa hg.ma0 hm0
+    hg.srcLo hg.dstLo (by omega) (by omega) (by omega) hg.disj hsip hipn hop hopc
+  have hll16 : (mem.byte ip).toNat / 16 < 16 := by have := (mem.byte ip).toNat_lt; omega
+  have hoffb : (mem.byte (ip + 1 + (mem.byte ip).toNat / 16)).toNat +
+      256 * (mem.byte (ip + 2 + (mem.byte ip).toNat / 16)).toNat <
+      65536 := by
+    have := (mem.byte (ip + 1 + (mem.byte ip).toNat / 16)).toNat_lt
+    have := (mem.byte (ip + 2 + (mem.byte ip).toNat / 16)).toNat_lt
+    omega
+  have hgood16 := hg.setMem hm0 (fwdCopy_size 16 mem op (ip + 1))
+    fun x hx => fwdCopy_outside _ _ _ _ _ (Or.inl (by omega))
+  refine Until.trans (untilR1 hu (fun _ x hx => ?_) (fun _ x hx => ?_)) ?_
+  · obtain ⟨-, ⟨-, hx⟩ | ⟨-, hx⟩⟩ := hx
+    · exact Or.inr (Or.inr (Or.inl hx))
+    · exact Or.inr (Or.inr (Or.inr hx))
+  · exact Or.inr (Or.inr hx.2)
+  · rintro c (⟨hll, rfl⟩ | ⟨hll, hsc, rfl⟩ | ⟨hll, hsc1, hsc2, -, rfl⟩ |
+      ⟨hll, hsc1, hsc2, hml, -, -, rfl⟩ | ⟨hll, hsc1, hsc2, hml, -, hle, rfl⟩)
+    · -- X1: the literal length's extension bytes
+      have hA' := hA H F0 st inst (((ls.set 15 (vI (ip + 1))).set 16 (vI (mem.byte ip).toNat)).set 2
+        (vI 15)) ma mem src dst n cap op ip (mem.byte ip).toNat
+        (((hcl.set (by omega) _).set (by omega) _).set (by omega) _)
+        (by rw [List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega),
+          List.getElem?_set_ne (by omega)]; exact hl.2.2.2.1)
+        (by rw [List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega),
+          List.getElem?_set_ne (by omega)]; exact hl.2.2.2.2.1) (by simp [hln]) (by simp [hln])
+        (by simp [hln]) hg.ma0 hm0 hg.srcLo hg.dstLo (by omega) (by omega) (by omega) hsip hipn
+        (by omega)
+      refine Until.trans (untilR1 hA' (fun _ x hx => ?_) (fun _ x hx => ?_)) ?_
+      · obtain ⟨-, ⟨-, hx⟩ | ⟨-, hx⟩⟩ := hx
+        · exact Or.inr (Or.inr (Or.inl hx))
+        · exact Or.inr (Or.inr (Or.inr hx))
+      · exact Or.inr (Or.inr hx.2)
+      · rintro c' (⟨acc, q, he, hx⟩ | ⟨-, he⟩)
+        · obtain ⟨h1, h2, h3, h4⟩ := extM_bound he
+          exact contX2 hB hC hD hR hg hx (by omega) (by omega) (by omega) hop hopc (by omega)
+        · exact contErr hR (by omega) he
+    · -- X2: no room for the shortcut
+      have h3' : ((((ls.set 15 (vI (ip + 1))).set 16 (vI (mem.byte ip).toNat)).set 2
+          (vI ((mem.byte ip).toNat / 16))).set 4 (vI (ip + 1)))[3]? = some (vI op) := by
+        rw [List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega),
+          List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega)]
+        exact hl.2.2.2.1
+      exact contX2 (q := ip + 1) (len := (mem.byte ip).toNat / 16) (t := (mem.byte ip).toNat)
+        hB hC hD hR hg ⟨_, ((((hcl.set (by omega) _).set (by omega) _).set (by omega)
+        _).set (by omega) _), h3', by simp [hln], by simp [hln], by simp [hln], rfl⟩
+        (by omega) (by omega) (by omega) hop hopc (by omega)
+    · -- X3: the match code with 16 literal bytes copied
+      exact contX3 (o' := op + (mem.byte ip).toNat / 16)
+        (off := ((mem.byte (ip + 1 + (mem.byte ip).toNat / 16)).toNat +
+          256 * (mem.byte (ip + 2 + (mem.byte ip).toNat / 16)).toNat))
+        (ml0 := (mem.byte ip).toNat % 16) (j := ip + 3 + (mem.byte ip).toNat / 16)
+        hC hD hR hgood16 ⟨_, (((((((hcl.set (by omega) _).set (by omega) _).set
+        (by omega) _).set (by omega) _).set (by omega) _).set (by omega) _).set (by omega) _),
+        by simp [hln], by simp [hln], by simp [hln], by simp [hln], by simp [hln], rfl⟩
+        (by omega) (by omega) (by omega) (by omega) (by omega) hoffb
+        (Nat.mod_lt _ (by decide))
+    · -- X4: the match starts before `dst`
+      exact contX4 (o' := op + (mem.byte ip).toNat / 16)
+        (off := ((mem.byte (ip + 1 + (mem.byte ip).toNat / 16)).toNat +
+          256 * (mem.byte (ip + 2 + (mem.byte ip).toNat / 16)).toNat))
+        (m := (mem.byte ip).toNat % 16) (j := ip + 3 + (mem.byte ip).toNat / 16)
+        hD hR hgood16 ⟨_, (((((((hcl.set (by omega) _).set (by omega) _).set
+        (by omega) _).set (by omega) _).set (by omega) _).set (by omega) _).set (by omega) _),
+        by simp [hln], by simp [hln], by simp [hln], by simp [hln], by simp [hln], rfl⟩
+        (by omega) (by omega) (by omega) (by omega) (by omega) hoffb (by omega)
+    · -- X5: the shortcut, back to the head
+      refine Until.done (Or.inl ⟨_, _, op + (mem.byte ip).toNat / 16 + (mem.byte ip).toNat % 16 + 4,
+        ip + 3 + (mem.byte ip).toNat / 16, ?_, HeadLocals.of_const ((((((((((hcl.set (by omega)
+        _).set (by omega) _).set (by omega) _).set (by omega) _).set (by omega) _).set (by omega)
+        _).set (by omega) _).set (by omega) _).set (by omega) _)) (by simp [hln])
+        (by simp [hln]), by omega, by omega, by omega, by omega, rfl⟩)
+      refine hg.setMem hm0 (by simp) fun x hx => ?_
+      rw [fwdCopy_outside _ _ _ _ _ (Or.inl (by omega)),
+        fwdCopy_outside _ _ _ _ _ (Or.inl (by omega))]
+
+/-- The main loop from a good head: func 2 returns one `i32`, inside R1's sets. -/
+theorem loop (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC) (hD : SegD) (hR : ErrRet)
+    {H : HostSem} {inst : ModuleInst} {ma src dst n cap : Nat} :
+    ∀ k (st : Store) (ls : List Val) (op ip : Nat), src + n - ip = k →
+      Good st inst ma src dst n cap → HeadLocals ls src dst n cap op ip → src ≤ ip →
+      ip < src + n → dst ≤ op → op ≤ dst + cap →
+      Until H (Within (R1R src n dst cap) (R1W dst cap))
+        (fun c => ∃ st' v, c = ⟨st', ⟨[], {}⟩, vals [.i32 v]⟩) (head st inst ls) := by
+  intro k
+  induction k using Nat.strong_induction_on with
+  | _ k ih =>
+    intro st ls op ip hk hg hl hsip hipn hop hopc
+    refine Until.trans (iter hS5 hA hB hC hD hR hg hl hsip hipn hop hopc) ?_
+    rintro c (⟨st', ls', op', ip', hg', hl', hlt, hipn', hop', hopc', rfl⟩ | hr)
+    · exact ih _ (by omega) st' ls' op' ip' rfl hg' hl' (by omega) hipn' hop' hopc'
+    · exact Until.done hr
+
 end Subjects.Lz4C
