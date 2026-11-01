@@ -125,7 +125,9 @@ noncomputable def AtX2 (F : Ref.Context) (st : Store) (inst : ModuleInst)
 
 /-- SegA: from X1 (the token's literal field is 15: locals 4 = `ip` the token's position,
 15 = `ip + 1`, 2 = 15, 16 = `t`, 3 = `op`), the literal length's extension bytes: X2 with length
-`15 + acc` at the position after them, or an error exit when `extM` fails. -/
+`15 + acc` at the position after them, or an error exit when `extM` fails. Memory at most
+2 MiB: otherwise the length's overflow guards (`len > ~op`, `len > ~ip`) can fire for an `acc`
+near `2^31`. -/
 def SegA : Prop :=
   ∀ (H : HostSem) (F : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
     (mem : MemInst) (src dst n cap op ip t : Nat),
@@ -133,7 +135,7 @@ def SegA : Prop :=
     ls[15]? = some (vI (ip + 1)) → ls[2]? = some (vI 15) → ls[16]? = some (vI t) →
     inst.mems[0]? = some ma → st.mems[ma]? = some mem →
     131072 ≤ src → 131072 ≤ dst → src + n ≤ mem.size → dst + cap ≤ mem.size →
-    mem.size < 2 ^ 32 → src ≤ ip → ip < src + n → op < 2 ^ 31 →
+    mem.size ≤ 2097152 → src ≤ ip → ip < src + n → op < 2 ^ 31 →
     Until H
       (Within (fun m x => m = ma ∧ (Span ma src n m x ∨ Span ma dst cap m x)) (Span ma dst cap))
       (fun c => (∃ acc q, extM mem (src + n - 15) n (ip + 1) 0 = some (acc, q) ∧
