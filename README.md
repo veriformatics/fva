@@ -81,7 +81,7 @@ Your review covers the claims in your specification files only. FVA's own files 
 
 - `FVATest/Examples/Toy`, `Mem`, `Rust`: C and Rust functions with loops, memory buffers, calls and `br_table`, proved on the compiled binaries.
 - `FVATest/Certs`: certificates for the same sorted output from Python, R, Java and TypeScript programs, and for a toy compiler; files that must fail show what FVA rejects.
-- `FVATest/Subjects`: results about published software, each checked by `fva trust`. They include counterexamples for a hand-written LZ4 codec in WebAssembly, measured against a reviewed specification of the LZ4 block format. They also include a proof for every input of edgeR's counts-per-million function in its shipped WebAssembly build, certificates that refute RNAnorm's claim that its TMM factors match edgeR's to 10 decimal places, and a counterexample for GLM's `iround`.
+- `FVATest/Subjects`: results about published software, each checked by `fva trust`. They include counterexamples for a hand-written LZ4 codec in WebAssembly, measured against a reviewed specification of the LZ4 block format. They also include a proof for every input of lz4's `LZ4_decompress_safe` in its shipped WebAssembly build: each call reads and writes only its two buffers and returns, a valid block decodes to its content, and a non-negative result means that the input parsed as LZ4 sequences (a 76-line specification, checked in the default and `--paranoid` modes). They include a proof for every input of edgeR's counts-per-million function in its shipped WebAssembly build, certificates that refute RNAnorm's claim that its TMM factors match edgeR's to 10 decimal places, and a counterexample for GLM's `iround`.
 
 ## Benchmark
 
@@ -89,7 +89,7 @@ Your review covers the claims in your specification files only. FVA's own files 
 
 - In every task, every agent that used FVA produced a machine-checked statement about the shipped binary or output files. The other agents did this only in some tasks, with an extractor and semantics that they wrote themselves and must be trusted.
 - FVA did not save time or cost. Agents with FVA used 3 to 11.5 times as many input tokens as agents with only the task.
-- On two tasks without a known defect (the LZ4 decoders in C and Rust), the agents with FVA proved less about memory access than the other agents. At the time of the benchmark, FVA had no reviewed claim form for memory access. It has one now: `CallWithin` states the bytes that a call may read and write at every step.
+- On two tasks without a known defect (the LZ4 decoders in C and Rust), the agents with FVA proved less about memory access than the other agents. At the time of the benchmark, FVA had no reviewed claim form for memory access. It has one now: `CallWithin` states the bytes that a call may read and write at every step, and the proof of the lz4 C decoder uses it.
 - On the GLM task, every agent found the wrong result for `0.49999999999999994`. Only the agents with FVA proved it about the shipped binary, in a statement of 9 to 12 lines.
 - FVA was developed with these tasks known.
 

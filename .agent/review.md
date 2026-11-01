@@ -53,7 +53,7 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | R2 (register) | upstream: §4.5.4 prose runs all active segments before declarative drops; the equations interleave by segment index | note | accepted: the transcription follows the equations (FVA's convention) |
 | R3 (register) | upstream: appendix extension keeps the table/memory type unchanged while growth updates its min | note | accepted: growth-compatible reading (same element type/maximum, size non-decreasing) |
 
-## U4 LoaderReady / RunsExport (6f2d83b) — open for the U4/phase closing review
+## U4 LoaderReady / RunsExport (6f2d83b) — ruled at the U4 close
 
 | row | check | verdict | ruling |
 |---|---|---|---|
@@ -137,7 +137,7 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | S19–S20 | `parseNat` ROR:2 (rejects digit 9), `parseArith` AOR:0 (rejects a root constant) | unspecified | accepted: U9 C1 "Both are sound and intentionally incomplete: a rejection gives no certificate, never a refutation" (`docs/contracts/U9-certify.md@94b60f122e2be4cb`, MAIN rematch `rg -Fc` = 1); the three compiler fixtures still accept |
 | REG-1 (major, outside the set) | scope coverage | finding: `fvamut sites` skipped `SortedPerm.check` + `Compiled.check` (`open Impl in` wrapped them; the lister does not descend into `<command> in`) | accepted → fixed: both moved to section-level `open Impl` (+41 mutants, 3,359 total); `scripts/check-scope` (gate) fails on any `<command> in` line in a scope file, planted inputs in test-checks |
 
-## U14 S1/S2 lz4-wasm subject (MAIN-authored; open for the closing review; S1 audit = E3 reviewer)
+## U14 S1/S2 lz4-wasm subject (MAIN-authored; ruled at the U14 close; S1 audit = E3 reviewer)
 
 | row | check | verdict | ruling |
 |---|---|---|---|
@@ -182,5 +182,18 @@ Check set fixed before reading: K1 `Spec.lean` R1–R3 = U19 contract Checkpoint
 | K2 | claim vocabulary reviewed | pass: `fva trust` probe = surface 88 lines (Spec 56 + Lz4.Format 26 + Lz4.Any 6), CAbi = FVA base | accepted |
 | K3 | cutpoint statements | finding: SegA–SegD claimed exits false for memories near 2^32 (overflow guards fire, i32 sums wrap) | accepted → fixed 1e7fbbd + 594ef18 (premise mem.size ≤ 2097152; every use has 2 MiB); remaining statements re-checked by their proofs |
 | K4 | axioms / sorry / roots | pass: r1_of r2_of r3_of entry errRet match_holds = {propext, Classical.choice, Quot.sound}; roots listed | accepted |
-| K5 | duplicates + dead code | finding: R1-only loop proof superseded by Sim (Loop.lean 400 → 186, 700ef98); instance lemmas deduped (10e9ea4); open: numeric helpers spread over Match (toNat_sub_ofNat, mod_pos/neg), Cut/Entry (ofNat_wrap, iadd_neg), Sim (ofNat_toInt) | open: consolidate into one helper module once the engine's own helpers land (ruling after U20) |
-| K6 | mechanism over special case | note: hand stepping's two failure classes (deep kernel term at ≈ 70 steps; `wasm_within` on `x + c`, c near 2^32) handled per proof (segments, iadd_neg) — mechanism-level fix belongs to the chosen engine | open: U20 ruling input |
+| K5 | duplicates + dead code | finding: R1-only loop proof superseded by Sim (Loop.lean 400 → 186, 700ef98); instance lemmas deduped (10e9ea4); numeric helpers spread over Match (toNat_sub_ofNat, mod_pos/neg), Cut/Entry (ofNat_wrap, iadd_neg), Sim (ofNat_toInt) + engine C's BlockNumeric/BlockFacts | accepted → deferred D60 (proof-side only; every proof builds and replays) |
+| K6 | mechanism over special case | note: hand stepping's two failure classes (deep kernel term at ≈ 70 steps; `wasm_within` on `x + c`, c near 2^32) handled per proof (segments, iadd_neg) — mechanism-level fix belongs to the chosen engine | closed: engine C batches a block into one evaluator equation and rewrites `x + (2^32 − k)` to `x − k` at `block_simp` priority 2000 (`iadd_mask1/4`); `.claude/rules/fva-eval.md` records the normal forms |
+
+## IMPLEMENT close — lz4 C decoder proof (U19 checkpoint 2, U20–U25), MAIN-led
+
+Check set fixed before reading the phase diff (c736868…HEAD): L1 correctness of the trusted and gate-side changes (`FVA/Trust/Replay.lean`, `scripts/subject-matrix`, `scripts/test-subjects`, `scripts/test-checks`, `Spec.lean`, `Call.lean`); L2 cleanup (duplicates, dead code, scaffolding left); L3 altitude (a special case on shared infrastructure); L4 `CLAUDE.md` conformance (commits, Tasks, teammates, cleanup); L5 security (MAIN only: inputs, injection, verdict spoofing).
+
+| row | lens | verdict | ruling |
+|---|---|---|---|
+| L1 | correctness | pass: `Replay.lean`'s new decline pattern seen red without it (`FVATest/Trust.lean`: heartbeat limit got reject) and green with it, a refutation still rejects; `subject-matrix` = kernel tier: tester-2's blind battery red before the runner, 15/15 after, a neutered runner → battery rc 1; `test-subjects` keeps rc 2/3; `Spec` + `Call` = K1 pass (reviewer-1) | accepted |
+| L2 | cleanup | finding: `Cut/ExtB` repeats checkpoint 1's loop proof (D59); numeric helpers spread (K5 → D60); no dead module (every `Eval/*` imported); spike worktrees + branches removed, tags `archive/spike-{c,d,v}` kept | accepted → D59, D60 |
+| L3 | altitude | pass: lean4lean's heartbeat limit handled in the kernel's run-set entry (a decline, as its recursion limit), not by excluding a subject; one matrix runner for every subject and mode | accepted |
+| L4 | conformance | pass: one commit per unit with measurements + teammates; Tasks ticked per commit; no push; worktrees `tester-1`/`tester-2` + their branches removed at the closing commit | accepted |
+| L5 | security | finding: `runKernel` matches decline patterns anywhere in a kernel's output, and lean4lean's log names every declaration it checks, so a project can name a theorem «deterministic timeout» and turn lean4lean's rejection of another declaration into a decline (the two older patterns already allowed this); bounded: a decline removes one kernel's veto, the replay rule still fails on any other kernel's rejection and needs a non-Lean accept | accepted → deferred D61 |
+
