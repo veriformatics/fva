@@ -1,0 +1,17 @@
+run	arm	module	wall_s	maxrss_kib	rc
+0	c	FVATest.Subjects.Lz4C.SpikeC.SegC	47.39	2852176	0
+0	d	FVATest.Subjects.Lz4C.SpikeD.SegC	27.02	2792200	0
+0	d	FVATest.Subjects.Lz4C.SpikeD.SegCBase	11.08	2681008	0
+0	d	FVATest.Subjects.Lz4C.SpikeD.SegCLoop	65.78	2837152	0
+1	d	FVATest.Subjects.Lz4C.SpikeD.SegC	12.80	2796804	0
+1	d	FVATest.Subjects.Lz4C.SpikeD.SegCBase	5.36	2683168	0
+1	d	FVATest.Subjects.Lz4C.SpikeD.SegCLoop	51.40	2832076	0
+1	c	FVATest.Subjects.Lz4C.SpikeC.SegC	23.19	2840372	0
+2	c	FVATest.Subjects.Lz4C.SpikeC.SegC	19.69	2841712	0
+2	d	FVATest.Subjects.Lz4C.SpikeD.SegC	9.81	2793048	0
+2	d	FVATest.Subjects.Lz4C.SpikeD.SegCBase	4.16	2682152	0
+2	d	FVATest.Subjects.Lz4C.SpikeD.SegCLoop	42.08	2831104	0
+3	d	FVATest.Subjects.Lz4C.SpikeD.SegC	9.72	2792996	0
+3	d	FVATest.Subjects.Lz4C.SpikeD.SegCBase	4.17	2681944	0
+3	d	FVATest.Subjects.Lz4C.SpikeD.SegCLoop	41.81	2830100	0
+3	c	FVATest.Subjects.Lz4C.SpikeC.SegC	23.62	2842584	0
