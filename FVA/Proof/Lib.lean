@@ -4,3 +4,7 @@ import FVA.Proof.Lib.Arith
 import FVA.Proof.Lib.Mem
 import FVA.Proof.Lib.Context
 import FVA.Proof.Lib.Footprint
+import FVA.Proof.Lib.BlockAttr
+import FVA.Proof.Lib.BlockEval
+import FVA.Proof.Lib.BlockFacts
+import FVA.Proof.Lib.BlockNumeric

@@ -1,0 +1,101 @@
+fva trust: PASS
+
+Claims
+  Subjects.Lz4C.r1 — about FVATest.Subjects.Lz4C.Lifted (artifact)
+    proved by Subjects.Lz4C.r1_holds (axioms: propext, Classical.choice, Quot.sound)
+  Subjects.Lz4C.r2 — about FVATest.Subjects.Lz4C.Lifted (artifact)
+    proved by Subjects.Lz4C.r2_holds (axioms: propext, Classical.choice, Quot.sound)
+  Subjects.Lz4C.r3 — about FVATest.Subjects.Lz4C.Lifted (artifact)
+    proved by Subjects.Lz4C.r3_holds (axioms: propext, Classical.choice, Quot.sound)
+
+Declared subjects (Lean-native implementations: judged, never reviewed)
+  FVATest.Subjects.Lz4C.Lifted
+
+Kernel replay
+  leanchecker (lean): accepted (93 s)
+  leanchecker-paranoid (lean): accepted (122 s)
+  lean4lean (lean): declined (28 s)
+  nanoda (nanoda): accepted (46 s)
+  con-leche (con): accepted (55 s)
+  con-ron (con): accepted (38 s)
+
+Canaries (72 known-false exports, /home/eturkes/Projects/fva/trust/canaries/set.tsv; known acceptances /home/eturkes/Projects/fva/trust/canaries/known.tsv)
+  leanchecker: 71 rejected, 0 declined, 0 crashed or timed out, 1 accepted
+  leanchecker-paranoid: 71 rejected, 0 declined, 0 crashed or timed out, 1 accepted
+  lean4lean: 64 rejected, 7 declined, 0 crashed or timed out, 1 accepted
+  nanoda: 6 rejected, 0 declined, 66 crashed or timed out, 0 accepted
+  con-leche: 69 rejected, 3 declined, 0 crashed or timed out, 0 accepted
+  con-ron: 69 rejected, 3 declined, 0 crashed or timed out, 0 accepted
+
+Links
+  FVATest.Subjects.Lz4C.Lifted (FVATest/Subjects/Lz4C/lz4-c.wasm) [lifted]: matches
+
+Read these: 88 code lines
+  FVATest.Subjects.Lz4C.Spec: 56 lines
+  FVATest.Subjects.Lz4.Format: 26 lines
+  FVATest.Subjects.Lz4.Any: 6 lines
+
+Names the claims use from outside the project (their meaning = their docs)
+  And (core): `And a b`, or `a ∧ b`, is the conjunction of propositions. It can be
+  BitVec (core): A bitvector of the specified width.
+  Eq (core): The equality relation. It has one introduction rule, `Eq.refl`.
+  Exists (core): Existential quantification. If `p : α → Prop` is a predicate, then `∃ x : α, p x`
+  Int (core): The integers.
+  List (core): Linked lists: ordered lists, in which each element has a reference to the next element.
+  Nat (core): The natural numbers, starting at zero.
+  Option (core): Optional values, which are either `some` around a value from the underlying type or `none`.
+  Or (core): `Or a b`, or `a ∨ b`, is the disjunction of propositions. There are two
+  PProd (core): A product type in which the types may be propositions, usually written `α ×' β`.
+  UInt8 (core): Unsigned 8-bit integers.
+  Unit (core): The canonical type with one element. This element is written `()`.
+  ite (core): `if c then t else e` is notation for `ite c t e`, "if-then-else", which decides to
+  BitVec.ofNat (core): The bitvector with value `i mod 2^n`.
+  BitVec.toInt (core): Interprets the bitvector as an integer stored in two's complement form.
+  GetElem?.getElem! (core): The syntax `arr[i]!` gets the `i`'th element of the collection `arr`,
+  HAdd.hAdd (core): `a + b` computes the sum of `a` and `b`.
+  HAppend.hAppend (core): `a ++ b` is the result of concatenation of `a` and `b`, usually read "append".
+  HDiv.hDiv (core): `a / b` computes the result of dividing `a` by `b`.
+  HMod.hMod (core): `a % b` computes the remainder upon dividing `a` by `b`.
+  HMul.hMul (core): `a * b` computes the product of `a` and `b`.
+  HPow.hPow (core): `a ^ b` computes `a` to the power of `b`.
+  HSub.hSub (core): `a - b` computes the difference of `a` and `b`.
+  Int.toNat (core): Converts an integer into a natural number. Negative numbers are converted to `0`.
+  LE.le (core): The less-equal relation: `x ≤ y` 
+  LT.lt (core): The less-than relation: `x < y` 
+  List.below (core)
+  List.brecOn (core)
+  List.casesOn (core)
+  List.flatMap (core): Applies a function that returns a list to each element of a list, and concatenates the resulting
+  List.getLast? (core): Returns the last element in the list, or `none` if the list is empty.
+  List.length (core): The length of a list.
+  List.replicate (core): Creates a list that contains `n` copies of `a`.
+  Membership.mem (core): The membership relation `a ∈ s : Prop` where `a : α`, `s : γ`. 
+  Min.min (core): Returns the lesser of its two arguments. 
+  Monoid.toNPow (mathlib)
+  NPow.toPow (mathlib)
+  Nat.below (core)
+  Nat.brecOn (core)
+  Nat.casesOn (core)
+  Nat.cast (core): The canonical homomorphism `Nat → R`. In most use cases, the target type will have a (semi)ring
+  Nat.decLe (core): A decision procedure for non-strict inequality of natural numbers, usually accessed via the
+  Nat.decLt (core): A decision procedure for strict inequality of natural numbers, usually accessed via the
+  OfNat.ofNat (core): The `OfNat.ofNat` function is automatically inserted by the parser when
+  Option.bind (core): Sequencing of `Option` computations.
+  Option.map (core): Apply a function to an optional value, if present.
+  UInt8.ofNat (core): Converts a natural number to an 8-bit unsigned integer, wrapping on overflow.
+  Unit.unit (core): The only element of the unit type.
+  FVA.Wasm.Exec.CallReturns (base): The call always returns, with final store and results satisfying `P` (never traps).
+  FVA.Wasm.Exec.CallWithin (base): Export `name` of `inst`, called on `args` in store `s`: the invocation is defined, and every
+  FVA.Wasm.Exec.Holds (base): Memory 0 of `s` exists and holds bytes `bs` at address `p`.
+  FVA.Wasm.Exec.HostSem (base): Host semantics: the outcomes a host function (by `HostId`) may produce on a store and
+  FVA.Wasm.Exec.ModuleInst (base): Module instances (§4.2.5): the module's types and the store address of every entity.
+  FVA.Wasm.Exec.Prep (base): One step of the caller's preparation of memory 0 before a call, through the embedder's
+  FVA.Wasm.Exec.Prepared (base): A fresh instance `inst` of the import-free module `m` after the caller's preparation `ps`:
+  FVA.Wasm.Exec.Store (base): The store (§4.2.3).
+  FVA.Wasm.Exec.Val (base): Values (§4.2.1); floats as their bit patterns (§4.3.1).
+
+What a PASS rests on
+  reviewed once: FVA's specs: Wasm syntax + binary grammar, execution semantics, integer + IEEE-754 numerics, claim forms, certificate relations, the verdict rules (FVA/Spec/**)
+  verified implementation: the decoder (sound + complete for the profile), the reference stepper, the float operators, instantiation, the validator (validated modules never get stuck), the verdict function, the certificate checkers (FVA.Self: fva trust on FVA itself)
+  trusted glue: fact collection from the environment, the link and surface checks (a certificate's files included), process orchestration, the external kernels (each canaried)
+  residual trust: the Lean kernel cross-checked by an independent kernel, the Lean compiler that built fva, Mathlib at the pinned revision, the specs

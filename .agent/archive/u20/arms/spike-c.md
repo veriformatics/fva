@@ -292,7 +292,7 @@ Base = `13431b9`; frozen Seg sha256 = `ff4cbe5871a98c2adaa946554a44918e6ff93c012
 | statement | status | theorem | start | first green | build iterations / M0 tools | new generic / specific code lines | axioms | failure class / last obligation |
 |---|---|---|---|---|---|---|---|---|
 | SegB | proved (`b2396f1`) | Subjects.Lz4C.SpikeC.segB | 2026-11-01T18:12:33+09:00 | 2026-11-01T18:38:21+09:00 | 3 capped builds; 17 M0 tools | 0 / 203 | [propext, Classical.choice, Quot.sound] | none |
-| SegD | unknown | Subjects.Lz4C.SpikeC.segD | 2026-11-01T18:41:04+09:00 | unknown | unknown | unknown | unknown | unknown |
+| SegD | proved (`77a662a`) | Subjects.Lz4C.SpikeC.segD | 2026-11-01T18:41:04+09:00 | 2026-11-01T19:39:49+09:00 | 13 capped builds (first root green 012; strict 013); 42 M0 tools | 10 / 645 | [propext, Classical.choice, Quot.sound] | none |
 
 ### Statement audit
 
@@ -307,3 +307,28 @@ none
 Commit `b2396f1a89c1b7c8dfab4f595dda68f2da44d654`; M0=1548 s contended (includes the upfront audit of both production statements). New `SegB.lean`=203 specific code lines, no engine changes. Reuses own `s2`, `s3`, `head_decompose`, `copy_source_byte`, `read_two`, SegC `cOuter`, unchanged evaluator + numeric facts; main `HeadLocals.of_const`, `off_lt`. Exact return crosses the function label/frame and restores the caller. Raw build logs=`prodB-build-001.log`…`003.log`; source counts=`prodB-declarations.tsv`; events=`prodB-tool-calls.json`.
 
 spike-c-DONE-3
+
+### SegD result
+
+Commit `77a662a1d44cb807fc46275c372c6d9370e8b776`; M0=3525 s contended (58 min 45 s),42 tool uses. Raw events=`prodD-tool-calls.json` (one previous SegB commit excluded at the rounded start boundary). Final `lake --wfail build FVATest.Subjects.Lz4C.SpikeC.SegD` passed with replayed/cache diagnostics (`prodD-build-013.log`,rc0); first fresh root green=`prodD-build-012.log`. Both production roots print only the three standard axioms.
+
+| module | total code lines | generic | SegD-specific |
+|---|---|---|---|
+| `SegDCommon.lean` | 126 | 10 | 116 |
+| `SegDPrologue.lean` | 138 | 0 | 138 |
+| `SegDLoops.lean` | 111 | 0 | 111 |
+| `SegDRest.lean` | 176 | 0 | 176 |
+| `SegD.lean` | 104 | 0 | 104 |
+| total | 655 | 10 | 645 |
+
+Generic support = `d_sub_mask1` (4),`d_sub_mask4` (4),`d_add8` (2). Other new code is decoder-specific; all module shells counted. Per-declaration counts=`prodD-declarations.tsv`; no generated-source discount. The shared block evaluator and its soundness proof remain unchanged.
+
+- `d_code` reads the complete frozen X4 suffix by kernel equality. Offset failure precedes writes. Both prologue variants produce exactly the frozen `prologue` memory/pointer. The low table bytes survive every scratch/callee write; all eight table entries, including negative dec64 words, are handled by kernel-checked arithmetic.
+- Far path reuses own S4; near path reuses `wc_until` at locals15/17/10 and proves the single-byte loop by 15/16-step evaluator blocks + induction. Both carry original dormant continuations and land on the next head. No direct-step fallback or outside generic execution lemma discharges these steps.
+- Reuses own S1/S4, `wc_until`, `chunks_spec`, `local_pair_reset`, `short_copy`, copy-memory lemmas, SegC locals/context support, and unchanged `Block*` infrastructure. Main support includes `TablesOK.of_low`, `write_low`, `HeadLocals.of_const`, `ConstLocals.set`, and the numeric `ExtCommon` lemmas.
+- Source checks=`prodD-source-check.log`: root `wasm_eval` positive control expected5/observed5 (rc0); prohibited or unfinished forms zero (rc1); outside-engine stepping names zero (rc1). Frozen Seg hash still `ff4cbe5871a98c2adaa946554a44918e6ff93c0120ac93004348fa0cf8077001`. No instruction/spec edits. MainAccept*.lean untouched.
+- Not run by this arm: full gate, separate `lake lint`, independent replay/export. MAIN owns integration and those checks. Statement issues remain none.
+
+Production report validator passed (rc0): both rows completed; codeLines203+655=858; generic10/specific848; M0 events match; frozen hash matches; placeholder positive control fires and clean cells zero. Raw result=`prod-validation.log`.
+
+spike-c-DONE-4
