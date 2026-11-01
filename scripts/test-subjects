@@ -30,6 +30,7 @@ proofs=(FVATest.Subjects.Lz4C.ExtDirect FVATest.Subjects.Lz4C.ExtRefine
 	FVATest.Subjects.Lz4C.Short FVATest.Subjects.Lz4C.ModelProof FVATest.Subjects.Lz4C.Prefix
 	FVATest.Subjects.Lz4C.Seg FVATest.Subjects.Lz4C.Loop FVATest.Subjects.Lz4C.Top
 	FVATest.Subjects.Lz4C.Match FVATest.Subjects.Lz4C.Cut.ErrRet FVATest.Subjects.Lz4C.Cut.Entry
+	FVATest.Subjects.Lz4C.Cut.SegA
 	FVATest.Subjects.Lz4C.Accept FVATest.Subjects.Lz4C.Refute.LastWrite
 	FVATest.Subjects.Lz4C.Refute.Length FVATest.Subjects.Lz4C.Refute.Nonnegative)
 # the Neg roots are no default target; build them by module name, expecting failure
