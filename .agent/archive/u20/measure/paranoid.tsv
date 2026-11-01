@@ -1,0 +1,9 @@
+kernel	tag	wall_s	maxrss_kib	rc	decline
+leanchecker-paranoid	c-s1-5	72.23	2401492	0	0
+leanchecker-paranoid	d-s1-5	76.05	2401124	0	0
+lean4lean	c-s1-5	26.62	393244	1	1
+lean4lean	d-s1-5	26.61	391528	1	1
+nanoda	c-s1-5	10.50	326036	0	0
+nanoda	d-s1-5	10.02	345036	0	0
+con-ron	c-s1-5	12.59	2067228	0	0
+con-ron	d-s1-5	13.08	2043836	0	0
