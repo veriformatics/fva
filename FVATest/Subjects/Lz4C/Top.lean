@@ -1,5 +1,5 @@
 import FVATest.Subjects.Lz4C.Sim
-import FVATest.Subjects.Lz4C.Spec
+import FVATest.Subjects.Lz4C.SpecEq
 import FVATest.Subjects.Lz4C.Instance
 import FVA.Proof.Lib.Mem
 
@@ -191,7 +191,7 @@ theorem invoke_ok (src dst : Nat) (input initDst : List UInt8) :
 
 /-- R1 from the cutpoint statements. -/
 theorem r1_of (hE : Entry) (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC) (hD : SegD)
-    (hR : ErrRet) : r1 := by
+    (hR : ErrRet) : r1Unfactored := by
   intro src dst input initDst hs hs' hd hd' _ _ hj
   refine ⟨fun H => ⟨_, _, store0, instance_store0 H, prep_eq hs' hd'⟩, ?_⟩
   intro H s inst hp
@@ -201,7 +201,7 @@ theorem r1_of (hE : Entry) (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC
 
 /-- R2 from the cutpoint statements. -/
 theorem r2_of (hE : Entry) (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC) (hD : SegD)
-    (hR : ErrRet) : r2 := by
+    (hR : ErrRet) : r2Unfactored := by
   intro src dst input initDst hs hs' hd hd' _ _ hj
   refine ⟨fun H => ⟨_, _, store0, instance_store0 H, prep_eq hs' hd'⟩, ?_⟩
   intro H s inst hp c hv hcl hroom
@@ -213,7 +213,7 @@ theorem r2_of (hE : Entry) (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC
 
 /-- R3 from the cutpoint statements. -/
 theorem r3_of (hE : Entry) (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC) (hD : SegD)
-    (hR : ErrRet) : r3 := by
+    (hR : ErrRet) : r3Unfactored := by
   intro src dst input initDst hs hs' hd hd' _ _ hj
   refine ⟨fun H => ⟨_, _, store0, instance_store0 H, prep_eq hs' hd'⟩, ?_⟩
   intro H s inst hp

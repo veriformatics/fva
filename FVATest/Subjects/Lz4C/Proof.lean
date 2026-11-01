@@ -9,13 +9,13 @@ import FVATest.Subjects.Lz4C.Eval.Accept
 
 namespace Subjects.Lz4C
 
-theorem r1_holds : r1 :=
+theorem r1_holds : r1 := r1_iff.mpr <|
   Top.r1_of Cut.entry Eval.s5 Cut.segA Eval.segB Eval.segC Eval.segD Cut.errRet
 
-theorem r2_holds : r2 :=
+theorem r2_holds : r2 := r2_iff.mpr <|
   Top.r2_of Cut.entry Eval.s5 Cut.segA Eval.segB Eval.segC Eval.segD Cut.errRet
 
-theorem r3_holds : r3 :=
+theorem r3_holds : r3 := r3_iff.mpr <|
   Top.r3_of Cut.entry Eval.s5 Cut.segA Eval.segB Eval.segC Eval.segD Cut.errRet
 
 end Subjects.Lz4C
