@@ -26,7 +26,7 @@ subjects=(
 proofs=(FVATest.Subjects.Lz4C.ExtDirect FVATest.Subjects.Lz4C.ExtRefine
 	FVATest.Subjects.Lz4C.O1.ExtDirect FVATest.Subjects.Lz4C.O1.ExtRefine FVATest.Subjects.Lz4C.Instance
 	FVATest.Subjects.Lz4C.Short FVATest.Subjects.Lz4C.ModelProof FVATest.Subjects.Lz4C.Prefix
-	FVATest.Subjects.Lz4C.Seg)
+	FVATest.Subjects.Lz4C.Seg FVATest.Subjects.Lz4C.Loop)
 # the Neg roots are no default target; build them by module name, expecting failure
 negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
 	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same FVATest.Subjects.Tmm.Neg.Exact)
