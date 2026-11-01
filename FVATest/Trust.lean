@@ -147,6 +147,18 @@ def expect {α : Type} [BEq α] [ToString α] (what : String) (got want : α) : 
   let slow : Kernel := { k with declineOn := [] }
   let (slept, _) ← runKernel slow (← fake "slow" "sleep 30") "x" (tmp / "s.json") 1
   expect "timeout" (repr slept).pretty "FVA.Trust.Status.timeout"
+  -- the run set's own lean4lean entry: its limits decline, a refutation still rejects
+  let some l4l := kernels.find? (·.name == "lean4lean")
+    | throw (IO.userError "check: no lean4lean entry in the run set")
+  let l4 (bin : System.FilePath) : IO Status :=
+    return (← runKernel l4l bin "x" (tmp / "l.json") 30).1
+  expect "lean4lean heartbeat limit" (repr (← l4 (← fake "l4t"
+    "echo 'uncaught exception: at X: (kernel) deterministic timeout' >&2; exit 1"))).pretty
+    "FVA.Trust.Status.decline"
+  expect "lean4lean recursion limit" (repr (← l4 (← fake "l4d"
+    "echo '(kernel) deep recursion detected' >&2; exit 1"))).pretty "FVA.Trust.Status.decline"
+  expect "lean4lean refutation" (repr (← l4 (← fake "l4r"
+    "echo '(kernel) declaration type mismatch' >&2; exit 1"))).pretty "FVA.Trust.Status.reject"
 
 -- Canary runs (F6): a decided status is cached per sha256 pair, a timeout never is
 #eval show IO Unit from IO.FS.withTempDir fun root => do

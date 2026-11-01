@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# U22 planted matrix cases: isolated FVA stubs, exact rc + diagnostics, both modes per subject.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+runner=$PWD/scripts/subject-matrix
+[[ -x $runner ]] || {
+	echo "test-subject-matrix: scripts/subject-matrix is missing or not executable"
+	exit 2
+}
+tmp=$(mktemp -d) || exit 2
+trap 'rm -rf "$tmp"' EXIT
+shopt -s nullglob
+fail=0
+bad() {
+	echo "test-subject-matrix: $*"
+	((fail += 1))
+}
+fresh() { # case → independent table, four configured results + argv-checking FVA stub
+	local d root spec subject surface mode key
+	d=$(mktemp -d "$tmp/$1.XXXXXX") || return 2
+	mkdir "$d/results" "$d/calls" || return 2
+	printf '%s\n' 'Matrix.Program Matrix.Program.Spec Matrix.Program.Lifted 11' \
+		'Matrix.Certificate Matrix.Certificate.Spec - 7' >"$d/table" || return 2
+	while read -r root spec subject surface; do
+		for mode in default paranoid; do
+			key=$d/results/$root.$mode
+			printf '0\n' >"$key.rc" || return 2
+			printf 'fva trust: PASS\nRead these: %s code lines\n' "$surface" >"$key.log" || return 2
+			{
+				printf '%s\n' trust . --spec-module "$spec" --root-module "$root"
+				[[ $subject == - ]] || printf '%s\n' --subject "$subject"
+				[[ $mode == default ]] || printf '%s\n' --paranoid
+			} >"$key.args"
+		done
+	done <"$d/table"
+	cat >"$d/fva" <<'STUB'
+#!/usr/bin/env bash
+set -uo pipefail
+d=$(cd "$(dirname "$0")" && pwd) || exit 2
+args=$(printf '%s\n' "$@")
+for expected in "$d"/results/*.args; do
+	[[ $args == "$(<"$expected")" ]] || continue
+	key=${expected##*/}
+	key=${key%.args}
+	printf '%s\n' "$args" >"$d/calls/$key.$BASHPID" || exit 2
+	if [[ -f $d/results/$key.kill-wrapper ]]; then
+		kill -s KILL "$PPID" || exit 2
+		exit 0
+	fi
+	cat "$d/results/$key.log" || exit 2
+	exit "$(<"$d/results/$key.rc")"
+done
+echo 'fva trust: fixture received unexpected arguments' >&2
+exit 2
+STUB
+	chmod +x "$d/fva" || return 2
+	printf '%s\n' "$d"
+}
+run_case() { # name dir expected-rc diagnostic [verdict-line] [jobs]
+	local name=$1 d=$2 want=$3 message=$4 verdict=${5-} jobs=${6:-2} before=$fail rc expected key n
+	local calls=()
+	# Keep a supervisor: an implementation that execs the stub must not let its PPID kill this battery.
+	(
+		cd "$d" || exit 2
+		FVA="$d/fva" FVA_SUBJECT_JOBS="$jobs" "$runner" <"$d/table" >"$d/out" 2>&1
+		rc=$?
+		exit "$rc"
+	)
+	rc=$?
+	((rc == want)) || bad "$name: rc $rc, want $want"
+	[[ -z $message ]] || grep -qF -- "$message" "$d/out" || bad "$name: missing '$message'"
+	[[ -z $verdict ]] || grep -qF -- "$verdict" "$d/out" || bad "$name: missing verdict '$verdict'"
+	if ((want != 2)); then
+		for expected in "$d"/results/*.args; do
+			key=${expected##*/}
+			key=${key%.args}
+			calls=("$d/calls/$key".*)
+			((${#calls[@]} == 1)) || bad "$name: $key invoked ${#calls[@]} times, want 1"
+		done
+	fi
+	if ((want == 0)); then
+		n=$(grep -c '^subject-matrix:' "$d/out")
+		((n == 4)) || bad "$name: $n subject-matrix lines, want 4 (2N)"
+		local root spec subject surface mode
+		while read -r root spec subject surface; do
+			for mode in default paranoid; do
+				n=$(awk -v root="$root" -v mode="$mode" '
+					$1 == "subject-matrix:" && $2 == root && $3 == mode &&
+					$4 ~ /^[0-9]+([.][0-9]+)?$/ && $5 == "s" && NF == 5 {n++}
+					END {print n + 0}' "$d/out")
+				((n == 1)) || bad "$name: $root $mode has $n timing lines, want 1"
+			done
+		done <"$d/table"
+	fi
+	if ((fail == before)); then
+		echo "test-subject-matrix: $name PASS"
+	else
+		tail -8 "$d/out"
+	fi
+}
+
+d=$(fresh all-pass) || exit 2
+run_case all-pass "$d" 0 ''
+d=$(fresh paranoid-only-failure) || exit 2
+printf '1\n' >"$d/results/Matrix.Program.paranoid.rc"
+printf 'fva trust: FAIL\n  [fixture] paranoid planted failure\nRead these: 11 code lines\n' \
+	>"$d/results/Matrix.Program.paranoid.log"
+run_case paranoid-only-failure "$d" 1 'Matrix.Program paranoid trust rc 1' '[fixture] paranoid planted failure'
+d=$(fresh default-only-failure) || exit 2
+printf '1\n' >"$d/results/Matrix.Program.default.rc"
+printf 'fva trust: FAIL\n  [fixture] default planted failure\nRead these: 11 code lines\n' \
+	>"$d/results/Matrix.Program.default.log"
+run_case default-only-failure "$d" 1 'Matrix.Program default trust rc 1' '[fixture] default planted failure'
+d=$(fresh missing-result) || exit 2
+: >"$d/results/Matrix.Program.paranoid.kill-wrapper"
+run_case missing-result "$d" 1 'missing Matrix.Program paranoid'
+d=$(fresh silent-crash) || exit 2
+printf '139\n' >"$d/results/Matrix.Program.paranoid.rc"
+: >"$d/results/Matrix.Program.paranoid.log"
+run_case silent-crash "$d" 3 'Matrix.Program paranoid crashed, rc 139'
+d=$(fresh paranoid-surface-mismatch) || exit 2
+printf 'fva trust: PASS\nRead these: 70 code lines\n' >"$d/results/Matrix.Certificate.paranoid.log"
+run_case paranoid-surface-mismatch "$d" 1 'Matrix.Certificate paranoid surface ≠ pinned 7'
+d=$(fresh default-surface-mismatch) || exit 2
+printf 'fva trust: PASS\nRead these: 70 code lines\n' >"$d/results/Matrix.Certificate.default.log"
+run_case default-surface-mismatch "$d" 1 'Matrix.Certificate default surface ≠ pinned 7'
+d=$(fresh default-surface-missing) || exit 2
+printf 'fva trust: PASS\n' >"$d/results/Matrix.Program.default.log"
+run_case default-surface-missing "$d" 1 'Matrix.Program default surface ≠ pinned 11'
+d=$(fresh empty-table) || exit 2
+: >"$d/table"
+run_case empty-table "$d" 2 ''
+d=$(fresh short-row) || exit 2
+printf 'Matrix.Program Matrix.Program.Spec Matrix.Program.Lifted\n' >"$d/table"
+run_case short-row "$d" 2 ''
+d=$(fresh nonnumeric-surface) || exit 2
+printf 'Matrix.Program Matrix.Program.Spec Matrix.Program.Lifted eleven\n' >"$d/table"
+run_case nonnumeric-surface "$d" 2 ''
+d=$(fresh duplicate-root) || exit 2
+duplicate=$(head -1 "$d/table") || exit 2
+printf '%s\n' "$duplicate" >>"$d/table"
+run_case duplicate-root "$d" 2 ''
+d=$(fresh missing-fva) || exit 2
+rm "$d/fva" || exit 2
+run_case missing-fva "$d" 2 ''
+d=$(fresh serial) || exit 2
+run_case serial "$d" 0 '' '' 1
+d=$(fresh crash-and-failure) || exit 2
+printf '139\n' >"$d/results/Matrix.Program.paranoid.rc"
+: >"$d/results/Matrix.Program.paranoid.log"
+printf '1\n' >"$d/results/Matrix.Certificate.default.rc"
+printf 'fva trust: FAIL\n  [fixture] default planted failure\nRead these: 7 code lines\n' \
+	>"$d/results/Matrix.Certificate.default.log"
+run_case crash-and-failure "$d" 3 'Matrix.Program paranoid crashed, rc 139' \
+	'Matrix.Certificate default trust rc 1'
+
+((fail == 0))

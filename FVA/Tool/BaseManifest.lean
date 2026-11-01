@@ -275,7 +275,7 @@ def baseManifest : List (String × String) := [
   ("FVA/Trust/Collect.lean",
     "32757aafc29ed5178d7bc451061ba750cb3dd55bb3bf6e7defa7bf7500646a9b"),
   ("FVA/Trust/Replay.lean",
-    "dbd4461ba6257c156937ecae4908cb26d4ad2a20c2b91cc76b11382dbbb676c5"),
+    "bfa634ef6cd1ef7b641a3dd80e02cc230484f910ab6ac44c449a80c6d22cd273"),
   ("FVA/Trust/Verdict.lean",
     "de30d1fd2b687b96cb0265d46f2b7736a61f21e219f7d95865321484f787009e"),
   ("FVA/Version.lean",
