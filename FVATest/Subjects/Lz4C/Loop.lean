@@ -88,7 +88,7 @@ theorem Good.setMem {st : Store} {inst : ModuleInst} {ma src dst n cap : Nat} {m
   disj := hg.disj
 
 /-- The main loop's head for `F0` (a top-level call). -/
-noncomputable def head (st : Store) (inst : ModuleInst) (ls : List Val) : Config :=
+noncomputable def mainHead (st : Store) (inst : ModuleInst) (ls : List Val) : Config :=
   (ctx4 (ctx2 F0)).fill ⟨st, ⟨ls, inst⟩, [.plain mainLoop]⟩
 
 theorem prologue_size (mem : MemInst) (o' off : Nat) :

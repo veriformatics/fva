@@ -137,7 +137,7 @@ def SimHead (inst : ModuleInst) (ma src dst cap : Nat) (inp : List UInt8) (i : N
   ∃ st ls mem, Good st inst ma src dst inp.length cap ∧
     HeadLocals ls src dst inp.length cap (dst + out.length) (src + i) ∧ st.mems[ma]? = some mem ∧
     HoldsAt mem src inp ∧ HoldsAt mem dst out ∧ i < inp.length ∧ out.length ≤ cap ∧
-    c = head st inst ls
+    c = mainHead st inst ls
 
 /-- Where func 2 goes for the model's outcome of a sequence started at `i0`. -/
 def OutExit (inst : ModuleInst) (ma src dst cap : Nat) (inp : List UInt8) (i0 : Nat) :
