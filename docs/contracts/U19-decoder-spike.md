@@ -49,7 +49,7 @@ Status rule: checkpoint 1 proves a frozen loop lemma; only checkpoint 2's comple
 - Seam built: A1 `FVA/Spec/Exec/Access.lean` (`Reads`, `Writes`, `Within`, `Throughout`) + A2 `CallWithin` (`CAbi`, with `InvokeOK`); A3 `FVA/Impl/Exec/Access.lean` (`access`) + `FVA/Proof/Exec/Access.lean` (`reads_iff`, `writes_iff`) + `FVA/Proof/Lib/Footprint.lean` (`MustW`, `Until`, `mustW_of_until`, `Until.trans`/`mono`, `wasm_access` simp set, tactics `wasm_cstepw`, `wasm_cstepu`, `wasm_within`); `Context` + `blockCode` & co. moved from EdgerCpm into `FVA/Proof/Lib/Context.lean`; `Det.lean` gained `no_step_values`, `steps_values`, `no_step_trap`, `no_step_final`, `final_unique`, `Must.outcome` (moved/added once). A4 `FVA/Proof/Lib/FootprintExamples.lean`: positive + rejection `CallWithin` for a callee-frame store and load; planted checker bound `+1` and deleted `Reads.frame` both break `FVA/Proof/Exec/Access.lean` (recorded in `.claude/rules/fva-checks.md`). A5 `FVATest/Subjects/Lz4C/`: `Lifted` + NOTICE, `instance_eq` (every fresh instance = one store: data segment by kernel-run `runDet` + `Must.outcome`), `Code` slices checked against `Lifted.func2` (`extLoop_eq`).
 - E2 = reviewer-1: V1–V8 pass, 0 findings (cross-checked against the Wasm 2.0 PDF §4.4.7).
 - Checkpoint 1 = L1 holds (`Ext.lean` `ExtL1`, frozen sha256 3466d1aa…): proved by route D (`ExtDirect.ext_l1`) and route R (`ExtRefine.ext_l1`); M4 `-O1` perturbation (`lz4-c-O1.wasm`, 11,167 B; loop 33 vs 22 instructions, renumbered locals, pre-incremented pointer, error flag + shared exit) proved by both (`O1/ExtDirect`, `O1/ExtRefine`, statement `O1/Ext.lean` `ExtL1O1`); the four historical exports contain only the standard axioms and were accepted by leanchecker + con-leche; final-source acceptance after the shared-helper extraction recorded separately (commit body). E1 (scientist-1 appraised; bounded wording adopted): no Pareto-dominant route (each phase's second implementation was quicker, with documented copying; route and carryover effects inseparable; M2 + M3 without 2× separation) → inconclusive, route D provisionally by policy, not a scaling result. Machine-facing iteration/induction proofs hold most route-specific lines (D 74.7 % / 76.1 %, R 61.0 % / 63.7 % at -O2 / -O1); on -O1 both routes wrote new iteration proofs, reusing the property, common lemmas, D's sum helpers and R's model.
-- Checkpoint 2 not attempted in U19's session (gate below): U19 closed partial by the Status rule; checkpoint 2 = the current IMPLEMENT phase (`.agent/spec.md` Tasks; method = U20), starting from the inventory below.
+- Checkpoint 2 not attempted in U19's session (gate below); done in the IMPLEMENT phase that followed (method = U20, `docs/contracts/U20-proof-scaling.md`): R1–R3 proven, `fva trust` PASS in both modes in the full gate — results at the end of this section.
 
 ### Checkpoint 2 obligation inventory (func 2 + callees, `-O2`)
 | # | class | where | status |
@@ -66,3 +66,49 @@ Status rule: checkpoint 1 proves a frozen loop lemma; only checkpoint 2's comple
 | I10 | main-loop termination (`ip` grows) + error returns `−(ip − src) − 1` | all paths | generic machinery available; untested |
 | I11 | claim assembly: `Prepared` (src + dst writes), `InvokeOK`, `CallWithin` + `CallReturns` from `MustW` | top level | machinery established, untested at top level |
 - Gate result: I4–I9 (and the target transfers of I1–I3, I10, I11) lack a demonstrated pattern ⇒ checkpoint 2 is not started in this session (contract gate) — unmet readiness, not a failed decoder proof or a time bound. IMPLEMENT first: a minimal I4 call-summary composition while scoping an I7 one-sequence semantic invariant, measuring first-use vs reuse effort, export/replay growth and theorem coverage (scientist-1 E4).
+
+### Checkpoint 2 results (IMPLEMENT, U20–U25)
+
+- Claims: `FVATest/Subjects/Lz4C/Spec.lean` R1–R3 over `Call.lean`'s `Buffers` (domain: both buffers in 131072…2097151, lengths < 2^31, disjoint unless one is empty) and `OnCall` (a prepared fresh instance exists; every one); proofs `Proof.lean` (`r{1,2,3}_holds`), never read. `fva trust` PASS default + `--paranoid` in the full gate (`scripts/test-subjects` → `scripts/subject-matrix`), review surface 76 lines (Spec 29 + Call 15 + `Lz4.Format` 26 + `Lz4.Any` 6). R1 = D52's acceptance (`CallWithin` on a lifted subject, trust PASS).
+- Observation boundary: R2/R3 = a success's decoded prefix + length; R1 = the call's footprint + termination with one i32. No claim on the exact negative code, on rollback, or on destination bytes past the decoded content (`Model.lean` drops them; consultant-10 P3, accepted).
+
+#### Coverage ledger (a repair index: statement → proof root → focused check)
+| row | obligation | status | statement | proof | focused check |
+|---|---|---|---|---|---|
+| I1 | entry guards, zero-capacity select, end pointers | proved | `Seg.Entry` | `Cut/Entry.lean` `Cut.entry` | `lake build FVATest.Subjects.Lz4C.Cut.Entry` |
+| I2 | literal + match length extension | proved | `Cut.ExtL1B` (→ `SegA`), `Seg.SegC` | `Cut/ExtB.lean` `Cut.extL1B`; `Eval/SegC.lean` `Eval.segC` | `lake build …Cut.ExtB …Eval.SegC` |
+| I3 | byte tail copy | proved | inside `Seg.SegD` | `Eval/SegDLoops.lean` | `lake build …Eval.SegDLoops` |
+| I4 | `memcpy` / `memmove` ordered-copy contracts | proved | `Copy.MemcpyS1`, `MemmoveS2` | `Eval/S1.lean`, `Eval/S2.lean` | `lake build …Eval.S2` |
+| I5 | wildcopy loops calling `memcpy` (3) | proved | `LitWildS3`, `MatchWildS4`, inside `SegD` | `Eval/S3`, `S4`, `Wild` (`wc_until`) | `lake build …Eval.S4` |
+| I6 | offset < 8 tables | proved | `Seg.TablesOK` | `Top.mem0_tables` (kernel), `Eval/SegDPrologue.lean` | `lake build …Eval.SegDPrologue` |
+| I7 | main loop ↔ LZ4 format | proved | `Sim.iterSim`, `loopSim` | `Sim.lean`, `Prefix.lean`, `Match.lean`, `ModelProof.lean` | `lake build …Sim` |
+| I8 | R3 converse | proved | `Model.decode_sound` + `Top.r3_of` | `ModelProof.lean`, `Top.lean` | `lake build …Top` |
+| I9 | speculative read/write ranges | proved | the cutpoint footprints (`Within`) | every cutpoint proof | `lake build …Eval.Accept` |
+| I10 | termination + error returns | proved | `Sim.loopSim`, `Seg.ErrRet` | `Sim.lean`, `Cut/ErrRet.lean` | `lake build …Cut.ErrRet` |
+| I11 | claim assembly | proved | `Spec.r1`…`r3` | `Top.lean` → `Proof.lean` via `SpecEq.rk_iff` | `fva trust` (gate) |
+| R1 | footprint + termination | proved | `Spec.r1` | `Proof.r1_holds` | `scripts/test-subjects` |
+| R2 | valid block → decoded length + bytes | proved | `Spec.r2` | `Proof.r2_holds` | same |
+| R3 | non-negative result → parse + bytes | proved | `Spec.r3` | `Proof.r3_holds` | same |
+Supplementary counts: func 2's body (550 static instructions) = the proven cutpoint slices Entry, S5, SegA–SegD and ErrRet, which `Top`'s composition joins into every path from the entry to a return; funcs 3/4 (93 + 191) = S1/S2; call sites 11 / 11 (10 × `memcpy`, 1 × `memmove`) composed through S1/S2.
+
+#### First-use vs reuse effort (new + changed code lines, authoring minutes M0; engine C unless noted)
+| piece | first use / reuse of | lines | M0 min |
+|---|---|---|---|
+| S1 `memcpy` | first use (engine + contract) | 511 | 33.8 |
+| S2 `memmove` | reuse of S1 (2.05× the instructions) | 633 | 43.3 |
+| S3 literal wildcopy | first composition with S1 | 113 | 5.0 |
+| S4 match wildcopy | reuse of S3 | 26 | 1.0 |
+| S5 shortcut | S1 ×4 + branch joins | 368 | 34.1 |
+| SegC match-length loop | first data-dependent loop | 247 | 22.8 (contended) |
+| SegB general literal path | reuse of S2 + S3 | 203 | 25.8 (contended) |
+| SegD offset/match path | reuse of S1, S4, `wc_until`, SegC support | 655 | 58.75 (contended) |
+| SegA via ExtL1B (stepping) | reuse of checkpoint 1's loop proof | 251 + 377 | — |
+
+#### Export + replay growth
+| closure | export | leanchecker | con-leche |
+|---|---|---|---|
+| frozen statements alone (baseline) | 45.0 MB | 6.8 s | 9.2 s |
+| S1 | 126.2 MB | — | — |
+| S1–S5 | 146.0 MB | 52.4 s | 60.4 s |
+| full decoder (trust closure: R1–R3 + `decode_eq` + bundle) | 202.2 MB | 93–112 s | 39–55 s |
+Paranoid on the full decoder: leanchecker-paranoid 122 s, nanoda 46 s, con-ron 38 s accept; lean4lean declines (its recursion limit at `instrStep_sound`). Timings = one shared laptop / pool host, observations only.
