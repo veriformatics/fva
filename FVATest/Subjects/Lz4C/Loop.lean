@@ -2,12 +2,11 @@ import FVATest.Subjects.Lz4C.Seg
 import FVATest.Subjects.Lz4C.Prefix
 
 /-!
-# The main loop from its segments (R1's composition, contract U20)
+# What the main loop's composition shares (contract U20)
 
-From the cutpoint statements (`Seg.lean`, `Short.lean`), assumed as hypotheses: from a good main
-loop head, every execution of func 2 returns one `i32` value, reading and writing only R1's sets.
-An iteration ends at a later head (`ip` grows) or in a return; the error exits return through the
-epilogue. Proof support; outside the review surface.
+R1's footprint sets, the invariant every cutpoint of one call keeps (`Good`), the main loop's
+head, and the frame facts of the decoder's memory changes; the composition itself = `Sim.lean`.
+Proof support; outside the review surface.
 -/
 
 namespace Subjects.Lz4C
@@ -92,13 +91,6 @@ theorem Good.setMem {st : Store} {inst : ModuleInst} {ma src dst n cap : Nat} {m
 noncomputable def head (st : Store) (inst : ModuleInst) (ls : List Val) : Config :=
   (ctx4 (ctx2 F0)).fill ⟨st, ⟨ls, inst⟩, [.plain mainLoop]⟩
 
-/-- Where an iteration from a head at `ip0` ends: a good head further on, or func 2 returned one
-`i32`. -/
-def IterExit (inst : ModuleInst) (ma src dst n cap ip0 : Nat) (c : Config) : Prop :=
-  (∃ st' ls' op' ip', Good st' inst ma src dst n cap ∧ HeadLocals ls' src dst n cap op' ip' ∧
-    ip0 < ip' ∧ ip' < src + n ∧ dst ≤ op' ∧ op' ≤ dst + cap ∧ c = head st' inst ls') ∨
-  ∃ st' v, c = ⟨st', ⟨[], {}⟩, vals [.i32 v]⟩
-
 theorem prologue_size (mem : MemInst) (o' off : Nat) :
     (prologue mem o' off).1.size = mem.size := by
   unfold prologue; split <;> simp [MemInst.size, MemInst.write]
@@ -145,45 +137,6 @@ theorem ConstLocals.set {ls : List Val} {src dst n cap i : Nat} (h : ConstLocals
   refine ⟨by simp [hl], ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     rw [List.getElem?_set_ne (by omega)] <;> assumption
 
-/-- An error exit returns through the epilogue. -/
-theorem contErr (hR : ErrRet) {H : HostSem} {st : Store} {inst : ModuleInst}
-    {ma src dst n cap ip0 : Nat} {c : Config} (hs : src + n + 1 < 2 ^ 32)
-    (hc : Err F0 st inst src dst n cap c) :
-    Until H (Within (R1R src n dst cap) (R1W dst cap)) (IterExit inst ma src dst n cap ip0) c := by
-  obtain ⟨v, -, hv, he⟩ := hc
-  exact (untilR1 (hR H st inst src dst n cap v c he (by omega) (by omega)) (fun _ _ h => h.elim)
-    (fun _ _ h => h.elim)).mono (fun _ h => h) fun _ h => Or.inr ⟨st, _, h⟩
-
-/-- From X4: SegD, then the epilogue or a later head (`ip0 < j`). -/
-theorem contX4 (hD : SegD) (hR : ErrRet) {H : HostSem} {st : Store} {inst : ModuleInst}
-    {ma src dst n cap o' off m j ip0 : Nat} {c : Config} (hg : Good st inst ma src dst n cap)
-    (hc : AtX4 F0 st inst src dst n cap o' off m j c) (hj : ip0 < j) (hsj : src ≤ j)
-    (hjn : j < src + n) (ho : dst ≤ o') (ho8 : o' + 8 ≤ dst + cap) (hoff : off < 65536)
-    (hm : m < 2 ^ 31) :
-    Until H (Within (R1R src n dst cap) (R1W dst cap)) (IterExit inst ma src dst n cap ip0) c := by
-  obtain ⟨ls, hcl, h4, h15, h17, h18, h2, rfl⟩ := hc
-  obtain ⟨a, ha, hfa⟩ := hg.a3
-  obtain ⟨mem, hm0, hsz, ht⟩ := hg.mem
-  have hb := hg.srcHi
-  have hb' := hg.dstHi
-  have hd0 := hg.dstLo
-  have hu := hD H F0 st inst ls a ma mem src dst n cap o' off m j hcl h4 h15 h17 h18 h2 ha hfa
-    hg.ma0 hm0 hg.srcLo hg.dstLo (by omega) (by omega) (by omega) hg.disj hsj (by omega) ho ho8
-    hoff hm ht
-  refine Until.trans (untilR1 hu (fun _ x hx => ?_) (fun _ x hx => ?_)) ?_
-  · obtain ⟨-, hx | ⟨-, hx⟩ | ⟨-, hx⟩⟩ := hx
-    · exact Or.inl hx
-    · exact Or.inr (Or.inr (Or.inl hx))
-    · exact Or.inr (Or.inr (Or.inr hx))
-  · exact Or.inr (Or.inr hx.2)
-  · rintro c' (⟨-, he⟩ | ⟨-, -, he⟩ | ⟨-, hroom, ls', hhl, rfl⟩)
-    · exact contErr hR (by omega) he
-    · exact contErr hR (by omega) he
-    · refine Until.done (Or.inl ⟨_, ls', o' + m + 4, j, ?_, hhl, hj, hjn, by omega, by omega, rfl⟩)
-      refine hg.setMem hm0 ?_ fun x hx => ?_
-      · rw [matchRest_size, prologue_size]
-      · rw [matchRest_low _ _ _ _ _ _ (by omega), prologue_low _ _ _ _ (by omega)]
-
 /-- An extension-byte read moves forward, stays inside its limit and adds at most 255 per byte. -/
 theorem extM_bound {mem : MemInst} {lim : Nat} :
     ∀ {fuel q acc a q' : Nat}, extM mem lim fuel q acc = some (a, q') →
@@ -215,69 +168,9 @@ noncomputable def AtX3 (F : Ref.Context) (st : Store) (inst : ModuleInst)
     ls'[2]? = some (.i32 (BitVec.ofNat 32 o' - BitVec.ofNat 32 off)) ∧
     c = (ctx6 (ctx2 F)).fill ⟨st, ⟨ls', inst⟩, (body6.drop 1).map .plain⟩
 
-/-- From X3: SegC, then X4 or the epilogue. -/
-theorem contX3 (hC : SegC) (hD : SegD) (hR : ErrRet) {H : HostSem} {st : Store}
-    {inst : ModuleInst} {ma src dst n cap o' off ml0 j ip0 : Nat} {c : Config}
-    (hg : Good st inst ma src dst n cap) (hc : AtX3 F0 st inst src dst n cap o' off ml0 j c)
-    (hj : ip0 < j) (hsj : src ≤ j) (hjn : j < src + n) (ho : dst ≤ o') (ho8 : o' + 8 ≤ dst + cap)
-    (hoff : off < 65536) (hml : ml0 < 16) :
-    Until H (Within (R1R src n dst cap) (R1W dst cap)) (IterExit inst ma src dst n cap ip0) c := by
-  obtain ⟨ls, hcl, h4, h15, h17, h18, h2, rfl⟩ := hc
-  obtain ⟨mem, hm0, hsz, ht⟩ := hg.mem
-  have hb := hg.srcHi
-  have hb' := hg.dstHi
-  have hu := hC H F0 st inst ls ma mem src dst n cap o' off ml0 j hcl h4 h15 h17 h18 h2 hg.ma0
-    hm0 hg.srcLo hg.dstLo (by omega) (by omega) (by omega) hsj (by omega) hml (by omega)
-  refine Until.trans (untilR1 hu (fun _ x hx => ?_) (fun _ x hx => ?_)) ?_
-  · obtain ⟨-, ⟨-, hx⟩ | ⟨-, hx⟩⟩ := hx
-    · exact Or.inr (Or.inr (Or.inl hx))
-    · exact Or.inr (Or.inr (Or.inr hx))
-  · exact Or.inr (Or.inr hx.2)
-  · rintro c' (⟨hl, hx⟩ | ⟨-, acc, j', he, hx⟩ | ⟨-, -, he⟩)
-    · exact contX4 hD hR hg hx hj hsj hjn ho ho8 hoff (by omega)
-    · obtain ⟨h1, h2, h3, h4⟩ := extM_bound he
-      exact contX4 hD hR hg hx (by omega) (by omega) (by omega) ho ho8 hoff (by omega)
-    · exact contErr hR (by omega) he
-
 theorem off_lt (mem : MemInst) (p : Nat) :
     (mem.byte p).toNat + 256 * (mem.byte (p + 1)).toNat < 65536 := by
   have := (mem.byte p).toNat_lt; have := (mem.byte (p + 1)).toNat_lt; omega
-
-/-- From X2: SegB, then the return (the last literals), the epilogue, or X3. -/
-theorem contX2 (hB : SegB) (hC : SegC) (hD : SegD) (hR : ErrRet) {H : HostSem} {st : Store}
-    {inst : ModuleInst} {ma src dst n cap op q len t ip0 : Nat} {c : Config}
-    (hg : Good st inst ma src dst n cap) (hc : AtX2 F0 st inst src dst n cap op q len t c)
-    (hq : ip0 < q) (hsq : src ≤ q) (hqn : q ≤ src + n) (hop : dst ≤ op) (hopc : op ≤ dst + cap)
-    (hlen : len < 2 ^ 31) :
-    Until H (Within (R1R src n dst cap) (R1W dst cap)) (IterExit inst ma src dst n cap ip0) c := by
-  obtain ⟨ls, hcl, h3, h4, h2, h16, rfl⟩ := hc
-  obtain ⟨a, ha, hfa⟩ := hg.a3
-  obtain ⟨a4, ha4, hfa4⟩ := hg.a4
-  obtain ⟨mem, hm0, hsz, ht⟩ := hg.mem
-  have hb := hg.srcHi
-  have hb' := hg.dstHi
-  have hd0 := hg.dstLo
-  have hu := hB H ⟨[], {}⟩ [] .hole st inst ls a a4 ma mem src dst n cap op q len t hcl h3 h4 h2
-    h16 ha hfa ha4 hfa4 hg.ma0 hm0 hg.srcLo hg.dstLo (by omega) (by omega) (by omega) hg.disj hsq
-    hqn hop hopc hlen
-  refine Until.trans (untilR1 hu (fun _ x hx => ?_) (fun _ x hx => ?_)) ?_
-  · obtain ⟨-, ⟨-, hx⟩ | ⟨-, hx⟩⟩ := hx
-    · exact Or.inr (Or.inr (Or.inl hx))
-    · exact Or.inr (Or.inr (Or.inr hx))
-  · exact Or.inr (Or.inr hx.2)
-  · rintro c' (⟨-, -, -, hr⟩ | ⟨-, -, he⟩ | ⟨hnear, rfl⟩)
-    · exact Until.done (Or.inr ⟨_, _, by simpa [Returned, Context.fill] using hr⟩)
-    · exact contErr hR (by omega) ⟨q, hsq, by omega, he⟩
-    · have hl := hcl.1
-      refine contX3 (o' := op + len)
-        (off := (mem.byte (q + len)).toNat + 256 * (mem.byte (q + len + 1)).toNat)
-        (ml0 := t % 16) (j := q + len + 2) hC hD hR (hg.setMem hm0 (fwdCopy_size _ _ _ _)
-        fun x hx => fwdCopy_outside _ _ _ _ _ (Or.inl (by omega))) ⟨_, ?_, ?_, ?_, ?_, ?_, ?_, rfl⟩
-        (by omega) (by omega) (by omega) (by omega) (by omega) (off_lt mem (q + len))
-        (Nat.mod_lt _ (by decide))
-      · exact ((((((hcl.set (by omega) _).set (by omega) _).set (by omega) _).set (by omega)
-          _).set (by omega) _).set (by omega) _)
-      all_goals simp [hl]
 
 theorem HeadLocals.const {ls : List Val} {src dst n cap op ip : Nat}
     (h : HeadLocals ls src dst n cap op ip) : ConstLocals ls src dst n cap := by
@@ -289,112 +182,5 @@ theorem HeadLocals.of_const {ls : List Val} {src dst n cap op ip : Nat}
     HeadLocals ls src dst n cap op ip := by
   obtain ⟨hl, h0, h1, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩ := h
   exact ⟨hl, h0, h1, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩
-
-/-- One iteration from a good head: a good head further on, or func 2 returned. -/
-theorem iter (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC) (hD : SegD) (hR : ErrRet)
-    {H : HostSem} {st : Store} {inst : ModuleInst} {ls : List Val} {ma src dst n cap op ip : Nat}
-    (hg : Good st inst ma src dst n cap) (hl : HeadLocals ls src dst n cap op ip)
-    (hsip : src ≤ ip) (hipn : ip < src + n) (hop : dst ≤ op) (hopc : op ≤ dst + cap) :
-    Until H (Within (R1R src n dst cap) (R1W dst cap)) (IterExit inst ma src dst n cap ip)
-      (head st inst ls) := by
-  obtain ⟨a, ha, hfa⟩ := hg.a3
-  obtain ⟨mem, hm0, hsz, ht⟩ := hg.mem
-  have hb := hg.srcHi
-  have hb' := hg.dstHi
-  have hd0 := hg.dstLo
-  have hcl := hl.const
-  have hln := hcl.1
-  have hu := hS5 H (ctx2 F0) st inst ls a ma mem src dst n cap op ip hl ha hfa hg.ma0 hm0
-    hg.srcLo hg.dstLo (by omega) (by omega) (by omega) hg.disj hsip hipn hop hopc
-  have hll16 : (mem.byte ip).toNat / 16 < 16 := by have := (mem.byte ip).toNat_lt; omega
-  have hoffb : (mem.byte (ip + 1 + (mem.byte ip).toNat / 16)).toNat +
-      256 * (mem.byte (ip + 2 + (mem.byte ip).toNat / 16)).toNat <
-      65536 := by
-    have := (mem.byte (ip + 1 + (mem.byte ip).toNat / 16)).toNat_lt
-    have := (mem.byte (ip + 2 + (mem.byte ip).toNat / 16)).toNat_lt
-    omega
-  have hgood16 := hg.setMem hm0 (fwdCopy_size 16 mem op (ip + 1))
-    fun x hx => fwdCopy_outside _ _ _ _ _ (Or.inl (by omega))
-  refine Until.trans (untilR1 hu (fun _ x hx => ?_) (fun _ x hx => ?_)) ?_
-  · obtain ⟨-, ⟨-, hx⟩ | ⟨-, hx⟩⟩ := hx
-    · exact Or.inr (Or.inr (Or.inl hx))
-    · exact Or.inr (Or.inr (Or.inr hx))
-  · exact Or.inr (Or.inr hx.2)
-  · rintro c (⟨hll, rfl⟩ | ⟨hll, hsc, rfl⟩ | ⟨hll, hsc1, hsc2, -, rfl⟩ |
-      ⟨hll, hsc1, hsc2, hml, -, -, rfl⟩ | ⟨hll, hsc1, hsc2, hml, -, hle, rfl⟩)
-    · -- X1: the literal length's extension bytes
-      have hA' := hA H F0 st inst (((ls.set 15 (vI (ip + 1))).set 16 (vI (mem.byte ip).toNat)).set 2
-        (vI 15)) ma mem src dst n cap op ip (mem.byte ip).toNat
-        (((hcl.set (by omega) _).set (by omega) _).set (by omega) _)
-        (by rw [List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega),
-          List.getElem?_set_ne (by omega)]; exact hl.2.2.2.1)
-        (by rw [List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega),
-          List.getElem?_set_ne (by omega)]; exact hl.2.2.2.2.1) (by simp [hln]) (by simp [hln])
-        (by simp [hln]) hg.ma0 hm0 hg.srcLo hg.dstLo (by omega) (by omega) (by omega) hsip hipn
-        (by omega)
-      refine Until.trans (untilR1 hA' (fun _ x hx => ?_) (fun _ x hx => ?_)) ?_
-      · obtain ⟨-, ⟨-, hx⟩ | ⟨-, hx⟩⟩ := hx
-        · exact Or.inr (Or.inr (Or.inl hx))
-        · exact Or.inr (Or.inr (Or.inr hx))
-      · exact Or.inr (Or.inr hx.2)
-      · rintro c' (⟨acc, q, he, hx⟩ | ⟨-, he⟩)
-        · obtain ⟨h1, h2, h3, h4⟩ := extM_bound he
-          exact contX2 hB hC hD hR hg hx (by omega) (by omega) (by omega) hop hopc (by omega)
-        · exact contErr hR (by omega) he
-    · -- X2: no room for the shortcut
-      have h3' : ((((ls.set 15 (vI (ip + 1))).set 16 (vI (mem.byte ip).toNat)).set 2
-          (vI ((mem.byte ip).toNat / 16))).set 4 (vI (ip + 1)))[3]? = some (vI op) := by
-        rw [List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega),
-          List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega)]
-        exact hl.2.2.2.1
-      exact contX2 (q := ip + 1) (len := (mem.byte ip).toNat / 16) (t := (mem.byte ip).toNat)
-        hB hC hD hR hg ⟨_, ((((hcl.set (by omega) _).set (by omega) _).set (by omega)
-        _).set (by omega) _), h3', by simp [hln], by simp [hln], by simp [hln], rfl⟩
-        (by omega) (by omega) (by omega) hop hopc (by omega)
-    · -- X3: the match code with 16 literal bytes copied
-      exact contX3 (o' := op + (mem.byte ip).toNat / 16)
-        (off := ((mem.byte (ip + 1 + (mem.byte ip).toNat / 16)).toNat +
-          256 * (mem.byte (ip + 2 + (mem.byte ip).toNat / 16)).toNat))
-        (ml0 := (mem.byte ip).toNat % 16) (j := ip + 3 + (mem.byte ip).toNat / 16)
-        hC hD hR hgood16 ⟨_, (((((((hcl.set (by omega) _).set (by omega) _).set
-        (by omega) _).set (by omega) _).set (by omega) _).set (by omega) _).set (by omega) _),
-        by simp [hln], by simp [hln], by simp [hln], by simp [hln], by simp [hln], rfl⟩
-        (by omega) (by omega) (by omega) (by omega) (by omega) hoffb
-        (Nat.mod_lt _ (by decide))
-    · -- X4: the match starts before `dst`
-      exact contX4 (o' := op + (mem.byte ip).toNat / 16)
-        (off := ((mem.byte (ip + 1 + (mem.byte ip).toNat / 16)).toNat +
-          256 * (mem.byte (ip + 2 + (mem.byte ip).toNat / 16)).toNat))
-        (m := (mem.byte ip).toNat % 16) (j := ip + 3 + (mem.byte ip).toNat / 16)
-        hD hR hgood16 ⟨_, (((((((hcl.set (by omega) _).set (by omega) _).set
-        (by omega) _).set (by omega) _).set (by omega) _).set (by omega) _).set (by omega) _),
-        by simp [hln], by simp [hln], by simp [hln], by simp [hln], by simp [hln], rfl⟩
-        (by omega) (by omega) (by omega) (by omega) (by omega) hoffb (by omega)
-    · -- X5: the shortcut, back to the head
-      refine Until.done (Or.inl ⟨_, _, op + (mem.byte ip).toNat / 16 + (mem.byte ip).toNat % 16 + 4,
-        ip + 3 + (mem.byte ip).toNat / 16, ?_, HeadLocals.of_const ((((((((((hcl.set (by omega)
-        _).set (by omega) _).set (by omega) _).set (by omega) _).set (by omega) _).set (by omega)
-        _).set (by omega) _).set (by omega) _).set (by omega) _)) (by simp [hln])
-        (by simp [hln]), by omega, by omega, by omega, by omega, rfl⟩)
-      refine hg.setMem hm0 (by simp) fun x hx => ?_
-      rw [fwdCopy_outside _ _ _ _ _ (Or.inl (by omega)),
-        fwdCopy_outside _ _ _ _ _ (Or.inl (by omega))]
-
-/-- The main loop from a good head: func 2 returns one `i32`, inside R1's sets. -/
-theorem loop (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC) (hD : SegD) (hR : ErrRet)
-    {H : HostSem} {inst : ModuleInst} {ma src dst n cap : Nat} :
-    ∀ k (st : Store) (ls : List Val) (op ip : Nat), src + n - ip = k →
-      Good st inst ma src dst n cap → HeadLocals ls src dst n cap op ip → src ≤ ip →
-      ip < src + n → dst ≤ op → op ≤ dst + cap →
-      Until H (Within (R1R src n dst cap) (R1W dst cap))
-        (fun c => ∃ st' v, c = ⟨st', ⟨[], {}⟩, vals [.i32 v]⟩) (head st inst ls) := by
-  intro k
-  induction k using Nat.strong_induction_on with
-  | _ k ih =>
-    intro st ls op ip hk hg hl hsip hipn hop hopc
-    refine Until.trans (iter hS5 hA hB hC hD hR hg hl hsip hipn hop hopc) ?_
-    rintro c (⟨st', ls', op', ip', hg', hl', hlt, hipn', hop', hopc', rfl⟩ | hr)
-    · exact ih _ (by omega) st' ls' op' ip' rfl hg' hl' (by omega) hipn' hop' hopc'
-    · exact Until.done hr
 
 end Subjects.Lz4C
