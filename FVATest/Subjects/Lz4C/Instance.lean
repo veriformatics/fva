@@ -2,7 +2,7 @@ import FVATest.Subjects.Lz4C.Lifted
 import FVA.Proof.Lib.Instance
 
 /-! Every fresh instance of `lz4-c.wasm` is one store: the stack-pointer global starts at 65536
-and the data segment (lz4's `inc32table`/`dec64table`, 60 bytes at 65536) is copied in by a
+and the data segment (lz4's `inc32table`/`dec64table`, 64 bytes at 65536) is copied in by a
 deterministic run (proof support; outside the review surface). -/
 
 namespace Subjects.Lz4C

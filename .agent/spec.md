@@ -58,12 +58,25 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
 
 ## Tasks
 
+- [ ] U20 proof-scaling method (orientation, `docs/contracts/U20-proof-scaling.md`): seam = frozen spike statements S1–S5 (`FVATest/Subjects/Lz4C/{Copy,Short}.lean`, S5 preflighted) + the decoder model (`Model.lean`, differentially tested vs the binary) with R2/R3's model halves proven (`ModelProof.lean`); spikes D+ / V / C in worktrees → scientist on the results → draft ruling → ≥ 5 consultants → advisor → one AskUserQuestion (method + the navigators' readings); then the unit plan + pre-mortem
 - [ ] U19 checkpoint 2: the full R1–R3 theorem on `LZ4_decompress_safe` (`FVATest/Subjects/Lz4C`) from the contract inventory (`docs/contracts/U19-decoder-spike.md` Status): I4 `memcpy`/`memmove` contracts + one wildcopy composition first, the I7 main-loop format seam scoped alongside, R1 whole-domain as the first milestone, then R2/R3; proof scaling (D9 block summaries, D52 acceptance, D55) as the inventory demands
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
 
 IMPLEMENT — lz4 C decoder proof + proof scaling (U19 checkpoint 2)
-> Decoder spike (Recommended)
-> If it is MAINTAIN work then here. If we should route to IMPLEMENT, then that should take place in a fresh session.
-> IMPLEMENT (Recommended)
+> Scope: U19 checkpoint 2, the decoder proof. Finish line: FVATest/Subjects/Lz4C/Spec.lean states R1–R3 for LZ4_decompress_safe on the shipped lz4-c.wasm, as formalized in
+> docs/contracts/U19-decoder-spike.md (Checkpoint 2). fva trust passes on it, default and --paranoid, with the review surface pinned in scripts/test-subjects. R1 meets D52's acceptance.
+>
+> Milestones, each committed gate-green: (1) R1 whole-domain, footprint plus termination; (2) R2 and R3. If a milestone shows the full theorem out of reach, stop with the evidence and ask me:
+> a narrower claim or a source-level link, per .agent/archive/maintain-bench-direction.md.
+>
+> Start from the contract inventory. Begin with I4 (separate ordered-copy contracts for the compiled memcpy and memmove, plus one wildcopy loop composed with them), and scope the I7
+> one-sequence format invariant alongside. Measure first-use vs reuse effort, export and replay growth, and theorem coverage (.agent/archive/u19/scientist-1-e1.md E4).
+>
+> Settled, do not reopen: the stack and wasm-lift link (Decisions), the footprint vocabulary as shipped, and the checkpoint-1 proofs.
+>
+> Open and costly to reverse, so it gets the IMPLEMENT orientation steps (research, a check-graded spike, consultants): the proof-scaling method. The options are hand stepping (provisional),
+> refinement to a model, or automated block summaries (D9, decompilation-into-logic style).
+>
+> Out of scope: lz4_flex, the encoder, bench v3
