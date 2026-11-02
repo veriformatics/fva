@@ -254,12 +254,11 @@ def importDesc (C : Context) : ImportDesc → Bool
   | .mem lim => limits (2 ^ 16) lim
   | .global _ => true
 
-/-- Function body validation; counting locals never expands their runs. -/
+/-- Function body validation; local declarations stay in compressed runs. -/
 def func (C : Context) (f : Func) : Bool :=
   match C.types[f.type]? with
   | none => false
   | some ft =>
-    Nat.blt (f.locals.foldl (fun n r => n + r.1) ft.params.length) (2 ^ 32) &&
     expr { C with
       locals := ft.params.map (1, ·) ++ f.locals
       labels := [ft.results]

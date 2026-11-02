@@ -75,7 +75,7 @@ def one (body : Expr) (params results : List ValType := [])
 
 #guard validate (one [.localGet (2 ^ 32 - 2), .drop] [] [] [(2 ^ 32 - 1, .num .i32)])
 #guard !validate (one [.localGet (2 ^ 32 - 1), .drop] [] [] [(2 ^ 32 - 1, .num .i32)])
-#guard !validate (one [] [] [] [(2 ^ 32, .num .i32)])
+#guard validate (one [] [] [] [(2 ^ 32, .num .i32)])
 #guard validate (one [.localGet 0, .drop] [.num .i64] [] [(0, .num .i32)])
 #guard !validate { one [] with exports := [⟨"f", .func 0⟩, ⟨"f", .func 0⟩] }
 #guard !validate { one [.iconst .w32 0] [] [.num .i32] with start := some 0 }

@@ -84,6 +84,10 @@ allows. -/
 @[fva_claim] def ValidateSound : Prop :=
   ∀ m : Module, FVA.Wasm.Valid.validate m = true → FVA.Wasm.Valid.ModuleValid m
 
+/-- The validator accepts every module the typing rules make valid. -/
+@[fva_claim] def ValidateComplete : Prop :=
+  ∀ m : Module, FVA.Wasm.Valid.ModuleValid m → FVA.Wasm.Valid.validate m = true
+
 /-- Validated modules never get stuck: every configuration reachable from a well-typed call of an
 export of a module the validator accepts is well typed and final or steps. -/
 @[fva_claim] def NeverStuck : Prop := FVA.Wasm.Valid.NeverStuck FVA.Wasm.Valid.validate
