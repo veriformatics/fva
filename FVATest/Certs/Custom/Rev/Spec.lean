@@ -10,6 +10,6 @@ namespace FVATest.Certs.Custom.Rev
 `FVATest/Certs/Custom/out.txt`
 stand in relation `FVATest.Certs.Custom.Reversed` to the bytes of
 `FVATest/Certs/Custom/in.txt`. -/
-def claim : Prop := FVA.Cert.Accepted FVATest.Certs.Custom.Reversed In.blob Out.blob
+@[fva_claim] def claim : Prop := FVA.Cert.Accepted FVATest.Certs.Custom.Reversed In.blob Out.blob
 
 end FVATest.Certs.Custom.Rev

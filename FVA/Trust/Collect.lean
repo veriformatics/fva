@@ -4,6 +4,7 @@ import FVA.Tool.Lift
 import FVA.Tool.Blob
 import FVA.Spec.Cert
 import FVA.Trust.Lines
+import FVA.Spec.ClaimAttr
 
 /-!
 # Trust facts from the environment (trusted glue)
@@ -286,7 +287,8 @@ def collect (input : Input) : CoreM Report := do
   let orig ← origins env input generated
   let originOf (c : Name) : Origin := ((modOf env c).bind orig.get?).getD .project
   let trusted (c : Name) : Bool := originOf c == .core || originOf c == .mathlib
-  -- claims: Prop-valued definitions of the spec module; a theorem there = a claim proven in place
+  -- claims (D13): the spec module's `@[fva_claim]` definitions; a theorem there = a claim proven
+  -- in place, marked or not; its unmarked `Prop` definitions = vocabulary, listed apart
   let userNames := (moduleConsts env input.specModule).filter fun n =>
     !n.isInternal && !isEqnLemma n
   -- a claim's type is `Prop` up to unfolding (`def MyProp := Prop` hides no claim)
@@ -313,7 +315,9 @@ def collect (input : Input) : CoreM Report := do
   let mut claims := #[]
   let mut stmtRoots := #[]
   let mut proofNames := #[]
-  for c in ← userNames.filterM fun n => return isThm n || (← isProp n) do
+  let marked (n : Name) : Bool := FVA.claimAttr.hasTag env n
+  let unmarked ← userNames.filterM fun n => return !marked n && !isThm n && (← isProp n)
+  for c in userNames.filter fun n => isThm n || marked n do
     let ci := (env.find? c).get!
     let thm := isThm c
     let prfs := if thm then #[c] else proofsOf.getD c #[]
@@ -394,6 +398,7 @@ def collect (input : Input) : CoreM Report := do
     if specClosure.contains m then links := links.push (← blobLinkOf env input.root m ns)
   return { built := true, claims := claims.toList, flags := flags.toList,
            reviewModules := reviewModules.toList, subjectSyntax := subjectSyntax.toList,
+           unmarked := (unmarked.map (·.toString)).toList,
            vocabulary := vocabulary.toList,
            prelude := prelude.toList,
            needsLink := input.subjects.isEmpty, links := links.toList, exportOk := false,

@@ -10,7 +10,7 @@ open FVA.Wasm FVA.Wasm.Exec
 
 /-- R1: every call terminates with one `i32` result. Among addresses 131072 to 2097151, it reads
 only the input and destination buffers and writes only the destination buffer. -/
-def r1 : Prop :=
+@[fva_claim] def r1 : Prop :=
   ∀ src dst input initDst, Buffers src dst input initDst → OnCall src dst input initDst
     fun H s inst args =>
       CallWithin H s inst "LZ4_decompress_safe" args
@@ -23,7 +23,7 @@ def r1 : Prop :=
 /-- R2: a valid independent LZ4 block that fits in the destination returns its decoded length
 and leaves its decoded bytes there. The destination has at least one byte unless the block is
 `[0]`. -/
-def r2 : Prop :=
+@[fva_claim] def r2 : Prop :=
   ∀ src dst input initDst, Buffers src dst input initDst → OnCall src dst input initDst
     fun H s inst args => ∀ c, Lz4.Valid input c → c.length ≤ initDst.length →
       (1 ≤ initDst.length ∨ input = [0]) →
@@ -34,7 +34,7 @@ def r2 : Prop :=
 destination capacity and is the length of decoded bytes left there. The whole input parses into
 LZ4 sequences with matches referring only to this block's decoded prefix. End-of-block conditions
 need not hold; offset 0 fills its match with bytes of value 0. -/
-def r3 : Prop :=
+@[fva_claim] def r3 : Prop :=
   ∀ src dst input initDst, Buffers src dst input initDst → OnCall src dst input initDst
     fun H s inst args => CallReturns H s inst "LZ4_decompress_safe" args (fun s' vs =>
       ∃ result : BitVec 32, vs = [.i32 result] ∧

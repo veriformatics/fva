@@ -25,8 +25,9 @@ Clean checker --canary-set $tmp/good.tsv --known $tmp/good-known.tsv
 Clean checker --canary-set $tmp/altered.tsv
 Clean checker --canary-set $tmp/prelude.tsv --known $tmp/empty.tsv
 Clean PASS --canary-set $tmp/prelude.tsv
-Clean surface --surface-budget 3
-Clean PASS --surface-budget 4
+Clean surface --surface-budget 4
+Clean PASS --surface-budget 5
+Unmarked PASS
 Axiom axiom,replay
 Sorry axiom,replay
 SkipKernel replay
@@ -98,6 +99,14 @@ while read -r c want args; do
 		fail=1
 	fi
 done <<<"$pinned"
+# D13: an unmarked Prop of the spec module is no claim, and the report lists it apart
+"$fva" trust . --spec-module FVATest.Cheats.Unmarked.Spec --root-module FVATest.Cheats.Unmarked \
+	>"$log" 2>&1
+if ! grep -q '^Prop definitions without @\[fva_claim\]' "$log" ||
+	! grep -qx '  Cheats.Unmarked.empty' "$log"; then
+	echo "test-trust: Unmarked → the unmarked Prop is not listed apart"
+	fail=1
+fi
 # worked examples (U8): each must PASS; `fva explain` runs `fva trust` itself, then shows the
 # saved explanation (U10: rc 0 = trust PASS + every intent check `matches` + the text current);
 # beside them the accepted certificates (U9), one aggregate run, must PASS

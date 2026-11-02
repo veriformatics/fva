@@ -22,7 +22,7 @@ open FVA.Wasm FVA.Wasm.Exec
 /-- Every covered input has an admissible call. Every admissible call terminates without a trap,
 returns no values, leaves each cell with an allowed CPM result, and preserves the kept input
 bytes. The `nthreads` argument is arbitrary; this binary does not use it. -/
-def claim : Prop :=
+@[fva_claim] def claim : Prop :=
   (∀ x, Domain x → ∃ H l s inst, Admissible H x l s inst) ∧
   ∀ x H l s inst, Domain x → Admissible H x l s inst → ∀ nth : BitVec 32,
     CallReturns H s inst "calc_cpm_raw"

@@ -10,6 +10,6 @@ namespace FVATest.Certs.Neg.Tampered
 `FVATest/Certs/Neg/e1-tampered.wasm`
 stand in relation `FVA.Cert.Compiled` to the bytes of
 `FVATest/Certs/Compile/e1.txt`. -/
-def claim : Prop := FVA.Cert.Accepted FVA.Cert.Compiled In.blob Out.blob
+@[fva_claim] def claim : Prop := FVA.Cert.Accepted FVA.Cert.Compiled In.blob Out.blob
 
 end FVATest.Certs.Neg.Tampered

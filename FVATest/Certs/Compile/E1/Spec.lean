@@ -10,6 +10,6 @@ namespace FVATest.Certs.Compile.E1
 `FVATest/Certs/Compile/e1.wasm`
 stand in relation `FVA.Cert.Compiled` to the bytes of
 `FVATest/Certs/Compile/e1.txt`. -/
-def claim : Prop := FVA.Cert.Accepted FVA.Cert.Compiled In.blob Out.blob
+@[fva_claim] def claim : Prop := FVA.Cert.Accepted FVA.Cert.Compiled In.blob Out.blob
 
 end FVATest.Certs.Compile.E1

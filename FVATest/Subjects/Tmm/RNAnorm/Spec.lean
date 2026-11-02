@@ -10,6 +10,7 @@ namespace FVATest.Subjects.Tmm.RNAnorm
 `bench/tasks/tmm/rnanorm-factors.txt`
 stand in relation `Subjects.Tmm.RefutesExactAverageTMM` to the bytes of
 `bench/tasks/tmm/counts.tsv`. -/
+@[fva_claim]
 def claim : Prop := FVA.Cert.Accepted Subjects.Tmm.RefutesExactAverageTMM In.blob Out.blob
 
 end FVATest.Subjects.Tmm.RNAnorm

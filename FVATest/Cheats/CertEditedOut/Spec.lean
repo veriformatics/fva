@@ -10,6 +10,6 @@ namespace FVATest.Cheats.CertEditedOut
 `FVATest/Cheats/CertEditedOut/out.txt`
 stand in relation `FVA.Cert.SortedPerm` to the bytes of
 `FVATest/Cheats/CertEditedOut/in.txt`. -/
-def claim : Prop := FVA.Cert.Accepted FVA.Cert.SortedPerm In.blob Out.blob
+@[fva_claim] def claim : Prop := FVA.Cert.Accepted FVA.Cert.SortedPerm In.blob Out.blob
 
 end FVATest.Cheats.CertEditedOut

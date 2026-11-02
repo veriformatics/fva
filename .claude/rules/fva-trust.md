@@ -13,6 +13,7 @@ paths:
 
 # `fva trust` law (U7, `docs/contracts/U7-trust.md`)
 
+- Claims = the spec module's `@[fva_claim]` definitions (`FVA/Spec/ClaimAttr.lean`, imported by every lifted and blob module through `FVA.Lifted`) + any theorem there (`[layout]`); the tag is read from `.olean` entries (`TagAttribute.hasTag` works under `loadExts := false`, scoped extensions such as instances do not); unmarked `Prop` defs = `Report.unmarked`, listed, never a FAIL.
 - Verdict = `FVA.Trust.verdict` over a `Report`, proven `= .pass ↔ Pass r` (`FVA/Proof/Trust.lean`); `FVA/Spec/Trust.lean` = the reviewed-once rules, imports nothing (it enters every project's closure). A new rule = a `Pass` conjunct + a `rule*` function + its `_nil` lemma + a cheat that fires it.
 - Project code (Lake config, build, `lake env`, explain's `lake env lean`) + the exporter run in `FVA.Tool.Sandbox` (bwrap: `/` ro, home covered ro, no network, writable = `.lake` dirs + the caller's temp dir); a new process that runs project code goes through it too, since an unsandboxed one hands the project the user's account.
 - Collection = trusted glue reading untrusted projects: imports run no project initializer (`loadExts := false`); no `git` or other process inside `.lake/packages/*` (repository config can run commands; a local mutation run integrity-checks that tree) — package pins come from `lake-manifest.json` + `.git/HEAD` read as files; the lifted `source` must stay inside the project; the export goes to a private temp dir.

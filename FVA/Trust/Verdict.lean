@@ -60,7 +60,8 @@ def ruleBuild (r : Report) : List Issue :=
 
 /-- No claim at all. -/
 def ruleClaims (r : Report) : List Issue :=
-  if r.claims.isEmpty then [⟨"claims", "the spec module declares no claim"⟩] else []
+  if r.claims.isEmpty then [⟨"claims", "the spec module marks no claim (`@[fva_claim]`)"⟩]
+  else []
 
 /-- `[unproven]`. -/
 def ruleUnproven (r : Report) : List Issue :=

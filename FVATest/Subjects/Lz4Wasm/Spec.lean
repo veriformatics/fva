@@ -45,7 +45,7 @@ the output address, yet `encBlock` is not a valid LZ4 block of any content — t
 parses is one match sequence whose literals end the block, and that fails End-of-block condition 3
 (the last match starts 10 bytes before the end, not the required 12). R1 asks that every returned
 block be valid. -/
-def encode_breaks_r1 : Prop :=
+@[fva_claim] def encode_breaks_r1 : Prop :=
   ReturnsOut Lifted.module encPrep "lz4BlockEncode" [.i32 (BitVec.ofNat 32 inputAddr), .i32 13,
       .i32 (BitVec.ofNat 32 (inputAddr + 13))] [.i32 12] (inputAddr + 13) encBlock ∧
     ∀ c, ¬ Lz4.Valid encBlock c
@@ -56,7 +56,7 @@ def lastByte : Nat := 65535
 /-- R2 is false for the shipped decoder: the empty block `00` is a valid block (its content is
 empty), yet, placed as the last byte of the initial memory, decoding it traps instead of returning
 the content. The statement records the trap alone, not its cause. -/
-def decode_traps_valid : Prop :=
+@[fva_claim] def decode_traps_valid : Prop :=
   Lz4.Valid [0x00] [] ∧
     TrapsAfter Lifted.module [.write lastByte [0x00]] "lz4BlockDecode"
       [.i32 (BitVec.ofNat 32 lastByte), .i32 1, .i32 0]

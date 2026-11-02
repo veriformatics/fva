@@ -10,6 +10,6 @@ namespace FVATest.Certs.Neg.UnusedInvalid
 `FVATest/Certs/Neg/unused-invalid.wasm`
 stand in relation `FVA.Cert.Compiled` to the bytes of
 `FVATest/Certs/Neg/x.txt`. -/
-def claim : Prop := FVA.Cert.Accepted FVA.Cert.Compiled In.blob Out.blob
+@[fva_claim] def claim : Prop := FVA.Cert.Accepted FVA.Cert.Compiled In.blob Out.blob
 
 end FVATest.Certs.Neg.UnusedInvalid

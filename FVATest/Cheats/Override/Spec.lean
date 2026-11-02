@@ -6,6 +6,6 @@ import FVATest.Cheats.Override.Vocab
 namespace Cheats.Override
 
 /-- The artifact's size is its length. -/
-def sized : Prop := size Lifted.len = Lifted.len
+@[fva_claim] def sized : Prop := size Lifted.len = Lifted.len
 
 end Cheats.Override

@@ -5,11 +5,12 @@ import FVA.Tool.Blob
 
 `fva certify <project> --relation R --input I --output O --ns Ns [--relation-module M]
 [--sound-module P]` writes, under the project: the two blob modules `Ns.In`, `Ns.Out`
-(`fva blob`), the claim `Ns.Spec` (`def claim : Prop := Accepted R In.blob Out.blob`, which
-imports only `M`, the reviewed relation), the proof `Ns.Proof` (`R.check_sound` applied to the
-kernel's evaluation of `R.check`, from `P`), and the root `Ns` importing the proof. Every file is
-generated, so nothing per certificate is trusted but the kernel and the relation; the verdict
-comes from `lake build` and `fva trust`, never from this command.
+(`fva blob`), the claim `Ns.Spec` (`@[fva_claim] def claim : Prop := Accepted R In.blob
+Out.blob`, which imports only `M`, the reviewed relation), the proof `Ns.Proof`
+(`R.check_sound` applied to the kernel's evaluation of `R.check`, from `P`), and the root `Ns`
+importing the proof. Every file is generated, so nothing per certificate is trusted but the
+kernel and the relation; the verdict comes from `lake build` and `fva trust`, never from this
+command.
 -/
 
 namespace FVA.Tool.Certify
@@ -29,7 +30,7 @@ def specFile (ns rel relMod inSrc outSrc : String) : String :=
   "/-! Certificate claim written by `fva certify`. -/\n\n" ++
   s!"namespace {ns}\n\n" ++
   s!"/-- The bytes of\n`{outSrc}`\nstand in relation `{rel}` to the bytes of\n`{inSrc}`. -/\n" ++
-  s!"def claim : Prop := FVA.Cert.Accepted {rel} In.blob Out.blob\n\n" ++
+  s!"@[fva_claim] def claim : Prop := FVA.Cert.Accepted {rel} In.blob Out.blob\n\n" ++
   s!"end {ns}\n"
 
 /-- The proof module: the checker's soundness theorem on the kernel's evaluation of the check. -/

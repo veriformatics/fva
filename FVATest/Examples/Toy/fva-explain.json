@@ -4,32 +4,32 @@
    "text":
    "clamp(x, lo, hi) reads its arguments as signed integers. It returns lo when x < lo, else hi\nwhen x > hi, else x.",
    "reason":
-   "The claim covers every 32-bit input triple and uses signed comparisons to return the lower bound, upper bound, or x as required.",
+   "The claim uses signed comparisons and returns `lo` when `x < lo`, `hi` when `x > hi`, and `x` otherwise, for every 32-bit input triple. This matches the stated behavior, including when the bounds are inverted.",
    "id": "R1",
    "claims": ["Examples.Toy.clamp"]},
   {"verdict": "matches",
    "text":
    "gcd(a, b) reads its arguments as unsigned integers and returns their greatest common divisor,\nwith gcd(a, 0) = a.",
    "reason":
-   "The claim interprets both inputs as unsigned values and returns their greatest common divisor; this includes gcd(a, 0) = a.",
+   "The claim computes the greatest common divisor of the inputs’ unsigned values. It covers every pair, including `gcd(0, 6) → 6`, as required.",
    "id": "R2",
    "claims": ["Examples.Toy.gcd"]},
   {"verdict": "matches",
    "text":
    "sum_to(n) reads n as an unsigned integer and returns 0 + 1 + ... + (n - 1), wrapped to 32 bits.",
    "reason":
-   "The claim sums the unsigned values from zero up to n − 1 and converts the result to 32 bits, so it wraps as required.",
+   "The claim sums the unsigned values from zero up to, but not including, `n`, then converts the result to 32 bits. This matches the specified sum and 32-bit wrapping.",
    "id": "R3",
    "claims": ["Examples.Toy.sumTo"]}],
  "model": "gpt-6-luna",
  "inputsSha":
- "5866a63c06a6fefbb5ce02d063cba2196f545cf82f1b5bc9fc4da6e6a0939c78",
- "generated": "2026-11-02 13:19 UTC",
+ "a066afc8a6ed53a45e10cbe724057619a92f7ca804017069e201f885b915d7e9",
+ "generated": "2026-11-02 15:14 UTC",
  "effort": "medium",
  "claims":
  [{"verdict": "",
    "summary":
-   "For every 32-bit input, the sum_to export returns the sum of the integers below its unsigned value, reduced to 32 bits.",
+   "For every 32-bit input, the exported function returns the sum of all nonnegative integers smaller than the input, reduced to 32 bits.",
    "statement":
    "∀ (n : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Toy.Lifted.module \"sum_to\" [FVA.Wasm.Exec.Val.i32 n]\n    [FVA.Wasm.Exec.Val.i32 (BitVec.ofNat 32 (List.range n.toNat).sum)]",
    "serves": ["R3"],
@@ -44,19 +44,16 @@
    [{"spec": [0], "binary": [0], "args": [0]},
     {"spec": [0], "binary": [0], "args": [1]},
     {"spec": [1], "binary": [1], "args": [2]},
-    {"spec": [6], "binary": [6], "args": [4]},
-    {"spec": null, "binary": [2147483649], "args": [4294967295]}],
+    {"spec": [10], "binary": [10], "args": [5]}],
    "details":
-   ["Covers every 32-bit input, interpreted as unsigned for the range bound.",
-    "The expected result is the sum of integers from zero up to, but not including, that bound, wrapped to 32 bits.",
-    "Returns adds that the module can be instantiated, and every call in a fresh instance under every host behavior terminates without a trap and returns exactly the specified value."],
+   ["Covers every 32-bit input, interpreted as an unsigned integer from zero through the maximum 32-bit value.",
+    "The sum is computed over integers from zero up to, but not including, that value, then reduced modulo 2³² for the returned 32-bit result.",
+    "Returns additionally guarantees the module can be instantiated and that every call execution under every host behavior terminates without trapping and returns exactly the specified value."],
    "caveats":
-   ["The list range is over the unsigned interpretation of the 32-bit input, so the claim does not describe a signed negative bound.",
-    "The sum is reduced modulo 2 to the power of 32; it is not an unbounded mathematical sum.",
-    "It asserts termination and no trap for every input, which includes very large loop bounds."]},
+   ["The guarantee is exactly the mathematical sum of all integers below the unsigned input, reduced to 32 bits; it does not describe a signed-input interpretation."]},
   {"verdict": "",
    "summary":
-   "For every triple of 32-bit inputs, clamp returns the value selected by signed comparisons against the supplied bounds.",
+   "For every triple of 32-bit inputs, the exported function returns the value constrained by the supplied bounds using signed comparisons.",
    "statement":
    "∀ (x lo hi : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Toy.Lifted.module \"clamp\"\n    [FVA.Wasm.Exec.Val.i32 x, FVA.Wasm.Exec.Val.i32 lo, FVA.Wasm.Exec.Val.i32 hi]\n    [FVA.Wasm.Exec.Val.i32 (if x.slt lo = true then lo else if hi.slt x = true then hi else x)]",
    "serves": ["R1"],
@@ -71,25 +68,22 @@
    "`clamp(x, lo, hi)` on signed 32-bit ints: `lo` if `x < lo`, else `hi` if `x > hi`, else `x`\n(tested in this order, so with `lo > hi` the result is `lo` for `x < lo` and `hi` otherwise). ",
    "fn": "clamp",
    "examples":
-   [{"spec": [0], "binary": [0], "args": [0, 4294967295, 1]},
-    {"spec": [4294967295],
-     "binary": [4294967295],
-     "args": [4294967294, 4294967295, 1]},
-    {"spec": [1], "binary": [1], "args": [2, 4294967295, 1]},
-    {"spec": [0], "binary": [0], "args": [2147483648, 0, 1]},
-    {"spec": [0], "binary": [0], "args": [2147483647, 1, 0]},
+   [{"spec": [5], "binary": [5], "args": [5, 0, 10]},
+    {"spec": [0], "binary": [0], "args": [4294967291, 0, 10]},
+    {"spec": [10], "binary": [10], "args": [15, 0, 10]},
+    {"spec": [10], "binary": [10], "args": [5, 10, 0]},
     {"spec": [0], "binary": [0], "args": [0, 0, 0]},
     {"spec": [1], "binary": [1], "args": [1, 1, 1]}],
    "details":
-   ["Covers every combination of three 32-bit inputs: the value, lower bound, and upper bound.",
-    "Comparisons use signed 32-bit order; the selected value is returned unchanged as a 32-bit bit pattern, with no arithmetic wraparound.",
-    "Returns adds that the module can be instantiated, and every call in a fresh instance under every host behavior terminates without a trap and returns exactly the specified value."],
+   ["Covers every triple of 32-bit inputs: the value, lower bound, and upper bound.",
+    "Comparisons interpret each bit pattern as a signed 32-bit integer. The selected result is one of the original inputs, so no arithmetic wraparound occurs.",
+    "Returns additionally guarantees the module can be instantiated and that every call execution under every host behavior terminates without trapping and returns exactly the specified value."],
    "caveats":
-   ["This is a signed comparison clamp: if the lower bound exceeds the upper bound, the nested comparisons do not enforce a conventional interval clamp; the claim still specifies its exact behavior.",
-    "No relationship between the three inputs is assumed."]},
+   ["This is a signed comparison clamp, but the claim does not require the lower bound to be no greater than the upper bound; for reversed bounds, its nested comparisons define the result.",
+    "All 32-bit bit patterns are covered; there are no excluded or invalid integer inputs."]},
   {"verdict": "",
    "summary":
-   "For every pair of 32-bit inputs, gcd returns their unsigned greatest common divisor.",
+   "For every pair of 32-bit inputs, the exported function returns their unsigned greatest common divisor.",
    "statement":
    "∀ (a b : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Toy.Lifted.module \"gcd\" [FVA.Wasm.Exec.Val.i32 a, FVA.Wasm.Exec.Val.i32 b]\n    [FVA.Wasm.Exec.Val.i32 (BitVec.ofNat 32 (a.toNat.gcd b.toNat))]",
    "serves": ["R2"],
@@ -102,17 +96,13 @@
    "fn": "gcd",
    "examples":
    [{"spec": [0], "binary": [0], "args": [0, 0]},
-    {"spec": [7], "binary": [7], "args": [0, 7]},
-    {"spec": [6], "binary": [6], "args": [12, 18]},
-    {"spec": [1], "binary": [1], "args": [1, 4294967295]},
-    {"spec": [4294967295],
-     "binary": [4294967295],
-     "args": [4294967295, 4294967295]},
+    {"spec": [6], "binary": [6], "args": [0, 6]},
+    {"spec": [4], "binary": [4], "args": [12, 8]},
+    {"spec": [1], "binary": [1], "args": [7, 1]},
     {"spec": [1], "binary": [1], "args": [1, 1]}],
    "details":
-   ["Covers every pair of 32-bit inputs, each interpreted as an unsigned number.",
-    "The result is their natural-number greatest common divisor, encoded in 32 bits; there is no arithmetic wraparound needed because it fits in 32 bits.",
-    "Returns adds that the module can be instantiated, and every call in a fresh instance under every host behavior terminates without a trap and returns exactly the specified value."],
+   ["Covers every pair of 32-bit inputs, each interpreted as an unsigned integer from zero through the maximum 32-bit value.",
+    "Returns their natural-number greatest common divisor as a 32-bit value; conversion to 32 bits wraps modulo 2³², though the divisor is within the 32-bit range.",
+    "Returns additionally guarantees the module can be instantiated and that every call execution under every host behavior terminates without trapping and returns exactly the specified value."],
    "caveats":
-   ["The inputs are treated as unsigned natural numbers, not signed integers; negative-looking bit patterns therefore denote large positive values.",
-    "The claim does not specify signed greatest common divisor behavior."]}]}
+   ["The inputs are treated as unsigned magnitudes, even when their high bit is set; this is not a signed greatest-common-divisor guarantee."]}]}

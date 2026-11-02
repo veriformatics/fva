@@ -10,6 +10,6 @@ namespace FVATest.Certs.Sort.Java
 `FVATest/Certs/Sort/out-java.txt`
 stand in relation `FVA.Cert.SortedPerm` to the bytes of
 `FVATest/Certs/Sort/input.txt`. -/
-def claim : Prop := FVA.Cert.Accepted FVA.Cert.SortedPerm In.blob Out.blob
+@[fva_claim] def claim : Prop := FVA.Cert.Accepted FVA.Cert.SortedPerm In.blob Out.blob
 
 end FVATest.Certs.Sort.Java

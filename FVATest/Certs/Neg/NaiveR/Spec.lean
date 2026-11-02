@@ -10,6 +10,6 @@ namespace FVATest.Certs.Neg.NaiveR
 `FVATest/Certs/Sort/out-naive-r.txt`
 stand in relation `FVA.Cert.SortedPerm` to the bytes of
 `FVATest/Certs/Sort/input.txt`. -/
-def claim : Prop := FVA.Cert.Accepted FVA.Cert.SortedPerm In.blob Out.blob
+@[fva_claim] def claim : Prop := FVA.Cert.Accepted FVA.Cert.SortedPerm In.blob Out.blob
 
 end FVATest.Certs.Neg.NaiveR

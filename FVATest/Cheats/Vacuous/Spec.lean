@@ -5,6 +5,6 @@ import FVATest.Cheats.Vacuous.Lifted
 namespace Cheats.Vacuous
 
 /-- Sounds like a claim about the artifact; mentions nothing of it. -/
-def trivially : Prop := True
+@[fva_claim] def trivially : Prop := True
 
 end Cheats.Vacuous
