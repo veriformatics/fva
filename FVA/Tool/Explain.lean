@@ -78,10 +78,11 @@ For each claim in the list, return:
 - caveats: what a reader could misread, what the claim leaves out, or why it may be weaker than
   it looks (vacuous, too narrow, trivially true). Empty when there is nothing.
   Keep example values out of summary, details and caveats; they go in examples alone.
-- examples (required for every claim that calls an exported function on integer arguments):
-  3 to 6 argument lists (inputs only, no outputs) that show the behavior, boundary cases
-  included. Integers; negative values are allowed where the claim reads a value as signed. Keep
-  values small where the result needs a loop or recursion over the input.
+- examples (required for every claim whose leading variables are integers): 3 to 6 lists of
+  values for those variables, inputs only (leave out a variable that names a function's result),
+  that show the behavior, boundary cases included. Integers; negative values are allowed where
+  the claim reads a value as signed. Keep values small where the result needs a loop or
+  recursion over the input.
 
 The elaborated statement of each claim = what Lean checks, after every macro and notation the
 specification imports has run. It is the truth: where it differs from the source text, explain
@@ -308,8 +309,11 @@ def evalLean (root : System.FilePath) (spec : String) (cmd : System.FilePath →
 structure Shape where
   doc : Option String
   statement : String
+  /-- `returns`, `implies` or `decide` (`FVA.Explain.shape`); `none` = no examples. -/
+  kind : Option String
   fn : Option String
   params : Array (String × Nat)
+  outputs : Array (String × Nat)
 
 /-- Read every claim's `Shape`, and the names the review modules `mods` declare. -/
 def shapes (root : System.FilePath) (spec : String) (claims : Array String)
@@ -326,13 +330,15 @@ def shapes (root : System.FilePath) (spec : String) (claims : Array String)
   for r in rows do
     let some c := (r.getObjValAs? String "claim").toOption | continue
     let sh := r.getObjValD "shape"
-    let ps := ((sh.getObjValD "params").getArr?.toOption.getD #[]).filterMap fun p =>
+    let binders (k : String) := ((sh.getObjValD k).getArr?.toOption.getD #[]).filterMap fun p =>
       match p.getObjValAs? String "name", p.getObjValAs? Nat "bits" with
       | .ok n, .ok b => some (n, b)
       | _, _ => none
     m := m.insert c { doc := (r.getObjValAs? String "doc").toOption,
                       statement := (r.getObjValAs? String "statement").toOption.getD "",
-                      fn := (sh.getObjValAs? String "fn").toOption, params := ps }
+                      kind := (sh.getObjValAs? String "kind").toOption,
+                      fn := (sh.getObjValAs? String "fn").toOption, params := binders "params",
+                      outputs := binders "outputs" }
   return (m, declared)
 
 /-- Spec value + kernel status per case (`FVA.Explain.run`: `confirmed`, `refused`, `cost`,
@@ -355,6 +361,21 @@ partial def specValues (root : System.FilePath) (spec claim : String)
   if got.length == cases.length then return got
   -- the case after the last result was too costly: skip it, continue with the rest
   let rest ← specValues root spec claim (cases.drop (got.length + 1))
+  return got ++ [(none, "cost")] ++ rest
+
+/-- The condition's truth + kernel status per case (`FVA.Explain.decideCases`: every binder's
+value; a killed or crashed evaluation = `cost`). -/
+partial def decided (root : System.FilePath) (spec claim : String) (cases : List (List Nat)) :
+    IO (List (Option Bool × String)) := do
+  if cases.isEmpty then return []
+  let lit := "[" ++ ", ".intercalate (cases.map fun c => toString c) ++ "]"
+  let (rows, _) ← evalLean root spec
+    (fun out => s!"#eval FVA.Explain.decideCases `{claim} {lit} {repr out.toString}")
+    (caseSeconds + 5 * cases.length)
+  let got := (rows.toList.map fun r => ((r.getObjValAs? Bool "holds").toOption,
+    (r.getObjValAs? String "status").toOption.getD "stuck")).take cases.length
+  if got.length == cases.length then return got
+  let rest ← decided root spec claim (cases.drop (got.length + 1))
   return got ++ [(none, "cost")] ++ rest
 
 /-- Bits of a result type name. -/
@@ -391,8 +412,10 @@ structure Example where
   args : List Nat
   spec : Option (List Nat)
   binary : Option (List Nat)
-  /-- The spec value's kernel status (`FVA.Explain.run`). -/
+  /-- The spec value's (or the decided condition's) kernel status (`FVA.Explain`). -/
   status : String := "confirmed"
+  /-- An `implies` or `decide` claim's condition on this case (D18). -/
+  holds : Option Bool := none
 
 /-- One explained claim. -/
 structure Row where
@@ -402,6 +425,8 @@ structure Row where
   summary : String
   details : List String
   caveats : List String
+  /-- Example shape: `returns`, `implies` or `decide` (`FVA.Explain.shape`, D18). -/
+  kind : String := "returns"
   fn : Option String := none
   params : List (String × Nat) := []
   resultBits : List Nat := []
@@ -422,7 +447,7 @@ deriving ToJson, FromJson
 
 instance : ToJson Example where
   toJson e := Json.mkObj [("args", toJson e.args), ("spec", toJson e.spec),
-    ("binary", toJson e.binary), ("status", toJson e.status)]
+    ("binary", toJson e.binary), ("status", toJson e.status), ("holds", toJson e.holds)]
 
 instance : FromJson Example where
   fromJson? j := do
@@ -430,7 +455,8 @@ instance : FromJson Example where
     let spec ← j.getObjValAs? (Option (List Nat)) "spec"
     let binary ← j.getObjValAs? (Option (List Nat)) "binary"
     return { args, spec, binary,
-             status := (j.getObjValAs? String "status").toOption.getD "confirmed" }
+             status := (j.getObjValAs? String "status").toOption.getD "confirmed",
+             holds := (j.getObjValAs? Bool "holds").toOption }
 
 instance : ToJson Row where
   toJson r := Json.mkObj [("name", toJson r.name), ("intent", toJson r.intent),
@@ -438,7 +464,8 @@ instance : ToJson Row where
     ("details", toJson r.details), ("caveats", toJson r.caveats), ("fn", toJson r.fn),
     ("params", toJson (r.params.map fun (n, b) => Json.mkObj [("name", toJson n),
       ("bits", toJson b)])),
-    ("resultBits", toJson r.resultBits), ("examples", toJson r.examples),
+    ("kind", toJson r.kind), ("resultBits", toJson r.resultBits),
+    ("examples", toJson r.examples),
     ("verdict", toJson r.verdict), ("reason", toJson r.reason), ("serves", toJson r.serves)]
 
 instance : FromJson Row where
@@ -458,7 +485,8 @@ instance : FromJson Row where
     return { name, intent := (j.getObjValAs? String "intent").toOption, statement, summary,
              details, caveats, fn := (j.getObjValAs? String "fn").toOption, params, resultBits,
              examples, verdict, reason,
-             serves := (j.getObjValAs? (List String) "serves").toOption.getD [] }
+             serves := (j.getObjValAs? (List String) "serves").toOption.getD [],
+             kind := (j.getObjValAs? String "kind").toOption.getD "returns" }
 
 /-- A claim's proof status from the trust report: issues naming the claim or its proofs, plus
 the project-wide ones (no claim named). -/
@@ -588,30 +616,60 @@ def generate (o : Opts) (root fva : System.FilePath) (t : Trust)
       { name := c.name, intent := s.bind (·.doc), statement := (s.map (·.statement)).getD "",
         summary := (e.getObjValAs? String "summary").toOption.getD "",
         details := strsOf "details", caveats := strsOf "caveats" }
-    if let (some s, [subj]) := (s, c.subjects) then
-      if let some fn := s.fn then
-        let bits := s.params.toList.map (·.2)
-        let proposed := ((e.getObjValAs? (List (List Int)) "examples").toOption.getD []) ++
-          fixedInputs.map fun v => List.replicate bits.length (Int.ofNat v)
-        let cases := (proposed.filter (·.length == bits.length)).map fun xs =>
-          (xs.zip bits).map fun (a, b) => (a % (2 ^ b : Int)).toNat
-        let cases := (cases.eraseDups).take maxExamples
+    if let some s := s then
+      let bits := s.params.toList.map (·.2)
+      let proposed := ((e.getObjValAs? (List (List Int)) "examples").toOption.getD []) ++
+        fixedInputs.map fun v => List.replicate bits.length (Int.ofNat v)
+      let cases := (proposed.filter (·.length == bits.length)).map fun xs =>
+        (xs.zip bits).map fun (a, b) => (a % (2 ^ b : Int)).toNat
+      let cases := (cases.eraseDups).take maxExamples
+      let wasm ← match c.subjects with
+        | [subj] => pure ((← liftedSource (modFile root subj)).map (root / ·))
+        | _ => pure none
+      match s.kind, s.fn, wasm with
+      | some "returns", some fn, some wasm =>
         let specV ← specValues root spec c.name cases
         let resBits := ((specV.findSome? (·.1)).getD []).map (typeBits ·.1)
-        let wasm ← match ← liftedSource (modFile root subj) with
-          | some w => pure (root / w)
-          | none => pure (root / "missing.wasm")
         let mut exs := #[]
         for (a, v, status) in cases.zip specV do
           let b ← binaryValue wasmtime wasm fn (a.zip bits) resBits
           exs := exs.push { args := a, spec := v.map (·.map (·.2)), binary := b, status }
         row := { row with fn := some fn, params := s.params.toList, resultBits := resBits,
                           examples := exs.toList }
+      | some "implies", some fn, some wasm =>
+        -- the binary's results stand in for the output variables, then the condition is decided
+        let outBits := s.outputs.toList.map (·.2)
+        let mut bins := #[]
+        for a in cases do bins := bins.push (← binaryValue wasmtime wasm fn (a.zip bits) outBits)
+        let mut ds ← decided root spec c.name
+          ((cases.zip bins.toList).filterMap fun (a, b) => b.map (a ++ ·))
+        let mut exs := #[]
+        for (a, b) in cases.zip bins.toList do
+          match b, ds with
+          | some bv, (h, status) :: rest =>
+            exs := exs.push { args := a, spec := none, binary := some bv, status, holds := h }
+            ds := rest
+          | _, _ => exs := exs.push { args := a, spec := none, binary := none, status := "trap" }
+        row := { row with kind := "implies", fn := some fn, params := s.params.toList,
+                          resultBits := outBits, examples := exs.toList }
+      | some "decide", _, _ =>
+        let ds ← decided root spec c.name cases
+        let exs : List Example := (cases.zip ds).map fun (a, h, status) =>
+          { args := a, spec := none, binary := none, status, holds := h }
+        row := { row with kind := "decide", params := s.params.toList, examples := exs }
+      | _, _, _ => pure ()
     rows := rows.push row
   let item (r : Row) (name statement : String) (head : String) :=
     let exs := r.examples.filterMap fun x => if x.status != "confirmed" then none else
-      x.spec.map fun v =>
-        s!"Example: {r.fn.getD ""}({", ".intercalate (x.args.map toString)}) → spec says {v}\n"
+      let call := s!"{r.fn.getD ""}({", ".intercalate (x.args.map toString)})"
+      match r.kind, x.spec, x.binary, x.holds with
+      | "returns", some v, _, _ => some s!"Example: {call} → spec says {v}\n"
+      | "implies", _, some b, some h =>
+        some s!"Example: {call} → the binary returns {b}; the claim's condition is {h}\n"
+      | "decide", _, _, some h =>
+        let vs := ", ".intercalate ((r.params.zip x.args).map fun ((n, _), a) => s!"{n} = {a}")
+        some s!"Example: {if vs.isEmpty then "Lean decides" else vs} → the statement is {h}\n"
+      | _, _, _, _ => none
     s!"## {name}\n{head}Formal statement: {statement}\n" ++
       s!"Explanation: {r.summary} {" ".intercalate r.details}\n" ++ String.join exs
   let shown (r : Row) : Row :=
@@ -715,11 +773,36 @@ def render (dir model trustVerdict : String) (saved : Option (String × Bool × 
       out := out.push "  Watch for:"
       for d in c.caveats do out := out ++ (wrap d "    - " "      ").toArray
     if !c.examples.isEmpty then
-      out := out ++ #[
-        "  Examples (spec value computed by Lean and checked by its kernel; binary value",
-        "  from wasmtime):"]
+      if c.kind == "returns" then
+        out := out ++ #[
+          "  Examples (spec value computed by Lean and checked by its kernel; binary value",
+          "  from wasmtime):"]
       let widths := c.params.map (·.2)
-      for x in c.examples do
+      let nums (vs : List Nat) (bits : List Nat) := ", ".intercalate ((vs.zip bits).map
+        fun (a, b) => num a b)
+      let verdict (x : Example) : String := match x.holds, x.status with
+        | some h, st => (if h then "holds" else "fails") ++
+          (if st == "refused" then " (✗ the kernel does not accept this)" else "")
+        | none, "stuck" => "cannot be decided"
+        | none, _ => "too costly to decide"
+      if c.kind == "implies" then
+        out := out ++ #["  Examples (the binary's results from wasmtime; the claim's condition on",
+          "  them decided by Lean and checked by its kernel):"]
+        for x in c.examples do
+          let call := s!"{c.fn.getD ""}({nums x.args widths})"
+          let line := match x.binary with
+            | none => s!"{call}: the binary traps (the claim says nothing for these inputs)"
+            | some b => s!"{call} → {nums b c.resultBits}: the condition {verdict x}"
+          out := out ++ (wrap line "    " "        ").toArray
+      if c.kind == "decide" then
+        out := out.push "  Examples (each case decided by Lean and checked by its kernel):"
+        for x in c.examples do
+          let vs := ", ".intercalate ((c.params.zip x.args).map fun ((n, b), a) =>
+            s!"{n} = {num a b}")
+          let line := if vs.isEmpty then s!"the statement {verdict x}"
+            else s!"{vs}: the statement {verdict x}"
+          out := out ++ (wrap line "    " "        ").toArray
+      for x in c.examples.filter (fun _ => c.kind == "returns") do
         let call := s!"{c.fn.getD ""}({", ".intercalate ((x.args.zip widths).map fun (a, b) =>
           num a b)})"
         let sv := match x.spec, x.status with
@@ -733,8 +816,9 @@ def render (dir model trustVerdict : String) (saved : Option (String × Bool × 
           | some _, none => "  ✗ binary traps"
         out := out ++ (wrap s!"{call} → {sv}{agree}" "    " "        ").toArray
     else if c.fn.isNone && !c.statement.isEmpty then
-      out := out ++ #["  Examples: none. FVA computes examples only for claims of the form",
-        "  `∀ inputs, Returns …` over integer arguments. Lean reads this claim as:"] ++
+      out := out ++ #["  Examples: none. FVA computes examples for claims over integer inputs of",
+        "  the forms `Returns …`, `Returns … → condition` and a decidable condition. Lean reads",
+        "  this claim as:"] ++
         (wrap (" ".intercalate (c.statement.splitOn "\n" |>.map (·.trimAscii.toString)))
           "    " "      ").toArray
     if reqs.isSome then
