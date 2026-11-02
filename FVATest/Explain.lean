@@ -31,8 +31,10 @@ open FVA.Tool.Explain
 #guard signed 255 8 == -1
 #guard modFile "/p" "A.B.Spec" == ("/p/A/B/Spec.lean" : System.FilePath)
 #guard modPath "A.B.Spec" == ("A/B/Spec.lean" : System.FilePath)
-#guard FVA.Trust.stripComments "def x := 1 -- c\n/- d -/def y := \"--s\"" ==
-  "def x := 1 \ndef y := \"--s\""
+#eval show IO Unit from do
+  let s := FVA.Trust.stripComments (← Lean.mkEmptyEnvironment)
+    "def x := 1 -- c\n/- d -/def y := \"--s\"\n/-- doc /- nested -/ -/ z\nw-- right after"
+  unless s == "def x := 1 \ndef y := \"--s\"\n z\nw" do throw <| .userError s!"stripComments: {s}"
 
 -- requirements file (D5): each `## <id>` line starts a requirement; the text before = context
 #guard parseReqs "Ctx line\n\n## R1\nclamp x.\n\n## R2\nsecond\nmore\n" ==

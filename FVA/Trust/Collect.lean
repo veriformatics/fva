@@ -3,6 +3,7 @@ import FVA.Spec.Trust
 import FVA.Tool.Lift
 import FVA.Tool.Blob
 import FVA.Spec.Cert
+import FVA.Trust.Lines
 
 /-!
 # Trust facts from the environment (trusted glue)
@@ -275,93 +276,6 @@ def blobLinkOf (env : Environment) (root : System.FilePath) (m ns : Name) : IO L
            lenMatch := natValue env (ns ++ `len) == some bs.size,
            decodeEq := false, regenerates }
 
-/-- A character that continues an identifier, so a following `'` is a prime, not a char
-literal (non-ASCII counts: misreading a literal only overcounts). -/
-def idChar (c : Char) : Bool :=
-  c.isAlphanum || c == '_' || c == '\'' || c == '!' || c == '?' || c.toNat ≥ 0x80
-
-/-- Which characters of a Lean source lie inside a comment or docstring (D11): `--` to the line
-end, `/-` … `-/` nested (docstrings included), neither inside a string, raw string, char or
-`«…»` literal. Every misread marks too little, never too much. -/
-def commentMask (src : String) : Array Bool := Id.run do
-  let cs := src.toList.toArray
-  let at_ (k : Nat) : Char := cs[k]?.getD ' '
-  let mut mask := Array.replicate cs.size false
-  let mut i := 0
-  let mut depth := 0
-  -- inside a literal: `"` string, `r#…"` raw string (hash count), `«` quoted name
-  let mut str := false
-  let mut raw : Option Nat := none
-  let mut quoted := false
-  while i < cs.size do
-    let c := cs[i]!
-    if c == '\n' then
-      i := i + 1
-    else if depth > 0 then
-      mask := mask.set! i true
-      if c == '/' && at_ (i + 1) == '-' then
-        mask := mask.set! (i + 1) true; depth := depth + 1; i := i + 2
-      else if c == '-' && at_ (i + 1) == '/' then
-        mask := mask.set! (i + 1) true; depth := depth - 1; i := i + 2
-      else i := i + 1
-    else if str then
-      if c == '\\' then i := i + 2
-      else
-        if c == '"' then str := false
-        i := i + 1
-    else if let some h := raw then
-      if c == '"' && (List.range h).all (fun k => at_ (i + 1 + k) == '#') then
-        raw := none; i := i + 1 + h
-      else i := i + 1
-    else if quoted then
-      if c == '»' then quoted := false
-      i := i + 1
-    else if c == '-' && at_ (i + 1) == '-' then
-      while i < cs.size && cs[i]! != '\n' do
-        mask := mask.set! i true; i := i + 1
-    else if c == '/' && at_ (i + 1) == '-' then
-      mask := (mask.set! i true).set! (i + 1) true; depth := 1; i := i + 2
-    else
-      let prevId := i > 0 && idChar cs[i - 1]!
-      if c == '"' then str := true; i := i + 1
-      else if c == '«' then quoted := true; i := i + 1
-      else if c == 'r' && !prevId &&
-          (at_ (i + 1) == '"' || at_ (i + 1) == '#') then
-        let mut h := 0
-        while at_ (i + 1 + h) == '#' do h := h + 1
-        if at_ (i + 1 + h) == '"' then raw := some h; i := i + 2 + h
-        else i := i + 1
-      else if c == '\'' && !prevId then
-        -- char literal: `'x'` or an escape `'\…'` closed within a few characters
-        if at_ (i + 1) == '\\' then
-          let mut j := i + 3
-          while j < i + 12 && j < cs.size && cs[j]! != '\'' && cs[j]! != '\n' do j := j + 1
-          i := if j < cs.size && cs[j]! == '\'' then j + 1 else i + 1
-        else if at_ (i + 2) == '\'' && at_ (i + 1) != '\n' then i := i + 3
-        else i := i + 1
-      else i := i + 1
-  return mask
-
-/-- Code lines of a Lean source (D11): lines holding a non-blank character outside comments and
-docstrings (`commentMask`); string, char and `«…»` contents count as code. -/
-def codeLines (src : String) : Nat := Id.run do
-  let mask := commentMask src
-  let mut n := 0
-  let mut code := false
-  for (c, k) in src.toList.zipIdx do
-    if c == '\n' then
-      if code then n := n + 1
-      code := false
-    else if !c.isWhitespace && !mask[k]! then code := true
-  if code then n := n + 1
-  return n
-
-/-- A Lean source without its comments and docstrings (`commentMask`), line breaks kept. -/
-def stripComments (src : String) : String :=
-  let mask := commentMask src
-  String.ofList <| src.toList.zipIdx.filterMap fun (c, k) =>
-    if mask[k]! && c != '\n' then none else some c
-
 /-- Every environment fact of the report (build, replay, canaries and budget are set later). -/
 def collect (input : Input) : CoreM Report := do
   let env ← getEnv
@@ -449,7 +363,7 @@ def collect (input : Input) : CoreM Report := do
     unless orig.get? m == some .project do continue
     let src ← sourceOf m
     let lines ← match src with
-      | some f => pure (codeLines (← IO.FS.readFile f))
+      | some f => pure (codeLines env (← IO.FS.readFile f))
       | none => pure 0
     reviewModules := reviewModules.push { module := m.toString, codeLines := lines,
                                           found := src.isSome,
