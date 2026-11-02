@@ -19,7 +19,7 @@ fi
 	exit 2
 }
 task=$1 order=$2
-base=$HOME/.cache/fva-bench
+base=${FVA_BENCH_HOME:-$HOME/.cache/fva-bench}
 read -ra cpus <<<"${FVA_BENCH_CPUS:-2}"
 ((${#cpus[@]} == 1)) || {
 	echo 'run-order: FVA_BENCH_CPUS must name one CPU' >&2

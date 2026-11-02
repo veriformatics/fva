@@ -69,7 +69,7 @@ Arms = bare/prompted/tool/fva; index starts at 1. Dry-run creates nothing and pr
 
 ### Isolation / capture contract
 
-- Work root = `$HOME/.cache/fva-bench/runs/<arm>-<task>-<n>/work`; fresh git repo, HOME, CODEX_HOME, XDG dirs, tmp. Only supplied task inputs are copied, no enclosing repo/history.
+- Work root = `$HOME/.cache/fva-bench/runs/<arm>-<task>-<n>/work` (`FVA_BENCH_HOME` replaces `$HOME/.cache/fva-bench` in every bench script); fresh git repo, HOME, CODEX_HOME, XDG dirs, tmp. Only supplied task inputs are copied, no enclosing repo/history.
 - CODEX_HOME starts with only the selected auth.json (mode 600). No global config, AGENTS.md, skills, MCP configuration, history, or user rules copied. Copied auth is removed on exit; original auth untouched. No real credentials were read/copied by prep tests.
 - `env -i` forwards only explicit HOME/CODEX_HOME/PATH/locale/temp/git controls; parent model/provider/API-key/shell-startup variables are absent. Auth comes from the selected file, not ambient API keys.
 - Launch = `codex exec -C <work> -s workspace-write --json --ephemeral --ignore-user-config --ignore-rules`; explicit model/reasoning effort, `approval_policy="never"`, `project_doc_max_bytes=0`; prompt argument + `< /dev/null`. Instructions/rules are disabled for this isolated benchmark session, not the development session.

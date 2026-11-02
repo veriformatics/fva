@@ -8,7 +8,7 @@
 # and a project importing all of Mathlib builds against the store (rc 0).
 set -euo pipefail
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
-dst=${FVA_BENCH_PACKAGES:-$HOME/.cache/fva-bench/packages-v4.35.0}
+dst=${FVA_BENCH_PACKAGES:-${FVA_BENCH_HOME:-$HOME/.cache/fva-bench}/packages-v4.35.0}
 if [[ ! -e $dst ]]; then
 	cp -a --reflink=auto "$root/.lake/packages" "$dst"
 	while IFS= read -r -d '' f; do
