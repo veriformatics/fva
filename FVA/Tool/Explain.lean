@@ -10,9 +10,11 @@ import FVA.Tool.Sandbox
 The spec in plain English for a reader who cannot read Lean, by Claimcheck's two-pass round trip
 (https://github.com/metareflection/claimcheck), reimplemented: pass 1 explains each claim from
 the comment-stripped spec source plus its elaborated statement (it never sees the author's
-intent), pass 2 compares that explanation with the intent (docstring, else name). Example inputs
+intent, nor the author's names), pass 2 compares that explanation with the intent (the
+requirements file, else the docstring, else the name). Example inputs
 come from pass 1 plus fixed `0`, `1` per argument; their outputs never come from the model: the
-spec value is Lean's evaluation of the claim's `Returns` result, the binary value is wasmtime's.
+spec value is the claim's `Returns` result reduced by Lean and confirmed by its kernel, the
+binary value is wasmtime's.
 
 The text is saved beside the spec module (`fva-explain.json`) and shown again without a model
 call; `--force` regenerates it. Its `inputsSha` covers everything the text derives from, so a
@@ -332,24 +334,27 @@ def shapes (root : System.FilePath) (spec : String) (claims : Array String)
                       fn := (sh.getObjValAs? String "fn").toOption, params := ps }
   return (m, declared)
 
-/-- Spec value per case (`none` = too costly: the evaluation was killed or crashed). -/
+/-- Spec value + kernel status per case (`FVA.Explain.run`: `confirmed`, `refused`, `cost`,
+`stuck`; a killed or crashed evaluation = `cost`, no value). -/
 partial def specValues (root : System.FilePath) (spec claim : String)
-    (cases : List (List Nat)) : IO (List (Option (List (String × Nat)))) := do
+    (cases : List (List Nat)) : IO (List (Option (List (String × Nat)) × String)) := do
   if cases.isEmpty then return []
   let lit := "[" ++ ", ".intercalate (cases.map fun c => toString c) ++ "]"
   let (rows, _) ← evalLean root spec
     (fun out => s!"#eval FVA.Explain.run `{claim} {lit} {repr out.toString}")
     (caseSeconds + 5 * cases.length)
   let vals := rows.toList.map fun r =>
-    ((r.getObjValD "res").getArr?.toOption.getD #[]).toList.filterMap fun v =>
+    let status := (r.getObjValAs? String "status").toOption.getD "stuck"
+    let vs := ((r.getObjValD "res").getArr?.toOption.getD #[]).toList.filterMap fun v =>
       match v.getObjValAs? String "type", v.getObjValAs? Nat "value" with
       | .ok t, .ok x => some (t, x)
       | _, _ => none
+    (if status == "confirmed" || status == "refused" then some vs else none, status)
   let got := vals.take cases.length
-  if got.length == cases.length then return got.map some
+  if got.length == cases.length then return got
   -- the case after the last result was too costly: skip it, continue with the rest
   let rest ← specValues root spec claim (cases.drop (got.length + 1))
-  return got.map some ++ [none] ++ rest
+  return got ++ [(none, "cost")] ++ rest
 
 /-- Bits of a result type name. -/
 def typeBits : String → Nat
@@ -385,6 +390,8 @@ structure Example where
   args : List Nat
   spec : Option (List Nat)
   binary : Option (List Nat)
+  /-- The spec value's kernel status (`FVA.Explain.run`). -/
+  status : String := "confirmed"
 
 /-- One explained claim. -/
 structure Row where
@@ -414,14 +421,15 @@ deriving ToJson, FromJson
 
 instance : ToJson Example where
   toJson e := Json.mkObj [("args", toJson e.args), ("spec", toJson e.spec),
-    ("binary", toJson e.binary)]
+    ("binary", toJson e.binary), ("status", toJson e.status)]
 
 instance : FromJson Example where
   fromJson? j := do
     let args ← j.getObjValAs? (List Nat) "args"
     let spec ← j.getObjValAs? (Option (List Nat)) "spec"
     let binary ← j.getObjValAs? (Option (List Nat)) "binary"
-    return { args, spec, binary }
+    return { args, spec, binary,
+             status := (j.getObjValAs? String "status").toOption.getD "confirmed" }
 
 instance : ToJson Row where
   toJson r := Json.mkObj [("name", toJson r.name), ("intent", toJson r.intent),
@@ -531,6 +539,19 @@ def inputsSha (o : Opts) (root fva : System.FilePath) (t : Trust) (reqs : Option
     let r ← IO.Process.output { cmd := "sha256sum", args := #[(tmp / "in").toString] }
     return (r.stdout.splitOn " ").headD ""
 
+/-- `Codex.ask`, and with `FVA_EXPLAIN_DUMP=<dir>` set, the exact prompt + schema and the reply
+saved there as `<tag>.prompt.txt`, `<tag>.schema.json`, `<tag>.reply.json` (a measurement can
+replay the same bytes on another model). -/
+def ask (tag prompt : String) (schema : Json) (o : Opts) : IO Json := do
+  let dump := (← IO.getEnv "FVA_EXPLAIN_DUMP").map System.FilePath.mk
+  if let some d := dump then
+    IO.FS.createDirAll d
+    IO.FS.writeFile (d / s!"{tag}.prompt.txt") prompt
+    IO.FS.writeFile (d / s!"{tag}.schema.json") schema.compress
+  let r ← Codex.ask prompt schema o.model o.effort
+  if let some d := dump then IO.FS.writeFile (d / s!"{tag}.reply.json") r.compress
+  return r
+
 /-- Pass 1, examples, pass 2: against each claim's docstring, or with a requirements file
 (`reqs` = its context + requirements) against the requirements. -/
 def generate (o : Opts) (root fva : System.FilePath) (t : Trust)
@@ -547,7 +568,7 @@ def generate (o : Opts) (root fva : System.FilePath) (t : Trust)
     return acc ++ s!"--- {f.fileName.getD ""}\n{← IO.FS.readFile (fva / f)}\n"
   let statements := "\n".intercalate (names.filterMap fun n =>
     (sh.get? n).map fun s => s!"{rn.apply n} : Prop := {rn.apply s.statement}")
-  let p1 ← Codex.ask (explainPrompt statements specText vocab) explainSchema o.model o.effort
+  let p1 ← ask "pass1" (explainPrompt statements specText vocab) explainSchema o
   let p1rows := (p1.getObjValD "claims").getArr?.toOption.getD #[]
   -- a reply names a claim by its full or its last component (neutral in pass 1)
   let named (x n : String) := x == n || x == (n.splitOn ".").getLastD n
@@ -575,20 +596,21 @@ def generate (o : Opts) (root fva : System.FilePath) (t : Trust)
           (xs.zip bits).map fun (a, b) => (a % (2 ^ b : Int)).toNat
         let cases := (cases.eraseDups).take maxExamples
         let specV ← specValues root spec c.name cases
-        let resBits := ((specV.findSome? id).getD []).map (typeBits ·.1)
+        let resBits := ((specV.findSome? (·.1)).getD []).map (typeBits ·.1)
         let wasm ← match ← liftedSource (modFile root subj) with
           | some w => pure (root / w)
           | none => pure (root / "missing.wasm")
         let mut exs := #[]
-        for (a, v) in cases.zip specV do
+        for (a, v, status) in cases.zip specV do
           let b ← binaryValue wasmtime wasm fn (a.zip bits) resBits
-          exs := exs.push { args := a, spec := v.map (·.map (·.2)), binary := b }
+          exs := exs.push { args := a, spec := v.map (·.map (·.2)), binary := b, status }
         row := { row with fn := some fn, params := s.params.toList, resultBits := resBits,
                           examples := exs.toList }
     rows := rows.push row
   let item (r : Row) (name statement : String) (head : String) :=
-    let exs := r.examples.filterMap fun x => x.spec.map fun v =>
-      s!"Example: {r.fn.getD ""}({", ".intercalate (x.args.map toString)}) → spec says {v}\n"
+    let exs := r.examples.filterMap fun x => if x.status != "confirmed" then none else
+      x.spec.map fun v =>
+        s!"Example: {r.fn.getD ""}({", ".intercalate (x.args.map toString)}) → spec says {v}\n"
     s!"## {name}\n{head}Formal statement: {statement}\n" ++
       s!"Explanation: {r.summary} {" ".intercalate r.details}\n" ++ String.join exs
   let shown (r : Row) : Row :=
@@ -600,7 +622,7 @@ def generate (o : Opts) (root fva : System.FilePath) (t : Trust)
     let items := "\n\n".intercalate (shownRows.toList.map fun r =>
       let intent := r.intent.getD s!"none written; infer it from the name {r.name}"
       item r r.name r.statement s!"Intent: {intent}\n")
-    let p2 ← Codex.ask (comparePrompt items) compareSchema o.model o.effort
+    let p2 ← ask "pass2" (comparePrompt items) compareSchema o
     let p2rows := (p2.getObjValD "claims").getArr?.toOption.getD #[]
     return (shownRows.toList.map fun r =>
       let v := find p2rows "name" r.name
@@ -610,7 +632,7 @@ def generate (o : Opts) (root fva : System.FilePath) (t : Trust)
     let items := "\n\n".intercalate (rows.toList.map fun r =>
       item r (rn.apply r.name) (rn.apply r.statement) "")
     let reqText := "\n\n".intercalate (rs.map fun r => s!"## {r.id}\n{r.text}")
-    let p2 ← Codex.ask (reqPrompt context reqText items) reqSchema o.model o.effort
+    let p2 ← ask "pass2" (reqPrompt context reqText items) reqSchema o
     let p2rows := (p2.getObjValD "requirements").getArr?.toOption.getD #[]
     let checks := rs.map fun q =>
       let v := (p2rows.find? fun j => (j.getObjValAs? String "id").toOption == some q.id).getD
@@ -692,14 +714,18 @@ def render (dir model trustVerdict : String) (saved : Option (String × Bool × 
       out := out.push "  Watch for:"
       for d in c.caveats do out := out ++ (wrap d "    - " "      ").toArray
     if !c.examples.isEmpty then
-      out := out.push "  Examples (spec value computed by Lean; binary value from wasmtime):"
+      out := out ++ #[
+        "  Examples (spec value computed by Lean and checked by its kernel; binary value",
+        "  from wasmtime):"]
       let widths := c.params.map (·.2)
       for x in c.examples do
         let call := s!"{c.fn.getD ""}({", ".intercalate ((x.args.zip widths).map fun (a, b) =>
           num a b)})"
-        let sv := match x.spec with
-          | none => "too costly to compute"
-          | some v => ", ".intercalate ((v.zip c.resultBits).map fun (a, b) => num a b)
+        let sv := match x.spec, x.status with
+          | none, "stuck" => "no value: Lean cannot reduce the result to numbers"
+          | none, _ => "too costly to compute"
+          | some v, st => ", ".intercalate ((v.zip c.resultBits).map fun (a, b) => num a b) ++
+            (if st == "refused" then " (✗ the kernel does not accept this value)" else "")
         let agree := match x.spec, x.binary with
           | none, _ => ""
           | some v, some b => if v == b then "  binary agrees" else s!"  ✗ binary returns {b}"

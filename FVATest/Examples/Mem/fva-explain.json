@@ -2,19 +2,19 @@
  "requirements": [],
  "model": "gpt-6-luna",
  "inputsSha":
- "c0be49055fb749ec5097d3a5d6577416861112efb3c63f5695cbf447d4f1f272",
- "generated": "2026-11-02 15:17 UTC",
+ "9905ecae98db21af3721fb2cad2e786d2a46120e1de1621630ab43f9ca9691c1",
+ "generated": "2026-11-02 15:48 UTC",
  "effort": "medium",
  "claims":
  [{"verdict": "matches",
    "summary":
-   "After writing the listed 32-bit elements at the given address, the array-sum export always returns their 32-bit sum for inputs satisfying the size bound.",
+   "After the listed 32-bit values are written to memory in little-endian order, the exported function returns their 32-bit wrapping sum.",
    "statement":
    "∀ (p : BitVec 32) (xs : List (BitVec 32)),\n  p.toNat + 4 * xs.length ≤ 65536 →\n    FVA.Wasm.Exec.ReturnsAfterWrite Examples.Mem.Lifted.module p.toNat (FVA.Wasm.Exec.le32s xs) \"array_sum\"\n      [FVA.Wasm.Exec.Val.i32 p, FVA.Wasm.Exec.Val.i32 (BitVec.ofNat 32 xs.length)] [FVA.Wasm.Exec.Val.i32 xs.sum]",
    "serves": [],
    "resultBits": [],
    "reason":
-   "The size premise is exactly the condition that the listed words fit within the 64 KiB memory, and it ensures the length is at most 16384. The claim guarantees the wrapped sum for every such array.",
+   "The premise ensures the entire list fits in the 64 KiB memory, which also keeps its length within the non-wrapping range. The statement guarantees the 32-bit wrapping sum for every such array, as intended.",
    "params": [],
    "name": "Examples.Mem.arraySum",
    "intent":
@@ -22,66 +22,76 @@
    "fn": null,
    "examples": [],
    "details":
-   ["Covers every 32-bit pointer and every finite list of 32-bit elements satisfying the stated size bound.",
-    "The pointer is used as an unsigned byte address. Each list element is written as four little-endian bytes; the second function argument is the list length encoded as a 32-bit value.",
-    "The returned value is the list sum in 32-bit bitvector arithmetic, so addition wraps modulo 2³².",
-    "ReturnsAfterWrite additionally requires fresh instances with enough memory for the write under every host behavior, and guarantees the call terminates without trapping and returns exactly that value."],
+   ["Inputs are a 32-bit pointer and a list of 32-bit values. The pointer is used as an unsigned byte address; each list element is written as four little-endian bytes.",
+    "The call receives the pointer and the list length as 32-bit arguments. It guarantees the returned 32-bit value equals the list sum, with arithmetic wrapping modulo 2 to the 32nd power.",
+    "The premise requires the written bytes to fit within 65,536 bytes from the pointer. ReturnsAfterWrite also requires a fresh instance with room for those bytes under every host behavior, and guarantees termination without a trap for every such call.",
+    "Example inputs (pointer, list): (0, []); (0, [0]); (4, [1, 2]); (65532, [7]); (0, [4294967295, 1])."],
    "caveats":
-   ["The written source uses a wildcard case, but after elaboration it is a catch-all match on the unsigned numeric value of the first input; every value other than zero through four returns zero.",
-    "The bound limits the written region to the first 65,536 address bytes, but does not by itself establish that memory exists or fits; the claim also requires that for every host behavior.",
-    "The claim specifies the returned value, not the final memory contents."]},
+   ["The length premise limits the list to at most 16,384 elements, so the 32-bit length argument does not wrap under this claim.",
+    "The guarantee is only for calls after the specified little-endian bytes are written at the given address; it does not promise unchanged memory or cover other preparations."]},
   {"verdict": "matches",
    "summary":
-   "The classify export always returns the selected 32-bit operation on its second input, or zero when the first input is outside the five listed cases.",
+   "The exported function selects an operation based on the first unsigned 32-bit input and returns the specified 32-bit result.",
    "statement":
    "∀ (x y : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Mem.Lifted.module \"classify\" [FVA.Wasm.Exec.Val.i32 x, FVA.Wasm.Exec.Val.i32 y]\n    [FVA.Wasm.Exec.Val.i32\n        (match x.toNat with\n        | 0 => y + 7\n        | 1 => y <<< 3\n        | 2 => y ^^^ 85#32\n        | 3 => y * 100\n        | 4 => y - 9\n        | x => 0)]",
    "serves": [],
    "resultBits": [32],
    "reason":
-   "The formal cases and default match the intent for every unsigned 32-bit input, with the operations performed in 32-bit arithmetic. The examples are consistent with those cases.",
+   "The cases use the stated operations on 32-bit values: `85` is `0x55`, and the default case returns zero. The examples agree with those results.",
    "params": [{"name": "x", "bits": 32}, {"name": "y", "bits": 32}],
    "name": "Examples.Mem.classify",
    "intent":
    "`classify(x, y)` on unsigned 32-bit ints, by the case `x`: `y + 7`, `y << 3`, `y xor 0x55`,\n`100 y`, `y − 9` for `x` = 0 … 4 (wrapped to 32 bits), else 0. ",
    "fn": "classify",
    "examples":
-   [{"spec": [6], "binary": [6], "args": [0, 4294967295]},
-    {"spec": [8], "binary": [8], "args": [1, 1]},
-    {"spec": [0], "binary": [0], "args": [2, 85]},
-    {"spec": [200], "binary": [200], "args": [3, 2]},
-    {"spec": [4294967287], "binary": [4294967287], "args": [4, 0]},
-    {"spec": [0], "binary": [0], "args": [5, 7]},
-    {"spec": [7], "binary": [7], "args": [0, 0]}],
+   [{"status": "confirmed", "spec": [7], "binary": [7], "args": [0, 0]},
+    {"status": "confirmed", "spec": [8], "binary": [8], "args": [1, 1]},
+    {"status": "confirmed", "spec": [0], "binary": [0], "args": [2, 85]},
+    {"status": "confirmed", "spec": [100], "binary": [100], "args": [3, 1]},
+    {"status": "confirmed", "spec": [0], "binary": [0], "args": [4, 9]},
+    {"status": "confirmed",
+     "spec": [0],
+     "binary": [0],
+     "args": [4294967295, 7]}],
    "details":
-   ["Covers all pairs of 32-bit inputs.",
-    "The first input is inspected as an unsigned 32-bit value. Values zero through four select the corresponding operation; all other unsigned values select zero.",
-    "The operations on the second input are 32-bit bitvector operations: addition, left shift by three, XOR with 85, multiplication by 100, or subtraction by nine. Results wrap modulo 2³²; the shift discards bits shifted out.",
-    "Returns guarantees instantiability and, for every host behavior and fresh instance, termination without a trap and the exact specified result."],
+   ["Inputs are two 32-bit values. The first is matched using its unsigned value; the second is treated as a 32-bit bit pattern.",
+    "The selected addition, subtraction, multiplication, and left shift use 32-bit bit-vector arithmetic and wrap modulo 2 to the 32nd power. The exclusive-or is bitwise; the default case returns zero.",
+    "Returns guarantees the module can be instantiated and that, for every host behavior and fresh instance, the call terminates without a trap and returns exactly the specified value.",
+    "Example inputs (first, second): (0, 0); (1, 1); (2, 85); (3, 1); (4, 9); (4294967295, 7)."],
    "caveats":
-   ["The written source spells the final match case as a wildcard; elaboration makes the match explicitly on the unsigned natural-number value of the first input.",
-    "The claim only describes returned values; it does not constrain memory effects or other state."]},
+   ["The case selection uses the unsigned numeric value of the first argument, not a signed interpretation.",
+    "This claim specifies results for every possible pair of 32-bit inputs but does not state any memory effects."]},
   {"verdict": "matches",
    "summary":
-   "The call_scale export always returns the sum of the two specified scaled-and-incremented 32-bit values.",
+   "The exported function returns the specified wrapping 32-bit expression of its input.",
    "statement":
    "∀ (x : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Mem.Lifted.module \"call_scale\" [FVA.Wasm.Exec.Val.i32 x]\n    [FVA.Wasm.Exec.Val.i32 (3 * x + 1 + (3 * (x + 1) + 1))]",
    "serves": [],
    "resultBits": [32],
    "reason":
-   "The formal expression computes both scaled-and-incremented values and adds them using 32-bit arithmetic, matching the intended wrapped formula for every input. The examples are consistent with it.",
+   "The formal expression is exactly `(3x + 1) + (3(x + 1) + 1)` using 32-bit wrapping arithmetic, as intended. The listed examples are consistent with it.",
    "params": [{"name": "x", "bits": 32}],
    "name": "Examples.Mem.callScale",
    "intent":
    "`call_scale(x)` on unsigned 32-bit ints: `(3x + 1) + (3(x + 1) + 1)`, wrapped to 32 bits. ",
    "fn": "call_scale",
    "examples":
-   [{"spec": [5], "binary": [5], "args": [0]},
-    {"spec": [11], "binary": [11], "args": [1]},
-    {"spec": [17], "binary": [17], "args": [2]},
-    {"spec": [4294967295], "binary": [4294967295], "args": [4294967295]}],
+   [{"status": "confirmed", "spec": [5], "binary": [5], "args": [0]},
+    {"status": "confirmed", "spec": [11], "binary": [11], "args": [1]},
+    {"status": "confirmed", "spec": [17], "binary": [17], "args": [2]},
+    {"status": "confirmed",
+     "spec": [4294967289],
+     "binary": [4294967289],
+     "args": [4294967294]},
+    {"status": "confirmed",
+     "spec": [4294967295],
+     "binary": [4294967295],
+     "args": [4294967295]}],
    "details":
-   ["Covers every 32-bit input.",
-    "All arithmetic is 32-bit bitvector arithmetic and wraps modulo 2³², including the increment, multiplications, and additions.",
-    "Returns guarantees instantiability and, for every host behavior and fresh instance, termination without a trap and the exact specified result."],
+   ["The input is one 32-bit value, treated as a bit pattern rather than a signed integer.",
+    "The returned expression adds two scaled-and-incremented terms using 32-bit bit-vector arithmetic; each operation wraps modulo 2 to the 32nd power.",
+    "Returns guarantees the module can be instantiated and that, for every host behavior and fresh instance, the call terminates without a trap and returns exactly that result.",
+    "Example inputs: (0); (1); (2); (4294967294); (4294967295)."],
    "caveats":
-   ["This specifies only the returned value; it says nothing about memory or other state changes."]}]}
+   ["The additions and multiplications are 32-bit operations, so intermediate values wrap; the inner increment also wraps before its multiplication.",
+    "No signed interpretation is used, and the claim says nothing about memory effects."]}]}
