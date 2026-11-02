@@ -454,7 +454,7 @@ for file in "${corpus[@]}"; do
 done
 valid_count=$(awk '$2 == "valid" {n++} END {print n+0}' "$work/corpus.valid")
 printf 'corpus %s %s %s\n' "${#corpus[@]}" "$valid_count" "$oracle_count" >>"$work/actual.txt"
-printf 'corpus 7 7 7\n' >>"$work/expected.txt"
+printf 'corpus 8 8 8\n' >>"$work/expected.txt"
 if [[ -n ${FVA_SPEC_COUNTS-} ]]; then cp "$work/actual.txt" "$FVA_SPEC_COUNTS" || exit 2; fi
 if ! diff <(sort "$work/actual.txt") <(sort "$work/expected.txt") >"$work/diff.txt"; then
 	echo "test-spec: counts differ from the pinned table (< actual, > pinned):"

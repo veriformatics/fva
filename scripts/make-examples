@@ -27,3 +27,8 @@ rustc --target wasm32-unknown-unknown -O --crate-type cdylib -C link-arg=--strip
 	"$ex/Rust/lib.rs" -o "$tmp/rust.wasm"
 same "$tmp/rust.wasm" "$ex/Rust/rust.wasm"
 "$fva" lift "$ex/Rust/rust.wasm" "$ex/Rust/Lifted.lean" --ns Examples.Rust.Lifted
+clang --target=wasm32 -O2 -nostdlib -Wl,--no-entry -Wl,--strip-all -Wl,--export=clamp \
+	-o "$tmp/mislabeled.wasm" "$ex/Mislabeled/mislabeled.c"
+same "$tmp/mislabeled.wasm" "$ex/Mislabeled/mislabeled.wasm"
+"$fva" lift "$ex/Mislabeled/mislabeled.wasm" "$ex/Mislabeled/Lifted.lean" \
+	--ns Examples.Mislabeled.Lifted

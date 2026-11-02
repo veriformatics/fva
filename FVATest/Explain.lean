@@ -34,6 +34,22 @@ open FVA.Tool.Explain
 #guard FVA.Trust.stripComments "def x := 1 -- c\n/- d -/def y := \"--s\"" ==
   "def x := 1 \ndef y := \"--s\""
 
+-- requirements file (D5): each `## <id>` line starts a requirement; the text before = context
+#guard parseReqs "Ctx line\n\n## R1\nclamp x.\n\n## R2\nsecond\nmore\n" ==
+  ("Ctx line", [{ id := "R1", text := "clamp x." }, { id := "R2", text := "second\nmore" }])
+#guard (parseReqs "no requirement\n# R1 is a title").2 == []
+
+-- neutral names (D5): a project name's last component renamed wherever an identifier names
+-- it, claims numbered first; string literals, projections and other packages' names stay
+private def rn : Renamer :=
+  Renamer.of [`Ex.Toy.clamp, `Ex.Toy.gcd] [`Ex.Toy.clamp, `Ex.Toy.gcd, `Ex.Toy.helper]
+#guard rn.apply "def clamp : Prop := Returns m \"clamp\" (helper x) ∧ Nat.gcd a b = x.gcd" ==
+  "def claim_1 : Prop := Returns m \"clamp\" (name_3 x) ∧ Nat.gcd a b = x.gcd"
+#guard rn.apply "Ex.Toy.gcd ∧ Toy.helper ∧ Other.helper ∧ «clamp» ∧ clamp'" ==
+  "Ex.Toy.claim_2 ∧ Toy.name_3 ∧ Other.helper ∧ «clamp» ∧ clamp'"
+#guard rn.restore "claim_1 holds when name_3 is claim_10; `claim_2`." ==
+  "clamp holds when helper is claim_10; `gcd`."
+
 -- the explain thread has no shell, image viewer or MCP tool (closing review SEC-4)
 #guard ["shell_tool", "unified_exec", "view_image"].all fun f =>
   (FVA.Tool.Codex.serverArgs.toList.zip FVA.Tool.Codex.serverArgs.toList.tail).contains

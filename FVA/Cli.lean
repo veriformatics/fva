@@ -28,7 +28,8 @@ def helpText : String :=
   "            files.\n" ++
   "  trust     Check that a project's claims are proven, about the artifact, with a small\n" ++
   "            spec.\n" ++
-  "  explain   Explain a project's claims in plain English and compare them with their intent.\n" ++
+  "  explain   Explain a project's claims in plain English and compare them with your\n" ++
+  "            requirements.\n" ++
   "  blob      Write a Lean module that holds the bytes of a file.\n" ++
   "  certify   Write a certificate: a claim that an output file stands in a relation to an\n" ++
   "            input file, and its proof by a verified checker.\n\n" ++
@@ -68,18 +69,22 @@ def usage : String → Option String
     "error.\n"
   | "explain" => some <|
     "Usage: fva explain <project> --spec-module <M> [options]\n\n" ++
-    "Explain each claim in plain English and compare the explanation with the claim's intent\n" ++
-    "(its docstring). The text is saved beside the spec module and shown again without a\n" ++
-    "model call. A signed-in codex CLI writes the text.\n\n" ++
+    "Explain each claim in plain English, then compare the claims with your requirements.\n" ++
+    "The requirements file has one \"## <id>\" line before each requirement. Without a\n" ++
+    "requirements file, each claim is compared with its author's docstring. The model\n" ++
+    "explains the claims without their names. The text is saved beside the spec module and\n" ++
+    "shown again without a model call. A signed-in codex CLI writes the text.\n\n" ++
     "Options:\n" ++
-    "  --spec-module M   The module that states the claims (required).\n" ++
-    "  --root-module R   The module that imports the proofs.\n" ++
-    "  --model M         Use the model M.\n" ++
-    "  --effort E        Use the reasoning effort E (default medium).\n" ++
-    "  --force           Write the text again.\n" ++
-    "  --json            Write the result as JSON.\n\n" ++
-    "Exit status: 0 when the trust verdict is PASS, each claim matches its intent and the\n" ++
-    "saved text is current, 1 otherwise, 2 for a usage error.\n"
+    "  --spec-module M    The module that states the claims (required).\n" ++
+    "  --root-module R    The module that imports the proofs.\n" ++
+    "  --requirements F   Use the requirements file F (default: requirements.md beside the\n" ++
+    "                     spec module, when it exists).\n" ++
+    "  --model M          Use the model M.\n" ++
+    "  --effort E         Use the reasoning effort E (default medium).\n" ++
+    "  --force            Write the text again.\n" ++
+    "  --json             Write the result as JSON.\n\n" ++
+    "Exit status: 0 when the trust verdict is PASS, each requirement (or else each claim's\n" ++
+    "docstring) matches and the saved text is current, 1 otherwise, 2 for a usage error.\n"
   | "certify" => some <|
     "Usage: fva certify <project> --relation R --input I --output O --ns Ns [options]\n\n" ++
     "Write a certificate: a claim that the output file stands in the relation R to the input\n" ++

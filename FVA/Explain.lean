@@ -6,7 +6,8 @@ import FVA.Spec.CAbi
 
 Run inside the project (`lake env lean` on a generated file that imports the spec module):
 `shapes` reads each claim's docstring, elaborated statement and shape
-`∀ (x : BitVec n)…, Returns m "f" args res`; `run` computes `res` on concrete inputs.
+`∀ (x : BitVec n)…, Returns m "f" args res`; `declared` lists the review modules' names;
+`run` computes `res` on concrete inputs.
 
 Values come from Lean's compiled evaluator, so an `implemented_by` override in the spec closure
 could show a value the kernel never sees; `fva trust` rejects every such override. Results go to
@@ -43,6 +44,17 @@ def shapes (cs : List Name) (out : System.FilePath) : MetaM Unit := do
     let st ← withOptions (pp.mvars.set · false) <| ppExpr d.value
     h.putStrLn (Json.compress <| Json.mkObj [("claim", toJson c), ("doc", toJson doc),
       ("statement", toJson (toString st)), ("shape", ← shape c)])
+  h.flush
+
+/-- Append `{"declared"}` per constant the modules `ms` (the review modules) declare: the names
+`fva explain` hides from the model (D5). -/
+def declared (ms : List Name) (out : System.FilePath) : MetaM Unit := do
+  let env ← getEnv
+  let h ← IO.FS.Handle.mk out .append
+  for m in ms do
+    let some i := env.header.moduleNames.idxOf? m | continue
+    for c in env.header.moduleData[i]!.constNames do
+      unless c.isInternal do h.putStrLn (Json.compress <| Json.mkObj [("declared", toJson c)])
   h.flush
 
 /-- A result value as JSON: its type and its bits as a natural number. -/
