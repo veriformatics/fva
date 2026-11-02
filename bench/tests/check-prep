@@ -4,13 +4,14 @@ set -euo pipefail
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 mkdir -p "$root/.cache/bench/tests"
 tmp=$(mktemp -d "$root/.cache/bench/tests/prep.XXXXXXXX")
-run_prefix=$(realpath -e -- "$HOME")/.cache/fva-bench/runs/bare-mock-$$
+bench_home=$(realpath -m -- "${FVA_BENCH_HOME:-$HOME/.cache/fva-bench}")
+run_prefix=$bench_home/runs/bare-mock-$$
 runs=()
 cleanup() {
 	rm -rf -- "$tmp"
 	for run in "${runs[@]}"; do rm -rf -- "$run"; done
-	rm -f -- "$(realpath -e -- "$HOME")"/.cache/fva-bench/harness-logs/*-mock-$$-*.log
-	rm -f -- "$(realpath -e -- "$HOME")"/.cache/fva-bench/batches/mock-$$-*.order
+	rm -f -- "$bench_home"/harness-logs/*-mock-$$-*.log
+	rm -f -- "$bench_home"/batches/mock-$$-*.order
 }
 trap cleanup EXIT
 expect_rc() {
@@ -172,7 +173,7 @@ cp "$order" "$tmp/order-first"
 expect_rc 0 env FVA_BENCH_N=2 "$root/bench/harness/run-batch" --order-only "mock-$$" 7 bare prompted
 cmp "$order" "$tmp/order-first"
 [[ $(sort "$order" | tr '\n' ' ') == 'bare 1 bare 2 prompted 1 prompted 2 ' ]]
-[[ ! -e $(realpath -e -- "$HOME")/.cache/fva-bench/inputs/mock-$$ ]]
+[[ ! -e $bench_home/inputs/mock-$$ ]]
 echo 'run-batch --order-only: seeded order reproduced byte for byte, every run once, no inputs prepared → pass'
 
 # archive refuses a run whose event log or agent files hold a secret of the auth file

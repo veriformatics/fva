@@ -39,7 +39,7 @@ case $FVA_BENCH_EFFORT in none | minimal | low | medium | high | xhigh) ;; *) ex
 auth=$(realpath -e -- "$FVA_BENCH_AUTH_FILE")
 [[ -f $auth ]] || exit 2
 home=$(realpath -e -- "$HOME")
-base=$home/.cache/fva-bench
+base=$(realpath -m -- "${FVA_BENCH_HOME:-$home/.cache/fva-bench}")
 run=$base/runs/$arm-$task-$index
 [[ $run != "$inputs" && $run != "$inputs/"* ]] || {
 	echo 'run-session: input directory contains the destination' >&2
@@ -89,13 +89,14 @@ for d in /home "$home" /run/user /var/log /mnt /srv /media; do
 done
 IFS=: read -ra path_dirs <<<"${FVA_BENCH_PATH:-/usr/local/bin:/usr/bin:/bin}"
 visible=()
+# a bench root (FVA_BENCH_HOME) under /tmp or /var/tmp: its dirs bind after the jail's own /tmp
+jail+=(--bind "$run/jail-tmp" /tmp --bind "$run/jail-tmp" /var/tmp)
 for d in "${path_dirs[@]}" "$base/tools" "${FVA_BENCH_PACKAGES:-$base/packages-v4.35.0}" \
 	"${codex%/*}"; do
-	[[ $d != "$home/"* || ! -d $d ]] || visible+=("$d")
+	[[ ! -d $d ]] || [[ $d != "$home/"* && $d != /tmp/* && $d != /var/tmp/* ]] || visible+=("$d")
 done
 for d in "${visible[@]}"; do jail+=(--ro-bind "$d" "$d"); done
-jail+=(--bind "$run" "$run" --bind "$run/jail-tmp" /tmp --bind "$run/jail-tmp" /var/tmp
-	--chdir "$run/work" --)
+jail+=(--bind "$run" "$run" --chdir "$run/work" --)
 args=(exec -C "$run/work" -s workspace-write --json --color never --ephemeral
 	--ignore-user-config --ignore-rules -m "$FVA_BENCH_MODEL"
 	-c "model_reasoning_effort=\"$FVA_BENCH_EFFORT\""

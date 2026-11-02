@@ -15,7 +15,7 @@ set -euo pipefail
 task=$1 arm=$2 out=$3
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 dl=$root/.cache/bench/downloads
-pkgs=${FVA_BENCH_PACKAGES:-$HOME/.cache/fva-bench/packages-v4.35.0}
+pkgs=${FVA_BENCH_PACKAGES:-${FVA_BENCH_HOME:-$HOME/.cache/fva-bench}/packages-v4.35.0}
 fvabuild=${FVA_BENCH_FVA_BUILD:-$root/.lake/build}
 fva=${FVA_BENCH_FVA_BIN:-$root/.lake/build/bin/fva}
 [[ -d $pkgs/mathlib/.lake/build ]] || {
