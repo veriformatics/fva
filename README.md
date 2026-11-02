@@ -15,6 +15,7 @@ Run `fva help` to see the commands, and `fva <command> --help` to see the argume
 - Lean 4.35.0 and Lake (`elan` installs them from `lean-toolchain`).
 - Mathlib v4.35.0. The command `lake exe cache get` downloads its compiled files once; after that, FVA works offline.
 - To compile examples: `clang` with the `wasm32` target, `rustc` with `wasm32-unknown-unknown`.
+- For `fva trust` and `fva explain`: `bwrap` (bubblewrap) with unprivileged user namespaces.
 - For `fva explain`: a signed-in `codex` CLI.
 
 ## Start a project
@@ -107,7 +108,7 @@ Your review covers the claims in your specification files only. FVA's own files 
 - FVA verifies core WebAssembly 2.0 without SIMD, threads, exceptions or garbage-collected types.
 - Programs that read files or the network through WASI are not modeled; certify their outputs instead.
 - A proof shows that the binary meets the claims. It is your task to check that the claims say what you want.
-- `fva trust` and `fva explain` build the project and run its Lean code with your permissions. If you do not trust a project, run them inside a container or a virtual machine.
+- `fva trust` and `fva explain` run the project's own code (its Lake configuration, its build, its Lean definitions) in a `bwrap` sandbox: no network, the system read-only, your home directory hidden, and writes allowed only in the project's `.lake` directories. The project needs a `lake-manifest.json`. FVA itself still reads the project's compiled `.olean` files. If you do not trust a project, run FVA inside a container or a virtual machine as well.
 
 ## License
 

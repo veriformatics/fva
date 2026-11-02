@@ -4,15 +4,18 @@ import FVA.Trust.Collect
 import FVA.Trust.Replay
 import FVA.Trust.Verdict
 import FVA.Tool.BaseManifest
+import FVA.Tool.Sandbox
 
 /-!
 # `fva trust` (CLI glue)
 
 `fva trust <lake-dir> [--spec-module M] [--root-module R] [--subject M]… [--paranoid]
-[--surface-budget N] [--json]`: builds the project, then reruns itself under the project's
-`lake env` (its search path) as `fva trust-run`, which imports the spec + root modules, collects
-the facts, exports and replays them through the kernel run set, and prints the verdict of
-`FVA.Trust.verdict` (proven equal to `FVA.Trust.Pass`). rc 0 PASS, 1 FAIL, 2 usage/setup.
+[--surface-budget N] [--json]`: builds the project and reads its `lake env` (its search path),
+both in the sandbox (`FVA.Tool.Sandbox`: the project's Lake configuration and modules are its
+code), then reruns itself with that environment as `fva trust-run`, which imports the spec +
+root modules, collects the facts, exports them (sandboxed) and replays them through the kernel
+run set, and prints the verdict of `FVA.Trust.verdict` (proven equal to `FVA.Trust.Pass`).
+rc 0 PASS, 1 FAIL, 2 usage/setup.
 -/
 
 namespace FVA.Tool.Trust
@@ -220,7 +223,10 @@ def run (argv : List String) : IO UInt32 := do
   let run := kernels.filter fun k => o.paranoid || defaultKernels.contains k.name
   let (exportOk, replay, times) ← IO.FS.withTempDir fun tmp => do
     let exportPath := tmp / "export.ndjson"
-    let exportOk ← exportDecls rootMod decls exportPath
+    -- the exporter reads the project's `.olean`s: sandboxed, the temp dir alone writable
+    let sandbox := (← Sandbox.bwrapArgs root (← findSysroot) #[tmp]) ++
+      #["--setenv", "LEAN_PATH", (← IO.getEnv "LEAN_PATH").getD ""]
+    let exportOk ← exportDecls rootMod decls exportPath sandbox
     let mut replay := #[]
     let mut times := #[]
     if exportOk then
@@ -288,7 +294,17 @@ def main (argv : List String) : IO UInt32 := do
   -- `trust-run` runs inside the project: every path it gets must be absolute
   let o ← try pure { o with dir := (← IO.FS.realPath o.dir).toString } catch e =>
     IO.eprintln s!"fva trust: {e}"; return 2
-  let b ← IO.Process.output { cmd := "lake", args := #["build"], cwd := o.dir }
+  let root : System.FilePath := o.dir
+  let sysroot ← Lean.findSysroot
+  -- the sandbox keeps the project root read-only: Lake cannot write a manifest there
+  unless ← (root / "lake-manifest.json").pathExists do
+    IO.eprintln "fva trust: the project has no lake-manifest.json (run `lake update` once)"
+    return 2
+  if let some e ← Sandbox.unavailable root sysroot then
+    IO.eprintln s!"fva trust: the sandbox for the project's code cannot start (bwrap: {e})"
+    return 2
+  let b ← IO.Process.output (← Sandbox.spawnArgs root sysroot (sysroot / "bin" / "lake").toString
+    #["build"])
   if b.exitCode != 0 then
     let r : Report :=
       { built := false, claims := [], flags := [], reviewModules := [], subjectSyntax := [],
@@ -301,9 +317,10 @@ def main (argv : List String) : IO UInt32 := do
     f.mapM fun f => return (← IO.FS.realPath f).toString
   let o ← try pure { o with canarySet := ← abs o.canarySet, known := ← abs o.known } catch e =>
     IO.eprintln s!"fva trust: {e}"; return 2
+  let some env ← Sandbox.lakeEnv root sysroot | IO.eprintln "fva trust: lake env failed"; return 2
   let self ← IO.appPath
   let child ← IO.Process.spawn
-    { cmd := "lake", args := #["env", self.toString, "trust-run"] ++ o.args, cwd := o.dir }
+    { cmd := self.toString, args := #["trust-run"] ++ o.args, cwd := o.dir, env }
   return ← child.wait
 
 end FVA.Tool.Trust
