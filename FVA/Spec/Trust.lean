@@ -142,8 +142,8 @@ structure Report where
   vocabulary : List Term
   /-- `[prelude]` violations: fixed-bundle constants outside the sysroot, modules without `Init`. -/
   prelude : List String
-  /-- `[olean]` violations: imported modules counted as Mathlib whose compiled files are not the
-  pinned bytes of FVA's Mathlib cache. -/
+  /-- `[olean]` violations: imported modules counted as Mathlib or FVA base whose compiled files
+  are not the pinned bytes (FVA's Mathlib cache, FVA's own build of its base). -/
   tampered : List String
   /-- The project's subjects are generated modules (Lean-native subjects need no link). -/
   needsLink : Bool
