@@ -61,6 +61,8 @@ def usage : String → Option String
     "  --subject M           Count the Lean module M as a subject. You can give this option\n" ++
     "                        more than once.\n" ++
     "  --paranoid            Replay the proofs with every bundled kernel.\n" ++
+    "  --no-sandbox          Run the project's code without the bwrap sandbox. Use this\n" ++
+    "                        only inside a container that you trust.\n" ++
     "  --surface-budget N    Fail when the review surface has more than N code lines.\n" ++
     "  --json                Write the report as JSON.\n" ++
     "  --kernel-limit S      Stop a kernel replay after S seconds (default 1200).\n" ++

@@ -38,6 +38,10 @@ structure Opts where
   canaryLimit : Nat := 60
   canarySet : Option String := none
   known : Option String := none
+  /-- `--no-sandbox` (D19): run the project's code unconfined. -/
+  noSandbox : Bool := false
+  /-- The sandbox mode `main` chose, for `trust-run`'s exporter (`full`, `noNet`, `off`). -/
+  sandbox : String := "full"
 
 /-- Parse options (`dir` first). -/
 partial def parse (o : Opts) : List String → Except String Opts
@@ -46,6 +50,8 @@ partial def parse (o : Opts) : List String → Except String Opts
   | "--root-module" :: m :: r => parse { o with root := some m.toName } r
   | "--subject" :: m :: r => parse { o with subjects := o.subjects.push m.toName } r
   | "--paranoid" :: r => parse { o with paranoid := true } r
+  | "--no-sandbox" :: r => parse { o with noSandbox := true } r
+  | "--sandbox-mode" :: m :: r => parse { o with sandbox := m } r
   | "--json" :: r => parse { o with json := true } r
   | "--surface-budget" :: n :: r => match n.toNat? with
     | some k => parse { o with budget := some k } r
@@ -73,7 +79,7 @@ def Opts.args (o : Opts) : Array String :=
     (if o.json then #["--json"] else #[]) ++ #["--kernel-limit", toString o.limit] ++
     #["--canary-limit", toString o.canaryLimit] ++
     (o.canarySet.map fun f => #["--canary-set", f]).getD #[] ++
-    (o.known.map fun f => #["--known", f]).getD #[]
+    (o.known.map fun f => #["--known", f]).getD #[] ++ #["--sandbox-mode", o.sandbox]
 
 /-- FVA base modules: every imported module whose source is byte-identical (sha256) to the FVA
 library file of the same path in `baseManifest` (compiled into this binary), except the judged
@@ -227,8 +233,12 @@ def run (argv : List String) : IO UInt32 := do
   let (exportOk, replay, times) ← IO.FS.withTempDir fun tmp => do
     let exportPath := tmp / "export.ndjson"
     -- the exporter reads the project's `.olean`s: sandboxed, the temp dir alone writable
-    let sandbox := (← Sandbox.bwrapArgs root (← findSysroot) #[tmp]) ++
-      #["--setenv", "LEAN_PATH", (← IO.getEnv "LEAN_PATH").getD ""]
+    let mode : Sandbox.Mode := match o.sandbox with
+      | "off" => .off | "noNet" => .noNet | _ => .full
+    let leanPath := (← IO.getEnv "LEAN_PATH").getD ""
+    let sandbox ← if mode == .off then pure #[] else
+      pure ((← Sandbox.bwrapArgs root (← findSysroot) #[tmp] mode) ++
+        #["--setenv", "LEAN_PATH", leanPath])
     let exportOk ← exportDecls rootMod decls exportPath sandbox
     let mut replay := #[]
     let mut times := #[]
@@ -303,11 +313,18 @@ def main (argv : List String) : IO UInt32 := do
   unless ← (root / "lake-manifest.json").pathExists do
     IO.eprintln "fva trust: the project has no lake-manifest.json (run `lake update` once)"
     return 2
-  if let some e ← Sandbox.unavailable root sysroot then
-    IO.eprintln s!"fva trust: the sandbox for the project's code cannot start (bwrap: {e})"
-    return 2
+  let mode ← match ← Sandbox.choose root sysroot o.noSandbox with
+    | .ok m => pure m
+    | .error e =>
+      IO.eprintln (s!"fva trust: the sandbox for the project's code cannot start (bwrap: {e}). " ++
+        "Run fva trust outside the agent's sandbox, or with --no-sandbox inside a container you " ++
+        "trust")
+      return 2
+  unless mode == .full do IO.eprintln s!"fva trust: sandbox: {mode.describe}"
+  let o := { o with
+    sandbox := match mode with | .full => "full" | .noNet => "noNet" | .off => "off" }
   let b ← IO.Process.output (← Sandbox.spawnArgs root sysroot (sysroot / "bin" / "lake").toString
-    #["build"])
+    #["build"] (mode := mode))
   if b.exitCode != 0 then
     let r : Report :=
       { built := false, claims := [], flags := [], reviewModules := [], subjectSyntax := [],
@@ -321,7 +338,8 @@ def main (argv : List String) : IO UInt32 := do
     f.mapM fun f => return (← IO.FS.realPath f).toString
   let o ← try pure { o with canarySet := ← abs o.canarySet, known := ← abs o.known } catch e =>
     IO.eprintln s!"fva trust: {e}"; return 2
-  let some env ← Sandbox.lakeEnv root sysroot | IO.eprintln "fva trust: lake env failed"; return 2
+  let some env ← Sandbox.lakeEnv root sysroot mode
+    | IO.eprintln "fva trust: lake env failed"; return 2
   let self ← IO.appPath
   let child ← IO.Process.spawn
     { cmd := self.toString, args := #["trust-run"] ++ o.args, cwd := o.dir, env }
