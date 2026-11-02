@@ -12,8 +12,9 @@ reuse current rows (committed table, then local cache), and execute the rest in 
 from one snapshot. Per mutant the group's stages run in order; the first decisive stage wins
 (K5): a Lean error inside a theorem/`example`/`#guard` or a test exiting 1 kills, an error in an
 ordinary declaration makes the mutant unviable, resource diagnostics and timeouts leave it
-inconclusive while independent stages continue, anything unrecognized is an `error` that fails
-the run. Every digest is sha256 over the manifest + the outcome's input files (R2).
+inconclusive while independent stages continue (a stage past its memory cap = a crash, K7),
+anything unrecognized is an `error` that fails the run. Every digest is sha256 over the manifest
++ the outcome's input files (R2).
 -/
 
 namespace FVA.Mutate
@@ -202,11 +203,14 @@ def runStage (ctx : Ctx) (w : Worker) (j : Job) (text : String) (stage : String)
     (limit : Nat) : IO Res := do
   let log := w.logs / s!"{stage.replace ":" "-"}.log"
   let mod := modOfPath j.m.file
+  let mem := ctx.cfg.memLimitMiB
+  let over := s!"crash: memory over {mem} MiB"
   if stage == "module" then
-    match ← runTimed w.dir ["lake", "build", s!"+{mod}"] limit log with
-    | none => return .inconclusive "module timeout"
-    | some 0 => return .pass
-    | some _ =>
+    match ← runTimed w.dir ["lake", "build", s!"+{mod}"] limit mem log with
+    | .timeout => return .inconclusive "module timeout"
+    | .memory => return .inconclusive s!"module {over}"
+    | .exit 0 => return .pass
+    | .exit _ =>
       let out ← IO.FS.readFile log
       match (diags out).find? (·.file == j.m.file) with
       | some d => return classifyHere j text d "module"
@@ -218,12 +222,15 @@ def runStage (ctx : Ctx) (w : Worker) (j : Job) (text : String) (stage : String)
     for p in ctx.graph.downstream mod ctx.proofSet do
       if (ctx.graph.upstream p).any failed.contains then continue
       let plog := w.logs / s!"proofs-{p}.log"
-      match ← runTimed w.dir ["lake", "build", s!"+{p}"] limit plog with
-      | none =>
+      match ← runTimed w.dir ["lake", "build", s!"+{p}"] limit mem plog with
+      | .timeout =>
         failed := failed.insert p
         if inconcl.isNone then inconcl := some s!"proofs {p} timeout"
-      | some 0 => pure ()
-      | some _ =>
+      | .memory =>
+        failed := failed.insert p
+        if inconcl.isNone then inconcl := some s!"proofs {p} {over}"
+      | .exit 0 => pure ()
+      | .exit _ =>
         let out ← IO.FS.readFile plog
         match (diags out).find? (·.file == pathOfMod p) with
         | none =>
@@ -241,10 +248,11 @@ def runStage (ctx : Ctx) (w : Worker) (j : Job) (text : String) (stage : String)
       | some why => .inconclusive why
       | none => .pass
   else if stage == "exes" then
-    match ← runTimed w.dir (["lake", "build"] ++ ctx.cfg.exes) limit log with
-    | none => return .inconclusive "exes timeout"
-    | some 0 => return .pass
-    | some _ =>
+    match ← runTimed w.dir (["lake", "build"] ++ ctx.cfg.exes) limit mem log with
+    | .timeout => return .inconclusive "exes timeout"
+    | .memory => return .inconclusive s!"exes {over}"
+    | .exit 0 => return .pass
+    | .exit _ =>
       let out ← IO.FS.readFile log
       match (diags out)[0]? with
       | some d => classifyDown ctx d "exes"
@@ -253,12 +261,13 @@ def runStage (ctx : Ctx) (w : Worker) (j : Job) (text : String) (stage : String)
   else
     let some t := ctx.cfg.tests.find? (s!"test:{·.name}" == stage)
       | return .error s!"unknown stage {stage}"
-    match ← runTimed w.dir t.cmd limit log with
-    | none => return .inconclusive s!"{stage} timeout"
-    | some 0 => return .pass
-    | some 1 => return .killed stage
-    | some 3 => return .inconclusive s!"{stage} crash"
-    | some rc => return .error s!"{stage}: rc {rc} (infrastructure, {log})"
+    match ← runTimed w.dir t.cmd limit mem log with
+    | .timeout => return .inconclusive s!"{stage} timeout"
+    | .memory => return .inconclusive s!"{stage} {over}"
+    | .exit 0 => return .pass
+    | .exit 1 => return .killed stage
+    | .exit 3 => return .inconclusive s!"{stage} crash"
+    | .exit rc => return .error s!"{stage}: rc {rc} (infrastructure, {log})"
 
 /-- Content listing (sha256 + path) of a worker tree, minus the build directory and the shared
 paths: a stray write of any size shows. -/

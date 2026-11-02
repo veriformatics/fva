@@ -70,6 +70,9 @@ structure Config where
   spotChecks : Nat := 3
   /-- Floor of every stage limit, seconds (K6). -/
   minLimit : Nat := 60
+  /-- Anonymous memory per stage command, MiB, summed over its processes; past it the stage is a
+  crash (K7). 0 = no cap. -/
+  memLimitMiB : Nat := 8192
 deriving FromJson, ToJson, Inhabited
 
 /-- Load a configuration file. -/

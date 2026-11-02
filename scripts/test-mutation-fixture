@@ -206,6 +206,9 @@ open_cases() {
 odd_cases() {
 	local d
 	d=$(variant odd odd)
+	# a growth mutant meets fvamut's own per-job cap (K7), no external cgroup around the run
+	jq '.memLimitMiB = 256' "$d/v.json" >"$d/v2" && mv "$d/v2" "$d/v.json"
+	git -C "$d" -c user.email=f@f -c user.name=f commit -qam cap
 	rc_is 1 "inconclusive + error" "$d" "$d/u.log" update
 	has "$d/u.log" "FINDING error Fix/Odd.lean:Fix.infra:LIT:0" "test rc 2 = error"
 	local rows
@@ -214,6 +217,7 @@ odd_cases() {
 		$'Fix/Odd.lean:Fix.slow:LIT:1\tinconclusive\ttest:check timeout' \
 		$'Fix/Odd.lean:Fix.slow:LIT:0\tkilled\ttest:check' \
 		$'Fix/Odd.lean:Fix.crashy:LIT:0\tinconclusive\ttest:check crash' \
+		$'Fix/Odd.lean:Fix.hungry:LIT:0\tinconclusive\ttest:check crash: memory over 256 MiB' \
 		$'Fix/Odd.lean:Fix.panicky:LIT:0\tkilled\texes FixTest.lean:4' \
 		$'Fix/Odd.lean:Fix.panicky:LIT:1\tinconclusive\texes crash'; do
 		grep -qxF "$want" <<<"$rows" || bad "odd: missing execution '$want'"
@@ -258,7 +262,7 @@ EOT
 [[ $leakA == 1 ]] && cp -p one.txt .lake/build/state
 [[ $leakB == 1 && $(cat .lake/build/state) == 1 ]] && exit 1
 EOT
-	sed -i 's/^read -r dbl slow crashy infra <<</read -r dbl slow crashy infra leakA leakB <<</' "$d/test.sh"
+	sed -i 's/^read -r dbl slow crashy hungry infra <<</read -r dbl slow crashy hungry infra leakA leakB <<</' "$d/test.sh"
 	sed -i "/^read -r/r $d/ins" "$d/test.sh" && rm "$d/ins"
 	echo 1 >"$d/one.txt" && touch -d '2000-01-01' "$d/one.txt"
 	jq '.groups[0].dirs = ["Fix/Leak.lean"]' "$d/v.json" >"$d/v2" && mv "$d/v2" "$d/v.json"
