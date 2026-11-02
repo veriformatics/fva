@@ -53,8 +53,8 @@ mapfile -t cheats < <(cut -d" " -f1 <<<"$pinned" | sort -u)
 lake build fva FVA "${cheats[@]/#/FVATest.Cheats.}" >/dev/null || exit 2
 examples=(Toy Mem Rust)
 # the examples are proofs FVA ships: warnings fail them (the cheats warn by design)
-lake --wfail build "${examples[@]/#/FVATest.Examples.}" FVATest.Examples.Mislabeled >/dev/null ||
-	exit 2
+lake --wfail build "${examples[@]/#/FVATest.Examples.}" FVATest.Examples.Mislabeled \
+	FVATest.Examples.Planted >/dev/null || exit 2
 fva=.lake/build/bin/fva
 fail=0
 log=$tmp/log
@@ -138,6 +138,16 @@ if ((rc != 1)) || ! grep -q '^  Proof check (fva trust): PASS$' "$log" ||
 	! grep -q '^  ✗ R1: DIFFERENT' "$log" || grep -q STALE "$log"; then
 	echo "test-trust: example Mislabeled → explain rc $rc, pinned 1 with R1 DIFFERENT"
 	grep -E '^  (Proof check|STALE|✗|✓)' "$log" | head -5
+	fail=1
+fi
+# D16: the planted `sumBelow` (compiled code returns 0) shows its kernel value: each saved
+# `sumToSpec` example agrees with the binary, one of them past the fixed inputs 0 and 1
+"$fva" explain . --spec-module FVATest.Examples.Planted.Spec \
+	--root-module FVATest.Examples.Planted >"$log" 2>&1
+block=$(sed -n '/^Examples.Planted.sumToSpec$/,/^Examples\./p' "$log")
+if grep -q STALE "$log" || grep -q '✗ binary' <<<"$block" ||
+	! grep -qE 'sum_to\(([2-9]|[1-9][0-9]+)\) → [0-9]+ binary agrees' <<<"$block"; then
+	echo "test-trust: example Planted → sumToSpec's examples are stale or disagree with the binary"
 	fail=1
 fi
 wait "$certs"

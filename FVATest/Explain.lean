@@ -1,4 +1,5 @@
 import FVA.Tool.Explain
+import FVA.Explain
 
 /-! # `fva explain` pure parts (U10; built with `fvatest`, so `lake test` runs them) -/
 
@@ -51,6 +52,25 @@ private def rn : Renamer :=
   "Ex.Toy.claim_2 ∧ Toy.name_3 ∧ Other.helper ∧ «clamp» ∧ clamp'"
 #guard rn.restore "claim_1 holds when name_3 is claim_10; `claim_2`." ==
   "clamp holds when helper is claim_10; `gcd`."
+
+-- example values (D16): `whnf` reads the definition, never the compiled override, and the
+-- kernel confirms the value by `rfl` (or refuses a wrong one)
+def sumBelowWrong (_ : Nat) : Nat := 0
+@[implemented_by sumBelowWrong]
+def sumBelow : Nat → Nat
+  | 0 => 0
+  | n + 1 => sumBelow n + n
+
+open Lean Meta FVA.Explain in
+#eval show MetaM Unit from do
+  let ten := mkApp (mkConst ``sumBelow) (mkNatLit 10)
+  let res := mkApp3 (mkConst ``List.cons [0]) (mkConst ``FVA.Wasm.Exec.Val)
+    (mkApp (mkConst ``FVA.Wasm.Exec.Val.i32) (mkApp2 (mkConst ``BitVec.ofNat) (mkNatLit 32) ten))
+    (mkApp (mkConst ``List.nil [0]) (mkConst ``FVA.Wasm.Exec.Val))
+  unless (← values res) == some [("i32", 45)] do throwError "values: {← values res}"
+  let tk ← IO.CancelToken.new
+  unless (← kernelAccepts res (valsExpr [("i32", 45)]) tk) == some true do throwError "45 refused"
+  unless (← kernelAccepts res (valsExpr [("i32", 0)]) tk) == some false do throwError "0 accepted"
 
 -- the explain thread has no shell, image viewer or MCP tool (closing review SEC-4)
 #guard ["shell_tool", "unified_exec", "view_image"].all fun f =>
