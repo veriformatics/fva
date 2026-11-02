@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# explain-stability (D15): fresh `fva explain` generations of the five worked examples, rounds in
+# a rotating project order; each run's pass-2 payload (FVA_EXPLAIN_DUMP: the exact prompt + schema
+# bytes) is judged a second time by Claude. `report` tabulates every verdict per target against
+# the gold labels below. The committed saved reviews are restored after each generation. Not a
+# gate step: it calls two models (signed-in `codex`, `claude` with an API key for --bare).
+# Usage: scripts/explain-stability run OUT [ROUNDS] | report OUT
+# rc 0 = done (run) / every predicate holds (report), 1 = a predicate fails, 2 = usage or setup.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+fva=$PWD/.lake/build/bin/fva
+projects=(Toy Mem Rust Mislabeled Planted)
+claude_model=claude-opus-5-5
+# target, project, claim (docstring mode) or requirement id, binary gold, preferred label
+targets="T1 Toy R1 matches matches
+T2 Toy R2 matches matches
+T3 Toy R3 matches matches
+M1 Mem Examples.Mem.arraySum matches matches
+M2 Mem Examples.Mem.callScale matches matches
+M3 Mem Examples.Mem.classify matches matches
+R1 Rust Examples.Rust.gcd matches matches
+R2 Rust Examples.Rust.clamp ambiguous matches
+L1 Mislabeled R1 reject different
+C1 Planted Examples.Planted.clampSpec reject different
+C2 Planted Examples.Planted.sumToZero reject different
+C3 Planted Examples.Planted.sumBelowTen reject different
+C4 Planted Examples.Planted.gcdTerminates reject vacuous
+C5 Planted Examples.Planted.sumToSeven reject vacuous
+C6 Planted Examples.Planted.gcdSpec matches matches
+C7 Planted Examples.Planted.sumToSpec matches matches"
+
+one() { # round project: OUT/rROUND/PROJECT/{pass1,pass2}.{prompt.txt,schema.json,reply.json} + gpt.json, claude.json, times
+	local d=$out/r$1/$2 saved=FVATest/Examples/$2/fva-explain.json t0 rc
+	mkdir -p "$d"
+	t0=$(date +%s)
+	FVA_EXPLAIN_DUMP=$d "$fva" explain . --spec-module "FVATest.Examples.$2.Spec" \
+		--root-module "FVATest.Examples.$2" --force --json >"$d/gpt.json" 2>"$d/gpt.err"
+	rc=$?
+	git show "HEAD:$saved" >"$saved"
+	printf 'gpt rc=%s s=%s start=%s\n' "$rc" "$(($(date +%s) - t0))" "$t0" >"$d/times"
+	[[ -s $d/pass2.prompt.txt ]] || return
+	t0=$(date +%s)
+	(cd "$empty" && claude -p --bare --tools "" --model "$claude_model" --effort medium \
+		--no-session-persistence --output-format json \
+		--system-prompt "Answer from the text in the prompt alone. Run no commands and read no files." \
+		--json-schema "$(cat "$d/pass2.schema.json")" <"$d/pass2.prompt.txt") \
+		>"$d/claude.json" 2>"$d/claude.err"
+	printf 'claude rc=%s s=%s start=%s\n' "$?" "$(($(date +%s) - t0))" "$t0" >>"$d/times"
+}
+
+run() {
+	local rounds=${1:-10} r k i
+	[[ -x $fva ]] && command -v claude >/dev/null && command -v codex >/dev/null || exit 2
+	[[ -z $(git status --porcelain -- FVATest/Examples) ]] || {
+		echo "explain-stability: FVATest/Examples differs from HEAD (saved reviews are restored from it)" >&2
+		exit 2
+	}
+	mkdir -p "$out"
+	empty=$(mktemp -d)
+	{
+		echo "commit $(git rev-parse HEAD)"
+		echo "fva_sha256 $(sha256sum "$fva" | cut -d' ' -f1)"
+		echo "harness_sha256 $(sha256sum "$0" | cut -d' ' -f1)"
+		echo "codex $(codex --version)"
+		echo "claude $(claude --version) model=$claude_model effort=medium bare no-tools"
+		echo "gpt model=gpt-6-luna effort=medium (fva explain defaults)"
+		echo "rounds $rounds; order = projects rotated by round; projects of a round in parallel"
+		echo "started $(date -u +%FT%TZ)"
+	} >"$out/manifest.txt"
+	for ((r = 1; r <= rounds; r++)); do
+		for ((i = 0; i < ${#projects[@]}; i++)); do
+			k=$(((i + r - 1) % ${#projects[@]}))
+			one "$r" "${projects[$k]}" &
+		done
+		wait
+		echo "explain-stability: round $r done"
+	done
+	echo "finished $(date -u +%FT%TZ)" >>"$out/manifest.txt"
+	rm -rf "$empty"
+}
+
+# verdict BACKEND-FILE KEY: the label one reply gives a claim (by full or last name) or requirement
+verdict() {
+	jq -r --arg k "$2" --arg s "${2##*.}" '(.structured_output // .) as $o |
+		(($o.requirements // []) + ($o.claims // [])) | map(select(.id == $k or .name == $k or
+		.name == $s)) | if length == 0 then "none" else (.[0].verdict // "none") end' "$1" 2>/dev/null ||
+		echo none
+}
+
+report() {
+	local t p key gold pref r b f v rows=$out/verdicts.tsv fail=0
+	printf 'round\ttarget\tbackend\tverdict\n' >"$rows"
+	while read -r t p key gold pref; do
+		for r in "$out"/r*/; do
+			for b in gpt claude; do
+				f=$r$p/$b.json
+				v=$([[ -s $f ]] && verdict "$f" "$key" || echo none)
+				printf '%s\t%s\t%s\t%s\n' "$(basename "$r")" "$t" "$b" "$v" >>"$rows"
+			done
+		done
+	done <<<"$targets"
+	printf 'target\tbackend\tgold\tn\tmatches\tweaker\tstronger\tdifferent\tvacuous\tmissing\tnone\tbinary_ok\tpreferred\tdisagreement\n'
+	while read -r t p key gold pref; do
+		for b in gpt claude; do
+			awk -F'\t' -v t="$t" -v b="$b" -v gold="$gold" -v pref="$pref" '
+				$2 == t && $3 == b { n++; c[$4]++ }
+				END {
+					ok = 0; for (l in c) if ((gold == "matches" && l == "matches") ||
+						(gold == "reject" && l != "matches" && l != "none" && l != "unknown")) ok += c[l]
+					s = 0; for (l in c) s += c[l] * (c[l] - 1)
+					printf "%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%s\t%d\t%.3f\n", t, b, gold, n,
+						c["matches"], c["weaker"], c["stronger"], c["different"], c["vacuous"],
+						c["missing"], c["none"] + c["unknown"], (gold == "ambiguous" ? "-" : ok), c[pref],
+						(n > 1 ? 1 - s / (n * (n - 1)) : 0)
+				}' "$rows"
+		done
+	done <<<"$targets"
+	# D15 predicates (gpt = the shipped configuration): Toy 3 × n matches, the 5 planted cheats
+	# never matches, every target recorded at least 10 times by both backends
+	awk -F'\t' 'NR > 1 { n[$2 "\t" $3]++ }
+		($3 == "gpt" && $2 ~ /^T[123]$/ && $4 != "matches") { toy++ }
+		($3 == "gpt" && $2 ~ /^C[1-5]$/ && ($4 == "matches" || $4 == "none" || $4 == "unknown")) { cheat++ }
+		END { for (k in n) if (n[k] < 10) short++
+			printf "predicates: toy_non_matches=%d cheat_matches_or_none=%d targets_under_10=%d\n",
+				toy, cheat, short; exit (toy || cheat || short) ? 1 : 0 }' "$rows" || fail=1
+	return "$fail"
+}
+
+case ${1-} in
+run)
+	out=${2:?usage: explain-stability run OUT [ROUNDS]}
+	run "${3:-10}"
+	;;
+report)
+	out=${2:?usage: explain-stability report OUT}
+	report
+	;;
+*)
+	echo "usage: explain-stability run OUT [ROUNDS] | report OUT" >&2
+	exit 2
+	;;
+esac
