@@ -308,6 +308,14 @@ def main (argv : List String) : IO UInt32 := do
   let o ← try pure { o with dir := (← IO.FS.realPath o.dir).toString } catch e =>
     IO.eprintln s!"fva trust: {e}"; return 2
   let root : System.FilePath := o.dir
+  -- D23: the project's `fva.json` sets the surface budget; `--surface-budget` overrides it
+  let cfg := root / "fva.json"
+  let o ← if o.budget.isSome || !(← cfg.pathExists) then pure o else
+    let budget := (Json.parse (← IO.FS.readFile cfg)).bind
+      (·.getObjValAs? (Option Nat) "surfaceBudget")
+    match budget with
+    | .ok b => pure { o with budget := b }
+    | .error e => IO.eprintln s!"fva trust: fva.json: {e}"; return 2
   let sysroot ← Lean.findSysroot
   -- the sandbox keeps the project root read-only: Lake cannot write a manifest there
   unless ← (root / "lake-manifest.json").pathExists do

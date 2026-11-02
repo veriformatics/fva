@@ -40,12 +40,21 @@ cp -a .lake/build "$p/fva/.lake/build"
 }
 fail=0
 trust() { (cd "$p" && "$fva" trust . --spec-module Demo.Spec --root-module Demo) >"$tmp/$1" 2>&1; }
+echo '{"surfaceBudget": 14}' >"$p/fva.json"
 trust plain.out
 if ! grep -q '^fva trust: PASS' "$tmp/plain.out" ||
 	! grep -q '^Read these: 14 code lines' "$tmp/plain.out"; then
 	echo "test-init: fresh project → $(head -1 "$tmp/plain.out"), surface $(grep '^Read these' "$tmp/plain.out")"
 	fail=1
 fi
+# D23: the project's fva.json budget one line under the surface fails `[surface]`
+echo '{"surfaceBudget": 13}' >"$p/fva.json"
+trust budget.out
+if ! grep -q '^  \[surface\] 14 code lines to review, budget 13' "$tmp/budget.out"; then
+	echo "test-init: fva.json budget 13 → $(head -1 "$tmp/budget.out"), pinned [surface] 14 > 13"
+	fail=1
+fi
+echo '{"surfaceBudget": null}' >"$p/fva.json"
 # the project, vendored FVA included, builds + replays inside `lake check`'s bwrap sandbox
 # (no --from-export); a proof resting on an extra axiom → rc 1 naming it
 # the cheat copy = hard links (the sandbox only reads), its Proof.lean a new file; both side by side
