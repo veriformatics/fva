@@ -33,15 +33,28 @@ def listEq : List Int → List Int → Bool
   | a :: as, b :: bs => intEq a b && listEq as bs
   | _, _ => false
 
-/-- Insert `x` before the first element it is at most. -/
-def insert (x : Int) : List Int → List Int
-  | [] => [x]
-  | y :: ys => bif intLe x y then x :: y :: ys else y :: insert x ys
+/-- Merge one left head against the right list, with the remaining-left merger supplied. -/
+def mergeWith (x : Int) (xs : List Int) (next : List Int → List Int) : List Int → List Int
+  | [] => x :: xs
+  | y :: ys => bif intLe x y then x :: next (y :: ys) else y :: mergeWith x xs next ys
 
-/-- Insertion sort into an accumulator (tail calls: the kernel never nests one per element). -/
-def isort : List Int → List Int → List Int
-  | [], acc => acc
-  | x :: xs, acc => isort xs (insert x acc)
+/-- Nested structural recursion: the kernel cannot reduce the library's well-founded merge. -/
+def merge (xs ys : List Int) : List Int :=
+  xs.rec (motive := fun _ => List Int → List Int) id
+    (fun x xs next => mergeWith x xs next) ys
+
+/-- Carry the length through each split: re-reading unevaluated sublists repeats kernel work. -/
+def sortFuel : Nat → Nat → List Int → List Int
+  | 0, _, xs => xs
+  | _ + 1, _, [] => []
+  | _ + 1, _, [x] => [x]
+  | fuel + 1, n, x :: y :: xs =>
+    let half := (n + 1) / 2
+    let halves := (x :: y :: xs).splitAt half
+    merge (sortFuel fuel half halves.1) (sortFuel fuel (n - half) halves.2)
+
+/-- `O(n log n)` comparisons, with only structural recursion evaluated by the kernel. -/
+def msort (xs : List Int) : List Int := sortFuel xs.length xs.length xs
 
 /-- Integers from `n` bytes packed in `v`: an optional `-`, decimal digits, a line feed each;
 `none` on any other byte or a number left open at the end. -/
@@ -98,7 +111,7 @@ open Impl
 def SortedPerm.check (i o : Blob) : Bool :=
   match parseInts i.len i.bytes false 0 0 [], parseInts o.len o.bytes false 0 0 [] with
   | some xs, some ys =>
-    printsAs xs i.len i.bytes && printsAs ys o.len o.bytes && listEq (isort xs []) ys
+    printsAs xs i.len i.bytes && printsAs ys o.len o.bytes && listEq (msort xs) ys
   | _, _ => false
 
 end
