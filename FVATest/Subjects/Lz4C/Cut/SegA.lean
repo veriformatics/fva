@@ -124,34 +124,6 @@ theorem extM_overflow_exit {mem : MemInst} {lim : Nat} : ∀ (k p acc fuel : Nat
       (fun i hi => by rw [← psum_shift]; exact hs (i + 1) (by omega))
       (by rw [← psum_shift]; exact ho)
 
-/-- `ExtL1`'s exits, the bound exit's position kept: the bound check fails at `p + k = lim`. -/
-def ExtExitB (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p lim acc : Nat)
-    (b : Nat → UInt8) (c : Config) : Prop :=
-  (∃ k f', (∀ j < k, b j = 255) ∧ b k ≠ 255 ∧ p + k + 1 ≤ lim ∧ (∀ i ≤ k, psum acc b i < 2 ^ 31) ∧
-    Locals ls inst f' (p + k + 1) (p + k + 1) (some (b k).toNat) (some (psum acc b k)) ∧
-    c = (ctx8 C).fill ⟨s, f', (body8.drop 4).map .plain⟩) ∨
-  (∃ k f', (∀ j < k, b j = 255) ∧ p + k = lim ∧ (∀ i, i + 1 ≤ k → psum acc b i < 2 ^ 31) ∧
-    Locals ls inst f' (p + k) (p + k + 1)
-      (if k = 0 then none else some (b (k - 1)).toNat)
-      (if k = 0 then none else some (psum acc b (k - 1))) ∧
-    c = C.fill ⟨s, f', (body2.drop 1).map .plain⟩) ∨
-  (∃ k f', (∀ j < k, b j = 255) ∧ p + k + 1 ≤ lim ∧ (∀ i, i + 1 ≤ k → psum acc b i < 2 ^ 31) ∧
-    2 ^ 31 ≤ psum acc b k ∧
-    Locals ls inst f' (p + k) (p + k + 1) (some (b k).toNat) (some (psum acc b k)) ∧
-    c = C.fill ⟨s, f', (body2.drop 1).map .plain⟩)
-
-/-- The literal length's extension loop (`ExtL1`'s statement with `ExtExitB`): the engine's
-obligation for `SegA`. -/
-def ExtL1B : Prop :=
-  ∀ (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
-    (mem : MemInst) (p lim acc : Nat),
-    ls[2]? = some (vI p) → ls[14]? = some (vI lim) → ls[17]? = some (vI acc) →
-    inst.mems[0]? = some ma → s.mems[ma]? = some mem →
-    p ≤ lim → lim + 1 < 2 ^ 32 → lim ≤ mem.size → acc < 2 ^ 31 →
-    Until H (Within (fun m a => m = ma ∧ p ≤ a ∧ a < lim) (fun _ _ => False))
-      (ExtExitB C s inst ls p lim acc fun j => mem.byte (p + j))
-      ((ctx9 C).fill ⟨s, ⟨ls, inst⟩, [.plain extLoop]⟩)
-
 theorem igtU_not {a b : Nat} (ha : a < 2 ^ 32) (hb : b < 2 ^ 32) (h : a + b < 2 ^ 32) :
     igtU (BitVec.ofNat 32 a) (~~~BitVec.ofNat 32 b) = 0 := by
   simp only [igtU, BitVec.toNat_not, BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha,
