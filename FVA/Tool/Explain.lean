@@ -534,9 +534,10 @@ def generate (o : Opts) (root fva : System.FilePath) (t : Trust)
   let names := t.claims.map (·.name)
   let (sh, declared) ← shapes root spec names.toArray t.reviewModules
   let rn := Renamer.of (names.map String.toName) declared
+  let env ← mkEmptyEnvironment
   let specText ← t.reviewModules.foldlM (init := "") fun acc m => do
     let src ← try IO.FS.readFile (modFile root m) catch _ => pure ""
-    return acc ++ s!"--- {m}\n{rn.apply (FVA.Trust.stripComments src)}\n"
+    return acc ++ s!"--- {m}\n{rn.apply (FVA.Trust.stripComments env src)}\n"
   let vocab ← fvaFiles.take 2 |>.foldlM (init := "") fun acc f => do
     return acc ++ s!"--- {f.fileName.getD ""}\n{← IO.FS.readFile (fva / f)}\n"
   let statements := "\n".intercalate (names.filterMap fun n =>

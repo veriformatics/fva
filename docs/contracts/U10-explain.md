@@ -11,7 +11,7 @@ Purpose: the prototype Decision "Non-expert review aid" rebuilt Lean-native (Dec
 
 ## Evidence (E)
 - E1 `scripts/test-trust` runs `fva explain` on the three examples (saved text, no model call; it runs `fva trust` itself): rc 0 each.
-- E2 `FVATest.Explain` guards: staleness, proof-status matching (whole names), report text helpers, comment stripping (shared lexer with the D11 line counter).
+- E2 `FVATest.Explain` guards: staleness, proof-status matching (whole names), report text helpers, comment stripping (Lean's tokenizer, shared with the D11 line counter).
 - E3 Generated once with the model: every example claim `matches`; spec and binary values agree on every computed case.
 
 ## Status

@@ -15,25 +15,37 @@ namespace FVA.Trust.Check
 
 open FVA.Trust Lean
 
-/-! ## Code lines (D11): comments + docstrings out; string, char and `«…»` contents in -/
+/-! ## Code lines (D11): comments + doc comments out; string, char and `«…»` contents in -/
 
-#guard codeLines "def s := \"--x\"" == 1
-#guard codeLines "-- comment" == 0
-#guard codeLines "/- c -/ def x := 1" == 1
-#guard codeLines "/- multi\nline -/ def y := 2" == 1
-#guard codeLines "/- c\n-/ def hidden : Prop := False" == 1
-#guard codeLines "/-- doc -/" == 0
-#guard codeLines "/-! module doc\n  def notCode := 1\n-/" == 0
-#guard codeLines "/- /- nested -/ still a comment -/" == 0
-#guard codeLines "def c := '\"' -- quote char" == 1
-#guard codeLines "def h' := 1 -- prime" == 1
-#guard codeLines "def α' := '-'" == 1
-#guard codeLines "def r := r#\"a \"-- b\"#" == 1
-#guard codeLines "def m := \"a\n-- not a comment\nb\"" == 3
-#guard codeLines "def q := \"a\\\"--\" -- c" == 1
-#guard codeLines "def e := '\\''  /- c\n -/ x" == 2
-#guard codeLines "def «a--b» := 1" == 1
-#guard codeLines "\n\n  \n" == 0
+-- Lean's own tokenizer (`FVA.Trust.Lines`): the counts the lexer it replaced gave, + Mathlib
+-- notation outside the collector's token table
+#eval show IO Unit from do
+  let env ← mkEmptyEnvironment
+  for (src, n) in ([
+      ("def s := \"--x\"", 1),
+      ("-- comment", 0),
+      ("/- c -/ def x := 1", 1),
+      ("/- multi\nline -/ def y := 2", 1),
+      ("/- c\n-/ def hidden : Prop := False", 1),
+      ("/-- doc -/", 0),
+      ("/-! module doc\n  def notCode := 1\n-/", 0),
+      ("/- /- nested -/ still a comment -/", 0),
+      ("def c := '\"' -- quote char", 1),
+      ("def h' := 1 -- prime", 1),
+      ("def α' := '-'", 1),
+      ("def r := r#\"a \"-- b\"#", 1),
+      ("def m := \"a\n-- not a comment\nb\"", 3),
+      ("def q := \"a\\\"--\" -- c", 1),
+      ("def e := '\\''  /- c\n -/ x", 2),
+      ("def «a--b» := 1", 1),
+      ("\n\n  \n", 0),
+      ("theorem t : ∑ i ∈ s, f i ≤ 3 := by\n  -- c\n  simp", 2),
+      -- code after a doc comment, a token alone on its line, CRLF line ends
+      ("/-- doc -/\ndef x := 1", 1), ("x\n-- c", 1), ("def x := 1\r\n-- c\r\ndef y := 2", 2),
+      ("a\r\nb\r\nc", 3)] :
+      List (String × Nat)) do
+    unless codeLines env src == n do
+      throw <| .userError s!"codeLines {repr src} = {codeLines env src}, pinned {n}"
 
 /-! ## Report text (E4): status words, link faults in check order, the canary count, axioms -/
 
