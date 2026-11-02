@@ -120,6 +120,8 @@ def main (fvaRoot : System.FilePath) (argv : List String) : IO UInt32 := do
   let fm ← IO.ofExcept (Json.parse (← IO.FS.readFile (fvaRoot / "lake-manifest.json")))
   IO.FS.writeFile (dir / "lake-manifest.json") ((projectManifest name fm).pretty ++ "\n")
   IO.FS.writeFile (dir / ".gitignore") "/.lake/\n/fva/.lake/\n"
+  -- D23: the review-surface budget `fva trust` enforces; null = none (set it once measured)
+  IO.FS.writeFile (dir / "fva.json") "{\"surfaceBudget\": null}\n"
   IO.FS.createDirAll (dir / o.lib)
   if let some w := o.wasm then
     let bs ← IO.FS.readBinFile w
