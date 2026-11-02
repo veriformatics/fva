@@ -1,0 +1,10 @@
+commit 1a734d0118d679a087cf65fb2f6e2fac599f4828
+fva_sha256 077afedfaf00582b9707a35062802212d787c0cb4885a0ef4be306da76ac1ae2
+harness_sha256 1e818eeb7bd5cc7e5a129dc378f22b23de6c2d63a2152c82b64a8d7580c71066
+codex codex-cli 0.166.0
+claude 2.1.312 (Claude Code)
+2.9.16 (tweakcc-fixed) model=claude-opus-5-5 effort=medium bare no-tools
+gpt model=gpt-6-luna effort=medium (fva explain defaults)
+rounds 10; order = projects rotated by round; projects of a round in parallel
+started 2026-11-02T20:43:58Z
+finished 2026-11-02T21:38:56Z

@@ -106,9 +106,11 @@ hold makes the claim vacuous). Compare the guarantee, not the wording. Every `Re
 includes termination without a trap; that alone never makes a claim stronger than its intent.
 Verdict:
 - matches: the claim guarantees what the intent says.
-- weaker: the claim guarantees less (narrower inputs, missing cases, a looser result).
+- weaker: the claim guarantees part of what the intent says and nothing contrary to it
+  (narrower inputs, missing cases, a looser result).
 - stronger: the claim guarantees more than the intent says.
-- different: the claim guarantees something else.
+- different: for some input the claim guarantees a result the intent rules out, or it
+  guarantees something else.
 - vacuous: the claim is trivially true or says nothing about the function.
 reason: one or two plain-English sentences a non-expert can follow; cite an example if one shows
 the gap.
@@ -138,9 +140,11 @@ requirement.
 For each requirement, list the claims that state it (often one), then judge what those claims
 guarantee together:
 - matches: they guarantee what the requirement says.
-- weaker: they guarantee less (narrower inputs, missing cases, a looser result).
+- weaker: they guarantee part of what the requirement says and nothing contrary to it
+  (narrower inputs, missing cases, a looser result).
 - stronger: they guarantee more than the requirement says.
-- different: they guarantee something else.
+- different: for some input they guarantee a result the requirement rules out, or they
+  guarantee something else.
 - vacuous: they are trivially true or say nothing about the function.
 - missing: no claim states the requirement.
 reason: one or two plain-English sentences a non-expert can follow; cite an example if one shows
