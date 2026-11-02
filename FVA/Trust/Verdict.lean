@@ -96,6 +96,10 @@ def ruleSyntax (r : Report) : List Issue :=
   if r.subjectSyntax.isEmpty then []
   else [⟨"syntax", s!"subject modules extend syntax: {", ".intercalate r.subjectSyntax}"⟩]
 
+/-- `[subject]`. -/
+def ruleSubject (r : Report) : List Issue :=
+  r.subjectMeaning.map fun s => ⟨"subject", s⟩
+
 /-- `[prelude]`. -/
 def rulePrelude (r : Report) : List Issue :=
   r.prelude.map fun p => ⟨"prelude", p⟩
@@ -156,8 +160,8 @@ def ruleSurface (r : Report) : List Issue := ruleSources r ++ ruleBudget r
 /-- Every violated rule, in tag order. -/
 def issues (r : Report) : List Issue :=
   [ruleBuild r, ruleClaims r, ruleUnproven r, ruleAxiom r, ruleVacuous r, ruleLayout r,
-   ruleOverride r, ruleSyntax r, rulePrelude r, ruleOlean r, ruleLink r, ruleReplay r,
-   ruleChecker r, ruleSurface r].flatten
+   ruleOverride r, ruleSyntax r, ruleSubject r, rulePrelude r, ruleOlean r, ruleLink r,
+   ruleReplay r, ruleChecker r, ruleSurface r].flatten
 
 /-- PASS iff no rule is violated. -/
 def verdict (r : Report) : Verdict := if (issues r).isEmpty then .pass else .fail

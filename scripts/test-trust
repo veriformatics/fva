@@ -36,6 +36,8 @@ NativeDecide axiom,replay
 Vacuous vacuous
 Syntax syntax
 Syntax syntax --subject FVATest.Cheats.Syntax.Vocab
+SubjectInstance subject --subject FVATest.Cheats.SubjectInstance.Impl
+SubjectArg PASS --subject FVATest.Cheats.SubjectArg.Impl
 Layout layout
 LinkSource link
 LinkMissing link

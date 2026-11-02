@@ -138,6 +138,11 @@ structure Report where
   /-- `Prop` definitions of the spec module without `@[fva_claim]` (informational, D13): read as
   vocabulary, never proven. -/
   unmarked : List String
+  /-- Instances and coercions of subject modules that the claims' statements use (D8):
+  unreviewed definitions that fix what notation and casts in the spec mean. An instance passed
+  straight to a subject function is that function's input; `Decidable` instances are
+  subsingletons. Neither is listed. -/
+  subjectMeaning : List String
   /-- Names outside the project the claims' statements use (informational, D10). -/
   vocabulary : List Term
   /-- `[prelude]` violations: fixed-bundle constants outside the sysroot, modules without `Init`. -/
@@ -177,6 +182,7 @@ structure Pass (r : Report) : Prop where
   layout : ∀ c ∈ r.claims, c.provenInSpec = false
   override : r.flags = []
   syntax_ : (∀ m ∈ r.reviewModules, m.syntaxExts = []) ∧ r.subjectSyntax = []
+  subject : r.subjectMeaning = []
   prelude : r.prelude = []
   olean : r.tampered = []
   link : (r.needsLink = true → r.links ≠ []) ∧
