@@ -356,10 +356,29 @@ theorem must_of_seq {H : HostSem} {Q : Outcome → Prop} {s : Store} {f : Frame}
     (h : Must H Q ⟨s', f', l'⟩) : Must H Q ⟨s, f, l⟩ :=
   must_of_step (by simp only [step, hs]) (by simpa only [uniqueStep] using hu) h
 
+open Lean Meta in
+/-- The instruction the next step of `l` (an `AInstr` list literal) executes: the first one that
+is no value, inside the innermost `label`/`frame` it opens. -/
+partial def nextInstr (l : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let l ← whnfD l
+  let some (_, e, rest) := l.app3? ``List.cons | return none
+  let e ← whnfD e
+  match e.getAppFn.constName?, e.getAppArgs with
+  | some ``AInstr.label, #[_, _, body] | some ``AInstr.frame, #[_, _, body] =>
+    return (← nextInstr body).getD e
+  | some ``AInstr.plain, #[i] =>
+    let i ← whnfD i
+    if i.isAppOf ``Instr.iconst || i.isAppOf ``Instr.fconst then nextInstr rest else return some i
+  | _, _ => return some e
+
 open Lean Meta Elab Tactic in
 /-- One unique reference step on a goal `Must H Q ⟨s, f, l⟩`: simp (`only [wasm_step, lemmas]`)
 computes `seq s f [] l` to `.step s' f' l'` and shows uniqueness; the goal moves to
-`Must H Q ⟨s', f', l'⟩` through `must_of_seq`. -/
+`Must H Q ⟨s', f', l'⟩` through `must_of_seq`. A configuration without free variables (a call on
+concrete inputs) that simp leaves uncomputed (float arithmetic, conversions) is stepped by
+evaluation instead, the kernel checking both equations by reduction; with free variables that
+would unfold `Nat` arithmetic next to large literals digit by digit, so the error names the
+instruction instead. -/
 elab "wasm_step1" " [" xs:Lean.Parser.Tactic.simpLemma,* "]" : tactic => withMainContext do
   let g ← getMainGoal
   let ty ← whnfR (← instantiateMVars (← g.getType))
@@ -370,14 +389,30 @@ elab "wasm_step1" " [" xs:Lean.Parser.Tactic.simpLemma,* "]" : tactic => withMai
   let stx ← `(tactic| simp only [wasm_step, $xs,*])
   let { ctx, simprocs, .. } ← mkSimpContext stx (eraseLocal := false)
   let nil ← mkListLit (mkConst ``Val) []
-  let (r, _) ← simp (← mkAppM ``seq #[s, f, nil, l]) ctx simprocs
+  let e ← mkAppM ``seq #[s, f, nil, l]
+  let u ← mkAppM ``seqUnique #[s, f, nil, l]
+  let tt := mkConst ``Bool.true
+  let (r, _) ← simp e ctx simprocs
   let out ← instantiateMVars r.expr
-  let some (s', f', l') := (← whnfR out).consumeMData.app3? ``Out.step
-    | throwError m!"wasm_step1: the next step is not computed: {out}"
-  let hs ← r.getProof
-  let hu ← mkFreshExprMVar (← mkEq (← mkAppM ``seqUnique #[s, f, nil, l]) (mkConst ``Bool.true))
-  let rest ← evalTacticAt stx hu.mvarId!
-  unless rest.isEmpty do throwError "wasm_step1: uniqueness of the step is not shown"
+  let (s', f', l', hs, hu) ← match (← whnfR out).consumeMData.app3? ``Out.step with
+    | some (s', f', l') =>
+      let hu ← mkFreshExprMVar (← mkEq u tt)
+      let rest ← evalTacticAt stx hu.mvarId!
+      unless rest.isEmpty do throwError "wasm_step1: uniqueness of the step is not shown"
+      pure (s', f', l', ← r.getProof, hu)
+    | none =>
+      let i := ((← nextInstr l).map fun i => m!" at `{i}`").getD m!""
+      if (← instantiateMVars e).hasFVar || (← instantiateMVars e).hasMVar then
+        throwError m!"wasm_step1: the next step{i} is not computed: give the facts its branch " ++
+          m!"needs (memory reads, locals, conditions) as lemmas, or state the call on concrete " ++
+          m!"inputs (then the step is evaluated)"
+      let ev ← withTransparency .all <| whnf e
+      let some (s', f', l') := ev.app3? ``Out.step
+        | throwError m!"wasm_step1: the next step{i} evaluates to no step: {ev}"
+      unless ← withTransparency .all <| isDefEq u tt do
+        throwError m!"wasm_step1: the next step{i} is a choice point (several successors)"
+      pure (s', f', l', ← mkExpectedTypeHint (← mkEqRefl e) (← mkEq e ev),
+        ← mkExpectedTypeHint (← mkEqRefl tt) (← mkEq u tt))
   let next ← mkFreshExprMVar (← mkAppM ``Must #[H, Q, ← mkAppM ``Config.mk #[s', f', l']])
   g.assign (← mkAppM ``must_of_seq #[hu, hs, next])
   replaceMainGoal [next.mvarId!]

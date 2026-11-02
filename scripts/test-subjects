@@ -15,6 +15,7 @@ fail=0 crash=0
 subjects=(
 	"FVATest.Subjects.Lz4Wasm FVATest.Subjects.Lz4Wasm.Spec FVATest.Subjects.Lz4Wasm.Lifted 48"
 	"FVATest.Subjects.GlmIround FVATest.Subjects.GlmIround.Spec FVATest.Subjects.GlmIround.Lifted 10"
+	"FVATest.Subjects.GlmCall.Proof FVATest.Subjects.GlmCall.Spec FVATest.Subjects.GlmIround.Lifted 8"
 	"FVATest.Subjects.Tmm.R3 FVATest.Subjects.Tmm.R3.Spec - 22"
 	"FVATest.Subjects.Tmm.EdgeR FVATest.Subjects.Tmm.EdgeR.Spec - 78"
 	"FVATest.Subjects.Tmm.RNAnorm FVATest.Subjects.Tmm.RNAnorm.Spec - 78"
@@ -35,7 +36,8 @@ proofs=(FVATest.Subjects.Lz4C.ExtDirect FVATest.Subjects.Lz4C.ExtRefine
 	FVATest.Subjects.Lz4C.Match FVATest.Subjects.Lz4C.Cut.ErrRet FVATest.Subjects.Lz4C.Cut.Entry
 	FVATest.Subjects.Lz4C.Cut.ExtB FVATest.Subjects.Lz4C.Eval.Accept
 	FVATest.Subjects.Lz4C.Accept FVATest.Subjects.Lz4C.Refute.LastWrite
-	FVATest.Subjects.Lz4C.Refute.Length FVATest.Subjects.Lz4C.Refute.Nonnegative)
+	FVATest.Subjects.Lz4C.Refute.Length FVATest.Subjects.Lz4C.Refute.Nonnegative
+	FVATest.Subjects.GlmCall.Step)
 # the Neg roots are no default target; build them by module name, expecting failure
 negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
 	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same FVATest.Subjects.Tmm.Neg.Exact)
@@ -50,6 +52,21 @@ cp .cache/corpus/edgeR.so FVATest/Subjects/EdgerCpm/edgeR.so || exit 2
 "$fva" lift FVATest/Subjects/EdgerCpm/edgeR.so "$tmp/Lifted.lean" --ns Subjects.EdgerCpm.Lifted >/dev/null || exit 2
 cmp -s "$tmp/Lifted.lean" FVATest/Subjects/EdgerCpm/Lifted.lean ||
 	cp "$tmp/Lifted.lean" FVATest/Subjects/EdgerCpm/Lifted.lean
+
+# D55: the GlmCall subject is `fva call`'s output for T7's input, byte for byte
+c=$tmp/call/FVATest/Subjects
+mkdir -p "$c/GlmIround" && cp FVATest/Subjects/GlmIround/{Lifted.lean,glm-iround.wasm} "$c/GlmIround/" ||
+	exit 2
+(cd "$tmp/call" && "$OLDPWD/$fva" call FVATest/Subjects/GlmIround/Lifted.lean iround \
+	f64:0x3fdfffffffffffff --spec FVATest/Subjects/GlmCall/Spec.lean \
+	--proof FVATest/Subjects/GlmCall/Proof.lean --name iroundBelowHalf --ns Subjects.GlmCall) \
+	>/dev/null || exit 2
+for f in Spec Proof; do
+	if ! cmp -s "$c/GlmCall/$f.lean" "FVATest/Subjects/GlmCall/$f.lean"; then
+		echo "test-subjects: FVATest/Subjects/GlmCall/$f.lean is not fva call's output (regenerate it)"
+		fail=1
+	fi
+done
 
 roots=(fva FVA "${proofs[@]}")
 for s in "${subjects[@]}"; do
