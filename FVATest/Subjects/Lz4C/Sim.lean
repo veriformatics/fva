@@ -36,16 +36,6 @@ theorem extM_eq {mem : MemInst} {src L : Nat} {inp : List UInt8} (hin : HoldsAt 
       · rw [ite_eq_right ha, ite_eq_right ha]; rfl
     · rw [ite_eq_right (by omega), ite_eq_right hq]; rfl
 
-/-- The error epilogue's value `~v + src` is negative for `src ≤ v < src + 2^31`. -/
-theorem errVal_neg {src v : Nat} (h1 : src ≤ v) (h2 : v < src + 2 ^ 31) :
-    (~~~(BitVec.ofNat 32 v) + BitVec.ofNat 32 src).toInt < 0 := by
-  rw [BitVec.toInt_eq_toNat_cond]
-  simp only [BitVec.toNat_add, BitVec.toNat_not, BitVec.toNat_ofNat]
-  split <;> omega
-
-theorem ofNat_toInt {k : Nat} (h : k < 2 ^ 31) : (BitVec.ofNat 32 k).toInt = k := by
-  rw [BitVec.toInt_eq_toNat_cond]; simp only [BitVec.toNat_ofNat]; split <;> omega
-
 /-- The input bytes from position `i`, held at `src + i`. -/
 theorem HoldsAt.drop {mem : MemInst} {src : Nat} {inp : List UInt8} (h : HoldsAt mem src inp)
     (i k : Nat) : HoldsAt mem (src + i) ((inp.drop i).take k) := by

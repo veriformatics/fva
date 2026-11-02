@@ -79,8 +79,6 @@ theorem good {src dst : Nat} {input initDst : List UInt8} (hs : 131072 ≤ src)
   dstHi := hd'
   disj := hj
 
-theorem neg1 : (BitVec.ofNat 32 4294967295).toInt < 0 := by decide
-
 /-- The source bytes stay held after the destination write (disjoint, or one of them empty). -/
 theorem held_input {src dst : Nat} {input initDst : List UInt8}
     (hj : input = [] ∨ initDst = [] ∨ src + input.length ≤ dst ∨ dst + initDst.length ≤ src) :

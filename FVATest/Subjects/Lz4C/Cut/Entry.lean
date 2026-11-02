@@ -49,32 +49,6 @@ theorem body4_eq : body4 = [mainLoop] := by kernel_rfl
 -- A failed `rfl` would otherwise unfold the slices into the 8 KiB module (memory without bound).
 attribute [local irreducible] body1 body2 body3 body4 mainLoop
 
-theorem ine_ofNat {a b : Nat} (ha : a < 2 ^ 32) (hb : b < 2 ^ 32) :
-    ine (BitVec.ofNat 32 a) (BitVec.ofNat 32 b) = Num.bool (a != b) := by
-  simp only [ine, ofNat_toNat ha, ofNat_toNat hb]
-
-theorem ofNat_zero_eq : decide (BitVec.ofNat 32 0 = 0) = true := by decide
-
-theorem ofNat_ne_zero {k : Nat} (h0 : k ≠ 0) (h : k < 2 ^ 32) :
-    decide (BitVec.ofNat 32 k = 0) = false := by
-  simp only [decide_eq_false_iff_not]
-  intro he
-  have := congrArg BitVec.toNat he
-  simp at this
-  omega
-
-/-- An `i32` constant `c = 2^32 − k` added to `x ≥ k`: `x − k`. -/
-theorem ofNat_wrap {x c k : Nat} (hc : c + k = 4294967296) (hk : k ≤ x) :
-    BitVec.ofNat 32 (x + c) = BitVec.ofNat 32 (x - k) := by
-  apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_ofNat]; omega
-
--- the footprint goal of a step blows up (memory without bound) on a value `x + c` with `c` near
--- `2^32` and `x` symbolic: the entry code's negative constants are folded into `x − k` instead
-/-- `x + (2^32 − k)` as an `i32` sum: `x − k`. -/
-theorem iadd_neg {x c k : Nat} (hc : c + k = 4294967296) (hk : k ≤ x) :
-    iadd (BitVec.ofNat 32 x) (BitVec.ofNat 32 c) = BitVec.ofNat 32 (x - k) := by
-  rw [iadd_ofNat, ofNat_wrap hc hk]
-
 /-- Block `@1`'s code `es` running with locals `ls` (func 2 invoked from outside). -/
 noncomputable abbrev at1 (st : Store) (inst : ModuleInst) (ls : List Val) (es : List Instr) :
     Config :=
@@ -148,7 +122,7 @@ theorem entry_guards (hs : 16 ≤ src) (hdc : dst + cap < 2 ^ 32) (hsn : src + n
           .block .empty body2 :: epi)))
       (at1 st inst (ls0 src dst n cap) body1) := by
   have hz : ieqz (BitVec.ofNat 32 src) = 0 := by
-    simp only [ieqz, ofNat_toNat (show src < 2 ^ 32 by omega)]
+    simp only [ieqz, ofNat32_toNat (show src < 2 ^ 32 by omega)]
     rw [show (src == 0) = false by simp; omega]; rfl
   have hlt := iltS_zero (a := cap) (by omega)
   show Until H _ _ ((ctx1 F0).fill ⟨st, ⟨_, inst⟩, _⟩)
@@ -187,11 +161,11 @@ theorem entry_zero (hm0 : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some m
     · -- no room, one byte: `0` for the block `0`, else −1
       subst hn1
       have hb0 : Num.bool ((1 : Nat) != 1) = 0 := rfl
-      have hsrc : (BitVec.ofNat 32 src).toNat = src := ofNat_toNat (by omega)
+      have hsrc : (BitVec.ofNat 32 src).toNat = src := ofNat32_toNat (by omega)
       have hblt : decide (mem.size < src + 1) = false := by simp; have := h1 rfl; omega
       repeat (wasm_cstepu [zeroCap, hne, hb0, ofNat_zero_eq, zero_eq, bool_false]
               · wasm_within [zeroCap])
-      wasm_cstepu [hm0, hmem, hsrc, hblt, read_one, PackSize.bits, packedVal, Nat.add_zero]
+      wasm_cstepu [hm0, hmem, hsrc, hblt, mem_read_one, PackSize.bits, packedVal, Nat.add_zero]
       · wasm_within [hm0, hmem, hsrc, hblt, PackSize.bits, Nat.add_zero]
         exact ⟨fun x h₁ h₂ => ⟨rfl, by omega, by omega⟩, by simp⟩
       by_cases hb : mem.byte src = 0
@@ -233,7 +207,7 @@ theorem entry_n (hs : 16 ≤ src) (hsn : src + n < 2 ^ 32) (hc0 : cap ≠ 0) :
       (at1 st inst (ls0 src dst n cap) (codeB ++ codeC1 ++ codeC2 ++
           .block .empty body2 :: epi)) := by
   have hz2 : ieqz (BitVec.ofNat 32 n) = Num.bool (n == 0) := by
-    simp only [ieqz, ofNat_toNat (show n < 2 ^ 32 by omega)]
+    simp only [ieqz, ofNat32_toNat (show n < 2 ^ 32 by omega)]
   show Until H _ _ ((ctx1 F0).fill ⟨st, ⟨_, inst⟩, _⟩)
   by_cases hn0 : n = 0
   · subst hn0
@@ -258,7 +232,7 @@ theorem entry_c1 (hd : 32 ≤ dst) (hs : 16 ≤ src) :
   have h9 := iadd_neg (x := dst + cap) (c := 4294967291) (k := 5) rfl (by omega)
   have h10 := iadd_neg (x := dst + cap) (c := 4294967289) (k := 7) rfl (by omega)
   show Until H _ _ ((ctx1 F0).fill ⟨st, ⟨_, inst⟩, _⟩)
-  repeat (wasm_cstepu [codeC1, ls0, h6, h8, h9, h10, iadd_ofNat]
+  repeat (wasm_cstepu [codeC1, ls0, h6, h8, h9, h10, add32]
           · wasm_within [codeC1])
   exact Until.done rfl
 

@@ -140,25 +140,6 @@ theorem write4_zero (mem : MemInst) (o x : Nat) :
     (mem.write o 4 0).byte x = if o ≤ x ∧ x < o + 4 then 0 else mem.byte x := by
   simp only [MemInst.write, Nat.zero_div]; rfl
 
-theorem toNat_sub_ofNat {x y : Nat} (hy : y ≤ x) (hx : x < 2 ^ 32) :
-    (BitVec.ofNat 32 x - BitVec.ofNat 32 y).toNat = x - y := by
-  simp only [BitVec.toNat_sub, BitVec.toNat_ofNat]
-  omega
-
-theorem toNat_add_ofNat {x : BitVec 32} {y : Nat} (h : x.toNat + y < 2 ^ 32) :
-    (x + BitVec.ofNat 32 y).toNat = x.toNat + y := by
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-  omega
-
-theorem mod_pos {P d : Nat} (h : d ≤ P) (hP : P < 4294967296) :
-    (P + 4294967296 - d) % 4294967296 = P - d := by
-  rw [show P + 4294967296 - d = P - d + 4294967296 by omega, Nat.add_mod_right,
-    Nat.mod_eq_of_lt (by omega)]
-
-theorem mod_neg {P e : Nat} (h : P + e < 4294967296) :
-    (P + 4294967296 - (4294967296 - e)) % 4294967296 = P + e := by
-  rw [show P + 4294967296 - (4294967296 - e) = P + e by omega, Nat.mod_eq_of_lt h]
-
 /-- The prologue below offset 8: four single bytes from `o' − off`, four from the `inc32table`
 entry, the match pointer moved back by the `dec64table` entry (as `i32`). -/
 theorem prologue_small {mem : MemInst} {o' off : Nat} (ht : TablesOK mem) (h7 : off < 8)

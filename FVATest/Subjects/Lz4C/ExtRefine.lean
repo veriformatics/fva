@@ -61,7 +61,7 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
   have hf14 : f.locals[14]? = some (vI lim) := by
     rw [hi.others 14 (by decide) (by decide) (by decide) (by decide), h14]
   have hlenf : f.locals.length = ls.length := hi.len
-  have hadd := iadd_ofNat (p + j) 1
+  have hadd := add32 (p + j) 1
   have hgt := igtU_ofNat (a := p + j + 1) (b := lim) (by omega) (by omega)
   rw [extModel]
   unfold head
@@ -95,10 +95,10 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
   · have hc : Num.bool (decide (lim < p + j + 1)) = 0 := by simp [hb, bool_false]
     have hle : p + j + 1 ≤ lim := by omega
     have hm' : f.inst.mems[0]? = some ma := by rw [hi.inst]; exact hm
-    have hpj : (BitVec.ofNat 32 (p + j)).toNat = p + j := ofNat_toNat (by omega)
+    have hpj : (BitVec.ofNat 32 (p + j)).toNat = p + j := ofNat32_toNat (by omega)
     have hblt : decide (mem.size < p + j + 1) = false := by simp; omega
     have hbyte : (mem.byte (p + j)).toNat < 256 := (mem.byte (p + j)).toNat_lt
-    have hadd2 := iadd_ofNat a (mem.byte (p + j)).toNat
+    have hadd2 := add32 a (mem.byte (p + j)).toNat
     have hlt := iltS_zero (a := a + (mem.byte (p + j)).toNat) (by omega)
     have h15ls : 15 < ls.length := by omega
     wasm_cstepu [extBody, hc, zero_eq]
@@ -108,7 +108,7 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
     · wasm_within [extBody]
     wasm_cstepu [extBody, getElem?_set_of_ne (show (4 : Nat) ≠ 2 by decide), hi.l2]
     · wasm_within [extBody]
-    wasm_cstepu [extBody, hm', hmem, hpj, hblt, read_one, PackSize.bits, packedVal,
+    wasm_cstepu [extBody, hm', hmem, hpj, hblt, mem_read_one, PackSize.bits, packedVal,
       Nat.add_zero]
     · wasm_within [extBody, hm', hmem, hpj, hblt, PackSize.bits, Nat.add_zero]
       exact ⟨fun x h₁ h₂ => ⟨trivial, by omega, by omega⟩, by simp⟩

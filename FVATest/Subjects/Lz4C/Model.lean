@@ -1,3 +1,4 @@
+import FVATest.Subjects.Lz4C.Numeric
 import FVATest.Subjects.Lz4.Format
 
 /-!

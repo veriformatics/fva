@@ -94,21 +94,11 @@ theorem d_table_bounds {off : Nat} (h : off < 8) :
     inc32[off]! ≤ off ∧ dDelta off ≤ off := by
   interval_cases off <;> decide
 
-theorem d_sub_mask1 (p : Nat) : BitVec.ofNat 32 p - BitVec.ofNat 32 4294967295 =
-    BitVec.ofNat 32 (p + 1) := by
-  rw [BitVec.sub_eq_add_neg, show -(BitVec.ofNat 32 4294967295) = BitVec.ofNat 32 1 by decide,
-    BitVec.ofNat_add_ofNat]
-
-theorem d_sub_mask4 (p : Nat) : BitVec.ofNat 32 p - BitVec.ofNat 32 4294967292 =
-    BitVec.ofNat 32 (p + 4) := by
-  rw [BitVec.sub_eq_add_neg, show -(BitVec.ofNat 32 4294967292) = BitVec.ofNat 32 4 by decide,
-    BitVec.ofNat_add_ofNat]
-
 theorem d_next (p off : Nat) (h : off < 8) :
     BitVec.ofNat 32 (p + inc32[off]!) - BitVec.ofNat 32 dec64[off]! =
       BitVec.ofNat 32 (p + dDelta off) := by
   interval_cases off <;>
-    simp (disch := omega) [inc32, dec64, dDelta, d_sub_mask1, d_sub_mask4,
+    simp (disch := omega) [inc32, dec64, dDelta, sub_mask1, sub_mask4,
       BitVec.ofNat_sub_ofNat_of_le, Nat.add_sub_assoc, Nat.add_assoc]
 
 theorem d_tables_zero {mem : MemInst} (h : TablesOK mem) {d : Nat} (hd : 131072 ≤ d) :
@@ -138,10 +128,6 @@ theorem d_copy (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst) (ls 
     exact ⟨hm', .inr hspan⟩
   · exact fun _ hx => hx
 
-/-- The model's overloaded literal does not match simp's `ofNat`-add pattern. -/
-theorem d_add8 (p : Nat) : BitVec.ofNat 32 p + 8 = BitVec.ofNat 32 (p + 8) :=
-  BitVec.ofNat_add_ofNat p 8
-
 theorem d_prologue_ptr (mem : MemInst) (dst o' off : Nat) (ht : TablesOK mem)
     (hmatch : dst + off ≤ o') (ho : o' < 2 ^ 32) :
     ∃ p, (prologue mem o' off).2 = BitVec.ofNat 32 p ∧ dst ≤ p ∧ p ≤ o' := by
@@ -149,7 +135,7 @@ theorem d_prologue_ptr (mem : MemInst) (dst o' off : Nat) (ht : TablesOK mem)
   have hM := ofNat32_sub (a := o') (b := off) (by omega) hoff
   by_cases hbig : 7 < off
   · refine ⟨o' - off + 8, ?_, by omega, by omega⟩
-    simp only [prologue, hbig, ite_true, hM, d_add8]
+    simp only [prologue, hbig, ite_true, hM, ofNat_add8]
   · have hsmall : off < 8 := by omega
     have hb := d_table_bounds hsmall
     have hinc := (ht off hsmall).1

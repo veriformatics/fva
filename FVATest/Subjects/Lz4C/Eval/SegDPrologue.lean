@@ -35,7 +35,7 @@ theorem d_prologue (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) 
   · have hpro : prologue mem o' off =
         (fwdCopy mem o' (o' - off) 8, BitVec.ofNat 32 (o' - off + 8)) := by
       simp only [prologue, hbig, ite_true, hM,
-        ofNat32_toNat (show o' - off < 2 ^ 32 by omega), d_add8]
+        ofNat32_toNat (show o' - off < 2 ^ 32 by omega), ofNat_add8]
     wasm_eval 8 [block_simp, dPrologue, dSmall, dLarge, dLs, igtU_ofNat, hbig]
     · simp [TraceOK, AccessOK]
     · let C := Context.label 0 [] (dAfterPrologue.map .plain) (ctx5 (ctx2 F))

@@ -8,13 +8,6 @@ namespace Subjects.Lz4C.O1
 
 open FVA.Wasm FVA.Wasm.Exec FVA.Wasm.Exec.Ref FVA.Wasm.Num
 
-theorem iadd_minus_one {q : Nat} (h1 : 1 ≤ q) (h : q < 2 ^ 32) :
-    iadd (BitVec.ofNat 32 q) (BitVec.ofNat 32 4294967295) = BitVec.ofNat 32 (q - 1) := by
-  rw [iadd_ofNat]
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_ofNat]
-  omega
-
 /-- The `-O1` loop head. -/
 noncomputable def head (C : Context) (s : Store) (f : Frame) : Config :=
   (ctx C).fill ⟨s, f, [.label 0 [.loop .empty extBody] (extBody.map .plain)]⟩

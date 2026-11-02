@@ -1,3 +1,4 @@
+import FVATest.Subjects.Lz4C.Numeric
 import FVATest.Subjects.Lz4C.Spec
 
 /-! The decoder claims as stated before the factoring (`Buffers`, `OnCall` in `Call.lean`), spelled
