@@ -11,6 +11,9 @@ def slow : Nat := 1
 /-- The test reports a crash (rc 3) when `crashy = 3`: inconclusive. -/
 def crashy : Nat := 2
 
+/-- The test allocates without bound when `hungry = 3`: past the memory cap, inconclusive. -/
+def hungry : Nat := 2
+
 /-- The test reports an infrastructure failure (rc 2) when `infra = 5`: an error. -/
 def infra : Nat := 4
 

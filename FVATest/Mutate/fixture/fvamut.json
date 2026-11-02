@@ -102,5 +102,6 @@
   "cacheDir": ".cache/mutate",
   "workers": 2,
   "spotChecks": 3,
-  "minLimit": 10
+  "minLimit": 10,
+  "memLimitMiB": 8192
 }

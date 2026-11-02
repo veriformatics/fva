@@ -5,7 +5,8 @@ import Lean
 
 `sha256sum` (coreutils) supplies every digest: file contents in batches, strings through
 temporary files. Stage commands run under `timeout -k` (it signals the whole process group,
-so Lake's `lean` children die with it) in a cleared environment (`env -i`, contract K3).
+so Lake's `lean` children die with it) in a cleared environment (`env -i`, contract K3), their
+anonymous memory summed over that process group and capped (K7).
 -/
 
 namespace FVA.Mutate
@@ -48,17 +49,53 @@ def sha256Strings (tmp : System.FilePath) (strs : Array String) : IO (Array Stri
   IO.FS.removeDirAll dir
   return names.map fun n => hs.getD n ""
 
-/-- Outcome of a timed command: its exit code, or `none` when the limit was hit. -/
-def runTimed (cwd : System.FilePath) (argv : List String) (limitSec : Nat)
-    (log : System.FilePath) : IO (Option UInt32) := do
+/-- How a timed command ended. -/
+inductive Ended where
+  | exit (rc : UInt32)
+  | timeout
+  /-- The process group's anonymous memory passed the cap; the group was killed. -/
+  | memory
+
+/-- Anonymous resident memory (KiB) summed over the processes of group `pg`: file-backed pages
+(the `.olean`s every `lean` maps, 1.5–2.7 GB each) stay out, the heap a growth mutant fills
+counts. -/
+def groupAnonKiB (pg : Nat) : IO Nat := do
+  let mut kib := 0
+  for e in ← System.FilePath.readDir "/proc" do
+    let some pid := e.fileName.toNat? | continue
+    let some stat ← (try some <$> IO.FS.readFile s!"/proc/{pid}/stat" catch _ => pure none)
+      | continue
+    -- the process group is field 5, after the parenthesized command name (it may hold spaces)
+    let some pgrp := ((stat.splitOn ") ").getLast!.splitOn " ")[2]?.bind (·.toNat?) | continue
+    if pgrp != pg then continue
+    let some st ← (try some <$> IO.FS.readFile s!"/proc/{pid}/status" catch _ => pure none)
+      | continue
+    for l in st.splitOn "\n" do
+      if l.startsWith "RssAnon:" then
+        kib := kib + (((l.drop 8).trimAscii.toString.splitOn " ")[0]!.toNat?.getD 0)
+  return kib
+
+/-- Run `argv` under `limitSec` seconds and `memMiB` MiB of anonymous memory for its whole
+process group (`timeout` leads that group; 0 = no memory cap), sampled every 200 ms. -/
+def runTimed (cwd : System.FilePath) (argv : List String) (limitSec memMiB : Nat)
+    (log : System.FilePath) : IO Ended := do
   let path := (← IO.getEnv "PATH").getD "/usr/bin:/bin"
   let home := (← IO.getEnv "HOME").getD "/tmp"
   let args := #["-k", "10", toString limitSec, "env", "-i", s!"PATH={path}", s!"HOME={home}",
     "LANG=C.UTF-8", "bash", "-c", "exec \"$@\" >\"$0\" 2>&1", log.toString] ++ argv.toArray
   let child ← IO.Process.spawn
     { cmd := "timeout", args, cwd, stdin := .null, stdout := .null, stderr := .null }
-  let rc ← child.wait
-  return if rc == 124 || rc == 137 then none else some rc
+  let ended (rc : UInt32) : Ended := if rc == 124 || rc == 137 then .timeout else .exit rc
+  if memMiB == 0 then return ended (← child.wait)
+  let pg := child.pid.toNat
+  while true do
+    if let some rc ← child.tryWait then return ended rc
+    if (← groupAnonKiB pg) > memMiB * 1024 then
+      discard <| run "bash" #["-c", s!"kill -KILL -- -{pg}"]
+      discard child.wait
+      return .memory
+    IO.sleep 200
+  return .timeout
 
 /-- Copy `src` to `dst` (reflink where the file system allows), replacing `dst`. -/
 def copyTree (src dst : System.FilePath) : IO Unit := do
