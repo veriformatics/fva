@@ -178,7 +178,7 @@ theorem d_far (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (a ma
               rfl
           · simp only [FVA.Wasm.Exec.Ref.setMem_setMem, matchRest, hfar, ite_true, hsmall,
             ite_false,
-              ofNat32_toNat (show p < 2 ^ 32 by omega), d_add8,
+              ofNat32_toNat (show p < 2 ^ 32 by omega), ofNat_add8,
               ofNat32_toNat (show p + 8 < 2 ^ 32 by omega)]
             rfl
 

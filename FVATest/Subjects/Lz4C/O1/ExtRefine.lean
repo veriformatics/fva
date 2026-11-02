@@ -85,19 +85,20 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
   · have hc : Num.bool (decide (lim < p + j + 1)) = 0 := by simp [hb, bool_false]
     have hle : p + j + 1 ≤ lim := by omega
     have hm' : f.inst.mems[0]? = some ma := by rw [hi.inst]; exact hm
-    have hq := iadd_minus_one (q := p + j + 1) (by omega) (by omega)
+    have hq := add32_m1 (a := p + j + 1) (by omega)
     have hpj : (BitVec.ofNat 32 (p + j + 1 - 1)).toNat = p + j := by
-      rw [Nat.add_sub_cancel]; exact ofNat_toNat (by omega)
+      rw [Nat.add_sub_cancel]; exact ofNat32_toNat (by omega)
     have hblt : decide (mem.size < p + j + 1) = false := by simp; omega
     have hbyte : (mem.byte (p + j)).toNat < 256 := (mem.byte (p + j)).toNat_lt
-    have hadd2 := iadd_ofNat a (mem.byte (p + j)).toNat
+    have hadd2 := add32 a (mem.byte (p + j)).toNat
     have hlt := iltS_zero (a := a + (mem.byte (p + j)).toNat) (by omega)
-    have hadd1 := iadd_ofNat (p + j + 1) 1
+    have hadd1 := add32 (p + j + 1) 1
     wasm_cstepu [extBody, hc, zero_eq]
     · wasm_within [extBody]
     iterate 3 (wasm_cstepu [extBody, List.getElem?_set, List.length_set, hlenf, h3, h4, hq]
                · wasm_within [extBody])
-    wasm_cstepu [extBody, hm', hmem, hpj, hblt, read_one, PackSize.bits, packedVal, Nat.add_zero]
+    wasm_cstepu [extBody, hm', hmem, hpj, hblt, mem_read_one, PackSize.bits, packedVal,
+      Nat.add_zero]
     · wasm_within [extBody, hm', hmem, hpj, hblt, PackSize.bits, Nat.add_zero]
       exact ⟨fun x h₁ h₂ => ⟨trivial, by omega, by omega⟩, by simp⟩
     iterate 5 (wasm_cstepu [extBody, List.getElem?_set, List.length_set, hlenf, h3, h4, h20,

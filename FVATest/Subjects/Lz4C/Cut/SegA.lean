@@ -124,12 +124,6 @@ theorem extM_overflow_exit {mem : MemInst} {lim : Nat} : ∀ (k p acc fuel : Nat
       (fun i hi => by rw [← psum_shift]; exact hs (i + 1) (by omega))
       (by rw [← psum_shift]; exact ho)
 
-theorem igtU_not {a b : Nat} (ha : a < 2 ^ 32) (hb : b < 2 ^ 32) (h : a + b < 2 ^ 32) :
-    igtU (BitVec.ofNat 32 a) (~~~BitVec.ofNat 32 b) = 0 := by
-  simp only [igtU, BitVec.toNat_not, BitVec.toNat_ofNat, Nat.mod_eq_of_lt ha,
-    Nat.mod_eq_of_lt hb, gt_iff_lt]
-  rw [show decide (2 ^ 32 - 1 - b < a) = false by simp; omega]; rfl
-
 /-- After the extension bytes (local 17 = `acc`, 4 = `q`): `len = acc + 15`, both overflow
 guards pass, block `@8` ends at X2. -/
 theorem tail_X2 {H : HostSem} {F : Context} {st : Store} {inst : ModuleInst} {ls : List Val}
@@ -143,7 +137,7 @@ theorem tail_X2 {H : HostSem} {F : Context} {st : Store} {inst : ModuleInst} {ls
   have hg1 := igtU_not (a := acc + 15) (b := op) (by omega) (by omega) hb1
   have hg2 := igtU_not (a := acc + 15) (b := q) (by omega) (by omega) hb2
   rw [body8_drop4]
-  repeat (wasm_cstepu [tailA, h3, h4, h17, iadd_ofNat, ixor, xor_neg1, hg1, hg2, zero_eq,
+  repeat (wasm_cstepu [tailA, h3, h4, h17, add32, ixor, xor_neg1, hg1, hg2, zero_eq,
             show 2 < ls.length by omega,
             getElem?_set_of_ne (show (2 : Nat) ≠ 3 by decide),
             getElem?_set_of_ne (show (2 : Nat) ≠ 4 by decide),
@@ -169,7 +163,7 @@ theorem tail_err {H : HostSem} {F : Context} {st : Store} {inst : ModuleInst} {l
       ((ctx2 F).fill ⟨st, ⟨ls, inst⟩, (body2.drop 1).map .plain⟩) := by
   have hln := hcl.1
   rw [body2_drop1]
-  repeat (wasm_cstepu [h2, iadd_ofNat, show 4 < ls.length by omega]
+  repeat (wasm_cstepu [h2, add32, show 4 < ls.length by omega]
           · wasm_within [])
   rw [show ctx2 F = .label 0 [] ((body1.drop 54).map .plain) (ctx1 F) from rfl,
     Context.fill.eq_2]
@@ -177,20 +171,6 @@ theorem tail_err {H : HostSem} {F : Context} {st : Store} {inst : ModuleInst} {l
   · wasm_within []
   exact Until.done ⟨w + 1, hlo, hhi, _, hcl.set (by omega) _,
     List.getElem?_set_self (by omega), rfl⟩
-
-theorem iltU_ofNat {a b : Nat} (ha : a < 2 ^ 32) (hb : b < 2 ^ 32) :
-    iltU (BitVec.ofNat 32 a) (BitVec.ofNat 32 b) = bool (decide (a < b)) := by
-  simp only [iltU, ofNat_toNat ha, ofNat_toNat hb]
-
-theorem ileU_ofNat {a b : Nat} (ha : a < 2 ^ 32) (hb : b < 2 ^ 32) :
-    ileU (BitVec.ofNat 32 a) (BitVec.ofNat 32 b) = bool (decide (a ≤ b)) := by
-  simp only [ileU, ofNat_toNat ha, ofNat_toNat hb]
-
-theorem bool_dec_true {p : Prop} [Decidable p] (h : p) : bool (decide p) = 1 := by
-  simp [h, bool_true]
-
-theorem bool_dec_false {p : Prop} [Decidable p] (h : ¬ p) : bool (decide p) = 0 := by
-  simp [h, bool_false]
 
 /-- The frame after a loop exit, as locals of `inst`. -/
 theorem frame_eta {f : Frame} {inst : ModuleInst} (h : f.inst = inst) : f = ⟨f.locals, inst⟩ := by
@@ -223,7 +203,7 @@ theorem segA_of (hL : ExtL1B) : SegA := by
     hsz hip1 hip2 hop
   have hcl' := hcl
   obtain ⟨hln, h0, h1, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩ := hcl'
-  have hlt := iltU_ofNat (a := ip + 1) (b := src + n - 15) (by omega) (by omega)
+  have hlt := ltU32 (a := ip + 1) (b := src + n - 15) (by omega) (by omega)
   rw [body8_drop1]
   by_cases hb1 : ip + 1 < src + n - 15
   swap
@@ -239,18 +219,18 @@ theorem segA_of (hL : ExtL1B) : SegA := by
       rw [hn']; simp only [extM, ite_eq_right (show ¬ ip + 1 + 1 ≤ src + (n' + 1) - 15 by omega)]
     exact Until.done (Or.inr ⟨hnone, ip + 1, by omega, by omega, _, hcl.set (by omega) _,
       List.getElem?_set_self (by omega), rfl⟩)
-  have hle := ileU_ofNat (a := ip + 2) (b := src + n - 15) (by omega) (by omega)
-  have hsrc1 : (BitVec.ofNat 32 (ip + 1)).toNat = ip + 1 := ofNat_toNat (by omega)
+  have hle := leU32 (a := ip + 2) (b := src + n - 15) (by omega) (by omega)
+  have hsrc1 : (BitVec.ofNat 32 (ip + 1)).toNat = ip + 1 := ofNat32_toNat (by omega)
   have hblt : decide (mem.size < ip + 1 + 1) = false := by simp; omega
   have heq := ieq_ofNat (a := (mem.byte (ip + 1)).toNat) (b := 255)
     (by have := (mem.byte (ip + 1)).toNat_lt; omega) (by omega)
   -- the bound checks, the first extension byte read
-  repeat (wasm_cstepu [g1, g2, ext3, b10, h4, h15, h14, hlt, hle, iadd_ofNat,
+  repeat (wasm_cstepu [g1, g2, ext3, b10, h4, h15, h14, hlt, hle, add32,
             bool_dec_true hb1, bool_dec_true (show ip + 2 ≤ src + n - 15 by omega), one_ne,
             getElem?_set_of_ne (show (2 : Nat) ≠ 14 by decide),
             getElem?_set_of_ne (show (2 : Nat) ≠ 15 by decide), show 2 < ls.length by omega]
           · wasm_within [g1, g2, ext3, b10])
-  wasm_cstepu [hm, hmem, hsrc1, hblt, read_one, PackSize.bits, packedVal, Nat.add_zero]
+  wasm_cstepu [hm, hmem, hsrc1, hblt, mem_read_one, PackSize.bits, packedVal, Nat.add_zero]
   · wasm_within [hm, hmem, hsrc1, hblt, PackSize.bits, Nat.add_zero]
     exact ⟨fun x h₁ h₂ => ⟨trivial, Or.inl ⟨rfl, by omega, by omega⟩⟩, by simp⟩
   have hb0 := (mem.byte (ip + 1)).toNat_lt

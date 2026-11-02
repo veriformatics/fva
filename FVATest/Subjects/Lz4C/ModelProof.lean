@@ -138,8 +138,6 @@ theorem copyMatch_cont {inp : List UInt8} {cap j off ml0 i' : Nat} {out o : List
               by omega, by omega, hc⟩
         · simp at h
 
-theorem ofNat_toNat_u8 (b : UInt8) : UInt8.ofNat b.toNat = b := by simp
-
 theorem at!_lt {inp : List UInt8} {i : Nat} (hi : i < inp.length) : at! inp i = inp[i].toNat := by
   simp [at!, List.getElem?_eq_getElem hi]
 
@@ -171,11 +169,11 @@ theorem assemble {inp : List UInt8} {i q len m i' : Nat} (hi : i < inp.length)
   have htok : UInt8.ofNat (16 * min len 15 + min m 15) = inp[i] := by
     rw [hll, hml, ht]
     have : 16 * (inp[i].toNat / 16) + inp[i].toNat % 16 = inp[i].toNat := by omega
-    rw [this]; exact ofNat_toNat_u8 _
+    rw [this]; exact UInt8.ofNat_toNat
   have hlo : UInt8.ofNat (off16 inp (q + len)) = inp[q + len] := by
-    rw [hoff]; apply UInt8.toNat_inj.mp; simp <;> omega
+    rw [hoff]; apply UInt8.toNat_inj.mp; simp
   have hhi : UInt8.ofNat (off16 inp (q + len) / 256) = inp[q + len + 1] := by
-    rw [hoff]; apply UInt8.toNat_inj.mp; simp <;> omega
+    rw [hoff]; apply UInt8.toNat_inj.mp; simp; omega
   conv => lhs; rw [drop_cons hi, hlit, hsplit, hmatch]
   simp only [Seq.bytes, head, hlen, show m + 4 - 4 = m by omega, htok, hlo, hhi, List.cons_append,
     List.append_assoc, List.nil_append]
@@ -296,7 +294,7 @@ theorem step_done {inp : List UInt8} {cap i : Nat} {out o : List UInt8}
     have htok : UInt8.ofNat (16 * min len 15 + at! inp i % 16) = inp[i] := by
       rw [hm, at!_lt hi]
       have : 16 * (inp[i].toNat / 16) + inp[i].toNat % 16 = inp[i].toNat := by omega
-      rw [this]; exact ofNat_toNat_u8 _
+      rw [this]; exact UInt8.ofNat_toNat
     rw [drop_cons hi, hd]
     simp only [Lz4.head, hlen, htok, List.cons_append]
   unfold step at h
@@ -408,7 +406,7 @@ theorem ext_read {inp rest : List UInt8} {L n q : Nat} (hn : 15 ≤ n)
     (by simpa [Lz4.ext, show ¬ n < 15 by omega, List.append_assoc] using hd) (by omega)
     (by omega)
   rw [h, hk]
-  congr 2 <;> omega
+  congr 2; omega
 
 theorem copy_length : ∀ {n : Nat} {out o : List UInt8} {off : Nat},
     Lz4.copy out off n = some o → o.length = out.length + n := by
@@ -487,7 +485,7 @@ theorem step_complete {inp rest : List UInt8} {cap i : Nat} {out o : List UInt8}
   have hoff16 := off16_of_drop hoff (by simpa [hL] using hdo)
   have htake : (inp.drop (i + 1 + (Lz4.ext L).length)).take L = lits := by
     rw [hdq, ← hL, List.take_left]
-  have hn := length_ge_of_drop hd1 (by simp; omega)
+  have hn := length_ge_of_drop hd1 (by simp)
   simp only [List.length_append, List.length_cons] at hn
   have hlenb : (UInt8.ofNat (16 * min L 15 + min M 15) :: (Lz4.ext L ++ (lits ++
       ([UInt8.ofNat off, UInt8.ofNat (off / 256)] ++ Lz4.ext M)))).length =
