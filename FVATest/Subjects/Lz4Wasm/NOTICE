@@ -1,3 +1,10 @@
+lz4-block-codec.wasm, embedded by Lifted.lean:
+  sha256 4bda6947a0498618552cba53ab3780745fd34cc1a0d84696e83a0547dcd68acf
+  license BSD-2-Clause
+  upstream https://github.com/gorhill/lz4-wasm
+  version 8995cdef7b3adc4a4d2fc4fc86b84a86789ff858
+  corresponding source: https://raw.githubusercontent.com/gorhill/lz4-wasm/8995cdef7b3adc4a4d2fc4fc86b84a86789ff858/src/lz4-block-codec.wat (hand-written WebAssembly text)
+
 lz4-block-codec.wasm = dist/lz4-block-codec.wasm of https://github.com/gorhill/lz4-wasm at
 8995cdef7b3adc4a4d2fc4fc86b84a86789ff858 (sha256 4bda6947a0498618552cba53ab3780745fd34cc1a0d84696e83a0547dcd68acf),
 unmodified, under the license below. Lifted.lean embeds the same bytes.

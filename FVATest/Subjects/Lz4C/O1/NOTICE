@@ -1,3 +1,10 @@
+lz4-c-O1.wasm, embedded by Lifted.lean:
+  sha256 2268a91bc122168f17d6dcfc3ae198546f4cb620a688b6f255809cb81b360ab1
+  license BSD-2-Clause
+  upstream https://github.com/lz4/lz4
+  version 1.10.0
+  corresponding source: https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz (lib/lz4.c) + bench/tasks/lz4-c/build.sh with -O1 + bench/subjects/c-memory.c
+
 Third-party code in lz4-c-O1.wasm (sha256 2268a91bc122168f17d6dcfc3ae198546f4cb620a688b6f255809cb81b360ab1): lz4 1.10.0 lib/lz4.c + bench/subjects/c-memory.c,
 built as bench/tasks/lz4-c/build.sh does with -O1 in place of -O2 (U19 perturbation M4). Lifted.lean
 embeds the same bytes. Upstream https://github.com/lz4/lz4, tag v1.10.0; corresponding source:

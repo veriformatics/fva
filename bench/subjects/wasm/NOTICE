@@ -1,3 +1,17 @@
+lz4-c.wasm:
+  sha256 8b73efb63f0467d9999d867007969b75826140dce9e5677bd0439dc6af384ac6
+  license BSD-2-Clause
+  upstream https://github.com/lz4/lz4
+  version 1.10.0
+  corresponding source: https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz (lib/lz4.c) + bench/subjects/build-lz4 + bench/subjects/c-memory.c
+
+lz4-flex.wasm:
+  sha256 1f115e3a5ddee865621f406e2abf545854218cb8dc632d759e998553031aa775
+  license MIT
+  upstream https://github.com/PSeitz/lz4_flex
+  version 0.14.0
+  corresponding source: https://static.crates.io/crates/lz4_flex/lz4_flex-0.14.0.crate + bench/subjects/lz4-flex-shim + bench/subjects/build-lz4
+
 Third-party code in the WebAssembly builds in this directory (built by bench/subjects/build-lz4; pins in bench/subjects/lz4.sha256).
 
 lz4-c.wasm contains lz4 1.10.0 lib/lz4.c, under the BSD-2-Clause license:

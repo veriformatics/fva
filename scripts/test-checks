@@ -61,6 +61,24 @@ if ! (cd "$d" && scripts/check-scope) >/dev/null; then
 	echo "test-checks: check-scope failed a clean scope"
 	fail=1
 fi
+# check-notices (D57): a module embedding a manifest artifact's bytes needs a NOTICE naming its
+# sha256, license, upstream, version and corresponding source, here or in an ancestor directory
+d=$tmp/notices && mkdir -p "$d/scripts" "$d/bench/subjects" "$d/runs/r1/Proofs"
+cp scripts/check-notices "$d/scripts/" && cp bench/subjects/manifest.json "$d/bench/subjects/"
+printf 'def bytes : Nat := wasm_bytes%% "%s"\n' \
+	"$(xxd -p FVATest/Subjects/Lz4Wasm/lz4-block-codec.wasm | tr -d '\n')" >"$d/runs/r1/Proofs/Lifted.lean"
+git -C "$d" init -q && git -C "$d" add -A
+expect_fail "embedded artifact without a NOTICE" "$d" scripts/check-notices
+notice=$(jq -r '.subjects[] | select(.id == "lz4-wasm") |
+	"sha256 \(.sha256)\nlicense \(.license)\nupstream \(.upstream)\nversion \(.version)"' \
+	bench/subjects/manifest.json)
+printf '%s\n' "$notice" >"$d/runs/NOTICE" && git -C "$d" add -A
+expect_fail "NOTICE without the corresponding source" "$d" scripts/check-notices
+printf '%s\ncorresponding source: the .wat\n' "$notice" >"$d/runs/NOTICE" && git -C "$d" add -A
+if ! (cd "$d" && scripts/check-notices) >/dev/null; then
+	echo "test-checks: check-notices failed an ancestor NOTICE naming every field"
+	fail=1
+fi
 scripts/test-mutation-fixture || fail=1
 scripts/test-subject-matrix || fail=1
 exit "$fail"

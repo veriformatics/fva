@@ -56,6 +56,7 @@ run spec-lint .agent/spec-lint &
 run pins scripts/check-pins &
 run base-manifest scripts/make-base-manifest --check &
 run scope scripts/check-scope &
+run notices scripts/check-notices &
 if ((${#workflows[@]})); then
 	run actionlint actionlint "${workflows[@]}" &
 	run zizmor zizmor --offline "${workflows[@]}" &

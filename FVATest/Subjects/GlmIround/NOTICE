@@ -1,3 +1,10 @@
+glm-iround.wasm, embedded by Lifted.lean:
+  sha256 eded7ae1f3c1ba100d618a98f8f86eb690577a8358e47e31f2039eb2f4a75a3a
+  license MIT
+  upstream https://github.com/g-truc/glm
+  version 1.0.3
+  corresponding source: https://codeload.github.com/g-truc/glm/tar.gz/refs/tags/1.0.3 + bench/subjects/glm-shim + bench/subjects/build-glm
+
 Third-party code in glm-iround.wasm (built by bench/subjects/build-glm).
 
 It contains glm::iround from GLM 1.0.3 (https://github.com/g-truc/glm), under the MIT License:
