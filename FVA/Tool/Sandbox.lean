@@ -30,6 +30,30 @@ def pathDeps (root : FilePath) : IO (Array FilePath) := do
         out := out.push (← IO.FS.realPath (root / d))
   return out
 
+/-- The git packages of the manifest whose `packagesDir` lies outside `root` (D66: a shared
+read-only store such as the bench's, under the covered home): each package directory that holds
+a Lake configuration, resolved. Only these are exposed, read-only, never the directory around
+them, so a manifest cannot name `$HOME` itself into the sandbox. -/
+def externalPackages (root : FilePath) : IO (Array FilePath) := do
+  let m := root / "lake-manifest.json"
+  unless ← m.pathExists do return #[]
+  let j ← IO.ofExcept (Json.parse (← IO.FS.readFile m))
+  let some d := (j.getObjValAs? String "packagesDir").toOption | return #[]
+  let dir : FilePath := if (d : FilePath).isAbsolute then d else root / d
+  unless ← dir.isDir do return #[]
+  let dir ← IO.FS.realPath dir
+  let r ← IO.FS.realPath root
+  if dir.toString.startsWith (r.toString ++ "/") then return #[]
+  let mut out := #[]
+  for p in (j.getObjValAs? (Array Json) "packages").toOption.getD #[] do
+    unless (p.getObjValAs? String "type").toOption == some "git" do continue
+    let some n := (p.getObjValAs? String "name").toOption | continue
+    if n.isEmpty || n.startsWith "." || (n.splitOn "/").length > 1 then continue
+    let pkg := dir / n
+    if (← (pkg / "lakefile.lean").pathExists) || (← (pkg / "lakefile.toml").pathExists) then
+      out := out.push (← IO.FS.realPath pkg)
+  return out
+
 /-- How project code is confined (D19): `full` = every namespace unshared; `noNet` = the same
 without a network namespace, chosen only where bwrap cannot create one (an agent sandbox that
 denies netlink sockets) and the outer sandbox already denies sockets; `off` = `--no-sandbox`. -/
@@ -51,7 +75,7 @@ def bwrapArgs (root sysroot : FilePath) (writable : Array FilePath) (mode : Mode
   let deps ← pathDeps root
   let rw := #[root / ".lake"] ++ deps.map (· / ".lake") ++ writable
   for d in rw do IO.FS.createDirAll d
-  let ro := #[sysroot, root] ++ deps
+  let ro := #[sysroot, root] ++ deps ++ (← externalPackages root)
   -- the outer `PATH` stays (NixOS keeps its tools under /run/current-system); its entries under
   -- a covered directory just vanish
   let path := (← IO.getEnv "PATH").getD "/usr/local/bin:/usr/bin:/bin"

@@ -109,6 +109,27 @@ if ((rc != 1)) || ! grep -qx '  Proof check (fva trust): FAIL' "$d/explain.out";
 	echo "test-checks: fva explain on a project that does not build → rc $rc, want 1 + the FAIL line"
 	fail=1
 fi
+# D66: a manifest packagesDir outside the project (a shared package store) stays visible, read-only,
+# inside fva trust's sandbox: the project builds there (no `[build]`)
+d=$tmp/store && mkdir -p "$d/src/dep" "$d/proj"
+printf 'name = "dep"\n\n[[lean_lib]]\nname = "Dep"\n' >"$d/src/dep/lakefile.toml"
+printf 'def depValue : Nat := 7\n' >"$d/src/dep/Dep.lean"
+cp lean-toolchain "$d/src/dep/" && cp lean-toolchain "$d/proj/"
+git -C "$d/src/dep" init -q -b main && git -C "$d/src/dep" add -A &&
+	git -C "$d/src/dep" -c user.email=t@t -c user.name=t commit -qm dep
+printf 'name = "proj"\ndefaultTargets = ["P"]\npackagesDir = "%s"\n\n[[require]]\nname = "dep"\n' \
+	"$d/packages" >"$d/proj/lakefile.toml"
+printf 'git = "%s"\nrev = "main"\n\n[[lean_lib]]\nname = "P"\n' "$d/src/dep" >>"$d/proj/lakefile.toml"
+printf 'import Dep\ndef p : Nat := depValue\n' >"$d/proj/P.lean"
+if ! (cd "$d/proj" && lake update && lake build) >"$d/setup.log" 2>&1; then
+	echo "test-checks: the external-store project does not set up"
+	exit 2
+fi
+.lake/build/bin/fva trust "$d/proj" --spec-module P --root-module P >"$d/trust.out" 2>&1
+if grep -q '^  \[build\]' "$d/trust.out"; then
+	echo "test-checks: a packagesDir outside the project is hidden from fva trust's sandbox ([build])"
+	fail=1
+fi
 scripts/test-mutation-fixture || fail=1
 scripts/test-subject-matrix || fail=1
 exit "$fail"

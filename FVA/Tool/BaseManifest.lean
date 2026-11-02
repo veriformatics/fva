@@ -281,7 +281,7 @@ def baseManifest : List (String × String) := [
   ("FVA/Tool/Pack.lean",
     "c0d7fea682c1b880d071b7d1094e6e7416c13f6027feb2c73f506d758fae915a"),
   ("FVA/Tool/Sandbox.lean",
-    "74bf17c3ead2103ed72e0992b5230cd2510f9f0a4c2aec0cecc3f3c09575e892"),
+    "da5cc409fb1eb5d316df0eb371fed377652c87a6c3c6456dc88995b94a95d10f"),
   ("FVA/Tool/Trust.lean",
     "ab3f225f039feb58049f653eda5660d9f0e2ad3263b39a589b18e82524984e1e"),
   ("FVA/Tool/Wast.lean",
