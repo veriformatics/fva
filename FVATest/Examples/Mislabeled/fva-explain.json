@@ -1,0 +1,48 @@
+{"requirementsFile": "FVATest/Examples/Mislabeled/requirements.md",
+ "requirements":
+ [{"verdict": "different",
+   "text":
+   "clamp(x, lo, hi) returns lo when x < lo, hi when x > hi, and x otherwise (for lo <= hi).",
+   "reason":
+   "The claim guarantees that `clamp` always returns `x`, rather than selecting `lo` or `hi` when `x` is outside the bounds. For example, with `x < lo <= hi`, the requirement says to return `lo`, but the claim returns `x`.",
+   "id": "R1",
+   "claims": ["Examples.Mislabeled.clamp"]}],
+ "model": "gpt-6-luna",
+ "inputsSha":
+ "14f7b850e37e97bba4a57a6465c5adfdc55d2651b954d2a78a7d94465a142854",
+ "generated": "2026-11-02 13:18 UTC",
+ "effort": "medium",
+ "claims":
+ [{"verdict": "",
+   "summary":
+   "For every triple of 32-bit inputs, the exported “clamp” function returns its first input unchanged.",
+   "statement":
+   "∀ (x lo hi : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Mislabeled.Lifted.module \"clamp\"\n    [FVA.Wasm.Exec.Val.i32 x, FVA.Wasm.Exec.Val.i32 lo, FVA.Wasm.Exec.Val.i32 hi] [FVA.Wasm.Exec.Val.i32 x]",
+   "serves": ["R1"],
+   "resultBits": [32],
+   "reason": "",
+   "params":
+   [{"name": "x", "bits": 32},
+    {"name": "lo", "bits": 32},
+    {"name": "hi", "bits": 32}],
+   "name": "Examples.Mislabeled.clamp",
+   "intent":
+   "`clamp(x, lo, hi)` on signed 32-bit ints: `x` clamped into the range `[lo, hi]`. ",
+   "fn": "clamp",
+   "examples":
+   [{"spec": [0], "binary": [0], "args": [0, 0, 0]},
+    {"spec": [1], "binary": [1], "args": [1, 0, 2]},
+    {"spec": [4294967295], "binary": [4294967295], "args": [4294967295, 0, 2]},
+    {"spec": [2147483647],
+     "binary": [2147483647],
+     "args": [2147483647, 2147483648, 2147483647]},
+    {"spec": [2147483648],
+     "binary": [2147483648],
+     "args": [2147483648, 2147483647, 2147483648]},
+    {"spec": [1], "binary": [1], "args": [1, 1, 1]}],
+   "details":
+   ["Inputs are three 32-bit bitvectors: x, lo, and hi. They are passed as Wasm i32 values; the claim does not interpret them as signed or unsigned integers or state any arithmetic or wraparound behavior.",
+    "For every input triple, the module must be instantiable, and calling its exported function named “clamp” in a fresh instance under every host behavior must terminate without trapping and return exactly x."],
+   "caveats":
+   ["The function name and claimed behavior are misleading: despite being named “clamp,” the elaborated claim says the result equals the first argument unchanged; it does not compare against the bounds.",
+    "The claim is universally quantified over all 32-bit bit patterns, but provides no examples section in the elaborated statement itself."]}]}

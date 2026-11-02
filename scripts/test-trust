@@ -52,7 +52,8 @@ mapfile -t cheats < <(cut -d" " -f1 <<<"$pinned" | sort -u)
 lake build fva FVA "${cheats[@]/#/FVATest.Cheats.}" >/dev/null || exit 2
 examples=(Toy Mem Rust)
 # the examples are proofs FVA ships: warnings fail them (the cheats warn by design)
-lake --wfail build "${examples[@]/#/FVATest.Examples.}" >/dev/null || exit 2
+lake --wfail build "${examples[@]/#/FVATest.Examples.}" FVATest.Examples.Mislabeled >/dev/null ||
+	exit 2
 fva=.lake/build/bin/fva
 fail=0
 log=$tmp/log
@@ -119,6 +120,17 @@ for ex in "${examples[@]}"; do
 	fi
 	rm -f "$log.$ex"
 done
+# D5: a proven claim named and documented `clamp` that returns `x`, checked against the
+# requirement R1 (clamp) under neutral names → R1 DIFFERENT, rc 1 (saved text, current)
+"$fva" explain . --spec-module FVATest.Examples.Mislabeled.Spec \
+	--root-module FVATest.Examples.Mislabeled >"$log" 2>&1
+rc=$?
+if ((rc != 1)) || ! grep -q '^  Proof check (fva trust): PASS$' "$log" ||
+	! grep -q '^  ✗ R1: DIFFERENT' "$log" || grep -q STALE "$log"; then
+	echo "test-trust: example Mislabeled → explain rc $rc, pinned 1 with R1 DIFFERENT"
+	grep -E '^  (Proof check|STALE|✗|✓)' "$log" | head -5
+	fail=1
+fi
 wait "$certs"
 rc=$?
 if ((rc != 0)) || ! grep -q '^fva trust: PASS' "$log.certs"; then

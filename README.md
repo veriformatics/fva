@@ -64,7 +64,16 @@ The build fails when the output does not satisfy the relation. The certificate i
 fva explain . --spec-module MyProof.Spec --root-module MyProof
 ```
 
-`fva explain` writes a plain-English explanation of each claim, a table of example values (computed by Lean and by the real binary, never by the language model), and a check that the claim matches its docstring. It is a reading aid: the verdict comes from `fva trust`.
+`fva explain` writes a plain-English explanation of each claim, a table of example values (computed by Lean and by the real binary, never by the language model), and a check of the claims against your requirements. It is a reading aid: the verdict comes from `fva trust`.
+
+Write the requirements in `requirements.md` beside the spec module, in your own words. Start each requirement with a `## <id>` line:
+
+```markdown
+## R1
+clamp(x, lo, hi) returns lo when x < lo, hi when x > hi, and x otherwise.
+```
+
+An agent can draft this file from the README, the issues or the source code. Read and approve it before you rely on the result: it is the reference that the claims are checked against. The model explains the claims without their names and docstrings, so a claim that is named `clamp` but returns `x` gets the verdict DIFFERENT. Without a requirements file, each claim is compared with its own docstring, which its author wrote.
 
 ## What a PASS means
 
