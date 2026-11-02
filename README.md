@@ -108,7 +108,7 @@ Your review covers the claims in your specification files only. FVA's own files 
 - FVA verifies core WebAssembly 2.0 without SIMD, threads, exceptions or garbage-collected types.
 - Programs that read files or the network through WASI are not modeled; certify their outputs instead.
 - A proof shows that the binary meets the claims. It is your task to check that the claims say what you want.
-- `fva trust` and `fva explain` run the project's own code (its Lake configuration, its build, its Lean definitions) in a `bwrap` sandbox: no network, the system read-only, your home directory hidden, and writes allowed only in the project's `.lake` directories. The project needs a `lake-manifest.json`. FVA itself still reads the project's compiled `.olean` files. If you do not trust a project, run FVA inside a container or a virtual machine as well.
+- `fva trust` and `fva explain` run the project's own code (its Lake configuration, its build, its Lean definitions) in a `bwrap` sandbox: no network, the system read-only, your home directory hidden, and writes allowed only in the project's `.lake` directories. The project needs a `lake-manifest.json`. Inside an agent's sandbox that denies network sockets, `fva trust` keeps its sandbox without its own network namespace and says so; where bwrap cannot run at all, `--no-sandbox` runs without it (use it only inside a container you trust). FVA itself still reads the project's compiled `.olean` files. If you do not trust a project, run FVA inside a container or a virtual machine as well.
 
 ## License
 

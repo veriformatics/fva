@@ -298,8 +298,10 @@ def evalLean (root : System.FilePath) (spec : String) (cmd : System.FilePath →
     let src := tmp / "FvaExplain.lean"
     IO.FS.writeFile src s!"import {spec}\nimport FVA.Explain\n{cmd out}\n"
     let sysroot ← Lean.findSysroot
+    -- the mode `fva trust` would choose (D19: reduced inside an agent sandbox)
+    let mode := ((← Sandbox.choose root sysroot).toOption).getD .full
     let a ← Sandbox.spawnArgs root sysroot (sysroot / "bin" / "lake").toString
-      #["env", "lean", src.toString] #[tmp]
+      #["env", "lean", src.toString] #[tmp] (mode := mode)
     let r ← runTimed a.cmd a.args root secs
     let lines := (← IO.FS.readFile out).splitOn "\n" |>.filter (!·.isEmpty)
     return (lines.toArray.filterMap fun l => (Json.parse l).toOption,
