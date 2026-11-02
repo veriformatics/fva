@@ -217,9 +217,12 @@ def run (argv : List String) : IO UInt32 := do
   let env ← try importModules #[{ module := spec }, { module := rootMod }] {} catch e =>
     IO.eprintln s!"fva trust: cannot import {spec} and {rootMod} (built?): {e}"; return 2
   let base ← baseModules env spec.getPrefix
+  let pinFile := fvaRoot / "trust" / "oleans.tsv"
+  let oleanPins ← try readOleanPins pinFile catch e =>
+    IO.eprintln s!"fva trust: cannot read the .olean pins {pinFile}: {e}"; return 2
   let input : Input :=
     { root, specModule := spec, rootModule := rootMod, subjects := o.subjects, base,
-      trustedPkgs }
+      trustedPkgs, oleanPins }
   let ctx : Core.Context := { fileName := "<fva trust>", fileMap := default }
   let (r, _) ← (collect input).toIO ctx { env }
   -- replay: claims + proofs + the fixed bundle, every run-set kernel on the export
@@ -337,7 +340,8 @@ def main (argv : List String) : IO UInt32 := do
     let r : Report :=
       { built := false, claims := [], flags := [], reviewModules := [], subjectSyntax := [],
         unmarked := [],
-        vocabulary := [], prelude := [], needsLink := false, links := [], exportOk := false,
+        vocabulary := [], prelude := [], tampered := [], needsLink := false, links := [],
+        exportOk := false,
         replay := [], canaries := [], canarySet := [], budget := none }
     IO.print (render r .fail (issues r) [] "" o.subjects)
     IO.eprintln (b.stdout.takeEnd 1500).toString

@@ -5,6 +5,7 @@ import FVA.Tool.Blob
 import FVA.Spec.Cert
 import FVA.Trust.Lines
 import FVA.Spec.ClaimAttr
+import FVA.Trust.Olean
 
 /-!
 # Trust facts from the environment (trusted glue)
@@ -39,6 +40,8 @@ structure Input where
   base : NameSet := {}
   /-- Resolved package directories whose modules count as Mathlib (`trustedPackages`). -/
   trustedPkgs : Array System.FilePath := #[]
+  /-- Pinned `.olean` digest per Mathlib module (D48, `trust/oleans.tsv`). -/
+  oleanPins : Std.HashMap String String := {}
 
 /-- The kernel's fixed bundle (Lake `Check.lean` primitive + builtin targets): constants the
 kernel treats specially, which must come from the official prelude. -/
@@ -93,8 +96,8 @@ def manifestPins (path : System.FilePath) :
 /-- Package directories whose modules count as Mathlib (contract F2): a package the project's
 manifest pins at the URL + revision FVA's own manifest pins, checked out (detached `.git/HEAD`)
 at that revision. Any other package, a local or forked one included, is project code. The
-checkout's files + `.olean`s are trusted state of the environment: `fva trust` runs no `git`
-in them (repository config can run commands) and never re-hashes their bytes. -/
+checkout runs no `git` from `fva trust` (repository config can run commands); its `.olean`s
+must still match the pins (`oleanMismatches`, D48), since the project's build can rewrite them. -/
 def trustedPackages (root fvaRoot : System.FilePath) : IO (Array System.FilePath) := do
   let (_, pins) ← manifestPins (fvaRoot / "lake-manifest.json")
   let (dir, pkgs) ← manifestPins (root / "lake-manifest.json")
@@ -285,6 +288,10 @@ def collect (input : Input) : CoreM Report := do
   let generated : NameSet :=
     blobs.fold (fun s m _ => s.insert m) (lifted.fold (fun s m _ => s.insert m) {})
   let orig ← origins env input generated
+  -- D48: a module counted as Mathlib must be the pinned compiled bytes
+  let mathlibMods ← (env.header.moduleNames.filter (orig.get? · == some .mathlib)).mapM
+    fun m => return (m, ← IO.FS.realPath (← findOLean m))
+  let tampered ← oleanMismatches input.oleanPins mathlibMods
   let originOf (c : Name) : Origin := ((modOf env c).bind orig.get?).getD .project
   let trusted (c : Name) : Bool := originOf c == .core || originOf c == .mathlib
   -- claims (D13): the spec module's `@[fva_claim]` definitions; a theorem there = a claim proven
@@ -400,7 +407,7 @@ def collect (input : Input) : CoreM Report := do
            reviewModules := reviewModules.toList, subjectSyntax := subjectSyntax.toList,
            unmarked := (unmarked.map (·.toString)).toList,
            vocabulary := vocabulary.toList,
-           prelude := prelude.toList,
+           prelude := prelude.toList, tampered := tampered.toList,
            needsLink := input.subjects.isEmpty, links := links.toList, exportOk := false,
            replay := [], canaries := [], canarySet := [], budget := none }
 

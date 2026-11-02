@@ -79,6 +79,16 @@ if ! (cd "$d" && scripts/check-notices) >/dev/null; then
 	echo "test-checks: check-notices failed an ancestor NOTICE naming every field"
 	fail=1
 fi
+# make-olean-pins --check (D48): pins that miss one package module, or pin other bytes, fail
+d=$tmp/oleans && mkdir -p "$d"
+sed '2d' trust/oleans.tsv >"$d/missing" && expect_fail "olean pins missing a module" . \
+	scripts/make-olean-pins --check "$d/missing"
+sed -E '2s/\t[0-9a-f]+$/\tdeadbeef/' trust/oleans.tsv >"$d/other" && expect_fail "olean pin of other bytes" . \
+	scripts/make-olean-pins --check "$d/other"
+if ! scripts/make-olean-pins --check >/dev/null 2>&1; then
+	echo "test-checks: make-olean-pins --check failed the committed pins"
+	fail=1
+fi
 scripts/test-mutation-fixture || fail=1
 scripts/test-subject-matrix || fail=1
 exit "$fail"

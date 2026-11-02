@@ -56,6 +56,9 @@ theorem ruleSyntax_nil (r : Report) : ruleSyntax r = [] ↔
 theorem rulePrelude_nil (r : Report) : rulePrelude r = [] ↔ r.prelude = [] := by
   simp [rulePrelude]
 
+theorem ruleOlean_nil (r : Report) : ruleOlean r = [] ↔ r.tampered = [] := by
+  simp [ruleOlean]
+
 theorem ruleLink_nil (r : Report) : ruleLink r = [] ↔ (r.needsLink = true → r.links ≠ []) ∧
     ∀ l ∈ r.links, l.present = true ∧ l.bytesMatch = true ∧ l.lenMatch = true ∧
       (l.kind = .wasm → l.decodeEq = true) ∧ l.regenerates = true := by
@@ -120,12 +123,13 @@ theorem issues_nil_iff (r : Report) : issues r = [] ↔ Pass r := by
   simp only [issues, List.flatten_eq_nil_iff, List.forall_mem_cons, List.mem_nil_iff,
     false_implies, implies_true, and_true, ruleBuild_nil, ruleClaims_nil, ruleUnproven_nil,
     ruleAxiom_nil, ruleVacuous_nil, ruleLayout_nil, ruleOverride_nil, ruleSyntax_nil,
-    rulePrelude_nil, ruleLink_nil, ruleReplay_nil, ruleChecker_nil, ruleSurface_nil]
+    rulePrelude_nil, ruleOlean_nil, ruleLink_nil, ruleReplay_nil, ruleChecker_nil,
+    ruleSurface_nil]
   constructor
-  · rintro ⟨hb, hc, hu, ha, hv, hl, hf, hs, hp, hk, hr, hch, hsu⟩
-    exact ⟨hb, hc, hu, ha, hv, hl, hf, hs, hp, hk, hr, hch, hsu⟩
-  · rintro ⟨hb, hc, hu, ha, hv, hl, hf, hs, hp, hk, hr, hch, hsu⟩
-    exact ⟨hb, hc, hu, ha, hv, hl, hf, hs, hp, hk, hr, hch, hsu⟩
+  · rintro ⟨hb, hc, hu, ha, hv, hl, hf, hs, hp, ho, hk, hr, hch, hsu⟩
+    exact ⟨hb, hc, hu, ha, hv, hl, hf, hs, hp, ho, hk, hr, hch, hsu⟩
+  · rintro ⟨hb, hc, hu, ha, hv, hl, hf, hs, hp, ho, hk, hr, hch, hsu⟩
+    exact ⟨hb, hc, hu, ha, hv, hl, hf, hs, hp, ho, hk, hr, hch, hsu⟩
 
 theorem verdict_pass_iff (r : Report) : verdict r = .pass ↔ Pass r := by
   rw [← issues_nil_iff]
