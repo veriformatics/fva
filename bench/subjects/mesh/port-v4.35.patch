@@ -1,0 +1,439 @@
+diff --git a/CSG/Proof/BVH.lean b/CSG/Proof/BVH.lean
+index be35e32..f0b7795 100644
+--- a/CSG/Proof/BVH.lean
++++ b/CSG/Proof/BVH.lean
+@@ -356,8 +356,8 @@ theorem ioverlap_eq (q : Box) (v : IBox) (hd : 0 < v.d) :
+   -- unfolding under `decide` leaves a stale `Decidable` instance, so compare the
+   -- underlying propositions instead of the `decide`s
+   rw [Bool.eq_iff_iff]
+-  simp only [ioverlap, iboxQ, overlap, ratBox, Bool.and_eq_true, decide_eq_true_eq,
+-    qle_div_iff _ _ _ hd, div_le_q_iff _ _ _ hd]
++  simp only [ioverlap, overlap, Bool.and_eq_true, decide_eq_true_eq]
++  simp only [iboxQ, ratBox, qle_div_iff _ _ _ hd, div_le_q_iff _ _ _ hd]
+ 
+ /-- X1 -/
+ theorem ioverlap_iboxOfBox (q b : Box) :
+@@ -776,8 +776,8 @@ theorem irayMeetsBoxFwdAx_eq (x d : Pt) (axis : Nat) (pos : Bool)
+     · rw [hline, Bool.true_and]
+       have hle : v.lox ≤ v.hix := by
+         rw [ilineMeetsBoxAx] at hline
+-        simp only [iaxLo, iaxHi, Bool.and_eq_true, decide_eq_true_eq] at hline
+-        exact hline.1.1.1
++        simp only [Bool.and_eq_true, decide_eq_true_eq] at hline
++        simpa [iaxLo, iaxHi] using hline.1.1.1
+       rw [irayMeetsBoxFwdAx, hline, Bool.true_and]
+       simp only [iaxLo, iaxHi, beq_self_eq_true]
+       have := islabNonneg_islab_ax d.x x.x pos v.d v.lox v.hix hdd hpe hle
+@@ -797,8 +797,8 @@ theorem irayMeetsBoxFwdAx_eq (x d : Pt) (axis : Nat) (pos : Bool)
+       simp only [Bool.true_and, Bool.and_true]
+       have hle : v.loy ≤ v.hiy := by
+         rw [ilineMeetsBoxAx] at hline
+-        simp only [iaxLo, iaxHi, Bool.and_eq_true, decide_eq_true_eq] at hline
+-        exact hline.1.1.1
++        simp only [Bool.and_eq_true, decide_eq_true_eq] at hline
++        simpa [iaxLo, iaxHi] using hline.1.1.1
+       rw [irayMeetsBoxFwdAx, hline, Bool.true_and]
+       simp only [iaxLo, iaxHi]
+       have := islabNonneg_islab_ax d.y x.y pos v.d v.loy v.hiy hdd hpe hle
+@@ -818,8 +818,8 @@ theorem irayMeetsBoxFwdAx_eq (x d : Pt) (axis : Nat) (pos : Bool)
+       simp only [Bool.true_and, Bool.and_true]
+       have hle : v.loz ≤ v.hiz := by
+         rw [ilineMeetsBoxAx] at hline
+-        simp only [iaxLo, iaxHi, Bool.and_eq_true, decide_eq_true_eq] at hline
+-        exact hline.1.1.1
++        simp only [Bool.and_eq_true, decide_eq_true_eq] at hline
++        simpa [iaxLo, iaxHi] using hline.1.1.1
+       rw [irayMeetsBoxFwdAx, hline, Bool.true_and]
+       simp only [iaxLo, iaxHi]
+       have := islabNonneg_islab_ax d.z x.z pos v.d v.loz v.hiz hdd hpe hle
+@@ -1028,8 +1028,9 @@ theorem moverlap_of_overlap (h : BVH) (q b : Box) (hov : overlap q b = true) :
+     moverlap (mboxQ h q) (mboxOfBox h.ax h.ay h.az h.ce b) = true := by
+   simp only [overlap, Bool.and_eq_true, decide_eq_true_eq] at hov
+   obtain ⟨⟨⟨⟨⟨h1, h2⟩, h3⟩, h4⟩, h5⟩, h6⟩ := hov
+-  simp only [moverlap, mboxQ, mboxOfBox_lox, mboxOfBox_loy, mboxOfBox_loz,
+-    mboxOfBox_hix, mboxOfBox_hiy, mboxOfBox_hiz, Bool.and_eq_true, decide_eq_true_eq]
++  simp only [moverlap, Bool.and_eq_true, decide_eq_true_eq]
++  simp only [mboxQ, mboxOfBox_lox, mboxOfBox_loy, mboxOfBox_loz,
++    mboxOfBox_hix, mboxOfBox_hiy, mboxOfBox_hiz]
+   exact ⟨⟨⟨⟨⟨mantFloor_le_mantCeil_of_le _ _ h1, mantFloor_le_mantCeil_of_le _ _ h2⟩,
+     mantFloor_le_mantCeil_of_le _ _ h3⟩, mantFloor_le_mantCeil_of_le _ _ h4⟩,
+     mantFloor_le_mantCeil_of_le _ _ h5⟩, mantFloor_le_mantCeil_of_le _ _ h6⟩
+@@ -1715,8 +1716,8 @@ theorem mrayMeetsBoxFwdAx_eq (x d : Pt) (ax ay az : ℚ) (e : ℤ) (axis : ℕ)
+     · rw [hline, Bool.true_and]
+       have hle : v.lox ≤ v.hix := by
+         rw [mlineMeetsBoxAx] at hline
+-        simp only [maxLo, maxHi, Bool.and_eq_true, decide_eq_true_eq] at hline
+-        exact hline.1.1.1
++        simp only [Bool.and_eq_true, decide_eq_true_eq] at hline
++        simpa [maxLo, maxHi] using hline.1.1.1
+       rw [mrayMeetsBoxFwdAx, hline, Bool.true_and]
+       simp only [maxLo, maxHi, beq_self_eq_true, if_pos]
+       have := mslabNonneg_dslab_ax d.x x.x ax e pos v.lox v.hix hdd hpe hle
+@@ -1737,8 +1738,8 @@ theorem mrayMeetsBoxFwdAx_eq (x d : Pt) (ax ay az : ℚ) (e : ℤ) (axis : ℕ)
+       simp only [Bool.true_and, Bool.and_true]
+       have hle : v.loy ≤ v.hiy := by
+         rw [mlineMeetsBoxAx] at hline
+-        simp only [maxLo, maxHi, Bool.and_eq_true, decide_eq_true_eq] at hline
+-        exact hline.1.1.1
++        simp only [Bool.and_eq_true, decide_eq_true_eq] at hline
++        simpa [maxLo, maxHi] using hline.1.1.1
+       rw [mrayMeetsBoxFwdAx, hline, Bool.true_and]
+       simp only [maxLo, maxHi]
+       have := mslabNonneg_dslab_ax d.y x.y ay e pos v.loy v.hiy hdd hpe hle
+@@ -1759,8 +1760,8 @@ theorem mrayMeetsBoxFwdAx_eq (x d : Pt) (ax ay az : ℚ) (e : ℤ) (axis : ℕ)
+       simp only [Bool.true_and, Bool.and_true]
+       have hle : v.loz ≤ v.hiz := by
+         rw [mlineMeetsBoxAx] at hline
+-        simp only [maxLo, maxHi, Bool.and_eq_true, decide_eq_true_eq] at hline
+-        exact hline.1.1.1
++        simp only [Bool.and_eq_true, decide_eq_true_eq] at hline
++        simpa [maxLo, maxHi] using hline.1.1.1
+       rw [mrayMeetsBoxFwdAx, hline, Bool.true_and]
+       simp only [maxLo, maxHi]
+       have := mslabNonneg_dslab_ax d.z x.z az e pos v.loz v.hiz hdd hpe hle
+diff --git a/CSG/Proof/MeshIntersectAtomize.lean b/CSG/Proof/MeshIntersectAtomize.lean
+index e2e96e4..c46228e 100644
+--- a/CSG/Proof/MeshIntersectAtomize.lean
++++ b/CSG/Proof/MeshIntersectAtomize.lean
+@@ -846,7 +846,8 @@ private theorem hCands_complete {vs : Array Vtx} {a b v : Vtx}
+   have hsz : idx < (univBoxes vs).size := by rw [univBoxes, Array.size_map]; exact hidx
+   have hbox : Impl.BVH.overlap (edgeBox a b) ((univBoxes vs).getD idx default) = true := by
+     rw [Proof.MeshIntersectKeep.arr_getD _ _ _ hsz]
+-    show Impl.BVH.overlap (edgeBox a b) (vs.map vtxBox)[idx] = true
++    show Impl.BVH.overlap (edgeBox a b)
++      ((vs.map vtxBox)[idx]'(by simpa only [Array.size_map] using hidx)) = true
+     rw [Array.getElem_map, hveq']
+     exact hov
+   -- boxQuery returns idx (no sort/dedup to traverse any more)
+diff --git a/CSG/Proof/MeshIntersectClusterBFS.lean b/CSG/Proof/MeshIntersectClusterBFS.lean
+index a0508c3..dc1de43 100644
+--- a/CSG/Proof/MeshIntersectClusterBFS.lean
++++ b/CSG/Proof/MeshIntersectClusterBFS.lean
+@@ -79,21 +79,14 @@ theorem forIn_array_eq {α β : Type} (as : Array α) (init : β) (F : α → β
+ /-- `Array.set!` is `setIfInBounds`: a write at another index is invisible. -/
+ theorem getD_set_ne {α : Type} (a : Array α) (j i : Nat) (v d : α) (h : i ≠ j) :
+     (a.set! j v).getD i d = a.getD i d := by
+-  simp only [Array.set!_eq_setIfInBounds, Array.getD, Array.size_setIfInBounds]
+-  by_cases hi : i < a.size
+-  · rw [dif_pos hi, dif_pos hi]
+-    show (Array.setIfInBounds a j v)[i]'(by simpa using hi) = a[i]
+-    simp only [Array.setIfInBounds]
+-    split
+-    · exact Array.getElem_set_ne _ _ (fun hc => h hc.symm)
+-    · rfl
+-  · rw [dif_neg hi, dif_neg hi]
++  simp only [Array.set!_eq_setIfInBounds, Array.getD_eq_getD_getElem?,
++    Array.getElem?_setIfInBounds_ne (Ne.symm h)]
+ 
+ /-- An in-bounds `Array.set!` is visible at the written index. -/
+ theorem getD_set_self {α : Type} (a : Array α) (j : Nat) (v d : α) (h : j < a.size) :
+     (a.set! j v).getD j d = v := by
+-  simp only [Array.set!_eq_setIfInBounds, Array.getD, Array.size_setIfInBounds, dif_pos h]
+-  exact Array.getElem_setIfInBounds_self _
++  simp only [Array.set!_eq_setIfInBounds, Array.getD_eq_getD_getElem?,
++    Array.getElem?_setIfInBounds_self_of_lt h, Option.getD_some]
+ 
+ /-- A `true` read from a `Bool` array with default `false` is in bounds. -/
+ theorem getD_true_lt (a : Array Bool) (i : Nat) (h : a.getD i false = true) : i < a.size := by
+diff --git a/CSG/Proof/MeshIntersectLedger.lean b/CSG/Proof/MeshIntersectLedger.lean
+index ade143c..f7b1f08 100644
+--- a/CSG/Proof/MeshIntersectLedger.lean
++++ b/CSG/Proof/MeshIntersectLedger.lean
+@@ -225,7 +225,9 @@ theorem mem_candidates_lt {A B : Array FaceS} {i : ℕ} {j : Nat}
+     have hi' : i < A.size := by
+       have : (candidates A B).size = A.size := Array.size_map ..
+       omega
+-    unfold candidates at hj
++    change j ∈ (A.map (fun f => Impl.BVH.boxQuery
++      (Impl.BVH.buildBVH (B.map (fun g => boxToBVH (bboxOfFace g))))
++      (boxToBVH (bboxOfFace f))))[i]'(by simpa only [Array.size_map] using hi') at hj
+     rw [Array.getElem_map] at hj
+     have := Proof.BVH.boxQuery_mem_lt (B.map (fun g => boxToBVH (bboxOfFace g)))
+       (boxToBVH (bboxOfFace (A[i]'hi'))) j hj
+diff --git a/CSG/Proof/MeshIntersectM2Equiv.lean b/CSG/Proof/MeshIntersectM2Equiv.lean
+index 90d528e..e92467d 100644
+--- a/CSG/Proof/MeshIntersectM2Equiv.lean
++++ b/CSG/Proof/MeshIntersectM2Equiv.lean
+@@ -502,14 +502,14 @@ theorem clipFragScoped_setPlane (g : IPlane) (scope : Box3) (p : IPlane)
+     clipFragScoped g scope (setPlaneP p fb)
+     = (clipFragScoped g scope fb).map (setPlaneP p) := by
+   simp only [clipFragScoped, setPlaneP]
+-  split
++  split <;> rename_i h <;> simp only [h, ↓reduceIte]
+   · rw [clipFrag_setPlane, Array.map_map, Array.map_map]
+     apply Array.ext'
+     rw [Array.toList_map, Array.toList_map]
+     apply List.map_congr_left
+     intro q _
+     simp only [Function.comp, setPlaneP, fragPolyBox_setPlane]
+-  · simp only [Array.map_singleton, setPlaneP]
++  · simp [setPlaneP]
+ 
+ theorem flatMap_clipFragScoped_setPlane (p : IPlane) (t : IPlane × Box3)
+     (acc : Array (Frag × Box3)) :
+diff --git a/CSG/Proof/MeshIntersectM2EquivEmit.lean b/CSG/Proof/MeshIntersectM2EquivEmit.lean
+index 6178d09..5f3f597 100644
+--- a/CSG/Proof/MeshIntersectM2EquivEmit.lean
++++ b/CSG/Proof/MeshIntersectM2EquivEmit.lean
+@@ -136,7 +136,7 @@ theorem emitFrag_tr (O : Point) (f : Frag) :
+     have g2 : ((f.poly.map (trVtx (ofPoint O))).getD 2 default).p
+             = psubS (f.poly.getD 2 default).p (ofPoint O) := by
+       rw [map_getD_lt _ _ _ (by omega) _ default]; rfl
+-    rw [g0, g1, g2, beqS_psubS, beqS_psubS, beqS_psubS]
++    simp only [trFrag_poly, g0, g1, g2, beqS_psubS]
+     apply Array.ext'
+     split_ifs with hc <;>
+       simp [trTri_triangle]
+diff --git a/CSG/Proof/MeshIntersectM2EquivSeam.lean b/CSG/Proof/MeshIntersectM2EquivSeam.lean
+index 1052983..ee59a6a 100644
+--- a/CSG/Proof/MeshIntersectM2EquivSeam.lean
++++ b/CSG/Proof/MeshIntersectM2EquivSeam.lean
+@@ -54,9 +54,7 @@ theorem clipFrag_setPlane (g p : IPlane) (f : Frag) :
+     = (clipFrag g f).map (setPlane p) := by
+   obtain ⟨pl, poly⟩ := f
+   simp only [setPlane, clipFrag]
+-  split
+-  · simp [setPlane]
+-  · simp only [List.map_toArray, List.map_cons, List.map_nil, setPlane]
++  split <;> simp_all [setPlane]
+ 
+ /-! ## 1. The seed seam: `fragOfFace ∘ trFaceS = setPlane (recomputed) ∘ trFrag ∘ fragOfFace` -/
+ 
+diff --git a/CSG/Proof/MeshIntersectRayClassifyNormal.lean b/CSG/Proof/MeshIntersectRayClassifyNormal.lean
+index c846700..6c1bdd5 100644
+--- a/CSG/Proof/MeshIntersectRayClassifyNormal.lean
++++ b/CSG/Proof/MeshIntersectRayClassifyNormal.lean
+@@ -643,9 +643,7 @@ private theorem materialize_getD_fields {M : Mesh} (i : ℕ) (hi : i < M.size) :
+     ((materialize M).getD i default).v₁.p = ofPoint (M[i]'hi).v₁ ∧
+     ((materialize M).getD i default).v₂.p = ofPoint (M[i]'hi).v₂ := by
+   have hisz : i < (materialize M).size := by unfold materialize; rw [Array.size_map]; exact hi
+-  rw [arr_getD _ _ _ hisz]
+-  unfold materialize
+-  rw [Array.getElem_map]
++  rw [arr_getD _ _ _ hisz, Proof.MeshIntersectClipBridge.materialize_getElem M i hi]
+   exact ⟨rfl, rfl, rfl⟩
+ 
+ /-- The `P3` barycenter of the three materialized vertices is `ofPoint (baryPt M[i])`.
+diff --git a/CSG/Proof/NormalCheckCell.lean b/CSG/Proof/NormalCheckCell.lean
+index 01263f4..5568545 100644
+--- a/CSG/Proof/NormalCheckCell.lean
++++ b/CSG/Proof/NormalCheckCell.lean
+@@ -471,7 +471,7 @@ private theorem safeStep_pos (G : Array Half) (d p : Point) :
+   have hdenom0 : 0 ≤ denom := (safeStep_denom_fold_ge G d).1
+   have hs := safeStep_s_pos G d p
+   have hden : 0 < 1 + denom := by linarith
+-  positivity
++  exact div_pos (div_pos hs hden) (by norm_num)
+ 
+ /-- **(PERT).**  For `g ∈ G` with `g.eval p ≠ 0`,
+ `(safeStep G d p) · |dotQ g.n d| < |g.eval p|`. -/
+@@ -630,7 +630,9 @@ private theorem samplePlanes_dotQ_dir_ne_zero (w : Chain) :
+     unfold scanNormals; exact Array.size_map
+   have hjlt' : (j : ℕ) < (scanNormals w).size := by rw [hsize]; exact hjlt
+   have hscan_j : (scanNormals w)[(j : ℕ)]'hjlt' = (samplePlanes w)[j].n := by
+-    unfold scanNormals; rw [Array.getElem_map]
++    simpa only [scanNormals] using
++      (Array.getElem_map (fun g : Half => g.n) (xs := samplePlanes w) (i := j)
++        (by simpa only [Array.size_map] using hjlt))
+   have hne := hgen (j : ℕ) hjlt'
+   simp only [bne_iff_ne, ne_eq] at hne
+   have hne' : dotQ ((scanNormals w)[(j : ℕ)]'hjlt') (dir w) ≠ 0 := hne
+diff --git a/CSG/Proof/NormalCheckVertex.lean b/CSG/Proof/NormalCheckVertex.lean
+index fbc1d57..f5fb3ef 100644
+--- a/CSG/Proof/NormalCheckVertex.lean
++++ b/CSG/Proof/NormalCheckVertex.lean
+@@ -326,7 +326,8 @@ theorem stepA'_increment {G : Fin m → Half} {s : Fin m → ℚ} {x : Point}
+   set Dec : Finset (Fin m) :=
+     Finset.univ.filter (fun j => s j * (gOf (G j)).linear v < 0) with hDecdef
+   have hmemDec : ∀ j, j ∈ Dec ↔ s j * (gOf (G j)).linear v < 0 := by
+-    intro j; rw [hDecdef]; simp
++    intro j; rw [hDecdef]
++    simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+   -- Nonempty by `hdec`.
+   have hne : Dec.Nonempty := by
+     obtain ⟨j, hj⟩ := hdec
+diff --git a/CSG/Proof/SimImplCover.lean b/CSG/Proof/SimImplCover.lean
+index c63ce03..115f140 100644
+--- a/CSG/Proof/SimImplCover.lean
++++ b/CSG/Proof/SimImplCover.lean
+@@ -2657,7 +2657,6 @@ theorem kfpc_eq (G : Array Half) (idxs : Array Nat) :
+         then acc.push i else acc) acc).toList
+       = L.foldl (fun acc i => if acc.all (fun j => ! relB G j i) then acc ++ [i] else acc) acc.toList by
+     convert h #[] using 3
+-    rfl
+   intro acc
+   induction L generalizing acc with
+   | nil => simp
+diff --git a/CSG/Proof/SimImplCoverCore.lean b/CSG/Proof/SimImplCoverCore.lean
+index a077f49..fbdf2e8 100644
+--- a/CSG/Proof/SimImplCoverCore.lean
++++ b/CSG/Proof/SimImplCoverCore.lean
+@@ -444,7 +444,7 @@ theorem det3_ne_zero_iff_linearIndependent (a b c : Point) :
+   rw [det3_eq]
+   set M : Matrix (Fin 3) (Fin 3) ℚ := ![a, b, c] with hM
+   have hdet : a ⬝ᵥ crossProduct b c = Matrix.det M := by
+-    rw [hM, Matrix.det_fin_three]; simp [cross_apply, dotProduct, Fin.sum_univ_three]; ring
++    rw [Matrix.det_fin_three]; simp [hM, cross_apply, dotProduct, Fin.sum_univ_three]; ring
+   rw [hdet]
+   rw [show LinearIndependent ℚ (![a, b, c] : Fin 3 → Point) ↔ LinearIndependent ℚ M.row
+         from Iff.rfl,
+diff --git a/CSG/Proof/SimWinding.lean b/CSG/Proof/SimWinding.lean
+index f99cf21..d31c459 100644
+--- a/CSG/Proof/SimWinding.lean
++++ b/CSG/Proof/SimWinding.lean
+@@ -856,7 +856,7 @@ private theorem perturb_along {ι : Type*} [Fintype ι] (g : ι → (Point →
+     obtain ⟨j0⟩ := hne
+     set ε : ℚ := min 1 (Finset.univ.inf' ⟨j0, Finset.mem_univ _⟩ e) with hεdef
+     have hinf_pos : 0 < Finset.univ.inf' ⟨j0, Finset.mem_univ _⟩ e := by
+-      rw [Finset.lt_inf'_iff]; intro j _; exact he_pos j
++      exact (Finset.lt_inf'_iff _).mpr (fun j _ => he_pos j)
+     have hεpos : 0 < ε := lt_min (by norm_num) hinf_pos
+     refine ⟨ε, hεpos, ?_⟩
+     rw [hK]; simp only [Set.mem_iInter, Set.mem_setOf_eq]
+diff --git a/CSG/Proof/SurfaceBoundaryGeom.lean b/CSG/Proof/SurfaceBoundaryGeom.lean
+index c95aafb..4c84bb4 100644
+--- a/CSG/Proof/SurfaceBoundaryGeom.lean
++++ b/CSG/Proof/SurfaceBoundaryGeom.lean
+@@ -185,8 +185,7 @@ theorem exists_box_pos_family {ι : Type*} [Fintype ι] (g : ι → (Point →
+     obtain ⟨α₀⟩ := hemp
+     set r := Finset.univ.inf' ⟨α₀, Finset.mem_univ α₀⟩ rf with hrdef
+     have hrpos' : 0 < r := by
+-      rw [hrdef, Finset.lt_inf'_iff]
+-      exact fun α _ => hrpos α
++      exact (Finset.lt_inf'_iff _).mpr (fun α _ => hrpos α)
+     refine ⟨r, hrpos', fun P hP α => ?_⟩
+     have hle : r ≤ rf α := Finset.inf'_le _ (Finset.mem_univ α)
+     exact hrspec α P (fun i => (hP i).trans hle)
+diff --git a/CSG/Proof/WellFormedCheckCycle.lean b/CSG/Proof/WellFormedCheckCycle.lean
+index 608a3ba..c8886f7 100644
+--- a/CSG/Proof/WellFormedCheckCycle.lean
++++ b/CSG/Proof/WellFormedCheckCycle.lean
+@@ -133,11 +133,6 @@ theorem edgeKeys_count (M : Mesh) (a b : Point) :
+   rw [List.count_map_of_injective _ _ ekeyPair_inj (a, b)]
+   -- and the source-list count is the multiset count of edgeMultiset
+   rw [edgeMultiset, Multiset.coe_count]
+-  -- the two `List.count`s differ only in the inferred `BEq (Point × Point)`
+-  -- instance (`instBEqProd` vs `instBEqOfDecidableEq`); both are lawful, so the
+-  -- counted predicates agree pointwise
+-  simp only [List.count_eq_countP]
+-  exact List.countP_congr fun y _ => by by_cases h : y = (a, b) <;> simp [h]
+ 
+ /-- **(★).**  The fold value at key `ekey a b` is the signed directed-edge
+ count `count(a,b) − count(b,a)`. -/
+diff --git a/lake-manifest.json b/lake-manifest.json
+index 938358d..10b0c9c 100644
+--- a/lake-manifest.json
++++ b/lake-manifest.json
+@@ -1,21 +1,21 @@
+-{"version": "1.2.0",
++{"version": "1.3.0",
+  "packagesDir": ".lake/packages",
+  "packages":
+  [{"url": "https://github.com/leanprover-community/mathlib4",
+    "type": "git",
+    "subDir": null,
+    "scope": "",
+-   "rev": "905b95818eb32af7874a58b427f50c1711a5e96c",
++   "rev": "56a005855ea17e0b0958f73ec801ae140b0a1679",
+    "name": "mathlib",
+    "manifestFile": "lake-manifest.json",
+-   "inputRev": "v4.32.2",
++   "inputRev": "v4.35.0",
+    "inherited": false,
+    "configFile": "lakefile.lean"},
+   {"url": "https://github.com/leanprover-community/plausible",
+    "type": "git",
+    "subDir": null,
+    "scope": "leanprover-community",
+-   "rev": "e12c1910fe855cbfc38803cd4e55543906d5fa62",
++   "rev": "dfa4f38190d07c37e315953e08b90fe2d95b3c24",
+    "name": "plausible",
+    "manifestFile": "lake-manifest.json",
+    "inputRev": "main",
+@@ -25,7 +25,7 @@
+    "type": "git",
+    "subDir": null,
+    "scope": "leanprover-community",
+-   "rev": "c5d5b8fe6e5158def25cd28eb94e4141ad97c843",
++   "rev": "d6b4c7be5be75ec4917c873ac50c756dc1436372",
+    "name": "LeanSearchClient",
+    "manifestFile": "lake-manifest.json",
+    "inputRev": "main",
+@@ -35,7 +35,7 @@
+    "type": "git",
+    "subDir": null,
+    "scope": "leanprover-community",
+-   "rev": "7e9612bf0b9ee66db3cb5b9988a35afc706f5a12",
++   "rev": "a41f0e9a4dea23188ea9cc1c41ac9f8bbafe0b93",
+    "name": "importGraph",
+    "manifestFile": "lake-manifest.json",
+    "inputRev": "main",
+@@ -45,7 +45,7 @@
+    "type": "git",
+    "subDir": null,
+    "scope": "leanprover-community",
+-   "rev": "6e311e2a844da9b2cc3971187df2fe0066947b93",
++   "rev": "df72b022e558978a1c50264cfc4d7fec86fa8e04",
+    "name": "proofwidgets",
+    "manifestFile": "lake-manifest.json",
+    "inputRev": "main",
+@@ -55,7 +55,7 @@
+    "type": "git",
+    "subDir": null,
+    "scope": "leanprover-community",
+-   "rev": "a7dbf0c63b694e47f425f3dcddbc0e178bb432d3",
++   "rev": "4a174c490d8707121c4a9290800489f105d85e07",
+    "name": "aesop",
+    "manifestFile": "lake-manifest.json",
+    "inputRev": "master",
+@@ -65,7 +65,7 @@
+    "type": "git",
+    "subDir": null,
+    "scope": "leanprover-community",
+-   "rev": "38d591e778f100aec9762bb582f9c7f55f50e9dc",
++   "rev": "dce0ad79c486cb1fb504af04f953c3466b0c6db8",
+    "name": "Qq",
+    "manifestFile": "lake-manifest.json",
+    "inputRev": "master",
+@@ -75,7 +75,7 @@
+    "type": "git",
+    "subDir": null,
+    "scope": "leanprover-community",
+-   "rev": "023ce7d62a0531e22a5331e20b587817a80d49ff",
++   "rev": "66e469188fe07963e5cf666c7d4433f45b8131c5",
+    "name": "batteries",
+    "manifestFile": "lake-manifest.json",
+    "inputRev": "main",
+@@ -85,10 +85,10 @@
+    "type": "git",
+    "subDir": null,
+    "scope": "leanprover",
+-   "rev": "88679d088c9720c27ebdf2ba4dafe17341747f94",
++   "rev": "c24fe6078c630e89b489bffe59b3e20ac30d12c8",
+    "name": "Cli",
+    "manifestFile": "lake-manifest.json",
+-   "inputRev": "v4.32.0",
++   "inputRev": "v4.35.0",
+    "inherited": true,
+    "configFile": "lakefile.toml"}],
+  "name": "CSG",
+diff --git a/lakefile.lean b/lakefile.lean
+index de9b168..0a0a0fd 100644
+--- a/lakefile.lean
++++ b/lakefile.lean
+@@ -8,7 +8,7 @@ package «CSG» where
+   ]
+ 
+ require mathlib from git
+-  "https://github.com/leanprover-community/mathlib4" @ "v4.32.2"
++  "https://github.com/leanprover-community/mathlib4" @ "v4.35.0"
+ 
+ @[default_target]
+ lean_lib «CSG» where
+diff --git a/lean-toolchain b/lean-toolchain
+index 0ec5999..a6aff06 100644
+--- a/lean-toolchain
++++ b/lean-toolchain
+@@ -1 +1 @@
+-leanprover/lean4:v4.32.2
++leanprover/lean4:v4.35.0

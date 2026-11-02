@@ -1,0 +1,4 @@
+port-v4.35.patch modifies files of schildep/verified-3d-mesh-intersection (MIT License,
+Copyright (c) 2026 P Schilde): https://github.com/schildep/verified-3d-mesh-intersection, base
+commit 804ab774f1d059b3bdb7cf606b155553dccccdfd; the license text is the upstream LICENSE file.
+The patch repairs proof bodies for Lean 4.35 (bench/subjects/mesh/surface applies it).

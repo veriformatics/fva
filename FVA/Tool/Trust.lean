@@ -342,7 +342,7 @@ def main (argv : List String) : IO UInt32 := do
   if b.exitCode != 0 then
     let r : Report :=
       { built := false, claims := [], flags := [], reviewModules := [], subjectSyntax := [],
-        unmarked := [],
+        unmarked := [], subjectMeaning := [],
         vocabulary := [], prelude := [], tampered := [], needsLink := false, links := [],
         exportOk := false,
         replay := [], canaries := [], canarySet := [], budget := none }

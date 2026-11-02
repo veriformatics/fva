@@ -136,6 +136,46 @@ def meaningDeps (ci : ConstantInfo) : Array Name :=
   | .inductInfo i => ty ++ i.ctors.toArray
   | _ => ty
 
+/-- The expressions that carry a constant's meaning in a statement closure: a definition's type
++ body, any other constant's type (a theorem's proof is not meaning). -/
+def meaningExprs (ci : ConstantInfo) : Array Expr :=
+  match ci with
+  | .defnInfo d => #[d.type, d.value]
+  | _ => #[ci.type]
+
+/-- Constants of `e` satisfying `pick`, each with whether that occurrence is an argument of an
+application whose head satisfies `pick` (the head itself keeps its context). -/
+partial def occurrences (pick : Name → Bool) (e : Expr) : Array (Name × Bool) :=
+  go e false #[]
+where
+  go (e : Expr) (arg : Bool) (acc : Array (Name × Bool)) : Array (Name × Bool) :=
+    match e with
+    | .const c _ => if pick c then acc.push (c, arg) else acc
+    | .app .. =>
+      let f := e.getAppFn
+      let toPicked := f.constName?.any pick
+      e.getAppArgs.foldl (fun acc a => go a toPicked acc) (go f arg acc)
+    | .lam _ t b _ | .forallE _ t b _ => go b false (go t false acc)
+    | .letE _ t v b _ => go b false (go v false (go t false acc))
+    | .mdata _ b => go b arg acc
+    | .proj _ _ b => go b false acc
+    | _ => acc
+
+/-- Instances and coercion functions of the imported modules, read from their `.olean` entries:
+the import runs no extension loader (`loadExts := false`), so `Meta.isInstance` and
+`Meta.getCoeFnInfo?` see none of them. -/
+def instancesCoes (env : Environment) : NameSet × NameSet := Id.run do
+  let mut inst : NameSet := {}
+  let mut coe : NameSet := {}
+  for i in [0:env.header.moduleNames.size] do
+    for e in Meta.instanceExtension.ext.getModuleEntries env i do
+      match e with
+      | .global x | .scoped _ x => if let some n := x.globalName? then inst := inst.insert n
+    for e in Meta.coeExt.ext.getModuleEntries env i do
+      match e with
+      | .global (n, _) | .scoped _ (n, _) => coe := coe.insert n
+  return (inst, coe)
+
 /-- Overrides that change what compiled code runs or hide a definition from the kernel. -/
 def overrides (env : Environment) (c : Name) (ci : ConstantInfo) : Array String := Id.run do
   let mut fs := #[]
@@ -381,6 +421,27 @@ def collect (input : Input) : CoreM Report := do
     reviewModules := reviewModules.push { module := m.toString, codeLines := lines,
                                           found := src.isSome,
                                           syntaxExts := (exts.map (·.toString)).toList }
+  -- D8: a subject's instances + coercions fix what the statements' notation and casts mean;
+  -- an instance passed straight to a subject function is that function's input, and
+  -- `Decidable` instances are subsingletons
+  let isSubj (c : Name) : Bool := originOf c == .subject
+  let (insts, coes) := instancesCoes env
+  let mut meaning : Array String := #[]
+  for n in statementClosure (claims.map (·.name.toName)) do
+    unless originOf n == .project do continue
+    let some ci := env.find? n | continue
+    for e in meaningExprs ci do
+      for (c, toSubj) in occurrences isSubj e do
+        let m := ((modOf env c).getD .anonymous).toString
+        if coes.contains c then
+          meaning := meaning.push s!"{c} ({m}) is a coercion that {n} uses"
+        else if insts.contains c && !toSubj then
+          let some ci' := env.find? c | continue
+          let dec : Bool ← (Meta.forallTelescopeReducing ci'.type fun _ b =>
+            return b.isAppOf ``Decidable : MetaM Bool).run'
+          unless dec do
+            meaning := meaning.push (s!"{c} ({m}) is an instance that {n} uses outside a " ++
+              "subject function's arguments")
   -- vocabulary (D10): the statement closure's frontier outside the project and the subjects,
   -- minus generated names (instances by Lean's `inst…` naming, internals, constructors, matchers)
   let mut vocabulary := #[]
@@ -408,6 +469,7 @@ def collect (input : Input) : CoreM Report := do
   return { built := true, claims := claims.toList, flags := flags.toList,
            reviewModules := reviewModules.toList, subjectSyntax := subjectSyntax.toList,
            unmarked := (unmarked.map (·.toString)).toList,
+           subjectMeaning := meaning.toList.eraseDups,
            vocabulary := vocabulary.toList,
            prelude := prelude.toList, tampered := tampered.toList,
            needsLink := input.subjects.isEmpty, links := links.toList, exportOk := false,

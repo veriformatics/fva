@@ -68,6 +68,15 @@ open FVA.Trust Lean
 #guard (ruleOlean { (default : Report) with tampered := ["M: x"] }).map
   (fun i => (i.tag, i.detail)) == [("olean", "M: x")]
 
+#guard (ruleSubject { (default : Report) with subjectMeaning := ["I (M) is an instance"] }).map
+    (fun i => (i.tag, i.detail)) == [("subject", "I (M) is an instance")]
+
+/-! ## Subject meaning (D8): an occurrence is a subject function's input only directly under one -/
+
+#guard occurrences (fun c => c == `S.f || c == `S.i)
+    (mkApp2 (.const `Core.g []) (.const `S.i []) (mkApp (.const `S.f []) (.const `S.i []))) ==
+  #[(`S.i, false), (`S.f, false), (`S.i, true)]
+
 /-! ## Link kinds (U9): a blob has no `decode_eq`; every other part counts as for a lifted module -/
 
 #guard Link.problems ⟨"B.lean", .blob, true, true, true, false, true⟩ == []
