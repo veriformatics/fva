@@ -54,7 +54,7 @@ lake build fva FVA "${cheats[@]/#/FVATest.Cheats.}" >/dev/null || exit 2
 examples=(Toy Mem Rust)
 # the examples are proofs FVA ships: warnings fail them (the cheats warn by design)
 lake --wfail build "${examples[@]/#/FVATest.Examples.}" FVATest.Examples.Mislabeled \
-	FVATest.Examples.Planted >/dev/null || exit 2
+	FVATest.Examples.Planted FVATest.Examples.Relational >/dev/null || exit 2
 fva=.lake/build/bin/fva
 fail=0
 log=$tmp/log
@@ -148,6 +148,16 @@ block=$(sed -n '/^Examples.Planted.sumToSpec$/,/^Examples\./p' "$log")
 if grep -q STALE "$log" || grep -q '✗ binary' <<<"$block" ||
 	! grep -qE 'sum_to\(([2-9]|[1-9][0-9]+)\) → [0-9]+ binary agrees' <<<"$block"; then
 	echo "test-trust: example Planted → sumToSpec's examples are stale or disagree with the binary"
+	fail=1
+fi
+# D18: relational claims get rows: a `Returns … → r ≤ n` claim shows a failing case of the
+# binary's result, a decidable claim its decided cases
+"$fva" explain . --spec-module FVATest.Examples.Relational.Spec \
+	--root-module FVATest.Examples.Relational >"$log" 2>&1
+block=$(sed -n '/^Examples.Relational.sumToAtMost$/,/^Examples\./p' "$log")
+if grep -q STALE "$log" || ! grep -qE '^    sum_to\([0-9]+\) → [0-9]+: the condition fails' <<<"$block" ||
+	! grep -qE '^    a = [0-9]+, b = [0-9]+: the statement holds' "$log"; then
+	echo "test-trust: example Relational → no relational rows (or stale)"
 	fail=1
 fi
 wait "$certs"

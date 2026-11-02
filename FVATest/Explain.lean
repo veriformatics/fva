@@ -78,6 +78,25 @@ open Lean Meta FVA.Explain in
   unless (← evalCase big).2 == "cost" do throwError "sumBelow 4294967295 not too costly"
   unless (← evalCase res) == ([("i32", 45)], "confirmed") do throwError "evalCase {← evalCase res}"
 
+-- example shapes (D18): a `Returns … → condition` claim and a decidable claim get rows; the
+-- condition is decided on concrete values (here a binary result of 6 for input 4)
+def relMod : FVA.Wasm.Module := {}
+def atMost : Prop := ∀ n r : BitVec 32,
+  FVA.Wasm.Exec.Returns relMod "f" [.i32 n] [.i32 r] → r ≤ n
+def comm : Prop := ∀ a b : BitVec 32, a + b = b + a
+
+open Lean Meta FVA.Explain in
+#eval show MetaM Unit from do
+  let k (c : Name) := return ((← shape c).getObjValAs? String "kind").toOption
+  unless (← k ``atMost) == some "implies" && (← k ``comm) == some "decide" do
+    throwError "shapes: {← shape ``atMost} {← shape ``comm}"
+  IO.FS.withTempDir fun d => do
+    decideCases ``atMost [[4, 6], [4, 3]] (d / "o")
+    decideCases ``comm [[6, 9]] (d / "o")
+    let holds := ((← IO.FS.readFile (d / "o")).splitOn "\n").filterMap fun l =>
+      (Json.parse l |>.toOption).bind fun j => (j.getObjValAs? Bool "holds").toOption
+    unless holds == [false, true, true] do throwError "decideCases: {holds}"
+
 -- the explain thread has no shell, image viewer or MCP tool (closing review SEC-4)
 #guard ["shell_tool", "unified_exec", "view_image"].all fun f =>
   (FVA.Tool.Codex.serverArgs.toList.zip FVA.Tool.Codex.serverArgs.toList.tail).contains
