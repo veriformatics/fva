@@ -65,6 +65,48 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
 
 ## Tasks
 
+- [ ] D4 `lake check` sandboxed build of an `fva init` project (test-init)
+- [ ] D5 `fva explain`: requirements file as pass-2 intent, neutral identifiers in pass 1
+- [ ] D6 agent packaging (MCP server + skill)
+- [ ] D8 declared Lean-native subjects: instance + coercion audit; mesh repo surface
+- [ ] D11 surface line counts from Lean's own tokenizer
+- [ ] D12 build + export inside bwrap
+- [ ] D13 `@[fva_claim]` claim marker
+- [ ] D15 `fva explain` verdict stability + second model family
+- [ ] D16 example spec values confirmed by the kernel
+- [ ] D17 per-case example budget inside Lean
+- [ ] D18 examples for decidable relational claims
+- [ ] D19 nested-sandbox replay state
+- [ ] D23 surface budget as project config
+- [ ] D24 controlled-language claims evaluation
+- [ ] D25 review ledger + attest
+- [ ] D26 pattern catalog
+- [ ] D27 review page
+- [ ] D28 WASI preview1 model
+- [ ] D29 Wasm exception handling
+- [ ] D30 optimized machine runs memory_copy
+- [ ] D31 stepper completeness
+- [ ] D32 CI gate fan-out on `ci/**`
+- [ ] D33 PFlog theorem
+- [ ] D34 fvamut per-job memory limit
+- [ ] D36 merge-sort `SortedPerm` checker
+- [ ] D37 validator completeness
+- [ ] D38 test-trust in parallel
+- [ ] D39 lz4-wasm decoder + lz4_flex all-input proofs
+- [ ] D40 filterByExpr boundary corollary
+- [ ] D42 bench root from `FVA_BENCH_HOME`
+- [ ] D48 Mathlib `.olean` manifest
+- [ ] D49 base `.olean` verification
+- [ ] D51 managed-language program proofs
+- [ ] D53 bench grading drivers in `bench/grade/`
+- [ ] D54 bench judged metrics under one blinded grader
+- [ ] D55 concrete-call proof command + T7 rerun
+- [ ] D56 `fva explain` on the archived fva-arm specs
+- [ ] D57 NOTICE check for embedded third-party bytes
+- [ ] D58 fvapi client (trigger: fvapi post-PROTOTYPE API)
+- [ ] D59 one lz4 C extension-loop proof
+- [ ] D60 one lz4 C numeric helper module
+- [ ] D61 lean4lean decline patterns on its final exception line
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase

@@ -2,8 +2,9 @@
 # `fva init` end to end (U11, full gate): a project made by `fva init --wasm` with the toy
 # example's claims and proofs builds and passes `fva trust` (this binary, from outside the
 # project) with a 14-line surface: the vendored FVA counts as base by content; the same project
-# with one vendored spec file edited reviews that file. The project reuses this checkout's
-# Mathlib (symlink) and FVA build (copy), so nothing is fetched or rebuilt.
+# with one vendored spec file edited reviews that file; `lake check` (bwrap sandbox, no
+# --from-export) accepts it and rejects an extra axiom. The project reuses this checkout's
+# Mathlib (hard links) and FVA build (copy), so nothing is fetched or rebuilt.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 fva=$PWD/.lake/build/bin/fva
@@ -27,7 +28,9 @@ sed 's/FVATest.Examples.Toy.Lifted/Demo.Lifted/; s/Examples.Toy/Demo/' "$ex/Spec
 sed 's/FVATest.Examples.Toy.Spec/Demo.Spec/; s/Examples.Toy/Demo/' "$ex/Proof.lean" \
 	>"$p/Demo/Proof.lean"
 mkdir -p "$p/.lake" "$p/fva/.lake"
-ln -s "$PWD/.lake/packages" "$p/.lake/packages"
+# hard links, not a symlink: `lake check`'s sandbox sees the project alone (a link out of it
+# dangles there, and dependency resolution then fails on the existing path)
+cp -al "$PWD/.lake/packages" "$p/.lake/packages" || exit 2
 cp -a .lake/build "$p/fva/.lake/build"
 (cd "$p" && lake build >"$tmp/build.log" 2>&1) || {
 	echo "test-init: the project does not build"
@@ -40,6 +43,35 @@ trust plain.out
 if ! grep -q '^fva trust: PASS' "$tmp/plain.out" ||
 	! grep -q '^Read these: 14 code lines' "$tmp/plain.out"; then
 	echo "test-init: fresh project → $(head -1 "$tmp/plain.out"), surface $(grep '^Read these' "$tmp/plain.out")"
+	fail=1
+fi
+# the project, vendored FVA included, builds + replays inside `lake check`'s bwrap sandbox
+# (no --from-export); a proof resting on an extra axiom → rc 1 naming it
+# the cheat copy = hard links (the sandbox only reads), its Proof.lean a new file; both side by side
+cp -al "$p" "$tmp/cheat" || exit 2
+rm "$tmp/cheat/Demo/Proof.lean"
+{
+	cat "$p/Demo/Proof.lean"
+	printf '\naxiom fvaCheatAx : False\ntheorem cheat_uses : 1 = 2 := fvaCheatAx.elim\n'
+} >"$tmp/cheat/Demo/Proof.lean"
+(cd "$p" && lake check) >"$tmp/check.out" 2>&1 &
+ok=$!
+(cd "$tmp/cheat" && lake check) >"$tmp/cheat.out" 2>&1
+rc_cheat=$?
+wait "$ok"
+rc=$?
+if ((rc == 2 || rc_cheat == 2)); then
+	tail -5 "$tmp/check.out" "$tmp/cheat.out"
+	exit 2
+fi
+if ((rc != 0)); then
+	echo "test-init: lake check on the fresh project → rc $rc"
+	tail -5 "$tmp/check.out"
+	fail=1
+fi
+if ((rc_cheat != 1)) || ! grep -q "Axiom 'fvaCheatAx' is not permitted" "$tmp/cheat.out"; then
+	echo "test-init: lake check on a proof using an extra axiom → rc $rc_cheat, pinned 1 naming it"
+	tail -5 "$tmp/cheat.out"
 	fail=1
 fi
 echo '-- edited after vendoring' >>"$p/fva/FVA/Spec/CAbi.lean"
