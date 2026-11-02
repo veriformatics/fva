@@ -157,6 +157,9 @@ def render (r : Report) (v : Verdict) (is : List Issue) (times : List (String ×
       let how := ((attach.find? (·.1 == c.name)).map fun (_, k) => s!" ({k})").getD ""
       out := out ++ s!"  {clean c.name} — about {clean (", ".intercalate c.subjects)}{how}\n" ++
         s!"    proved by {clean ("; ".intercalate prfs)}\n"
+    unless r.unmarked.isEmpty do
+      out := out ++ "\nProp definitions without @[fva_claim] (not claims: nothing proves them)\n"
+      for n in r.unmarked do out := out ++ s!"  {clean n}\n"
     unless subjects.isEmpty do
       out := out ++ "\nDeclared subjects (Lean-native implementations: judged, never reviewed)\n"
       for m in subjects do out := out ++ s!"  {clean m.toString}\n"
@@ -308,6 +311,7 @@ def main (argv : List String) : IO UInt32 := do
   if b.exitCode != 0 then
     let r : Report :=
       { built := false, claims := [], flags := [], reviewModules := [], subjectSyntax := [],
+        unmarked := [],
         vocabulary := [], prelude := [], needsLink := false, links := [], exportOk := false,
         replay := [], canaries := [], canarySet := [], budget := none }
     IO.print (render r .fail (issues r) [] "" o.subjects)

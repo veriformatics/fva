@@ -5,6 +5,6 @@ import FVATest.Cheats.OverridePartial.Vocab
 namespace Cheats.OverridePartial
 
 /-- The claim. -/
-def stable : Prop := loop Lifted.len = loop Lifted.len
+@[fva_claim] def stable : Prop := loop Lifted.len = loop Lifted.len
 
 end Cheats.OverridePartial

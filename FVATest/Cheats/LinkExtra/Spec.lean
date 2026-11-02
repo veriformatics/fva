@@ -6,6 +6,7 @@ namespace Cheats.LinkExtra
 
 open Lifted in
 /-- The artifact's bytes decode to the lifted module, and the decoding is fine. -/
+@[fva_claim]
 def decodes : Prop := FVA.Wasm.Decode.decode Lifted.bytes Lifted.len = .ok Lifted.module ∨ fine
 
 end Cheats.LinkExtra

@@ -5,6 +5,7 @@ import FVATest.Cheats.Sorry.Lifted
 namespace Cheats.Sorry
 
 /-- The bytes decode to the lifted module. -/
+@[fva_claim]
 def decodes : Prop := FVA.Wasm.Decode.decode Lifted.bytes Lifted.len = .ok Lifted.module
 
 end Cheats.Sorry

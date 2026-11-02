@@ -2,67 +2,73 @@
  "requirements": [],
  "model": "gpt-6-luna",
  "inputsSha":
- "06712aab630f23953842f682fdc20a7dc713a740dcfe7cc890d70b20bd32d166",
- "generated": "2026-11-02 13:20 UTC",
+ "c0be49055fb749ec5097d3a5d6577416861112efb3c63f5695cbf447d4f1f272",
+ "generated": "2026-11-02 15:17 UTC",
  "effort": "medium",
  "claims":
  [{"verdict": "matches",
    "summary":
-   "For every fitting list of 32-bit values written at a valid pointer, the export returns their wrapping 32-bit sum.",
+   "After writing the listed 32-bit elements at the given address, the array-sum export always returns their 32-bit sum for inputs satisfying the size bound.",
    "statement":
    "∀ (p : BitVec 32) (xs : List (BitVec 32)),\n  p.toNat + 4 * xs.length ≤ 65536 →\n    FVA.Wasm.Exec.ReturnsAfterWrite Examples.Mem.Lifted.module p.toNat (FVA.Wasm.Exec.le32s xs) \"array_sum\"\n      [FVA.Wasm.Exec.Val.i32 p, FVA.Wasm.Exec.Val.i32 (BitVec.ofNat 32 xs.length)] [FVA.Wasm.Exec.Val.i32 xs.sum]",
    "serves": [],
    "resultBits": [],
    "reason":
-   "For every list whose 4-byte elements fit in memory at the given unsigned pointer, the formal statement writes those elements and requires their wrapped 32-bit sum as the result.",
+   "The size premise is exactly the condition that the listed words fit within the 64 KiB memory, and it ensures the length is at most 16384. The claim guarantees the wrapped sum for every such array.",
    "params": [],
    "name": "Examples.Mem.arraySum",
    "intent":
-   "`array_sum(p, n)`: the sum, wrapped to 32 bits, of the `n` unsigned 32-bit words `xs` that\nthe caller wrote at address `p`, for every array inside the module's 64 KiB memory. ",
+   "`array_sum(p, n)`: the sum, wrapped to 32 bits, of the `n` unsigned 32-bit words `xs` that\nthe caller wrote at address `p`, for every array inside the module's 64 KiB memory (so\n`n ≤ 16384`: the length argument never wraps). ",
    "fn": null,
    "examples": [],
    "details":
-   ["Covers every 32-bit pointer bit pattern and every list of 32-bit values whose encoded bytes fit in memory 0 at the pointer.",
-    "The pointer is interpreted as an unsigned byte address. The list is written as little-endian 32-bit elements; the export receives the pointer and the list length as i32 values.",
-    "The result is the 32-bit sum of the list elements, with arithmetic wrapping modulo 2³². Returns also guarantees termination and no trap for every qualifying fresh instance and host behavior."],
+   ["Covers every 32-bit pointer and every finite list of 32-bit elements satisfying the stated size bound.",
+    "The pointer is used as an unsigned byte address. Each list element is written as four little-endian bytes; the second function argument is the list length encoded as a 32-bit value.",
+    "The returned value is the list sum in 32-bit bitvector arithmetic, so addition wraps modulo 2³².",
+    "ReturnsAfterWrite additionally requires fresh instances with enough memory for the write under every host behavior, and guarantees the call terminates without trapping and returns exactly that value."],
    "caveats":
-   ["The length is passed as a 32-bit value, but the fit condition limits the list to at most 16,384 elements, so it cannot wrap. The claim does not specify final memory contents."]},
+   ["The written source uses a wildcard case, but after elaboration it is a catch-all match on the unsigned numeric value of the first input; every value other than zero through four returns zero.",
+    "The bound limits the written region to the first 65,536 address bytes, but does not by itself establish that memory exists or fits; the claim also requires that for every host behavior.",
+    "The claim specifies the returned value, not the final memory contents."]},
   {"verdict": "matches",
    "summary":
-   "The export returns a result selected by the unsigned first input, applying the specified 32-bit operation to the second input or returning zero.",
+   "The classify export always returns the selected 32-bit operation on its second input, or zero when the first input is outside the five listed cases.",
    "statement":
    "∀ (x y : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Mem.Lifted.module \"classify\" [FVA.Wasm.Exec.Val.i32 x, FVA.Wasm.Exec.Val.i32 y]\n    [FVA.Wasm.Exec.Val.i32\n        (match x.toNat with\n        | 0 => y + 7\n        | 1 => y <<< 3\n        | 2 => y ^^^ 85#32\n        | 3 => y * 100\n        | 4 => y - 9\n        | x => 0)]",
    "serves": [],
    "resultBits": [32],
    "reason":
-   "The formal cases and default result match the intent for every pair of 32-bit inputs, using the stated wrapping arithmetic and bitwise operation.",
+   "The formal cases and default match the intent for every unsigned 32-bit input, with the operations performed in 32-bit arithmetic. The examples are consistent with those cases.",
    "params": [{"name": "x", "bits": 32}, {"name": "y", "bits": 32}],
    "name": "Examples.Mem.classify",
    "intent":
    "`classify(x, y)` on unsigned 32-bit ints, by the case `x`: `y + 7`, `y << 3`, `y xor 0x55`,\n`100 y`, `y − 9` for `x` = 0 … 4 (wrapped to 32 bits), else 0. ",
    "fn": "classify",
    "examples":
-   [{"spec": [7], "binary": [7], "args": [0, 0]},
+   [{"spec": [6], "binary": [6], "args": [0, 4294967295]},
     {"spec": [8], "binary": [8], "args": [1, 1]},
     {"spec": [0], "binary": [0], "args": [2, 85]},
-    {"spec": [100], "binary": [100], "args": [3, 1]},
+    {"spec": [200], "binary": [200], "args": [3, 2]},
     {"spec": [4294967287], "binary": [4294967287], "args": [4, 0]},
-    {"spec": [0], "binary": [0], "args": [4294967295, 7]}],
+    {"spec": [0], "binary": [0], "args": [5, 7]},
+    {"spec": [7], "binary": [7], "args": [0, 0]}],
    "details":
-   ["Covers every pair of 32-bit inputs; both are passed as i32 values.",
-    "The first input is matched as unsigned. Addition, multiplication, subtraction, and left shift operate at 32 bits and wrap modulo 2³²; the shift discards bits shifted out. The bitwise case uses the 32-bit pattern 85.",
-    "Returns guarantees termination and no trap for every fresh instance and host behavior."],
+   ["Covers all pairs of 32-bit inputs.",
+    "The first input is inspected as an unsigned 32-bit value. Values zero through four select the corresponding operation; all other unsigned values select zero.",
+    "The operations on the second input are 32-bit bitvector operations: addition, left shift by three, XOR with 85, multiplication by 100, or subtraction by nine. Results wrap modulo 2³²; the shift discards bits shifted out.",
+    "Returns guarantees instantiability and, for every host behavior and fresh instance, termination without a trap and the exact specified result."],
    "caveats":
-   ["The match uses the unsigned numeric value of the first input, so only five exact input values select nonzero-result cases; all other bit patterns select zero."]},
+   ["The written source spells the final match case as a wildcard; elaboration makes the match explicitly on the unsigned natural-number value of the first input.",
+    "The claim only describes returned values; it does not constrain memory effects or other state."]},
   {"verdict": "matches",
    "summary":
-   "The export returns the sum of two specified linear expressions in the input, computed with 32-bit wraparound.",
+   "The call_scale export always returns the sum of the two specified scaled-and-incremented 32-bit values.",
    "statement":
    "∀ (x : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Mem.Lifted.module \"call_scale\" [FVA.Wasm.Exec.Val.i32 x]\n    [FVA.Wasm.Exec.Val.i32 (3 * x + 1 + (3 * (x + 1) + 1))]",
    "serves": [],
    "resultBits": [32],
    "reason":
-   "The formal expression is the intended sum of the two linear expressions, with 32-bit bit-vector arithmetic wrapping as specified.",
+   "The formal expression computes both scaled-and-incremented values and adds them using 32-bit arithmetic, matching the intended wrapped formula for every input. The examples are consistent with it.",
    "params": [{"name": "x", "bits": 32}],
    "name": "Examples.Mem.callScale",
    "intent":
@@ -74,8 +80,8 @@
     {"spec": [17], "binary": [17], "args": [2]},
     {"spec": [4294967295], "binary": [4294967295], "args": [4294967295]}],
    "details":
-   ["Covers every 32-bit input, passed as an i32 value; it does not interpret the input as signed or unsigned for a comparison.",
-    "All additions and multiplications are 32-bit bit-vector arithmetic and wrap modulo 2³², including the increment inside the second expression.",
-    "Returns guarantees termination and no trap for every fresh instance and host behavior."],
+   ["Covers every 32-bit input.",
+    "All arithmetic is 32-bit bitvector arithmetic and wraps modulo 2³², including the increment, multiplications, and additions.",
+    "Returns guarantees instantiability and, for every host behavior and fresh instance, termination without a trap and the exact specified result."],
    "caveats":
-   ["The claim specifies only the returned value; it does not state any memory or other side-effect guarantees."]}]}
+   ["This specifies only the returned value; it says nothing about memory or other state changes."]}]}

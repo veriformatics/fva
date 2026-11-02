@@ -1,6 +1,7 @@
 import FVA.Impl.Decode
 import FVA.Tool.Pack
 import Lean.Elab.Tactic.Basic
+import FVA.Spec.ClaimAttr
 
 /-!
 # Support for `Lifted.lean` files written by `fva lift`

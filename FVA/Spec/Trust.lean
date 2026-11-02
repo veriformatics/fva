@@ -135,6 +135,9 @@ structure Report where
   /-- Syntax, macro or elaborator declarations in subject modules the spec module imports
   (unreviewed text that could change how the spec reads). -/
   subjectSyntax : List String
+  /-- `Prop` definitions of the spec module without `@[fva_claim]` (informational, D13): read as
+  vocabulary, never proven. -/
+  unmarked : List String
   /-- Names outside the project the claims' statements use (informational, D10). -/
   vocabulary : List Term
   /-- `[prelude]` violations: fixed-bundle constants outside the sysroot, modules without `Init`. -/

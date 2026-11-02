@@ -5,6 +5,7 @@ import FVATest.Cheats.Clean.Lifted
 namespace Cheats.Clean
 
 /-- The artifact's bytes decode to the lifted module. -/
+@[fva_claim]
 def decodes : Prop := FVA.Wasm.Decode.decode Lifted.bytes Lifted.len = .ok Lifted.module
 
 end Cheats.Clean

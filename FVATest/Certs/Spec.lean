@@ -14,33 +14,33 @@ import FVATest.Certs.Custom.Rev.Spec
 namespace FVATest.Certs
 
 /-- Certificate: the Python producer's sorted output. -/
-def sortPy : Prop := FVATest.Certs.Sort.Py.claim
+@[fva_claim] def sortPy : Prop := FVATest.Certs.Sort.Py.claim
 
 /-- Certificate: the R producer's sorted output. -/
-def sortR : Prop := FVATest.Certs.Sort.R.claim
+@[fva_claim] def sortR : Prop := FVATest.Certs.Sort.R.claim
 
 /-- Certificate: the Java producer's sorted output. -/
-def sortJava : Prop := FVATest.Certs.Sort.Java.claim
+@[fva_claim] def sortJava : Prop := FVATest.Certs.Sort.Java.claim
 
 /-- Certificate: the TypeScript producer's sorted output. -/
-def sortTs : Prop := FVATest.Certs.Sort.Ts.claim
+@[fva_claim] def sortTs : Prop := FVATest.Certs.Sort.Ts.claim
 
 /-- Certificate: a sorted output with duplicates. -/
-def sortDuplicates : Prop := FVATest.Certs.Pos.Sorted.claim
+@[fva_claim] def sortDuplicates : Prop := FVATest.Certs.Pos.Sorted.claim
 
 /-- Certificate: the empty file as its own sorted output. -/
-def sortEmpty : Prop := FVATest.Certs.Pos.Empty.claim
+@[fva_claim] def sortEmpty : Prop := FVATest.Certs.Pos.Empty.claim
 
 /-- Certificate: the toy compiler's output for `(x+1)`. -/
-def compiled1 : Prop := FVATest.Certs.Compile.E1.claim
+@[fva_claim] def compiled1 : Prop := FVATest.Certs.Compile.E1.claim
 
 /-- Certificate: the toy compiler's output for `((x*x)-(3*x))`. -/
-def compiled2 : Prop := FVATest.Certs.Compile.E2.claim
+@[fva_claim] def compiled2 : Prop := FVATest.Certs.Compile.E2.claim
 
 /-- Certificate: the toy compiler's output for `(((x+7)*(x-2))*100000)`. -/
-def compiled3 : Prop := FVATest.Certs.Compile.E3.claim
+@[fva_claim] def compiled3 : Prop := FVATest.Certs.Compile.E3.claim
 
 /-- Certificate: the project relation `Reversed` on a small file. -/
-def reversed : Prop := FVATest.Certs.Custom.Rev.claim
+@[fva_claim] def reversed : Prop := FVATest.Certs.Custom.Rev.claim
 
 end FVATest.Certs

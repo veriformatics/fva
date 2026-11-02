@@ -15,8 +15,8 @@ subjects=(
 	"FVATest.Subjects.Lz4Wasm FVATest.Subjects.Lz4Wasm.Spec FVATest.Subjects.Lz4Wasm.Lifted 48"
 	"FVATest.Subjects.GlmIround FVATest.Subjects.GlmIround.Spec FVATest.Subjects.GlmIround.Lifted 10"
 	"FVATest.Subjects.Tmm.R3 FVATest.Subjects.Tmm.R3.Spec - 22"
-	"FVATest.Subjects.Tmm.EdgeR FVATest.Subjects.Tmm.EdgeR.Spec - 77"
-	"FVATest.Subjects.Tmm.RNAnorm FVATest.Subjects.Tmm.RNAnorm.Spec - 77"
+	"FVATest.Subjects.Tmm.EdgeR FVATest.Subjects.Tmm.EdgeR.Spec - 78"
+	"FVATest.Subjects.Tmm.RNAnorm FVATest.Subjects.Tmm.RNAnorm.Spec - 78"
 	"FVATest.Subjects.EdgerCpm FVATest.Subjects.EdgerCpm.Spec FVATest.Subjects.EdgerCpm.Lifted 91"
 	"FVATest.Subjects.Lz4C.Proof FVATest.Subjects.Lz4C.Spec FVATest.Subjects.Lz4C.Lifted 76"
 )

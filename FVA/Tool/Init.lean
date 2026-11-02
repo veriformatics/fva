@@ -49,11 +49,13 @@ def projectManifest (name : String) (fvaManifest : Json) : Json :=
 
 /-- The claims module template. -/
 def specFile (lib : String) (lifted : Bool) : String :=
-  (if lifted then s!"import {lib}.Lifted\n" else "") ++ "import FVA.Spec.CAbi\n\n" ++
-  "/-! Claims: `Prop`-valued definitions about the artifact, read by a reviewer. Import only\n" ++
-  "FVA's specs and the lifted artifact here; proofs go to `Proof.lean`. -/\n\n" ++
+  (if lifted then s!"import {lib}.Lifted\n" else "") ++
+  "import FVA.Spec.CAbi\nimport FVA.Spec.ClaimAttr\n\n" ++
+  "/-! Claims: `@[fva_claim]` `Prop` definitions about the artifact, read by a reviewer.\n" ++
+  "Import only FVA's specs and the lifted artifact here; proofs go to `Proof.lean`. -/\n\n" ++
   s!"namespace {lib}\n\nopen FVA.Wasm FVA.Wasm.Exec\n\n" ++
-  "-- Example: `def answer : Prop := Returns Lifted.module \"f\" [.i32 1] [.i32 2]`\n\n" ++
+  "-- Example:\n" ++
+  "-- `@[fva_claim] def answer : Prop := Returns Lifted.module \"f\" [.i32 1] [.i32 2]`\n\n" ++
   s!"end {lib}\n"
 
 /-- The proofs module template. -/

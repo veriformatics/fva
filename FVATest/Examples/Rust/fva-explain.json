@@ -2,19 +2,19 @@
  "requirements": [],
  "model": "gpt-6-luna",
  "inputsSha":
- "f7ec8e9a1a7e30815c5b81c0ca0805b9fbb4ab1e9709e86f18a980767bec1075",
- "generated": "2026-11-02 13:25 UTC",
+ "8475946efefef8ecceaaf2ed522996d3f5fbf5782164f1df3225dbd4ec59fb53",
+ "generated": "2026-11-02 15:13 UTC",
  "effort": "medium",
  "claims":
  [{"verdict": "matches",
    "summary":
-   "For every pair of 32-bit inputs, the gcd export returns their unsigned greatest common divisor as a 32-bit value.",
+   "For every pair of 32-bit inputs, the exported gcd function returns their unsigned greatest common divisor.",
    "statement":
    "∀ (a b : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Rust.Lifted.module \"gcd\" [FVA.Wasm.Exec.Val.i32 a, FVA.Wasm.Exec.Val.i32 b]\n    [FVA.Wasm.Exec.Val.i32 (BitVec.ofNat 32 (a.toNat.gcd b.toNat))]",
    "serves": [],
    "resultBits": [32],
    "reason":
-   "The statement specifies the unsigned greatest common divisor for every 32-bit input pair, including gcd(a, 0) = a, as intended.",
+   "The statement covers every pair of 32-bit inputs and returns their unsigned greatest common divisor, including gcd(a, 0) = a.",
    "params": [{"name": "a", "bits": 32}, {"name": "b", "bits": 32}],
    "name": "Examples.Rust.gcd",
    "intent":
@@ -24,24 +24,22 @@
    [{"spec": [0], "binary": [0], "args": [0, 0]},
     {"spec": [7], "binary": [7], "args": [0, 7]},
     {"spec": [1], "binary": [1], "args": [1, 1]},
-    {"spec": [4], "binary": [4], "args": [12, 8]},
-    {"spec": [3], "binary": [3], "args": [4294967295, 6]}],
+    {"spec": [6], "binary": [6], "args": [12, 18]},
+    {"spec": [1], "binary": [1], "args": [4294967295, 2]}],
    "details":
-   ["Covers every pair of 32-bit inputs, interpreted as unsigned values for the gcd calculation.",
-    "The result is the greatest common divisor of those unsigned values, encoded as a 32-bit result.",
-    "Returns guarantees a fresh instance exists and, under every host behavior, the call terminates without a trap and returns exactly the specified value."],
-   "caveats":
-   ["The claim describes unsigned mathematical gcd of the two 32-bit bit patterns, not signed integer gcd; conversion back to 32 bits wraps modulo 2^32 (though the gcd itself fits).",
-    "It does not specify memory effects or any behavior for exports other than this call."]},
+   ["Covers every pair of 32-bit bit patterns passed as two i32 arguments; the inputs are interpreted as unsigned natural numbers when computing the greatest common divisor.",
+    "The returned i32 is the 32-bit wrapping representation of that greatest common divisor; since the gcd of two 32-bit unsigned values fits in 32 bits, this does not change its value.",
+    "Returns additionally guarantees that the module can be instantiated and that, for every host behavior and every fresh instance, the call terminates without trapping and returns exactly the specified value."],
+   "caveats": []},
   {"verdict": "matches",
    "summary":
-   "For every triple of 32-bit inputs, the clamp export returns the first input bounded by the second and third according to signed comparison, in the specified comparison order.",
+   "For every triple of 32-bit inputs, the exported clamp function applies the specified signed comparisons and returns the selected input.",
    "statement":
    "∀ (x lo hi : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Rust.Lifted.module \"clamp\"\n    [FVA.Wasm.Exec.Val.i32 x, FVA.Wasm.Exec.Val.i32 lo, FVA.Wasm.Exec.Val.i32 hi]\n    [FVA.Wasm.Exec.Val.i32 (if x.slt lo = true then lo else if hi.slt x = true then hi else x)]",
    "serves": [],
    "resultBits": [32],
    "reason":
-   "The statement implements the stated signed clamp comparison order for every 32-bit triple, including when lo exceeds hi.",
+   "It uses signed comparisons and returns lo when x is below lo, hi when x is above hi, and x otherwise, matching the stated behavior for every input triple.",
    "params":
    [{"name": "x", "bits": 32},
     {"name": "lo", "bits": 32},
@@ -51,19 +49,17 @@
    "`clamp(x, lo, hi)` on signed 32-bit ints: `lo` below `lo`, `hi` above `hi`, else `x`. ",
    "fn": "clamp",
    "examples":
-   [{"spec": [0], "binary": [0], "args": [0, 0, 0]},
-    {"spec": [0], "binary": [0], "args": [4294967295, 0, 1]},
-    {"spec": [3], "binary": [3], "args": [5, 0, 3]},
-    {"spec": [5], "binary": [5], "args": [2, 5, 1]},
-    {"spec": [2147483647],
-     "binary": [2147483647],
-     "args": [2147483647, 2147483648, 2147483647]},
+   [{"spec": [1], "binary": [1], "args": [0, 1, 2]},
+    {"spec": [0], "binary": [0], "args": [4294967295, 0, 2]},
+    {"spec": [2], "binary": [2], "args": [3, 0, 2]},
+    {"spec": [2], "binary": [2], "args": [1, 2, 0]},
+    {"spec": [0], "binary": [0], "args": [0, 0, 0]},
     {"spec": [1], "binary": [1], "args": [1, 1, 1]}],
    "details":
-   ["Covers every triple of 32-bit inputs, interpreting comparisons as signed two’s-complement comparisons.",
-    "If x is below lo, the result is lo; otherwise, if hi is below x, it is hi; otherwise, it is x. The selected input bit pattern is returned unchanged.",
-    "There is no arithmetic here, so no arithmetic wraparound occurs.",
-    "Returns guarantees a fresh instance exists and, under every host behavior, the call terminates without a trap and returns exactly the specified value."],
+   ["Covers every triple of 32-bit bit patterns passed as i32 arguments.",
+    "Both comparisons are signed 32-bit comparisons: return lo if x is below lo; otherwise return hi if x is above hi; otherwise return x.",
+    "The chosen input is returned unchanged as a 32-bit pattern; there is no arithmetic here to wrap.",
+    "Returns additionally guarantees that the module can be instantiated and that, for every host behavior and every fresh instance, the call terminates without trapping and returns exactly the specified value."],
    "caveats":
-   ["The bounds are not required to be ordered; the expression checks the lower bound first, then the upper bound, so reversed bounds still have a defined result.",
-    "The claim is only about the returned value; it does not state anything about memory or other exports."]}]}
+   ["The bounds are not checked or reordered: the guarantee is the nested signed comparison rule as written, even when the lower bound exceeds the upper bound.",
+    "This does not guarantee any additional memory effects or behavior for other exports."]}]}

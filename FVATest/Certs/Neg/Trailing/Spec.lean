@@ -10,6 +10,6 @@ namespace FVATest.Certs.Neg.Trailing
 `FVATest/Certs/Neg/trailing-out.txt`
 stand in relation `FVA.Cert.SortedPerm` to the bytes of
 `FVATest/Certs/Neg/trailing-in.txt`. -/
-def claim : Prop := FVA.Cert.Accepted FVA.Cert.SortedPerm In.blob Out.blob
+@[fva_claim] def claim : Prop := FVA.Cert.Accepted FVA.Cert.SortedPerm In.blob Out.blob
 
 end FVATest.Certs.Neg.Trailing

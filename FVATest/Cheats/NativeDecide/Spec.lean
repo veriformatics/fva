@@ -5,6 +5,6 @@ import FVATest.Cheats.NativeDecide.Lifted
 namespace Cheats.NativeDecide
 
 /-- The artifact is small. -/
-def small : Prop := Lifted.len < 100
+@[fva_claim] def small : Prop := Lifted.len < 100
 
 end Cheats.NativeDecide

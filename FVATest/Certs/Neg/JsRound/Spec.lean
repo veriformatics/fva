@@ -10,6 +10,6 @@ namespace FVATest.Certs.Neg.JsRound
 `FVATest/Certs/Neg/big-out-ts.txt`
 stand in relation `FVA.Cert.SortedPerm` to the bytes of
 `FVATest/Certs/Neg/big-in.txt`. -/
-def claim : Prop := FVA.Cert.Accepted FVA.Cert.SortedPerm In.blob Out.blob
+@[fva_claim] def claim : Prop := FVA.Cert.Accepted FVA.Cert.SortedPerm In.blob Out.blob
 
 end FVATest.Certs.Neg.JsRound
