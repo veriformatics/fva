@@ -8,7 +8,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 declare -A groups=(
-	[lean]="build checks test decoder numerics floatdiff spec difftest lint mutation pins"
+	[lean]="build checks test decoder numerics floatdiff spec difftest lint mutation pins olean-pins"
 	[trust]="build trust"
 	[init]="build init"
 	[subjects]="build subjects"
@@ -55,6 +55,8 @@ mapfile -t workflows < <(git ls-files -co --exclude-standard -- '.github/workflo
 
 lean_lane() {
 	run build lake --wfail build
+	# the .olean pins (D48): the package files the Mathlib cache delivered
+	run olean-pins scripts/make-olean-pins --check &
 	# the planted checks need the built fvamut; they run beside the rest of this lane
 	run checks scripts/test-checks &
 	run test lake --wfail test

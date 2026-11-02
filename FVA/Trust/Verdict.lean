@@ -100,6 +100,10 @@ def ruleSyntax (r : Report) : List Issue :=
 def rulePrelude (r : Report) : List Issue :=
   r.prelude.map fun p => ⟨"prelude", p⟩
 
+/-- `[olean]`. -/
+def ruleOlean (r : Report) : List Issue :=
+  r.tampered.map fun t => ⟨"olean", t⟩
+
 /-- `[link]`. -/
 def ruleLink (r : Report) : List Issue :=
   (if r.needsLink && r.links.isEmpty then [⟨"link", "no generated module in the project"⟩]
@@ -152,8 +156,8 @@ def ruleSurface (r : Report) : List Issue := ruleSources r ++ ruleBudget r
 /-- Every violated rule, in tag order. -/
 def issues (r : Report) : List Issue :=
   [ruleBuild r, ruleClaims r, ruleUnproven r, ruleAxiom r, ruleVacuous r, ruleLayout r,
-   ruleOverride r, ruleSyntax r, rulePrelude r, ruleLink r, ruleReplay r, ruleChecker r,
-   ruleSurface r].flatten
+   ruleOverride r, ruleSyntax r, rulePrelude r, ruleOlean r, ruleLink r, ruleReplay r,
+   ruleChecker r, ruleSurface r].flatten
 
 /-- PASS iff no rule is violated. -/
 def verdict (r : Report) : Verdict := if (issues r).isEmpty then .pass else .fail

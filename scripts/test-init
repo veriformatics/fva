@@ -118,5 +118,52 @@ if ! grep -q '^  FVA.Spec.CAbi: [0-9]* lines' "$tmp/edited.out"; then
 	echo "test-init: an edited vendored spec file stayed out of the review surface"
 	fail=1
 fi
-((fail)) || echo "test-init: fresh project PASS, 14-line surface; edited vendored spec reviewed"
+# D48: the project's build rewrites a Mathlib definition the claims use (`Real.sqrt`, the meaning of
+# every `f32.sqrt`/`f64.sqrt` step: + 1), its module's broken proofs stubbed, and writes the
+# recompiled module over the cache's; the module stays in a trusted package, so its bytes must fail
+m=Mathlib/Analysis/Real/Sqrt
+src=$tmp/planted/$m.lean
+mkdir -p "$(dirname "$src")"
+awk '/^@\[irreducible\] noncomputable def sqrt \(x : ℝ\) : ℝ :=$/ { d = 1; print; next }
+	d && /^  NNReal.sqrt \(Real.toNNReal x\)$/ { print $0 " + 1"; d = 0; n = 1; next }
+	{ print } END { exit n ? 0 : 2 }' ".lake/packages/mathlib/$m.lean" >"$src" || {
+	echo "test-init: the planted Real.sqrt edit no longer applies to $m.lean"
+	exit 2
+}
+olean=$p/.lake/packages/mathlib/.lake/build/lib/lean/$m.olean
+rm -f "$olean" "$olean.server" "$olean.private"
+# compile; each declaration Lean reports an error in gets its proof replaced by `sorry`
+for round in 1 2 3 4 5; do
+	lake env lean -o "$olean" "$src" >"$tmp/planted.log" 2>&1 && break
+	((round < 5)) || exit 2
+	sed -n "s|^$src:\([0-9]*\):[0-9]*: error.*|\1|p" "$tmp/planted.log" | sort -un >"$tmp/planted.err"
+	[[ -s $tmp/planted.err ]] || exit 2
+	awk -v errs="$tmp/planted.err" '
+		BEGIN { while ((getline l < errs) > 0) bad[l] = 1 }
+		{ line[NR] = $0 }
+		END {
+			for (i = 1; i <= NR; i++) {
+				if (line[i] ~ /^[^ \t\/-]/ && line[i] !~ /^(end|namespace|section|open|variable)/) start = i
+				if (bad[i] && start) hit[start] = 1
+			}
+			for (i = 1; i <= NR;) {
+				if (!hit[i]) { print line[i++]; continue }
+				for (j = i; j <= NR && index(line[j], ":=") == 0; j++) print line[j]
+				if (j <= NR) print substr(line[j], 1, index(line[j], ":=") + 1) " sorry"
+				for (j++; j <= NR && (line[j] == "" || line[j] ~ /^[ \t]/); j++) continue
+				print ""
+				i = j
+			}
+		}' "$src" >"$src.new" && mv "$src.new" "$src"
+done
+cp "$olean" "$tmp/planted.olean"
+trust olean.out
+if ! grep -q "^  \[olean\] Mathlib.Analysis.Real.Sqrt: compiled files differ" "$tmp/olean.out" ||
+	! cmp -s "$olean" "$tmp/planted.olean"; then
+	echo "test-init: a rewritten Mathlib definition → $(head -1 "$tmp/olean.out"), pinned [olean]" \
+		"naming its module, the planted bytes kept ($(cmp -s "$olean" "$tmp/planted.olean" && echo kept || echo rebuilt))"
+	fail=1
+fi
+((fail)) || echo "test-init: fresh project PASS, 14-line surface; edited vendored spec reviewed;" \
+	"rewritten Mathlib definition [olean]"
 exit "$fail"

@@ -65,6 +65,9 @@ open FVA.Trust Lean
     claims := [⟨"c", false, [⟨"p", ["propext", "Classical.choice", "Quot.sound", "sorryAx"]⟩],
       ["S"]⟩] }).map (·.detail) == ["p (proof of c) depends on sorryAx"]
 
+#guard (ruleOlean { (default : Report) with tampered := ["M: x"] }).map
+  (fun i => (i.tag, i.detail)) == [("olean", "M: x")]
+
 /-! ## Link kinds (U9): a blob has no `decode_eq`; every other part counts as for a lifted module -/
 
 #guard Link.problems ⟨"B.lean", .blob, true, true, true, false, true⟩ == []
@@ -117,6 +120,26 @@ def expect {α : Type} [BEq α] [ToString α] (what : String) (got want : α) : 
   checkout proj2 "deps" "mathlib" "a1"
   let root2 ← IO.FS.realPath proj2
   expect "custom packagesDir" (← trustedPackages root2 fva) #[root2 / "deps" / "mathlib"]
+
+-- `.olean` pins (D48): the digest `scripts/make-olean-pins` computes in bash (sha256 of
+-- "h1 h2 h3", "-" for an absent part); a pinned module with other bytes or no pin is reported
+#eval show IO Unit from IO.FS.withTempDir fun tmp => do
+  IO.FS.writeFile (tmp / "A.olean") "a"
+  IO.FS.writeFile (tmp / "B.olean") "a"
+  IO.FS.writeFile (tmp / "B.olean.server") "b"
+  let a := tmp / "A.olean"
+  let b := tmp / "B.olean"
+  let ds ← oleanDigests #[a, b]
+  expect "one part" (ds.get? a.toString)
+    (some "c545c97dc734611e19c187b71324e981e60fb69b9ca7c9f5bcf246cda8880076")
+  expect "two parts" (ds.get? b.toString)
+    (some "d1c3aac6ba205523e88d33c47cb692371f8a22454ad65e0c575e84fe9093b27e")
+  let pins : Std.HashMap String String :=
+    ({} : Std.HashMap String String).insert "A" (ds.getD a.toString "")
+      |>.insert "B" (ds.getD a.toString "")
+  expect "mismatches" (← oleanMismatches pins #[(`A, a), (`B, b), (`C, a)])
+    #[s!"B: compiled files differ from the pinned bytes ({b})",
+      s!"C: not in the pinned .olean set ({a})"]
 
 -- Link artifact path (F4): relative, no `..`, inside the project after symlinks
 #eval show IO Unit from IO.FS.withTempDir fun tmp => do

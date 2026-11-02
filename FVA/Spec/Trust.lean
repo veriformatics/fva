@@ -142,6 +142,9 @@ structure Report where
   vocabulary : List Term
   /-- `[prelude]` violations: fixed-bundle constants outside the sysroot, modules without `Init`. -/
   prelude : List String
+  /-- `[olean]` violations: imported modules counted as Mathlib whose compiled files are not the
+  pinned bytes of FVA's Mathlib cache. -/
+  tampered : List String
   /-- The project's subjects are generated modules (Lean-native subjects need no link). -/
   needsLink : Bool
   /-- Its generated modules (lifted artifacts and certificate blobs). -/
@@ -175,6 +178,7 @@ structure Pass (r : Report) : Prop where
   override : r.flags = []
   syntax_ : (∀ m ∈ r.reviewModules, m.syntaxExts = []) ∧ r.subjectSyntax = []
   prelude : r.prelude = []
+  olean : r.tampered = []
   link : (r.needsLink = true → r.links ≠ []) ∧
     ∀ l ∈ r.links, l.present = true ∧ l.bytesMatch = true ∧ l.lenMatch = true ∧
       (l.kind = .wasm → l.decodeEq = true) ∧ l.regenerates = true

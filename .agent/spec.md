@@ -111,6 +111,7 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
 - [ ] D62 trust-run facts without mapping project `.olean`s in FVA's process
 - [ ] D63 `fva trust --json` on a build failure
 - [ ] D64 pass-2 labels: WEAKER vs DIFFERENT
+- [ ] D65 project `.olean`s tied to their sources
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
