@@ -135,3 +135,9 @@ Per task, median and spread over n runs per cell; no significance claims at n = 
 ## Addendum 2026-10-29 (2) (T2 tool-arm M8; before the T3 tool-arm M8)
 
 - On a tool run whose documented check regenerates the file a cheat is planted in, the cheat is erased before the prover runs. M8 records it as not caught (rc 0, not named) and notes the erasure: the check's verdict on the regenerated file is correct, but it is not a detection. On T2, the checks of tool 2 and tool 4 erased the planted `admit` (their `lift.py` rewrites the planted file); tool 3 and tool 6 kept it, and WP passed: a genuine miss, as on T4.
+
+## Addendum 2026-11-03 (before the T7 fva-arm orientation rerun, D55)
+
+- Purpose: measure whether D55 (`fva call`, `wasm_step1` stepping concrete calls, the AGENT.md route to both) cuts the fva arm's orientation overhead on T7. Five fva-arm runs (indices 6–10, seed 7), not graded: no M1–M10, and T7's graded figures stay as they are.
+- Metrics, per run: steps that read FVA internals (`bench/grade/orientation`: the bench-v2 orientation analysis's categories, first match wins, `fva call` counted as a CLI step) and input tokens; compared with the graded T7 fva runs 1–5 (median 12 internal steps, 3.48 M input tokens). Target: a median of at most 3 internal steps.
+- Everything else as the T7 batch: codex-cli 0.163.0 (binary sha256 399ff69c…, restored from its release package), model gpt-6.1-sol, effort high, the T7 prompt and task inputs, `harness/run-order` (one run at a time on one CPU, memory gate, capped user service). The vendored FVA = this repository at the commit that carries D55 (prebuilt in a frozen worktree).
