@@ -42,6 +42,7 @@ import FVA.Proof.Exec.SoundLemmas
 import FVA.Proof.Exec.Sound
 import FVA.Proof.Exec.DetLemmas
 import FVA.Proof.Exec.Det
+import FVA.Proof.Exec.Complete
 import FVA.Proof.Exec.Access
 import FVA.Proof.Exec.Choice
 import FVA.Proof.Exec.Spike
