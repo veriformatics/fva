@@ -47,6 +47,17 @@ Run `fva help` to see the commands, and `fva <command> --help` to see the argume
 
    `fva trust` prints PASS or FAIL, the reasons for a FAIL, and the files that you must review. Use an `fva` that you built outside the project for the final check, because a project can change its own copy.
 
+## State what one call returns
+
+To state and prove what one call of an exported function returns, give FVA the inputs:
+
+```sh
+fva call MyProof/Lifted.lean iround f64:0x3fdfffffffffffff --spec Calls/Spec.lean --proof Calls/Proof.lean
+lake build && fva trust . --spec-module Calls.Spec --root-module Calls.Proof
+```
+
+FVA runs the call with its reference interpreter. Then it writes the claim of the result and a proof that the kernel checks. Give an integer argument as `i32:<n>` or `i64:<n>`. Give a float argument as its bits, for example `f64:0x3fe0000000000000`. This command supports modules without imports, globals, element or data segments, or a start function. A wrong result of one call is often the shortest proof that a requirement fails.
+
 ## Certify outputs
 
 To certify that a program's output is correct for its input, give FVA both files and a relation:

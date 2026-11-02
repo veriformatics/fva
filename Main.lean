@@ -6,6 +6,7 @@ import FVA.Tool.Trust
 import FVA.Tool.Explain
 import FVA.Tool.Certify
 import FVA.Tool.Init
+import FVA.Tool.Call
 
 /-- CLI entry point. -/
 def main (args : List String) : IO UInt32 := do
@@ -43,6 +44,7 @@ def main (args : List String) : IO UInt32 := do
     IO.FS.writeFile out (FVA.Tool.Blob.file ns (← IO.FS.readBinFile path) path)
     return 0
   | "certify" :: rest => FVA.Tool.Certify.main rest
+  | "call" :: rest => FVA.Tool.Call.main rest
   | "init" :: rest => do FVA.Tool.Init.main (← FVA.Tool.Trust.fvaRoot) rest
   | "difftest" :: rest => FVA.Tool.Difftest.main rest
   | "trust" :: rest => FVA.Tool.Trust.main rest

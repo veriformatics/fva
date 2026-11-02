@@ -32,7 +32,9 @@ def helpText : String :=
   "            requirements.\n" ++
   "  blob      Write a Lean module that holds the bytes of a file.\n" ++
   "  certify   Write a certificate: a claim that an output file stands in a relation to an\n" ++
-  "            input file, and its proof by a verified checker.\n\n" ++
+  "            input file, and its proof by a verified checker.\n" ++
+  "  call      Write the claim and the proof of what one call of an exported function\n" ++
+  "            returns.\n\n" ++
   "Run \"fva <command> --help\" to see the arguments and options of a command.\n"
 
 /-- Usage text of each command that takes arguments (`fva <command> --help`); `difftest`
@@ -96,6 +98,24 @@ def usage : String → Option String
     "  --relation-module M   The module that defines R (needed for a relation outside FVA).\n" ++
     "  --sound-module P      The module that proves R's checker sound (same condition).\n\n" ++
     "Exit status: 0 when the files are written, 2 for a usage error or a missing file.\n"
+  | "call" => some <|
+    "Usage: fva call <Lifted.lean> <export> [<type>:<value>]... --spec <file.lean>\n" ++
+    "       --proof <file.lean> [options]\n\n" ++
+    "Call the exported function on the arguments with FVA's reference interpreter, then\n" ++
+    "write a spec module with the claim of what the call returns and a proof module that\n" ++
+    "proves it in the kernel. Then run lake build and fva trust. Give the paths relative to\n" ++
+    "the project root, without `..`. An argument is i32:<n> or i64:<n> (decimal or 0x hex;\n" ++
+    "a minus sign wraps), or f32:0x<bits> or f64:0x<bits>. The module must have no imports,\n" ++
+    "globals, element or data segments and no start function. To keep the claim in a spec\n" ++
+    "module that has other claims, move the claim there.\n\n" ++
+    "Options:\n" ++
+    "  --name N         The claim's name (default <export>_call).\n" ++
+    "  --ns Ns          The namespace of the claim and its proof (default: the lifted\n" ++
+    "                   module's namespace without its last part).\n" ++
+    "  --max-steps K    Stop the call after K steps (default 1000000).\n" ++
+    "  --force          Replace the spec and proof files when they exist.\n\n" ++
+    "Exit status: 0 when the files are written, 1 when the call traps or does not finish,\n" ++
+    "2 for a usage error or an unsupported module.\n"
   | "init" => some <|
     "Usage: fva init <directory> [--lib Name] [--wasm file.wasm]\n\n" ++
     "Create a verification project: FVA vendored in fva/, a lakefile, and templates for the\n" ++

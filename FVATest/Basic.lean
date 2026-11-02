@@ -12,5 +12,5 @@ import FVA.Cli
 #guard (FVA.Cli.dispatch ["lift", "a.wasm"]).code == 2
 #guard ((FVA.Cli.dispatch ["lift", "a.wasm"]).err.splitOn "Usage: fva lift").length == 2
 #guard ((FVA.Cli.dispatch ["frobnicate", "--help"]).err.splitOn "unknown command").length == 2
-#guard ["decode", "lift", "blob", "trust", "explain", "certify", "init"].all
+#guard ["decode", "lift", "blob", "trust", "explain", "certify", "call", "init"].all
   (FVA.Cli.usage · |>.isSome)
