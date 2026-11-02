@@ -194,6 +194,13 @@ def render (r : Report) (v : Verdict) (is : List Issue) (times : List (String ×
     for (layer, what) in boundary do out := out ++ s!"  {layer}: {what}\n"
     return out
 
+/-- The `--json` document (`fva explain` reads it), the same for every verdict. -/
+def json (r : Report) (v : Verdict) (is : List Issue) (attach : List (String × String))
+    (setFile knownFile : String) : Json :=
+  Json.mkObj [("verdict", toJson v), ("issues", toJson is), ("report", toJson r),
+    ("attachments", Json.mkObj (attach.map fun (c, k) => (c, toJson k))),
+    ("canarySet", toJson setFile), ("known", toJson knownFile), ("boundary", toJson boundary)]
+
 /-- `fva trust-run`: everything after the build, inside the project's `lake env`. The imports
 run no initializer of the project (`loadExts := false`); builtin extensions such as
 `implemented_by` and `extern` still read their imported entries. -/
@@ -271,11 +278,7 @@ def run (argv : List String) : IO UInt32 := do
   let is := issues r
   let v := verdict r
   let attach := attachments env r
-  if o.json then
-    IO.println (Json.mkObj [("verdict", toJson v), ("issues", toJson is), ("report", toJson r),
-      ("attachments", Json.mkObj (attach.map fun (c, k) => (c, toJson k))),
-      ("canarySet", toJson setFile.toString), ("known", toJson knownFile.toString),
-      ("boundary", toJson boundary)]).pretty
+  if o.json then IO.println (json r v is attach setFile.toString knownFile.toString).pretty
   else IO.print (render r v is times.toList s!"{setFile}; known acceptances {knownFile}" o.subjects
     attach)
   return if v == .pass then 0 else 1
@@ -343,7 +346,9 @@ def main (argv : List String) : IO UInt32 := do
         vocabulary := [], prelude := [], tampered := [], needsLink := false, links := [],
         exportOk := false,
         replay := [], canaries := [], canarySet := [], budget := none }
-    IO.print (render r .fail (issues r) [] "" o.subjects)
+    -- D63: `--json` keeps its shape on a build failure (`fva explain` reads it)
+    if o.json then IO.println (json r .fail (issues r) [] "" "").pretty
+    else IO.print (render r .fail (issues r) [] "" o.subjects)
     IO.eprintln (b.stdout.takeEnd 1500).toString
     return 1
   let abs (f : Option String) : IO (Option String) :=

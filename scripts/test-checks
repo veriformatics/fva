@@ -89,6 +89,26 @@ if ! scripts/make-olean-pins --check >/dev/null 2>&1; then
 	echo "test-checks: make-olean-pins --check failed the committed pins"
 	fail=1
 fi
+# D63: on a build failure `fva trust --json` keeps its JSON shape, and `fva explain` shows the
+# failed proof check (rc 1) and stops before any model call
+d=$tmp/nobuild && mkdir -p "$d"
+printf 'name = "bad"\ndefaultTargets = ["Bad"]\n\n[[lean_lib]]\nname = "Bad"\n' >"$d/lakefile.toml"
+printf 'def x : Nat := "a"\n' >"$d/Bad.lean"
+echo '{"version": "1.3.0", "packagesDir": ".lake/packages", "packages": [], "name": "bad",' \
+	'"lakeDir": ".lake"}' >"$d/lake-manifest.json"
+cp lean-toolchain "$d/"
+.lake/build/bin/fva trust "$d" --spec-module Bad --json >"$d/trust.json" 2>/dev/null
+got=$(jq -r '.verdict + " " + .issues[0].tag' "$d/trust.json" 2>/dev/null)
+if [[ $got != "fail build" ]]; then
+	echo "test-checks: fva trust --json on a project that does not build → '$got', want 'fail build'"
+	fail=1
+fi
+.lake/build/bin/fva explain "$d" --spec-module Bad >"$d/explain.out" 2>&1
+rc=$?
+if ((rc != 1)) || ! grep -qx '  Proof check (fva trust): FAIL' "$d/explain.out"; then
+	echo "test-checks: fva explain on a project that does not build → rc $rc, want 1 + the FAIL line"
+	fail=1
+fi
 scripts/test-mutation-fixture || fail=1
 scripts/test-subject-matrix || fail=1
 exit "$fail"

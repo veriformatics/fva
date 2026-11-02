@@ -855,6 +855,18 @@ def main (argv : List String) : IO UInt32 := do
       return 2
   let specDir := (modFile root spec).parent.getD root
   let path := specDir / savedName
+  -- D63: a project that does not build has no claims to explain; a saved text still shows
+  if t.issues.any (·.1 == "build") && !(← path.pathExists) then
+    if o.json then
+      IO.println (Json.mkObj [("project", toJson root.toString),
+        ("trustVerdict", toJson t.verdict), ("trustIssues", toJson (t.issues.map fun (k, d) =>
+          Json.mkObj [("tag", toJson k), ("detail", toJson d)])), ("claims", Json.arr #[])]).pretty
+    else
+      IO.println (s!"FVA explain — {FVA.Tool.Trust.clean root.toString}\n\n" ++
+        s!"  Proof check (fva trust): {t.verdict}\n" ++
+        "  The project does not build, so there are no claims to explain.\n" ++
+        "  To see the build errors, run `fva trust`.")
+    return 1
   let reqPath : Option System.FilePath ← match o.reqs with
     | some f => pure (some f)
     | none => do
