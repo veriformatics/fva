@@ -10,9 +10,9 @@ Run inside the project (`lake env lean` on a generated file that imports the spe
 `run` computes `res` on concrete inputs.
 
 Values come from `whnf` (definitional: compiled code, which an `implemented_by` override can
-change, never runs) and each is confirmed by the kernel (`res = value` by `rfl`, D16). Results go
-to a file, one JSON line per case, flushed: `#eval` buffers stdout until the command ends, and a
-too-costly case can end the process mid-command.
+change, never runs) and each is confirmed by the kernel (`res = value` by `rfl`, D16), both within
+a heartbeat budget per case (D17). Results go to a file, one JSON line per case, flushed: `#eval`
+buffers stdout until the command ends.
 -/
 
 namespace FVA.Explain
@@ -88,21 +88,38 @@ def valsExpr (vs : List (String × Nat)) : Lean.Expr :=
     mkApp3 (mkConst ``List.cons [0]) valT
       (mkApp (mkConst ctor) (mkApp2 (mkConst ``BitVec.ofNat) (mkNatLit bits) (mkNatLit n))) acc
 
-/-- The kernel's verdict on `res = v` by `rfl`: `some true` accepted, `some false` refused,
-`none` = cancelled at its deadline (`tk`) or out of its own resources. -/
-def kernelAccepts (res v : Lean.Expr) (tk : IO.CancelToken) : MetaM (Option Bool) := do
+/-- Heartbeats (thousands) one example case may spend, in its reduction and again in its kernel
+check (D17): deterministic, so a case is too costly on every machine or on none; at 10000,
+`sum_to(3000)` fits and `sum_to(4294967295)` stops within about 1.3 s. -/
+def caseHeartbeats : Nat := 10000
+
+/-- The kernel's verdict on `res = v` by `rfl` within `caseHeartbeats`: `some true` accepted,
+`some false` refused, `none` = out of budget or of its own resources. -/
+def kernelAccepts (res v : Lean.Expr) : MetaM (Option Bool) := do
   let decl := Declaration.thmDecl
     { name := `_fva_explain_case, levelParams := [], type := ← mkEq res v, value := ← mkEqRefl v }
-  return match Kernel.Environment.addDecl (← getEnv).toKernelEnv (← getOptions) decl tk with
+  let opts := maxHeartbeats.set (← getOptions) caseHeartbeats
+  return match Kernel.Environment.addDecl (← getEnv).toKernelEnv opts decl with
     | .ok _ => some true
     | .error .interrupted | .error .deterministicTimeout | .error .deepRecursion
     | .error .excessiveMemory => none
     | .error _ => some false
 
+/-- One case's values + status: `confirmed` (the kernel accepts `result = values`), `refused`
+(it does not: the values are shown as such), `cost` (past `caseHeartbeats` in the reduction or
+the kernel), `stuck` (no literal values). The budget is enforced inside Lean (D17), never by
+killing the process. -/
+def evalCase (res : Lean.Expr) : MetaM (List (String × Nat) × String) :=
+  tryCatchRuntimeEx
+    (withCurrHeartbeats <| withTheReader Core.Context
+      ({ · with maxHeartbeats := caseHeartbeats * 1000, maxRecDepth := 100000 }) do
+      let some vals ← values res | return ([], "stuck")
+      return (vals, match ← kernelAccepts res (valsExpr vals) with
+        | some true => "confirmed" | some false => "refused" | none => "cost"))
+    fun _ => return ([], "cost")
+
 /-- Append `{"claim", "case", "res", "status"}` per case of `cases` (arguments as naturals) to
-`out`: `res` = the claim's `Returns` result reduced by `whnf`, `status` = `confirmed` (the kernel
-accepts `result = res`), `refused` (it does not: `res` is shown as such), `cost` (past the
-reduction or kernel budget), `stuck` (no literal values). -/
+`out`: `res` = the claim's `Returns` result reduced by `whnf`, `status` as `evalCase`. -/
 def run (c : Name) (cases : List (List Nat)) (out : System.FilePath) : MetaM Unit := do
   let some (.defnInfo d) := (← getEnv).find? c | throwError "{c}: not a definition"
   let h ← IO.FS.Handle.mk out .append
@@ -113,13 +130,7 @@ def run (c : Name) (cases : List (List Nat)) (out : System.FilePath) : MetaM Uni
         let t ← whnfR (← inferType x)
         vs := vs.push (mkApp2 (mkConst ``BitVec.ofNat) (t.getArg! 0) (mkNatLit a))
       return vs
-    let res := (← instantiateForall d.value vs).getArg! 3
-    let tk ← IO.CancelToken.new
-    let (vals, status) ← tryCatchRuntimeEx (do
-        let some vals ← values res | return ([], "stuck")
-        return (vals, match ← kernelAccepts res (valsExpr vals) tk with
-          | some true => "confirmed" | some false => "refused" | none => "cost"))
-      fun _ => return ([], "cost")
+    let (vals, status) ← evalCase ((← instantiateForall d.value vs).getArg! 3)
     h.putStrLn (Json.compress <| Json.mkObj [("claim", toJson c), ("case", toJson i),
       ("res", Json.arr (vals.toArray.map fun (t, n) =>
         Json.mkObj [("type", toJson t), ("value", toJson n)])), ("status", toJson status)])

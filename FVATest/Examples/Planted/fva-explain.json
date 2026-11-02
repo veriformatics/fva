@@ -2,19 +2,19 @@
  "requirements": [],
  "model": "gpt-6-luna",
  "inputsSha":
- "3db7c4c20b6ae1439ed7798679ac70d71f42728652c8f5ff9ebb8ab3ab1f6654",
- "generated": "2026-11-02 15:43 UTC",
+ "610f4bf6d4c8b475a83edd3b982943af9f5c3b347c12136fc43e6cf5ea3a973a",
+ "generated": "2026-11-02 16:01 UTC",
  "effort": "medium",
  "claims":
  [{"verdict": "different",
    "summary":
-   "The clamp export returns its first input unchanged for every combination of three 32-bit inputs.",
+   "For every three i32 inputs, calling the exported clamp function returns its first input unchanged.",
    "statement":
    "∀ (x lo hi : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Planted.Lifted.module \"clamp\"\n    [FVA.Wasm.Exec.Val.i32 x, FVA.Wasm.Exec.Val.i32 lo, FVA.Wasm.Exec.Val.i32 hi] [FVA.Wasm.Exec.Val.i32 x]",
    "serves": [],
    "resultBits": [32],
    "reason":
-   "The intent requires choosing lo, hi, or x based on signed comparisons, but the statement requires returning x unchanged for every input. For example, with x=0, lo=5, hi=10, the intent returns 5 while the statement requires 0.",
+   "The statement requires clamp to return x unchanged for every input, while the intent requires returning a bound when x is outside the range. For example, with x=0, lo=2, hi=8, the intent returns 2 but the claim requires 0.",
    "params":
    [{"name": "x", "bits": 32},
     {"name": "lo", "bits": 32},
@@ -25,46 +25,52 @@
    "fn": "clamp",
    "examples":
    [{"status": "confirmed", "spec": [0], "binary": [0], "args": [0, 0, 0]},
-    {"status": "confirmed", "spec": [5], "binary": [5], "args": [5, 0, 10]},
-    {"status": "confirmed", "spec": [0], "binary": [5], "args": [0, 5, 10]},
+    {"status": "confirmed", "spec": [5], "binary": [5], "args": [5, 2, 8]},
     {"status": "confirmed",
      "spec": [4294967295],
      "binary": [0],
-     "args": [4294967295, 0, 1]},
+     "args": [4294967295, 0, 10]},
+    {"status": "confirmed",
+     "spec": [2147483647],
+     "binary": [2147483647],
+     "args": [2147483647, 2147483648, 2147483647]},
     {"status": "confirmed", "spec": [1], "binary": [1], "args": [1, 1, 1]}],
    "details":
-   ["All three inputs are any 32-bit bit patterns, passed as i32 values; the claim gives no signed or unsigned interpretation.",
-    "The result must equal the first input exactly, with no additional arithmetic or wraparound specified.",
-    "Returns requires instantiability and that every call under every host behavior terminates without a trap."],
+   ["Covers every combination of three 32-bit bit-vector inputs: value, lower bound, and upper bound.",
+    "The inputs are passed as raw i32 values; the claim does not say the function interprets them as signed or unsigned.",
+    "The returned i32 must equal the first input exactly; no arithmetic wraparound is involved.",
+    "Returns additionally guarantees instantiability and termination without a trap for every host behavior."],
    "caveats":
-   ["The claim says the export returns its first argument regardless of the lower and upper bounds; it does not assert conventional clamping behavior."]},
+   ["The claim only guarantees returning the first argument; it does not state that the result is clamped or depends on either bound."]},
   {"verdict": "vacuous",
-   "summary": "The claim imposes no actual guarantee on the sum-to export.",
+   "summary":
+   "The claim is vacuously true and places no requirement on sum_to.",
    "statement":
    "∀ (n : BitVec 32),\n  False →\n    FVA.Wasm.Exec.Returns Examples.Planted.Lifted.module \"sum_to\" [FVA.Wasm.Exec.Val.i32 n] [FVA.Wasm.Exec.Val.i32 7]",
    "serves": [],
    "resultBits": [],
    "reason":
-   "The premise is False, so the implication holds regardless of what sum_to does and imposes no requirement on the export.",
+   "The premise is False, so there are no inputs for which the implication requires sum_to to return 7; it guarantees nothing about the function.",
    "params": [],
    "name": "Examples.Planted.sumToSeven",
    "intent": "`sum_to(n)` returns 7 for every input. ",
    "fn": null,
    "examples": [],
    "details":
-   ["The input is any 32-bit bit pattern, passed as an i32; no signed or unsigned interpretation is specified by the claim.",
-    "The elaborated claim has an additional false premise, so it places no effective requirement on the export.",
-    "Returns would require instantiability and, for every host behavior and fresh instance, termination without a trap and the exact result."],
+   ["The quantified input is any 32-bit bit-vector, passed as an i32; no signed interpretation is specified.",
+    "Because false implies anything, no actual call result, termination, or trap behavior is required."],
    "caveats":
-   ["The guarantee applies only when the premise is satisfied; it never is, so the claim is vacuously true and guarantees no call behavior."]},
+   ["The elaborated claim has a false antecedent, so it is true vacuously and guarantees nothing about sum_to.",
+    "The source binder syntax for this claim triggers a macro that inserts the false antecedent; that is why the elaborated statement differs from the apparent source-level claim.",
+    "The examples are illustrative arguments only; the claim imposes no behavior for them."]},
   {"verdict": "different",
-   "summary": "The sum-to export always returns zero for every 32-bit input.",
+   "summary": "For every i32 input, calling sum_to returns zero.",
    "statement":
    "∀ (n : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Planted.Lifted.module \"sum_to\" [FVA.Wasm.Exec.Val.i32 n] [FVA.Wasm.Exec.Val.i32 0]",
    "serves": [],
    "resultBits": [32],
    "reason":
-   "The statement requires zero for every input, while the intended sum is 1 at n=2. It therefore specifies a different result, not the intended wrapped sum.",
+   "Returning zero for every input is not the stated wrapped sum: for example, at n=2 the intended result is 1, but the claim requires 0.",
    "params": [{"name": "n", "bits": 32}],
    "name": "Examples.Planted.sumToZero",
    "intent":
@@ -79,37 +85,37 @@
      "binary": [2147483649],
      "args": [4294967295]}],
    "details":
-   ["The inputs are any 32-bit bit patterns, passed as i32 values; no signed or unsigned interpretation is specified.",
-    "The claim requires the returned i32 to be zero for every input.",
-    "Returns adds instantiability and guarantees that every call under every host behavior terminates without a trap."],
+   ["Covers every 32-bit bit-vector input, passed as an i32; it is not specified as signed or unsigned.",
+    "The returned i32 must be zero, with no computation or wraparound described by the claim.",
+    "Returns additionally guarantees instantiability and termination without a trap for every host behavior."],
    "caveats":
-   ["The claim checks only the result, not how the export computes it or whether it uses the input."]},
-  {"verdict": "weaker",
+   ["The claim requires the result to be zero for every input, which may be much stronger than a specification for a summation function."]},
+  {"verdict": "vacuous",
    "summary":
-   "This claim is unconditionally true and makes no behavioral guarantee.",
+   "The proposition is true for every pair of 32-bit values and makes no claim about a function.",
    "statement": "∀ (_a _b : BitVec 32), True",
    "serves": [],
    "resultBits": [],
    "reason":
-   "The statement is always true and says nothing about whether gcd terminates. It omits the termination guarantee requested by the intent.",
+   "The statement is simply True for every pair and does not call gcd or guarantee its termination.",
    "params": [],
    "name": "Examples.Planted.gcdTerminates",
    "intent": "`gcd(a, b)` terminates for every pair of 32-bit inputs. ",
    "fn": null,
    "examples": [],
    "details":
-   ["The quantified variables range over all 32-bit bit patterns, but they are not used."],
+   ["Quantifies over two 32-bit bit-vectors, but the body is simply true; there is no signedness, arithmetic, call, or return behavior to guarantee."],
    "caveats":
-   ["The universal variables are unused, and the claim says only True; it imposes no requirement on any module or function."]},
+   ["This proposition does not mention the module or any exported function, so it says nothing about WebAssembly behavior."]},
   {"verdict": "matches",
    "summary":
-   "The sum-to export returns the recursively defined natural-number sum of all values below the unsigned input, reduced to 32 bits.",
+   "For every i32 input, sum_to returns the 32-bit representation of the Lean helper's value on that input's unsigned value.",
    "statement":
    "∀ (n : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Planted.Lifted.module \"sum_to\" [FVA.Wasm.Exec.Val.i32 n]\n    [FVA.Wasm.Exec.Val.i32 (BitVec.ofNat 32 (Examples.Planted.sumBelow n.toNat))]",
    "serves": [],
    "resultBits": [32],
    "reason":
-   "The statement uses the unsigned natural-number value of n, computes the sum of values below it, and reduces the result to 32 bits, as the intent requires. Returns also requires termination without a trap, which does not change the intended result guarantee.",
+   "This matches the stated unsigned wrapped sum; the helper examples give 0, 0, 1, and 6 for inputs 0, 1, 2, and 4 respectively, as intended.",
    "params": [{"name": "n", "bits": 32}],
    "name": "Examples.Planted.sumToSpec",
    "intent":
@@ -119,24 +125,25 @@
    [{"status": "confirmed", "spec": [0], "binary": [0], "args": [0]},
     {"status": "confirmed", "spec": [0], "binary": [0], "args": [1]},
     {"status": "confirmed", "spec": [1], "binary": [1], "args": [2]},
-    {"status": "confirmed", "spec": [3], "binary": [3], "args": [3]}],
+    {"status": "confirmed", "spec": [6], "binary": [6], "args": [4]}],
    "details":
-   ["The input is any 32-bit bit pattern, passed as i32; toNat interprets it as an unsigned value from zero to 2^32 minus one.",
-    "The expected result is the natural-number sum computed by sumBelow, reduced to 32 bits with wraparound.",
-    "Returns would additionally require instantiability and termination without a trap under every host behavior."],
+   ["Covers every 32-bit bit-vector input, passed to sum_to as an i32.",
+    "The expected value is computed from the input's unsigned natural-number value, then represented modulo 2 to the power of 32 by BitVec.ofNat.",
+    "No signed interpretation is used in the expected-value expression.",
+    "Returns additionally guarantees instantiability and termination without a trap for every host behavior."],
    "caveats":
-   ["The claim refers to the Lean definition of sumBelow, not to the compiled export directly.",
-    "The elaborated statement uses sumBelow n.toNat, with the result reduced modulo 2^32 by BitVec.ofNat.",
-    "The implementation hint sumBelowWrong does not change the equation used to elaborate this proposition; as defined, sumBelow sums the preceding natural numbers, so this claim is not true."]},
+   ["The specification compares the result with the Lean helper sumBelow, not an independently stated mathematical sum.",
+    "The helper has an implemented_by annotation naming a constant-zero implementation; that annotation can affect compiled/evaluated execution, but the elaborated proposition still names sumBelow.",
+    "The input is treated through its unsigned natural-number representation, and the helper’s result is reduced to 32 bits."]},
   {"verdict": "matches",
    "summary":
-   "The gcd export returns the greatest common divisor of the unsigned values of its two 32-bit inputs.",
+   "For every pair of i32 inputs, gcd returns their unsigned natural-number greatest common divisor as an i32.",
    "statement":
    "∀ (a b : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Planted.Lifted.module \"gcd\" [FVA.Wasm.Exec.Val.i32 a, FVA.Wasm.Exec.Val.i32 b]\n    [FVA.Wasm.Exec.Val.i32 (BitVec.ofNat 32 (a.toNat.gcd b.toNat))]",
    "serves": [],
    "resultBits": [32],
    "reason":
-   "The statement applies Nat.gcd to the unsigned values of both inputs and requires that result as the output, matching the intended unsigned 32-bit gcd. Returns also requires termination without a trap, which does not change the intended result guarantee.",
+   "This requires the unsigned gcd result, including gcd(a, 0)=a, as stated; the listed examples are consistent with that guarantee.",
    "params": [{"name": "a", "bits": 32}, {"name": "b", "bits": 32}],
    "name": "Examples.Planted.gcdSpec",
    "intent":
@@ -144,35 +151,36 @@
    "fn": "gcd",
    "examples":
    [{"status": "confirmed", "spec": [0], "binary": [0], "args": [0, 0]},
-    {"status": "confirmed", "spec": [5], "binary": [5], "args": [0, 5]},
-    {"status": "confirmed", "spec": [3], "binary": [3], "args": [6, 9]},
+    {"status": "confirmed", "spec": [4], "binary": [4], "args": [12, 8]},
+    {"status": "confirmed", "spec": [1], "binary": [1], "args": [1, 0]},
     {"status": "confirmed",
      "spec": [1],
      "binary": [1],
-     "args": [4294967295, 2]},
+     "args": [4294967295, 1]},
     {"status": "confirmed", "spec": [1], "binary": [1], "args": [1, 1]}],
    "details":
-   ["Both inputs are any 32-bit bit patterns, passed as i32 values.",
-    "The claim applies Nat.gcd to their unsigned natural-number interpretations; it does not treat either input as signed.",
-    "The greatest common divisor is converted to a 32-bit result, with reduction modulo 2^32.",
-    "Returns requires instantiability and that every call under every host behavior terminates without a trap."],
+   ["Covers every pair of 32-bit bit-vectors, passed as i32 arguments.",
+    "Both inputs are interpreted as unsigned natural numbers via toNat; Nat.gcd is used, and the result is represented modulo 2 to the power of 32.",
+    "Returns additionally guarantees instantiability and termination without a trap for every host behavior."],
    "caveats":
-   ["This specifies only the returned numeric result, not the implementation or memory effects."]},
+   ["The expected gcd is computed from the unsigned natural values of the bit-vectors; the claim does not assert a signed-integer gcd.",
+    "It specifies only the returned value, not any internal algorithm or memory effects."]},
   {"verdict": "different",
-   "summary": "The claim asserts that sumBelow evaluated at ten equals zero.",
+   "summary":
+   "The proposition asserts that the Lean helper sumBelow evaluated at ten equals zero.",
    "statement": "Examples.Planted.sumBelow 10 = 0",
    "serves": [],
    "resultBits": [],
    "reason":
-   "The statement asserts that sumBelow 10 is 0, whereas the intent says the sum is 45. It asserts a different value.",
+   "The statement requires sumBelow 10 to equal zero, whereas the intent asserts it equals 45, so it guarantees the opposite result.",
    "params": [],
    "name": "Examples.Planted.sumBelowTen",
    "intent": "`0 + 1 + … + 9 = 45`. ",
    "fn": null,
    "examples": [],
    "details":
-   ["There are no function inputs or calls in this claim.",
-    "sumBelow operates on natural numbers, not fixed-width values, so its recursion does not wrap around."],
+   ["The claim checks whether the Lean expression sumBelow applied to the natural number ten equals zero.",
+    "There are no bit widths, signedness, wraparound, function call, or Returns guarantee in this proposition."],
    "caveats":
-   ["This is a proposition about a Lean definition, not about an exported function.",
-    "The definition is a recursive sum, so its value at ten is not zero; the claim is false."]}]}
+   ["This is a Lean-level equality, not a claim about an exported WebAssembly function.",
+    "The recursive definition gives sumBelow a sum of the preceding natural numbers, while implemented_by associates it with a constant-zero implementation; thus the equality's truth under the elaborated statement should not be confused with compiled implementation behavior."]}]}

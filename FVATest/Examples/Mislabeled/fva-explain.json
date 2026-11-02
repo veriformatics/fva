@@ -4,18 +4,18 @@
    "text":
    "clamp(x, lo, hi) returns lo when x < lo, hi when x > hi, and x otherwise (for lo <= hi).",
    "reason":
-   "The claim says the function always returns x, but R1 requires returning lo or hi when x is outside the bounds. For example, clamp(7, 10, 2) → [7] conflicts with R1’s required result lo when lo ≤ hi; this example has lo > hi, so instead clamp(7, 2, 10) → [7] is consistent, but the claim also covers valid inputs such as clamp(1, 1, 2), where R1 requires 1. The claim does not state the required boundary behavior.",
+   "The claim guarantees the function returns x for every input, but clamping must return a bound when x is outside [lo, hi]. For example, clamp(5, 0, 3) is claimed to return 5, while the requirement says it should return 3.",
    "id": "R1",
    "claims": ["Examples.Mislabeled.clamp"]}],
  "model": "gpt-6-luna",
  "inputsSha":
- "e83c0b4868aee6dd2a7ed95f9e10737b34c7fbc4d8b0b4daf936ab68fd57b3d9",
- "generated": "2026-11-02 15:47 UTC",
+ "5ac2bf1faed9cca9f2b000f1a497d9c1c69a71e2694472eca6ec8039ebfa1e75",
+ "generated": "2026-11-02 16:07 UTC",
  "effort": "medium",
  "claims":
  [{"verdict": "",
    "summary":
-   "For every choice of three 32-bit inputs, the exported function named clamp returns its first input unchanged.",
+   "For every combination of three 32-bit inputs, the exported function named clamp returns the first input unchanged.",
    "statement":
    "∀ (x lo hi : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Mislabeled.Lifted.module \"clamp\"\n    [FVA.Wasm.Exec.Val.i32 x, FVA.Wasm.Exec.Val.i32 lo, FVA.Wasm.Exec.Val.i32 hi] [FVA.Wasm.Exec.Val.i32 x]",
    "serves": ["R1"],
@@ -30,22 +30,19 @@
    "`clamp(x, lo, hi)` on signed 32-bit ints: `x` clamped into the range `[lo, hi]`. ",
    "fn": "clamp",
    "examples":
-   [{"status": "confirmed", "spec": [0], "binary": [0], "args": [0, 0, 0]},
-    {"status": "confirmed", "spec": [7], "binary": [7], "args": [7, 2, 10]},
-    {"status": "confirmed", "spec": [7], "binary": [7], "args": [7, 10, 2]},
+   [{"status": "confirmed", "spec": [0], "binary": [0], "args": [0, 0, 1]},
+    {"status": "confirmed", "spec": [5], "binary": [5], "args": [5, 0, 3]},
     {"status": "confirmed",
      "spec": [4294967295],
      "binary": [4294967295],
-     "args": [4294967295, 0, 5]},
-    {"status": "confirmed",
-     "spec": [2147483647],
-     "binary": [2147483647],
-     "args": [2147483647, 2147483648, 4294967295]},
+     "args": [4294967295, 0, 3]},
+    {"status": "confirmed", "spec": [0], "binary": [0], "args": [0, 1, 0]},
+    {"status": "confirmed", "spec": [0], "binary": [0], "args": [0, 0, 0]},
     {"status": "confirmed", "spec": [1], "binary": [1], "args": [1, 1, 1]}],
    "details":
-   ["Covers all three inputs, each a 32-bit bit pattern: x, lo, and hi.",
-    "The export receives and returns the first input unchanged. No signed or unsigned interpretation, arithmetic, or wraparound behavior is asserted.",
-    "Returns also requires the module to be instantiable and guarantees that each call in a fresh instance terminates without trapping, under every host behavior."],
+   ["The claim covers all three inputs: x, lo, and hi, each passed as a 32-bit WebAssembly integer bit pattern.",
+    "It requires the function to return x exactly, with no signed or unsigned interpretation, comparison, or arithmetic specified by this claim.",
+    "Returns also requires the module to be instantiable and every call under every host behavior to terminate without trapping and return exactly the stated value."],
    "caveats":
-   ["The exported function is called “clamp,” but this claim does not check clamping: it only guarantees that the result is the first argument. It does not constrain or compare the other two arguments.",
-    "The guarantee is universal over every 32-bit input, not just values in a signed or unsigned range. BitVec inputs are bit patterns; no signed interpretation is specified."]}]}
+   ["The source spells out the same result list, but the elaborated claim confirms the export returns its input x unchanged; it does not express clamping.",
+    "The claim is universal over every 32-bit pattern, including cases where the lower bound exceeds the upper bound. It does not state what a clamp function should do in those cases."]}]}
