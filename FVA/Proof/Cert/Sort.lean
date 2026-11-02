@@ -21,49 +21,52 @@ theorem listEq_iff (as bs : List Int) : listEq as bs = true ↔ as = bs := by
   | nil => cases bs <;> simp [listEq]
   | cons a as ih => cases bs <;> simp [listEq, intEq_iff, ih]
 
-theorem insert_perm (x : Int) (l : List Int) : (insert x l).Perm (x :: l) := by
-  induction l with
-  | nil => simp [insert]
-  | cons y ys ih =>
-    unfold insert
-    cases intLe x y
-    · exact ((ih.cons y).trans (List.Perm.swap x y ys))
-    · exact List.Perm.refl _
-
-theorem insert_sorted (x : Int) (l : List Int) (h : l.Pairwise (· ≤ ·)) :
-    (insert x l).Pairwise (· ≤ ·) := by
-  induction l with
-  | nil => simp [insert]
-  | cons y ys ih =>
-    unfold insert
-    rw [List.pairwise_cons] at h
-    cases hxy : intLe x y
-    · have hyx : y ≤ x := by have := (intLe_iff x y).not.mp (by simp [hxy]); omega
-      simp only [Bool.cond_false, List.pairwise_cons]
-      refine ⟨fun z hz => ?_, ih h.2⟩
-      rcases List.mem_cons.mp ((insert_perm x ys).mem_iff.mp hz) with rfl | hz
-      · exact hyx
-      · exact h.1 z hz
-    · have hle := (intLe_iff x y).mp hxy
-      simp only [Bool.cond_true, List.pairwise_cons]
-      refine ⟨fun z hz => ?_, h.1, h.2⟩
-      rcases List.mem_cons.mp hz with rfl | hz
-      · exact hle
-      · exact le_trans hle (h.1 z hz)
-
-theorem isort_perm (xs acc : List Int) : (isort xs acc).Perm (xs ++ acc) := by
-  induction xs generalizing acc with
-  | nil => simp [isort]
+theorem merge_eq (xs ys : List Int) : merge xs ys = xs.merge ys intLe := by
+  induction xs generalizing ys with
+  | nil => simp [merge]
   | cons x xs ih =>
-    simp only [isort]
-    refine (ih _).trans ?_
-    exact ((insert_perm x acc).append_left xs).trans List.perm_middle
+    induction ys with
+    | nil => simp [merge, mergeWith]
+    | cons y ys ihy =>
+      change (bif intLe x y then x :: merge xs (y :: ys)
+        else y :: merge (x :: xs) ys) = _
+      rw [List.cons_merge_cons, ih, ihy]
+      cases intLe x y <;> rfl
 
-theorem isort_sorted (xs acc : List Int) (h : acc.Pairwise (· ≤ ·)) :
-    (isort xs acc).Pairwise (· ≤ ·) := by
-  induction xs generalizing acc with
-  | nil => simpa [isort]
-  | cons x xs ih => exact ih _ (insert_sorted x acc h)
+theorem sortFuel_eq (fuel n : Nat) (xs : List Int) (hn : xs.length = n) (h : n ≤ fuel) :
+    sortFuel fuel n xs = xs.mergeSort intLe := by
+  induction fuel generalizing n xs with
+  | zero =>
+    have hx : xs = [] := List.eq_nil_of_length_eq_zero (by omega)
+    subst xs
+    simp [sortFuel]
+  | succ fuel ih =>
+    cases xs with
+    | nil => simp [sortFuel]
+    | cons x xs =>
+      cases xs with
+      | nil => simp [sortFuel]
+      | cons y xs =>
+        have hl : ((x :: y :: xs).splitAt ((n + 1) / 2)).1.length = (n + 1) / 2 := by
+          simp [List.splitAt_eq, hn]; omega
+        have hr : ((x :: y :: xs).splitAt ((n + 1) / 2)).2.length = n - (n + 1) / 2 := by
+          simp [List.splitAt_eq, hn]
+        have hn2 : 2 ≤ n := by simp only [List.length_cons] at hn; omega
+        rw [sortFuel, ih _ _ hl (by omega), ih _ _ hr (by omega), merge_eq,
+          List.mergeSort]
+        subst n; rfl
+
+theorem msort_perm (xs : List Int) : (msort xs).Perm xs := by
+  rw [msort, sortFuel_eq _ _ _ rfl (by omega)]
+  exact List.mergeSort_perm _ _
+
+theorem msort_sorted (xs : List Int) : (msort xs).Pairwise (· ≤ ·) := by
+  rw [msort, sortFuel_eq _ _ _ rfl (by omega)]
+  exact (List.pairwise_mergeSort (le := intLe)
+    (fun a b c hab hbc => (intLe_iff a c).2 ((intLe_iff a b).1 hab |>.trans
+      ((intLe_iff b c).1 hbc)))
+    (fun a b => by simp only [Bool.or_eq_true, intLe_iff]; omega) xs).imp
+      (fun h => (intLe_iff _ _).1 h)
 
 /-- `digitsOf` prints `decimal`, given fuel above the digit count. -/
 theorem digitsOf_eq (fuel n : Nat) (acc : List UInt8) (h : n < 10 ^ (fuel + 1)) :
@@ -164,8 +167,8 @@ theorem SortedPerm.check_sound (i o : Blob) (h : SortedPerm.check i o = true) :
     obtain ⟨⟨hi, ho⟩, hs⟩ := h
     have hys := (listEq_iff _ _).mp hs
     refine ⟨xs, ys, printsAs_sound hi, printsAs_sound ho, ?_, ?_⟩
-    · rw [← hys]; exact isort_sorted xs [] List.Pairwise.nil
-    · rw [← hys]; simpa using isort_perm xs []
+    · rw [← hys]; exact msort_sorted xs
+    · rw [← hys]; exact msort_perm xs
   · simp at h
 
 end FVA.Cert
