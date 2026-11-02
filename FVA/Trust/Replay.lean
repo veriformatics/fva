@@ -59,15 +59,17 @@ def statusOf : Option UInt32 → Status
   | some _ => .crash
 
 /-- Write the export of `decls` (+ their closure) from module `root` to `out`; `true` = ok.
-`exportPath` names avoid the `export` keyword. -/
-def exportDecls (root : Lean.Name) (decls : Array Lean.Name) (out : System.FilePath) :
-    IO Bool := do
+`sandbox` = the `bwrap` arguments the exporter runs under (it reads the project's `.olean`s;
+`out`'s directory writable), empty = none. `exportPath` names avoid the `export` keyword. -/
+def exportDecls (root : Lean.Name) (decls : Array Lean.Name) (out : System.FilePath)
+    (sandbox : Array String := #[]) : IO Bool := do
   let bin := (← Lean.findSysroot) / "bin" / "leanexport"
+  let cmd := #["bash", "-c", "out=$1; shift; exec \"$@\" >\"$out\"", "_", out.toString,
+    bin.toString, root.toString, "--"] ++ decls.map (·.toString)
+  let (c, args) := if sandbox.isEmpty then (cmd[0]!, cmd.extract 1)
+    else ("bwrap", sandbox ++ #["--"] ++ cmd)
   let child ← IO.Process.spawn
-    { cmd := "bash",
-      args := #["-c", "out=$1; shift; exec \"$@\" >\"$out\"", "_", out.toString, bin.toString,
-        root.toString, "--"] ++ decls.map (·.toString),
-      stdout := .null, stderr := .null, stdin := .null }
+    { cmd := c, args, stdout := .null, stderr := .null, stdin := .null }
   return (← child.wait) == 0
 
 /-- nanoda's configuration for `exportPath`. `unpermitted_axiom_hard_error`: without it nanoda

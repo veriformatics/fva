@@ -3,7 +3,8 @@
 # example's claims and proofs builds and passes `fva trust` (this binary, from outside the
 # project) with a 14-line surface: the vendored FVA counts as base by content; the same project
 # with one vendored spec file edited reviews that file; `lake check` (bwrap sandbox, no
-# --from-export) accepts it and rejects an extra axiom. The project reuses this checkout's
+# --from-export) accepts it and rejects an extra axiom; a lakefile target that writes beside its
+# project fails in fva trust's sandbox (D12). The project reuses this checkout's
 # Mathlib (hard links) and FVA build (copy), so nothing is fetched or rebuilt.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
@@ -72,6 +73,33 @@ fi
 if ((rc_cheat != 1)) || ! grep -q "Axiom 'fvaCheatAx' is not permitted" "$tmp/cheat.out"; then
 	echo "test-init: lake check on a proof using an extra axiom → rc $rc_cheat, pinned 1 naming it"
 	tail -5 "$tmp/cheat.out"
+	fail=1
+fi
+# D12: the project's code (here a lakefile build target) runs in the sandbox, so a write beside
+# the project fails the build and leaves no file
+l=$tmp/leak
+mkdir -p "$l"
+cat >"$l/lakefile.lean" <<LAKEFILE
+import Lake
+open Lake DSL
+
+package leak
+
+@[default_target] lean_lib Leak
+
+/-- Writes beside the project when built. -/
+@[default_target] target escape : Unit := do
+  IO.FS.writeFile "$tmp/outside" "written by the build"
+  return .nil
+LAKEFILE
+echo 'def x := 1' >"$l/Leak.lean"
+echo '{"version": "1.3.0", "packagesDir": ".lake/packages", "packages": [], "name": "leak",' \
+	'"lakeDir": ".lake"}' >"$l/lake-manifest.json"
+"$fva" trust "$l" --spec-module Leak >"$tmp/leak.out" 2>&1
+rc=$?
+if ((rc != 1)) || [[ -e $tmp/outside ]] || ! grep -q '^  \[build\]' "$tmp/leak.out"; then
+	echo "test-init: a build target writing beside the project → rc $rc, file" \
+		"$([[ -e $tmp/outside ]] && echo written || echo absent); pinned rc 1, [build], absent"
 	fail=1
 fi
 echo '-- edited after vendoring' >>"$p/fva/FVA/Spec/CAbi.lean"

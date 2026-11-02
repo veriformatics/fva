@@ -2,6 +2,7 @@ import Lean
 import FVA.Tool.Codex
 import FVA.Tool.Trust
 import FVA.Trust.Collect
+import FVA.Tool.Sandbox
 
 /-!
 # `fva explain` (advisory review aid; the verdict stays with `fva trust`)
@@ -282,16 +283,20 @@ def runTimed (cmd : String) (args : Array String) (cwd : System.FilePath) (secs 
   return if o.exitCode == 137 then none else some o
 
 /-- `#eval` `cmd` (writing JSON lines to the file it is given) in a file importing the spec
-module, under `lake env lean` in the project; the lines written + whether Lean finished. -/
+module, under `lake env lean` in the project's sandbox (`FVA.Tool.Sandbox`: the spec's
+definitions are project code), the temp dir alone writable; the lines written + whether Lean
+finished. -/
 def evalLean (root : System.FilePath) (spec : String) (cmd : System.FilePath → String)
     (secs : Nat) : IO (Array Json × Bool) :=
   IO.FS.withTempDir fun tmp => do
     let out := tmp / "out.jsonl"
     IO.FS.writeFile out ""
-    let src := root / s!"FvaExplain_{(← IO.monoNanosNow)}.lean"
+    let src := tmp / "FvaExplain.lean"
     IO.FS.writeFile src s!"import {spec}\nimport FVA.Explain\n{cmd out}\n"
-    let r ← try runTimed "lake" #["env", "lean", src.toString] root secs finally
-      IO.FS.removeFile src
+    let sysroot ← Lean.findSysroot
+    let a ← Sandbox.spawnArgs root sysroot (sysroot / "bin" / "lake").toString
+      #["env", "lean", src.toString] #[tmp]
+    let r ← runTimed a.cmd a.args root secs
     let lines := (← IO.FS.readFile out).splitOn "\n" |>.filter (!·.isEmpty)
     return (lines.toArray.filterMap fun l => (Json.parse l).toOption,
       r.any (·.exitCode == 0))
