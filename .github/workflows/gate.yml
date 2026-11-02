@@ -1,9 +1,11 @@
-# Same full gate as local runs (scripts/gate); Mathlib oleans come from its cache, not a rebuild.
+# The full gate (scripts/gate) as a CI fan-out (D32): one build, then one job per gate group
+# (`scripts/gate --groups`); together the groups cover every step, which a full local run checks.
+# Mathlib oleans come from its cache, never a rebuild. `ci/**` pushes = an agent's full gate.
 name: gate
 
 on:
   push:
-    branches: [main]
+    branches: [main, "ci/**"]
   pull_request:
 
 permissions:
@@ -14,24 +16,58 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gate:
+  build:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # gitleaks scans history
           persist-credentials: false
       - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
         with:
           auto-config: "false"
           use-mathlib-cache: "true"
           use-github-cache: "true"
-      # `lake check` (test-init) sandboxes with bwrap: absent from the image, and Ubuntu 24.04's
-      # AppArmor default denies the unprivileged user namespace it needs
+      - name: Build
+        run: lake --wfail build && lake --wfail build fvatest
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .lake/build
+          key: fva-build-${{ github.sha }}
+
+  gate:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [lean, trust, init, subjects, static]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # gitleaks scans history
+          persist-credentials: false
+      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
+        if: matrix.group != 'static'
+        with:
+          auto-config: "false"
+          use-mathlib-cache: "true"
+          use-github-cache: "true"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: matrix.group != 'static'
+        with:
+          path: .lake/build
+          key: fva-build-${{ github.sha }}
+          fail-on-cache-miss: true
+      # `lake check` (test-init) and fva trust's own sandbox use bwrap: absent from the image, and
+      # Ubuntu 24.04's AppArmor default denies the unprivileged user namespace it needs
       - name: Sandbox
+        if: matrix.group != 'static'
         run: |
           sudo apt-get install -y -qq bubblewrap
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Gate
-        run: scripts/gate
+        env:
+          GROUP: ${{ matrix.group }}
+        run: scripts/gate --group "$GROUP"
