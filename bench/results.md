@@ -517,6 +517,19 @@ reported the rest as open; no report over-claimed.
   0–364. The tables were not needed to check a statement against the README (their fidelity is
   M2's question). The tool arm's 15 `readable` ratings are for short contracts about the entry
   paths.
+- Grader drift (D54): one arm-blinded grader per metric re-judged all 20 runs at once (packets
+  in a seeded random order, run names removed; content still shows the tool arm's ACSL and the
+  fva arm's FVA vocabulary; record `bench/regrade/t2-blinded/`). Per-verdict agreement with the
+  shipped verdicts: M3 60 / 60 (fva 1–4 R1 `not proven, reported` again, every other row
+  `weaker`), M6 20 / 20 (no over-claim), M9 53 / 60. The 7 M9 disagreements are all fva rows
+  (runs 1, 3, 4), rated `readable` where the shipped verdict is `readable with effort`; MAIN
+  kept the shipped verdicts (fva 1's statements rest on its own `initialStore` fold, fva 3–4's
+  R2/R3 on decimal byte tables a reader decodes against the hex format, the basis on which both
+  graders rated every bare and prompted case table). Scientist appraisal (scientist-d54): the
+  M3 loss and the zero over-claims replicate for T2; the M9 ordering (fva the most readable Lean
+  arm) survives but its size does not (fva 5 / 15 shipped, 12 / 15 blinded); the other tasks were
+  not re-judged; the check is a sensitivity test (one task, one grader model family, label-only
+  blinding, briefs and rulings as adjudicated), not a measured absence of drift.
 - M7: the host was not idle (batch note above); tokens are the primary cost measure, CPU seconds
   the secondary one (rubric addendum 2026-10-28 (3)). Ranges: input tokens bare 2.39–8.75 M,
   prompted 2.16–9.20 M, fva 7.02–14.05 M, tool 2.95–15.57 M; wall time bare 954–2,132 s,
