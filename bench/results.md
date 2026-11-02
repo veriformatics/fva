@@ -697,3 +697,36 @@ The arms differ in the evidence.
   bytes.
 - M7: the host was not idle; tokens are primary. Ranges: input tokens bare 0.26–0.49 M, prompted
   0.85–1.67 M, fva 1.65–4.54 M; wall time bare 223–306 s, prompted 460–816 s, fva 481–698 s.
+
+## Plain-English review on the archived fva specs (D56)
+
+`fva explain` (requirements mode: each task's README requirements as `requirements.md`; FVA at
+d8cbbb3, the prompts before D64) ran on all 30 archived fva-arm specs (record
+`bench/regrade/fva-explain/`). The archives predate the claim marker (D13), so the scratch copies
+got `@[fva_claim]` on exactly the definitions the archived trust reports listed as claims (147),
+the bench package store was made visible to the sandbox, and two proofs had one renamed FVA
+helper; spec text and theorem statements are byte-identical to the archives. Fresh `fva trust`:
+PASS 29, FAIL 1 (lz4-rust 5: con-leche timed out the export; its labels are compared, not
+credited).
+
+| | requirement rows | agree with the shipped M3 (mapped) | disagree |
+|---|---|---|---|
+| all tasks | 75 | 48 | 27 |
+
+Mapping: `matches`/`stronger` ↔ `faithful`, `weaker` ↔ `weaker`, `missing` ↔ `missing` or
+`not proven, reported`, `different` ↔ `not proven, reported`, `vacuous` ↔ `false claim`. MAIN
+ruled all 27 disagreements; the shipped M3 verdict stands in each:
+
+- 15 rows (edger-cpm, glm-iround, lz4-wasm, tmm 3): the run refutes the requirement with a
+  machine-checked counterexample; explain labeled the contradicting claims `weaker` — the label
+  confusion D64 fixed (its definitions call this `different`).
+- 6 rows (tmm 1, 2, 4): `faithful` certificates against the run's exact-real TMM model; explain
+  cannot read the edgeR/RNAnorm documentation the requirements cite, so it cannot confirm the
+  model is the documented method.
+- 3 rows (lz4-c 1–3 R1): the claims constrain the final store, not R1's access trace; explain has
+  no notion of a different observable.
+- 3 rows (lz4-rust 1 R3, lz4-rust 4 R2–R3): finite or narrow statements of the requirement's own
+  observable; explain labeled them `missing` or `different` instead of `weaker`.
+
+So the round trip agreed with the graders on 64 % of the rows, and every disagreement was an
+explain error or a limit of the check, not a grading error found by explain.
