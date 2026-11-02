@@ -174,7 +174,8 @@ def expect {α : Type} [BEq α] [ToString α] (what : String) (got want : α) : 
   expect "rc 1" (repr (← st (← fake "no" "echo 'type mismatch' >&2; exit 1"))).pretty
     "FVA.Trust.Status.reject"
   expect "rc 1 + resource message" (repr (← st (← fake "deep"
-    "echo '(kernel) deep recursion detected, use set_option' >&2; exit 1"))).pretty
+    "echo 'uncaught exception: at X: (kernel) deep recursion detected, use set_option' >&2
+     exit 1"))).pretty
     "FVA.Trust.Status.decline"
   expect "rc 2" (repr (← st (← fake "dec" "exit 2"))).pretty "FVA.Trust.Status.decline"
   expect "panic" (repr (← st (← fake "panic" "exit 101"))).pretty "FVA.Trust.Status.crash"
@@ -191,9 +192,26 @@ def expect {α : Type} [BEq α] [ToString α] (what : String) (got want : α) : 
     "echo 'uncaught exception: at X: (kernel) deterministic timeout' >&2; exit 1"))).pretty
     "FVA.Trust.Status.decline"
   expect "lean4lean recursion limit" (repr (← l4 (← fake "l4d"
-    "echo '(kernel) deep recursion detected' >&2; exit 1"))).pretty "FVA.Trust.Status.decline"
+    "echo 'uncaught exception: at X: (kernel) deep recursion detected' >&2; exit 1"))).pretty
+    "FVA.Trust.Status.decline"
   expect "lean4lean refutation" (repr (← l4 (← fake "l4r"
-    "echo '(kernel) declaration type mismatch' >&2; exit 1"))).pretty "FVA.Trust.Status.reject"
+    "echo 'uncaught exception: at X: (kernel) declaration type mismatch' >&2; exit 1"))).pretty
+    "FVA.Trust.Status.reject"
+  -- D61: only the final exception's message decides; lean4lean prints the declarations it
+  -- checks, and a message can quote a declaration's name
+  expect "a declaration named like a limit, then a refutation" (repr (← l4 (← fake "l4n"
+    ("echo 'deterministic timeout'; echo 'uncaught exception: at Y: (kernel) declaration type " ++
+     "mismatch' >&2; exit 1")))).pretty "FVA.Trust.Status.reject"
+  expect "the name quoted in the message" (repr (← l4 (← fake "l4q"
+    ("echo \"uncaught exception: at «deterministic timeout»: (kernel) declaration type " ++
+     "mismatch, '«deterministic timeout»' has type\" >&2; exit 1")))).pretty
+    "FVA.Trust.Status.reject"
+  expect "the marker inside the name" (repr (← l4 (← fake "l4m"
+    ("echo 'uncaught exception: at «x: (kernel) unknown constant»: (kernel) declaration " ++
+     "type mismatch' >&2; exit 1")))).pretty "FVA.Trust.Status.reject"
+  expect "an exception without the kernel marker" (repr (← l4 (← fake "l4p"
+    "echo 'uncaught exception: deep recursion detected' >&2; exit 1"))).pretty
+    "FVA.Trust.Status.decline"
 
 -- Canary runs (F6): a decided status is cached per sha256 pair, a timeout never is
 #eval show IO Unit from IO.FS.withTempDir fun root => do

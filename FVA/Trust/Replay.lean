@@ -24,8 +24,9 @@ structure Kernel where
   bin : String
   /-- Arguments; `EXPORT` and `CONFIG` are replaced by the paths. -/
   args : List String
-  /-- Output that turns an exit code 1 into a decline (the kernel ran out of a resource; it
-  never decided the file). -/
+  /-- Messages that turn an exit code 1 into a decline (the kernel ran out of a resource; it
+  never decided the file), matched at the start of its final exception's message
+  (`finalMessage`). -/
   declineOn : List String := []
   /-- An absolute binary path in place of the toolchain's (planted kernels in checks). -/
   binPath : Option String := none
@@ -49,6 +50,17 @@ def kernels : List Kernel :=
 /-- The default run set: Lean's kernel + con-leche, whose default mode carries a machine-checked
 guarantee that no file declaring a theorem of `False` is accepted. -/
 def defaultKernels : List String := ["leanchecker", "con-leche"]
+
+/-- The message of a kernel's final `uncaught exception:` line: after its last `: (kernel) `
+(lean4lean: `uncaught exception: at <name>: (kernel) <message>`), else after the prefix. Only
+this line decides a decline: lean4lean prints the declarations it checks, and a message may
+quote a declaration's name, so a name such as «deterministic timeout» must match nothing. -/
+def finalMessage (out : String) : String :=
+  match (out.splitOn "\n").reverse.find? (·.startsWith "uncaught exception: ") with
+  | some l =>
+    if (l.splitOn ": (kernel) ").length > 1 then (l.splitOn ": (kernel) ").getLast!
+    else (l.drop "uncaught exception: ".length).toString
+  | none => ""
 
 /-- Status of a kernel exit (`none` = the wall limit hit). -/
 def statusOf : Option UInt32 → Status
@@ -109,8 +121,8 @@ def runKernel (k : Kernel) (bin exportPath config : System.FilePath) (limit : Na
   let ms := (← IO.monoMsNow) - t0
   let st := statusOf (if rc == 124 || rc == 137 then none else some rc)
   if st == .reject && !k.declineOn.isEmpty then
-    let text ← IO.FS.readFile out
-    if k.declineOn.any fun p => (text.splitOn p).length > 1 then return (.decline, ms)
+    let msg := finalMessage (← IO.FS.readFile out)
+    if k.declineOn.any (msg.startsWith ·) then return (.decline, ms)
   return (st, ms)
 
 end FVA.Trust
