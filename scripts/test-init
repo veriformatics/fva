@@ -134,7 +134,7 @@ olean=$p/.lake/packages/mathlib/.lake/build/lib/lean/$m.olean
 rm -f "$olean" "$olean.server" "$olean.private"
 # compile; each declaration Lean reports an error in gets its proof replaced by `sorry`
 for round in 1 2 3 4 5; do
-	lake env lean -o "$olean" "$src" >"$tmp/planted.log" 2>&1 && break
+	lake env lean -R "$tmp/planted" -o "$olean" "$src" >"$tmp/planted.log" 2>&1 && break
 	((round < 5)) || exit 2
 	sed -n "s|^$src:\([0-9]*\):[0-9]*: error.*|\1|p" "$tmp/planted.log" | sort -un >"$tmp/planted.err"
 	[[ -s $tmp/planted.err ]] || exit 2
@@ -164,6 +164,27 @@ if ! grep -q "^  \[olean\] Mathlib.Analysis.Real.Sqrt: compiled files differ" "$
 		"naming its module, the planted bytes kept ($(cmp -s "$olean" "$tmp/planted.olean" && echo kept || echo rebuilt))"
 	fail=1
 fi
+# D49: the build rewrites a vendored base module's compiled file with its source untouched
+# (`CallReturns`, which `Returns` claims mean, admitting a trap): the module stays base by its
+# source, so its compiled bytes must fail the pins; the cache's Real.sqrt comes back first
+for x in "" .server .private; do
+	ln -f "$PWD/.lake/packages/mathlib/.lake/build/lib/lean/$m.olean$x" "$olean$x" || exit 2
+done
+b=FVA/Spec/Claims
+bsrc=$tmp/planted-base/$b.lean
+mkdir -p "$(dirname "$bsrc")"
+sed 's/^    | \.trapped _ => False$/    | .trapped _ => True/' "$p/fva/$b.lean" >"$bsrc"
+cmp -s "$bsrc" "$p/fva/$b.lean" && exit 2
+bolean=$p/fva/.lake/build/lib/lean/$b.olean
+lake env lean -R "$tmp/planted-base" -o "$bolean" "$bsrc" >"$tmp/planted-base.log" 2>&1 || exit 2
+cp "$bolean" "$tmp/planted-base.olean"
+trust base.out
+if ! grep -q "^  \[olean\] FVA.Spec.Claims: compiled files differ" "$tmp/base.out" ||
+	grep -q "^  \[olean\] Mathlib" "$tmp/base.out" || ! cmp -s "$bolean" "$tmp/planted-base.olean"; then
+	echo "test-init: a rewritten base .olean (source unchanged) → $(head -1 "$tmp/base.out"), pinned" \
+		"[olean] naming FVA.Spec.Claims alone, the planted bytes kept"
+	fail=1
+fi
 ((fail)) || echo "test-init: fresh project PASS, 14-line surface; edited vendored spec reviewed;" \
-	"rewritten Mathlib definition [olean]"
+	"rewritten Mathlib definition + base .olean [olean]"
 exit "$fail"

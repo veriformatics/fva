@@ -6,8 +6,9 @@ import Lean
 A module counts as Mathlib by where its `.olean` lies (contract F2), but the project's build
 writes that directory: an edited Mathlib definition, rebuilt in place, would keep its constants
 outside the review surface while the claims that use them change meaning, and replay accepts it
-(a definition is never refuted). So every such module's compiled bytes must equal the pinned
-bytes of FVA's own Mathlib cache at the pinned revision (`trust/oleans.tsv`, written by
+(a definition is never refuted). The same holds for FVA base modules, matched by source alone
+(D49). So every such module's compiled bytes must equal the pinned bytes: FVA's own Mathlib cache
+at the pinned revision, FVA's own build of its base (`trust/oleans.tsv`, written by
 `scripts/make-olean-pins`, which computes the same digest in bash, apart from this code).
 -/
 

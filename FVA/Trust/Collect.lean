@@ -288,10 +288,12 @@ def collect (input : Input) : CoreM Report := do
   let generated : NameSet :=
     blobs.fold (fun s m _ => s.insert m) (lifted.fold (fun s m _ => s.insert m) {})
   let orig ← origins env input generated
-  -- D48: a module counted as Mathlib must be the pinned compiled bytes
-  let mathlibMods ← (env.header.moduleNames.filter (orig.get? · == some .mathlib)).mapM
+  -- D48, D49: a module counted as Mathlib or FVA base must be the pinned compiled bytes (the
+  -- project's build writes both; base sources alone are matched by `baseModules`)
+  let pinned ← (env.header.moduleNames.filter fun m =>
+      orig.get? m == some .mathlib || orig.get? m == some .base).mapM
     fun m => return (m, ← IO.FS.realPath (← findOLean m))
-  let tampered ← oleanMismatches input.oleanPins mathlibMods
+  let tampered ← oleanMismatches input.oleanPins pinned
   let originOf (c : Name) : Origin := ((modOf env c).bind orig.get?).getD .project
   let trusted (c : Name) : Bool := originOf c == .core || originOf c == .mathlib
   -- claims (D13): the spec module's `@[fva_claim]` definitions; a theorem there = a claim proven
