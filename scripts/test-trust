@@ -31,6 +31,7 @@ Unmarked PASS
 Axiom axiom,replay
 Sorry axiom,replay
 SkipKernel replay
+Decline link,replay,vacuous
 NativeDecide axiom,replay
 Vacuous vacuous
 Syntax syntax
@@ -118,6 +119,16 @@ while read -r c want args; do
 	fi
 done <<<"$pinned"
 echo "test-trust: self runs + $n cheat runs in $(($(date +%s) - t0)) s ($jobs at a time)"
+# D61: lean4lean decides by its final exception's message alone: a true theorem named like its
+# heartbeat-limit message, printed inside the refutation of a false proof, leaves that a reject
+"$fva" trust . --spec-module FVATest.Cheats.Decline.Spec --root-module FVATest.Cheats.Decline \
+	--paranoid >"$log.decline" 2>&1
+tags=$(sed -n 's/^  \[\([a-z]*\)\].*/\1/p' "$log.decline" | sort -u | paste -sd,)
+if [[ $tags != link,replay,vacuous ]] || ! grep -q '^  lean4lean (lean): rejected' "$log.decline"; then
+	echo "test-trust: Decline --paranoid → $tags, $(grep '^  lean4lean (' "$log.decline");" \
+		"pinned link,replay,vacuous + lean4lean rejected"
+	fail=1
+fi
 # D13: an unmarked Prop of the spec module is no claim, and the report lists it apart
 "$fva" trust . --spec-module FVATest.Cheats.Unmarked.Spec --root-module FVATest.Cheats.Unmarked \
 	>"$log" 2>&1
