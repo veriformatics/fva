@@ -52,6 +52,22 @@ def ExtExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p lim
     Locals ls inst f' (p + k) (p + k + 1) (some (b k).toNat) (some (psum acc b k)) ∧
     c = C.fill ⟨s, f', (body2.drop 1).map .plain⟩)
 
+/-- `ExtL1`'s exits, the bound exit's position kept: the bound check fails at `p + k = lim`. -/
+def ExtExitB (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p lim acc : Nat)
+    (b : Nat → UInt8) (c : Config) : Prop :=
+  (∃ k f', (∀ j < k, b j = 255) ∧ b k ≠ 255 ∧ p + k + 1 ≤ lim ∧ (∀ i ≤ k, psum acc b i < 2 ^ 31) ∧
+    Locals ls inst f' (p + k + 1) (p + k + 1) (some (b k).toNat) (some (psum acc b k)) ∧
+    c = (ctx8 C).fill ⟨s, f', (body8.drop 4).map .plain⟩) ∨
+  (∃ k f', (∀ j < k, b j = 255) ∧ p + k = lim ∧ (∀ i, i + 1 ≤ k → psum acc b i < 2 ^ 31) ∧
+    Locals ls inst f' (p + k) (p + k + 1)
+      (if k = 0 then none else some (b (k - 1)).toNat)
+      (if k = 0 then none else some (psum acc b (k - 1))) ∧
+    c = C.fill ⟨s, f', (body2.drop 1).map .plain⟩) ∨
+  (∃ k f', (∀ j < k, b j = 255) ∧ p + k + 1 ≤ lim ∧ (∀ i, i + 1 ≤ k → psum acc b i < 2 ^ 31) ∧
+    2 ^ 31 ≤ psum acc b k ∧
+    Locals ls inst f' (p + k) (p + k + 1) (some (b k).toNat) (some (psum acc b k)) ∧
+    c = C.fill ⟨s, f', (body2.drop 1).map .plain⟩)
+
 /-- Checkpoint 1's statement L1. -/
 def ExtL1 : Prop :=
   ∀ (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
@@ -62,5 +78,25 @@ def ExtL1 : Prop :=
     Until H (Within (fun m a => m = ma ∧ p ≤ a ∧ a < lim) (fun _ _ => False))
       (ExtExit C s inst ls p lim acc fun j => mem.byte (p + j))
       ((ctx9 C).fill ⟨s, ⟨ls, inst⟩, [.plain extLoop]⟩)
+
+/-- The literal length's extension loop (`ExtL1`'s statement with `ExtExitB`): the engine's
+obligation for `SegA`. -/
+def ExtL1B : Prop :=
+  ∀ (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
+    (mem : MemInst) (p lim acc : Nat),
+    ls[2]? = some (vI p) → ls[14]? = some (vI lim) → ls[17]? = some (vI acc) →
+    inst.mems[0]? = some ma → s.mems[ma]? = some mem →
+    p ≤ lim → lim + 1 < 2 ^ 32 → lim ≤ mem.size → acc < 2 ^ 31 →
+    Until H (Within (fun m a => m = ma ∧ p ≤ a ∧ a < lim) (fun _ _ => False))
+      (ExtExitB C s inst ls p lim acc fun j => mem.byte (p + j))
+      ((ctx9 C).fill ⟨s, ⟨ls, inst⟩, [.plain extLoop]⟩)
+
+theorem ExtExitB.exit {C : Context} {s : Store} {inst : ModuleInst} {ls : List Val}
+    {p lim acc : Nat} {b : Nat → UInt8} {c : Config}
+    (h : ExtExitB C s inst ls p lim acc b c) : ExtExit C s inst ls p lim acc b c := by
+  rcases h with h | ⟨k, f, hff, hb, hs, hl, hc⟩ | h
+  · exact Or.inl h
+  · exact Or.inr (Or.inl ⟨k, f, hff, by omega, hs, hl, hc⟩)
+  · exact Or.inr (Or.inr h)
 
 end Subjects.Lz4C

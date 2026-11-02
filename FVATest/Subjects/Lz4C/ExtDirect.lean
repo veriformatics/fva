@@ -82,9 +82,9 @@ theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls
     (hi : Inv ls inst p lim acc (fun i => mem.byte (p + i)) j f)
     (hk : p + j + 1 ≤ lim → ∀ f', Inv ls inst p lim acc (fun i => mem.byte (p + i)) (j + 1) f' →
       Until H (Within (fun m a => m = ma ∧ p ≤ a ∧ a < lim) (fun _ _ => False))
-        (ExtExit C s inst ls p lim acc fun i => mem.byte (p + i)) (head C s f')) :
+        (ExtExitB C s inst ls p lim acc fun i => mem.byte (p + i)) (head C s f')) :
     Until H (Within (fun m a => m = ma ∧ p ≤ a ∧ a < lim) (fun _ _ => False))
-      (ExtExit C s inst ls p lim acc fun i => mem.byte (p + i)) (head C s f) := by
+      (ExtExitB C s inst ls p lim acc fun i => mem.byte (p + i)) (head C s f) := by
   have hlen17 : 17 < ls.length := by
     have := List.getElem?_eq_some_iff.mp h17; exact this.1
   have hf14 : f.locals[14]? = some (vI lim) := by
@@ -114,7 +114,7 @@ theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls
     · wasm_within [extBody]
     wasm_cstepu [extBody]
     · wasm_within [extBody]
-    refine Until.done (Or.inr (Or.inl ⟨j, _, hi.ff, hb, hi.sums, ?_, rfl⟩))
+    refine Until.done (Or.inr (Or.inl ⟨j, _, hi.ff, by omega, hi.sums, ?_, rfl⟩))
     refine locals_of_inv hi hi.inst (by simp) (fun i h₂ h₄ _ _ => getElem?_set_of_ne (Ne.symm h₄))
       (by rw [getElem?_set_of_ne (by decide)]; exact hi.l2) ?_ ?_ ?_
     · rw [List.getElem?_set_self (by omega)]
@@ -276,7 +276,7 @@ theorem iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : L
     (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size) (hacc : acc < 2 ^ 31) :
     ∀ n j f, lim - (p + j) = n → Inv ls inst p lim acc (fun i => mem.byte (p + i)) j f →
     Until H (Within (fun m a => m = ma ∧ p ≤ a ∧ a < lim) (fun _ _ => False))
-      (ExtExit C s inst ls p lim acc fun i => mem.byte (p + i)) (head C s f) := by
+      (ExtExitB C s inst ls p lim acc fun i => mem.byte (p + i)) (head C s f) := by
   intro n
   induction n with
   | zero =>
@@ -288,8 +288,8 @@ theorem iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : L
     exact one_iter H C s inst ls ma mem p lim acc j f h14 h17 hm hmem hlim hsize hacc hi
       (fun _ f' hi' => ih (j + 1) f' (by omega) hi')
 
-/-- Checkpoint 1's statement, route D. -/
-theorem ext_l1 : ExtL1 := by
+/-- The strengthened statement, from the shared iteration proof. -/
+theorem extL1B : ExtL1B := by
   intro H C s inst ls ma mem p lim acc h2 h14 h17 hm hmem hpl hlim hsize hacc
   have hlen17 : 17 < ls.length := (List.getElem?_eq_some_iff.mp h17).1
   have hinv : Inv ls inst p lim acc (fun i => mem.byte (p + i)) 0 ⟨ls, inst⟩ :=
@@ -308,5 +308,12 @@ theorem ext_l1 : ExtL1 := by
   · wasm_within [extBody]
   simpa only [head, ctx9, Context.fill, extBody, List.map_cons, List.map_nil] using
     iter H C s inst ls ma mem p lim acc h14 h17 hm hmem hlim hsize hacc _ 0 _ rfl hinv
+
+/-- Checkpoint 1's frozen statement, by forgetting the bound exit's exact position. -/
+theorem ext_l1 : ExtL1 := by
+  intro H C s inst ls ma mem p lim acc h2 h14 h17 hm hmem hpl hlim hsize hacc
+  exact Until.mono
+    (extL1B H C s inst ls ma mem p lim acc h2 h14 h17 hm hmem hpl hlim hsize hacc)
+    (fun _ h => h) (fun _ h => h.exit)
 
 end Subjects.Lz4C.Direct

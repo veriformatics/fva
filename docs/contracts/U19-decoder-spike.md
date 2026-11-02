@@ -76,7 +76,7 @@ Status rule: checkpoint 1 proves a frozen loop lemma; only checkpoint 2's comple
 | row | obligation | status | statement | proof | focused check |
 |---|---|---|---|---|---|
 | I1 | entry guards, zero-capacity select, end pointers | proved | `Seg.Entry` | `Cut/Entry.lean` `Cut.entry` | `lake build FVATest.Subjects.Lz4C.Cut.Entry` |
-| I2 | literal + match length extension | proved | `Cut.ExtL1B` (→ `SegA`), `Seg.SegC` | `Cut/ExtB.lean` `Cut.extL1B`; `Eval/SegC.lean` `Eval.segC` | `lake build …Cut.ExtB …Eval.SegC` |
+| I2 | literal + match length extension | proved | `ExtL1B` (→ `SegA`), `Seg.SegC` | `ExtDirect.lean` `Direct.extL1B`; `Eval/SegC.lean` `Eval.segC` | `lake build …Cut.ExtB …Eval.SegC` |
 | I3 | byte tail copy | proved | inside `Seg.SegD` | `Eval/SegDLoops.lean` | `lake build …Eval.SegDLoops` |
 | I4 | `memcpy` / `memmove` ordered-copy contracts | proved | `Copy.MemcpyS1`, `MemmoveS2` | `Eval/S1.lean`, `Eval/S2.lean` | `lake build …Eval.S2` |
 | I5 | wildcopy loops calling `memcpy` (3) | proved | `LitWildS3`, `MatchWildS4`, inside `SegD` | `Eval/S3`, `S4`, `Wild` (`wc_until`) | `lake build …Eval.S4` |
@@ -103,6 +103,13 @@ Supplementary counts: func 2's body (550 static instructions) = the proven cutpo
 | SegB general literal path | reuse of S2 + S3 | 203 | 25.8 (contended) |
 | SegD offset/match path | reuse of S1, S4, `wc_until`, SegC support | 655 | 58.75 (contended) |
 | SegA via ExtL1B (stepping) | reuse of checkpoint 1's loop proof | 251 + 377 | — |
+
+Shared loop: `ExtDirect.one_iter` + `iter` prove `ExtExitB`; `Direct.extL1B` keeps its exact
+bound position and `Direct.ext_l1` weakens it to the frozen `ExtL1`. Historical checkpoint-1
+route D = 281 code lines (M1); the current tokenizer counts its pre-extraction module as 282,
+its shared proof + weakening adapter as 287 (312 → 319 physical lines). `Cut/ExtB` = composition
+alone: 236 → 4 code lines (251 → 9 physical), replacing its repeated iteration/induction proof.
+These source counts are separate from the historical effort + runtime measurements above.
 
 #### Export + replay growth
 | closure | export | leanchecker | con-leche |
