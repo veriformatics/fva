@@ -31,7 +31,8 @@
       "file": "lz4-block-codec.wasm",
       "sha256": "4bda6947a0498618552cba53ab3780745fd34cc1a0d84696e83a0547dcd68acf",
       "license": "BSD-2-Clause",
-      "scope": "Byte-identical to gorhill/lz4-wasm dist at 8995cdef7b3adc4a4d2fc4fc86b84a86789ff858"
+      "scope": "Byte-identical to gorhill/lz4-wasm dist at 8995cdef7b3adc4a4d2fc4fc86b84a86789ff858",
+      "source": "https://raw.githubusercontent.com/gorhill/lz4-wasm/8995cdef7b3adc4a4d2fc4fc86b84a86789ff858/src/lz4-block-codec.wat (hand-written WebAssembly text)"
     },
     {
       "id": "edger-emscripten",
@@ -55,7 +56,8 @@
       "extract": {
         "from": "edger-emscripten",
         "member": "edgeR/libs/edgeR.so"
-      }
+      },
+      "source": "https://bioc.r-universe.dev/src/contrib/edgeR_4.99.10.tar.gz (sha256 c33c3f85edf6a67abbcb3e899124d266adc039b32e811d11e69fc34cedba6218)"
     },
     {
       "id": "rnanorm",
@@ -134,6 +136,53 @@
       "sha256": "6775e47231a446fd086d660ecc18bcd076531cfedd912fbd66e576b118607001",
       "license": "MIT",
       "scope": "glm/ (headers) for T7: glm::iround<double> built by bench/subjects/build-glm"
+    }
+  ],
+  "builds": [
+    {
+      "id": "lz4-c-wasm",
+      "file": "bench/subjects/wasm/lz4-c.wasm",
+      "sha256": "8b73efb63f0467d9999d867007969b75826140dce9e5677bd0439dc6af384ac6",
+      "license": "BSD-2-Clause",
+      "upstream": "https://github.com/lz4/lz4",
+      "version": "1.10.0",
+      "source": "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz (lib/lz4.c) + bench/subjects/build-lz4 + bench/subjects/c-memory.c"
+    },
+    {
+      "id": "lz4-c-o1-wasm",
+      "file": "FVATest/Subjects/Lz4C/O1/lz4-c-O1.wasm",
+      "sha256": "2268a91bc122168f17d6dcfc3ae198546f4cb620a688b6f255809cb81b360ab1",
+      "license": "BSD-2-Clause",
+      "upstream": "https://github.com/lz4/lz4",
+      "version": "1.10.0",
+      "source": "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz (lib/lz4.c) + bench/tasks/lz4-c/build.sh with -O1 + bench/subjects/c-memory.c"
+    },
+    {
+      "id": "lz4-flex-wasm",
+      "file": "bench/subjects/wasm/lz4-flex.wasm",
+      "sha256": "1f115e3a5ddee865621f406e2abf545854218cb8dc632d759e998553031aa775",
+      "license": "MIT",
+      "upstream": "https://github.com/PSeitz/lz4_flex",
+      "version": "0.14.0",
+      "source": "https://static.crates.io/crates/lz4_flex/lz4_flex-0.14.0.crate + bench/subjects/lz4-flex-shim + bench/subjects/build-lz4"
+    },
+    {
+      "id": "glm-iround-wasm",
+      "file": "bench/subjects/wasm-glm/glm-iround.wasm",
+      "sha256": "eded7ae1f3c1ba100d618a98f8f86eb690577a8358e47e31f2039eb2f4a75a3a",
+      "license": "MIT",
+      "upstream": "https://github.com/g-truc/glm",
+      "version": "1.0.3",
+      "source": "https://codeload.github.com/g-truc/glm/tar.gz/refs/tags/1.0.3 + bench/subjects/glm-shim + bench/subjects/build-glm"
+    },
+    {
+      "id": "runorm-pflog-wasm",
+      "file": "bench/subjects/wasm-pflog/runorm-pflog.wasm",
+      "sha256": "ab1fc4edf899dc1afbbeec8871e35b5041e04c854f34831cc8cf393f497c2900",
+      "license": "BSD-2-Clause",
+      "upstream": "https://github.com/cleartools/runorm",
+      "version": "9429aa00784a972fdeae64e0ca050ea08f3c5bc9",
+      "source": "https://github.com/cleartools/runorm/archive/9429aa00784a972fdeae64e0ca050ea08f3c5bc9.tar.gz + bench/subjects/runorm-shim + bench/subjects/build-runorm"
     }
   ]
 }

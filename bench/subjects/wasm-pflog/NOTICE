@@ -1,3 +1,10 @@
+runorm-pflog.wasm:
+  sha256 ab1fc4edf899dc1afbbeec8871e35b5041e04c854f34831cc8cf393f497c2900
+  license BSD-2-Clause
+  upstream https://github.com/cleartools/runorm
+  version 9429aa00784a972fdeae64e0ca050ea08f3c5bc9
+  corresponding source: https://github.com/cleartools/runorm/archive/9429aa00784a972fdeae64e0ca050ea08f3c5bc9.tar.gz + bench/subjects/runorm-shim + bench/subjects/build-runorm
+
 Third-party code in runorm-pflog.wasm (built by bench/subjects/build-runorm).
 
 It contains runorm 9429aa00784a972fdeae64e0ca050ea08f3c5bc9 src/lib.rs, under the BSD-2-Clause license:

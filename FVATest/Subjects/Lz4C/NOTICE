@@ -1,3 +1,10 @@
+lz4-c.wasm, embedded by Lifted.lean:
+  sha256 8b73efb63f0467d9999d867007969b75826140dce9e5677bd0439dc6af384ac6
+  license BSD-2-Clause
+  upstream https://github.com/lz4/lz4
+  version 1.10.0
+  corresponding source: https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz (lib/lz4.c) + bench/subjects/build-lz4 + bench/subjects/c-memory.c
+
 Third-party code in lz4-c.wasm (sha256 8b73efb63f0467d9999d867007969b75826140dce9e5677bd0439dc6af384ac6;
 a copy of bench/subjects/wasm/lz4-c.wasm, built by bench/subjects/build-lz4 from the sources pinned in
 bench/subjects/lz4.sha256). Lifted.lean embeds the same bytes.
