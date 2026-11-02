@@ -5,6 +5,7 @@
 # mutated expected byte or weakened spec clause). rc 0 = all as pinned.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
+scripts/fetch-canaries || exit 2
 fva=.lake/build/bin/fva
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
