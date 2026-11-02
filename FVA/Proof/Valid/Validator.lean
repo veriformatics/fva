@@ -35,8 +35,7 @@ theorem func_sound {C : Context} {f : Func} (h : func C f = true) : ∃ ft, Func
   split at h
   · cases h
   · rename_i ft hf
-    simp only [Bool.and_eq_true] at h
-    exact ⟨ft, hf, expr_sound h.2⟩
+    exact ⟨ft, hf, expr_sound h⟩
 
 theorem elemMode_sound {C : Context} {t : RefType} {mode : ElemMode}
     (h : elemMode C t mode = true) : mode.Ok C t := by

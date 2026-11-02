@@ -50,6 +50,7 @@ import FVA.Proof.Exec.Instantiate
 import FVA.Proof.Pin.Decode
 import FVA.Proof.Pin.Exec
 import FVA.Proof.Valid.Validator
+import FVA.Proof.Valid.Complete
 import FVA.Proof.Valid.Soundness
 import FVA.Proof.Valid.Instantiate
 import FVA.Proof.Valid.Corollary

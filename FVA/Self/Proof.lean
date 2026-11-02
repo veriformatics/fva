@@ -7,6 +7,7 @@ import FVA.Proof.Trust
 import FVA.Proof.Cert.Sort
 import FVA.Proof.Cert.Compile
 import FVA.Proof.Valid.Validator
+import FVA.Proof.Valid.Complete
 import FVA.Proof.Valid.Corollary
 
 /-! Proofs of the self package's claims, from the unit theorems. -/
@@ -51,6 +52,8 @@ theorem certSortSound : CertSortSound := FVA.Cert.SortedPerm.check_sound
 theorem certCompileSound : CertCompileSound := FVA.Cert.Compiled.check_sound
 
 theorem validateSound : ValidateSound := fun _ h => FVA.Wasm.Valid.validate_sound h
+
+theorem validateComplete : ValidateComplete := fun _ h => FVA.Wasm.Valid.validate_complete h
 
 theorem neverStuck : NeverStuck := FVA.Wasm.Valid.neverStuck
 
