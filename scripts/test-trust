@@ -69,36 +69,55 @@ for m in FVA.Impl.Decode FVA.Impl.Decode.Reader FVA.Impl.Decode.Instr FVA.Impl.D
 	FVA.Impl.Cert.Sort FVA.Impl.Cert.Compile FVA.Impl.Valid; do
 	subjects+=(--subject "$m")
 done
-"$fva" trust . --spec-module FVA.Self.Spec --root-module FVA.Self "${subjects[@]}" >"$log" 2>&1
-rc=$?
-grep -A3 'Kernel replay' "$log"
-if ((rc != 0)); then
-	echo "test-trust: self package rc $rc"
-	head -20 "$log"
-	fail=1
-fi
+# D38: the two self runs side by side, the cheats in parallel (FVA_TRUST_JOBS, default
+# nproc / 2, at least 1; each a few GB at most), every pinned tag set compared after
+jobs=${FVA_TRUST_JOBS:-$(($(nproc) / 2))}
+((jobs >= 1)) || jobs=1
+throttle() { while (($(jobs -rp | wc -l) >= jobs)); do wait -n; done; }
+t0=$(date +%s)
+"$fva" trust . --spec-module FVA.Self.Spec --root-module FVA.Self "${subjects[@]}" \
+	>"$log.self" 2>&1 &
+self=$!
 "$fva" trust . --spec-module FVA.Self.Spec --root-module FVA.Self "${subjects[@]}" --paranoid \
-	>"$log" 2>&1
-rc=$?
-grep -A7 'Kernel replay' "$log"
-if ((rc != 0)); then
-	echo "test-trust: self package --paranoid rc $rc"
-	head -20 "$log"
-	fail=1
-fi
+	>"$log.paranoid" 2>&1 &
+paranoid=$!
 n=0
 while read -r c want args; do
 	n=$((n + 1))
+	throttle
 	# shellcheck disable=SC2086 # extra arguments split on purpose
-	got=$("$fva" trust . --spec-module "FVATest.Cheats.$c.Spec" \
-		--root-module "FVATest.Cheats.$c" $args 2>/dev/null |
-		sed -n 's/^  \[\([a-z]*\)\].*/\1/p' | sort -u | paste -sd,)
+	("$fva" trust . --spec-module "FVATest.Cheats.$c.Spec" --root-module "FVATest.Cheats.$c" \
+		$args 2>/dev/null | sed -n 's/^  \[\([a-z]*\)\].*/\1/p' | sort -u | paste -sd, \
+		>"$tmp/cheat.$n") &
+done <<<"$pinned"
+wait "$self"
+rc=$?
+grep -A3 'Kernel replay' "$log.self"
+if ((rc != 0)); then
+	echo "test-trust: self package rc $rc"
+	head -20 "$log.self"
+	fail=1
+fi
+wait "$paranoid"
+rc=$?
+grep -A7 'Kernel replay' "$log.paranoid"
+if ((rc != 0)); then
+	echo "test-trust: self package --paranoid rc $rc"
+	head -20 "$log.paranoid"
+	fail=1
+fi
+wait
+n=0
+while read -r c want args; do
+	n=$((n + 1))
+	got=$(<"$tmp/cheat.$n")
 	[[ -z $got ]] && got=PASS
 	if [[ $got != "$want" ]]; then
 		echo "test-trust: FVATest.Cheats.$c $args → $got, pinned $want"
 		fail=1
 	fi
 done <<<"$pinned"
+echo "test-trust: self runs + $n cheat runs in $(($(date +%s) - t0)) s ($jobs at a time)"
 # D13: an unmarked Prop of the spec module is no claim, and the report lists it apart
 "$fva" trust . --spec-module FVATest.Cheats.Unmarked.Spec --root-module FVATest.Cheats.Unmarked \
 	>"$log" 2>&1
