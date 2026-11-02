@@ -34,7 +34,8 @@ def fixedInputs : List Nat := [0, 1]
 /-- Example rows per claim. -/
 def maxExamples : Nat := 8
 
-/-- Seconds for one spec-value case (a too-costly case is shown as such). -/
+/-- Seconds for one spec-value case: a backstop for a process that dies or hangs, since each case's
+budget is enforced inside Lean (`FVA.Explain.caseHeartbeats`, D17). -/
 def caseSeconds : Nat := 10
 
 private def obj (fs : List (String × Json)) : Json := Json.mkObj fs

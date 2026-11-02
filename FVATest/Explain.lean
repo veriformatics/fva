@@ -68,9 +68,15 @@ open Lean Meta FVA.Explain in
     (mkApp (mkConst ``FVA.Wasm.Exec.Val.i32) (mkApp2 (mkConst ``BitVec.ofNat) (mkNatLit 32) ten))
     (mkApp (mkConst ``List.nil [0]) (mkConst ``FVA.Wasm.Exec.Val))
   unless (← values res) == some [("i32", 45)] do throwError "values: {← values res}"
-  let tk ← IO.CancelToken.new
-  unless (← kernelAccepts res (valsExpr [("i32", 45)]) tk) == some true do throwError "45 refused"
-  unless (← kernelAccepts res (valsExpr [("i32", 0)]) tk) == some false do throwError "0 accepted"
+  unless (← kernelAccepts res (valsExpr [("i32", 45)])) == some true do throwError "45 refused"
+  unless (← kernelAccepts res (valsExpr [("i32", 0)])) == some false do throwError "0 accepted"
+  -- D17: a case past its heartbeat budget is `cost`, decided inside Lean (no process kill)
+  let big := mkApp3 (mkConst ``List.cons [0]) (mkConst ``FVA.Wasm.Exec.Val)
+    (mkApp (mkConst ``FVA.Wasm.Exec.Val.i32) (mkApp2 (mkConst ``BitVec.ofNat) (mkNatLit 32)
+      (mkApp (mkConst ``sumBelow) (mkNatLit 4294967295))))
+    (mkApp (mkConst ``List.nil [0]) (mkConst ``FVA.Wasm.Exec.Val))
+  unless (← evalCase big).2 == "cost" do throwError "sumBelow 4294967295 not too costly"
+  unless (← evalCase res) == ([("i32", 45)], "confirmed") do throwError "evalCase {← evalCase res}"
 
 -- the explain thread has no shell, image viewer or MCP tool (closing review SEC-4)
 #guard ["shell_tool", "unified_exec", "view_image"].all fun f =>
