@@ -2,17 +2,42 @@
 # Full gate (default) or fast gate (--fast): every check this repo grades by, one rc.
 # Prints each step's wall-clock; Lean steps run in sequence (one lake workspace), the rest in parallel.
 # Fast = skips network/history scanners (osv-scanner, gitleaks history); full = CI + closing commits.
+# --group G = the full gate's steps of CI group G alone (gate.yml: one job per group, D32);
+# --groups = the group names. A full run fails when a step belongs to no group or gate.yml's
+# matrix misses a group, so the CI fan-out always covers every step.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
-fast=0
-[[ ${1:-} == --fast ]] && fast=1
+declare -A groups=(
+	[lean]="build checks test decoder numerics floatdiff spec difftest lint mutation pins"
+	[trust]="build trust"
+	[init]="build init"
+	[subjects]="build subjects"
+	[static]="format-lean shellcheck shfmt spec-lint base-manifest scope notices actionlint zizmor gitleaks-tree gitleaks-history osv-scanner"
+)
+fast=0 group=
+case ${1:-} in
+--fast) fast=1 ;;
+--groups)
+	printf '%s\n' "${!groups[@]}" | sort
+	exit 0
+	;;
+--group)
+	group=${2:-}
+	[[ -n ${groups[$group]+x} ]] || {
+		echo "gate: no group '$group' (--groups lists them)" >&2
+		exit 1
+	}
+	;;
+esac
+want() { [[ -z $group || " ${groups[$group]} " == *" $1 "* ]]; }
 scripts/fetch-tools || exit 1
 export PATH="$PWD/.tools/bin:$PATH"
 logs=$(mktemp -d)
 trap 'rm -rf "$logs"' EXIT
 
-run() { # name cmd... -> logs/name.{out,rc,sec}
+run() { # name cmd... -> logs/name.{out,rc,sec}, when the selected group has the step
 	local name=$1 t0
+	want "$name" || return 0
 	shift
 	t0=$(date +%s%N)
 	"$@" >"$logs/$name.out" 2>&1
@@ -67,6 +92,24 @@ if ((! fast)); then
 	run osv-scanner osv-scanner scan source -r --x-exclude .lake --x-exclude .tools --x-exclude .scratch --x-exclude .cache . &
 fi
 wait
+# CI coverage: every step that ran belongs to a group, and gate.yml's matrix lists every group
+if [[ -z $group ]] && ((! fast)); then
+	for rc in "$logs"/*.rc; do
+		name=$(basename "$rc" .rc)
+		[[ " ${groups[*]} " == *" $name "* ]] || {
+			echo "gate: step $name belongs to no CI group" >"$logs/ci-groups.out"
+			echo 1 >"$logs/ci-groups.rc"
+		}
+	done
+	for g in "${!groups[@]}"; do
+		grep -qE "^ +group: \[.*\b$g\b.*\]" .github/workflows/gate.yml || {
+			echo "gate: gate.yml's matrix misses group $g" >>"$logs/ci-groups.out"
+			echo 1 >"$logs/ci-groups.rc"
+		}
+	done
+	[[ -e $logs/ci-groups.rc ]] || echo 0 >"$logs/ci-groups.rc"
+	echo 0 >"$logs/ci-groups.ms"
+fi
 
 status=0
 printf '%-16s %8s  %s\n' step seconds result
