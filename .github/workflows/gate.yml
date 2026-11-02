@@ -27,5 +27,11 @@ jobs:
           auto-config: "false"
           use-mathlib-cache: "true"
           use-github-cache: "true"
+      # `lake check` (test-init) sandboxes with bwrap: absent from the image, and Ubuntu 24.04's
+      # AppArmor default denies the unprivileged user namespace it needs
+      - name: Sandbox
+        run: |
+          sudo apt-get install -y -qq bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Gate
         run: scripts/gate
