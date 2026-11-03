@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# orientation RUN… (D55): per run directory (result.json + stdout.jsonl[.gz]), the completed
+# agent steps by category, first match wins: wait, fva-cli, build, fva-internal (how FVA works:
+# FVA/{Impl,Proof,Trust,Tool,Cli,…}, scripts, lakefile), fva-spec (vocabulary a claim author reads
+# anyway), exec, write, read, message, other; + input tokens. The categories are the bench-v2
+# orientation analysis's (.agent/archive/maintain-bench-direction.md), `fva call` added.
+set -euo pipefail
+printf 'run\tsteps\twait\tfva-cli\tbuild\tfva-internal\tfva-spec\texec\twrite\tread\tmessage\tother\tinput_tokens\n'
+for d in "$@"; do
+	{ if [[ -e $d/stdout.jsonl.gz ]]; then zcat "$d/stdout.jsonl.gz"; else cat "$d/stdout.jsonl"; fi; } | jq -r --slurpfile res "$d/result.json" -s '
+		def cat: . as $c |
+			if test("^\\S*bash -lc .{0,3}(sleep|while |until |wait\\b|tail -f|pgrep|ps )|\\bsleep \\d") then "wait"
+			elif test("(?:^|[;&|(]\\s*|-lc [\u0027\"]?|timeout \\S+ |time )(?:\\S*/)?(?:fva (?:trust|lift|difftest|certify|blob|init|help|explain|call)\\b|lake exe fva\\b)") then "fva-cli"
+			elif test("(?:^|[;&|(]\\s*|-lc [\u0027\"]?|timeout \\S+ |time |env \\S+ )(?:\\S*/)?(?:lake (?:build|env|check|exe)|lean |leanchecker|con-leche|leanexport|frama-c|verus|cargo )") then "build"
+			elif test("\\bfva/(FVA/(Impl|Proof|Trust|Tool|Cli|Lifted|Explain|Version)|Main|scripts|lakefile|trust|lake-manifest)") then "fva-internal"
+			elif test("\\bfva/(FVA/Spec|AGENT|README|FVA\\.lean)") then "fva-spec"
+			elif test("(?:^|[;&|(]\\s*|-lc [\u0027\"]?|timeout \\S+ |time )(?:\\S*/)?(?:wasmtime|node|Rscript|wasm-tools|python3?) ") then "exec"
+			elif test("cat >|apply_patch|tee |<<\u0027?[A-Z]+\u0027?\\s*$|> [\\w./-]+\\.(lean|md|py|sh)") then "write"
+			elif test("\\b(cat|sed|rg|grep|head|tail|ls|find|wc|nl|awk)\\b") then "read"
+			else "other" end;
+		[ .[] | select(.type == "item.completed") | .item |
+			if .type == "command_execution" then (.command // "" | cat)
+			elif .type == "agent_message" then "message"
+			elif .type == "file_change" then "write" else "other" end ] as $s |
+		def n($k): [$s[] | select(. == $k)] | length;
+		[($res[0] | "\(.arm)-\(.task)-\(.index)"), ($s | length), n("wait"), n("fva-cli"), n("build"),
+			n("fva-internal"), n("fva-spec"), n("exec"), n("write"), n("read"), n("message"), n("other"),
+			$res[0].usage.input_tokens] | @tsv'
+done
