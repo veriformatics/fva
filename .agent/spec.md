@@ -113,6 +113,7 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
 - [ ] D64 pass-2 labels: WEAKER vs DIFFERENT
 - [ ] D65 project `.olean`s tied to their sources
 - [ ] D66 sandbox sees an outside `packagesDir`
+- [ ] D67 `fva init` vendors the `.olean` pins
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
