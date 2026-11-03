@@ -66,154 +66,13 @@ if ! lake build FVATest.Trust FVATest.Explain >"$log" 2>&1; then
 	grep '^error' "$log" | head -5
 	fail=1
 fi
+lake --wfail build FVATest.Certs FVATest.Certs.Custom.Rev >/dev/null || exit 2
 subjects=()
 for m in FVA.Impl.Decode FVA.Impl.Decode.Reader FVA.Impl.Decode.Instr FVA.Impl.Decode.Module \
 	FVA.Impl.Exec.Ref FVA.Impl.Exec.Det FVA.Impl.Numerics.Float FVA.Trust.Verdict \
 	FVA.Impl.Cert.Sort FVA.Impl.Cert.Compile FVA.Impl.Valid; do
 	subjects+=(--subject "$m")
 done
-# D38: the two self runs side by side, the cheats in parallel (FVA_TRUST_JOBS, default
-# nproc / 2, at least 1; each a few GB at most), every pinned tag set compared after
-jobs=${FVA_TRUST_JOBS:-$(($(nproc) / 2))}
-((jobs >= 1)) || jobs=1
-throttle() { while (($(jobs -rp | wc -l) >= jobs)); do wait -n; done; }
-t0=$(date +%s)
-"$fva" trust . --spec-module FVA.Self.Spec --root-module FVA.Self "${subjects[@]}" \
-	>"$log.self" 2>&1 &
-self=$!
-"$fva" trust . --spec-module FVA.Self.Spec --root-module FVA.Self "${subjects[@]}" --paranoid \
-	>"$log.paranoid" 2>&1 &
-paranoid=$!
-n=0
-while read -r c want args; do
-	n=$((n + 1))
-	throttle
-	# shellcheck disable=SC2086 # extra arguments split on purpose
-	("$fva" trust . --spec-module "FVATest.Cheats.$c.Spec" --root-module "FVATest.Cheats.$c" \
-		$args 2>/dev/null | sed -n 's/^  \[\([a-z]*\)\].*/\1/p' | sort -u | paste -sd, \
-		>"$tmp/cheat.$n") &
-done <<<"$pinned"
-wait "$self"
-rc=$?
-grep -A3 'Kernel replay' "$log.self"
-if ((rc != 0)); then
-	echo "test-trust: self package rc $rc"
-	head -20 "$log.self"
-	fail=1
-fi
-wait "$paranoid"
-rc=$?
-grep -A7 'Kernel replay' "$log.paranoid"
-if ((rc != 0)); then
-	echo "test-trust: self package --paranoid rc $rc"
-	head -20 "$log.paranoid"
-	fail=1
-fi
-wait
-n=0
-while read -r c want args; do
-	n=$((n + 1))
-	got=$(<"$tmp/cheat.$n")
-	[[ -z $got ]] && got=PASS
-	if [[ $got != "$want" ]]; then
-		echo "test-trust: FVATest.Cheats.$c $args → $got, pinned $want"
-		fail=1
-	fi
-done <<<"$pinned"
-echo "test-trust: self runs + $n cheat runs in $(($(date +%s) - t0)) s ($jobs at a time)"
-# D61: lean4lean decides by its final exception's message alone: a true theorem named like its
-# heartbeat-limit message, printed inside the refutation of a false proof, leaves that a reject
-"$fva" trust . --spec-module FVATest.Cheats.Decline.Spec --root-module FVATest.Cheats.Decline \
-	--paranoid >"$log.decline" 2>&1
-tags=$(sed -n 's/^  \[\([a-z]*\)\].*/\1/p' "$log.decline" | sort -u | paste -sd,)
-if [[ $tags != link,replay,vacuous ]] || ! grep -q '^  lean4lean (lean): rejected' "$log.decline"; then
-	echo "test-trust: Decline --paranoid → $tags, $(grep '^  lean4lean (' "$log.decline");" \
-		"pinned link,replay,vacuous + lean4lean rejected"
-	fail=1
-fi
-# D13: an unmarked Prop of the spec module is no claim, and the report lists it apart
-"$fva" trust . --spec-module FVATest.Cheats.Unmarked.Spec --root-module FVATest.Cheats.Unmarked \
-	>"$log" 2>&1
-if ! grep -q '^Prop definitions without @\[fva_claim\]' "$log" ||
-	! grep -qx '  Cheats.Unmarked.empty' "$log"; then
-	echo "test-trust: Unmarked → the unmarked Prop is not listed apart"
-	fail=1
-fi
-# worked examples (U8): each must PASS; `fva explain` runs `fva trust` itself, then shows the
-# saved explanation (U10: rc 0 = trust PASS + every intent check `matches` + the text current);
-# beside them the accepted certificates (U9), one aggregate run, must PASS
-lake --wfail build FVATest.Certs FVATest.Certs.Custom.Rev >/dev/null || exit 2
-"$fva" trust . --spec-module FVATest.Certs.Spec --root-module FVATest.Certs >"$log.certs" 2>&1 &
-certs=$!
-declare -A pid
-for ex in "${examples[@]}"; do
-	"$fva" explain . --spec-module "FVATest.Examples.$ex.Spec" \
-		--root-module "FVATest.Examples.$ex" >"$log.$ex" 2>&1 &
-	pid[$ex]=$!
-done
-for ex in "${examples[@]}"; do
-	wait "${pid[$ex]}"
-	rc=$?
-	if ((rc != 0)) || ! grep -q '^  Proof check (fva trust): PASS$' "$log.$ex"; then
-		echo "test-trust: example $ex → explain rc $rc"
-		grep -E '^  (Proof check|STALE)|Intent check|✗' "$log.$ex" | head -5
-		fail=1
-	fi
-	rm -f "$log.$ex"
-done
-# D5: a proven claim named and documented `clamp` that returns `x`, checked against the
-# requirement R1 (clamp) under neutral names → R1 DIFFERENT, rc 1 (saved text, current)
-"$fva" explain . --spec-module FVATest.Examples.Mislabeled.Spec \
-	--root-module FVATest.Examples.Mislabeled >"$log" 2>&1
-rc=$?
-if ((rc != 1)) || ! grep -q '^  Proof check (fva trust): PASS$' "$log" ||
-	! grep -q '^  ✗ R1: DIFFERENT' "$log" || grep -q STALE "$log"; then
-	echo "test-trust: example Mislabeled → explain rc $rc, pinned 1 with R1 DIFFERENT"
-	grep -E '^  (Proof check|STALE|✗|✓)' "$log" | head -5
-	fail=1
-fi
-# D16: the planted `sumBelow` (compiled code returns 0) shows its kernel value: each saved
-# `sumToSpec` example agrees with the binary, one of them past the fixed inputs 0 and 1
-"$fva" explain . --spec-module FVATest.Examples.Planted.Spec \
-	--root-module FVATest.Examples.Planted >"$log" 2>&1
-block=$(sed -n '/^Examples.Planted.sumToSpec$/,/^Examples\./p' "$log")
-if grep -q STALE "$log" || grep -q '✗ binary' <<<"$block" ||
-	! grep -qE 'sum_to\(([2-9]|[1-9][0-9]+)\) → [0-9]+ binary agrees' <<<"$block"; then
-	echo "test-trust: example Planted → sumToSpec's examples are stale or disagree with the binary"
-	fail=1
-fi
-# D18: relational claims get rows: a `Returns … → r ≤ n` claim shows a failing case of the
-# binary's result, a decidable claim its decided cases
-"$fva" explain . --spec-module FVATest.Examples.Relational.Spec \
-	--root-module FVATest.Examples.Relational >"$log" 2>&1
-block=$(sed -n '/^Examples.Relational.sumToAtMost$/,/^Examples\./p' "$log")
-if grep -q STALE "$log" || ! grep -qE '^    sum_to\([0-9]+\) → [0-9]+: the condition fails' <<<"$block" ||
-	! grep -qE '^    a = [0-9]+, b = [0-9]+: the statement holds' "$log"; then
-	echo "test-trust: example Relational → no relational rows (or stale)"
-	fail=1
-fi
-wait "$certs"
-rc=$?
-if ((rc != 0)) || ! grep -q '^fva trust: PASS' "$log.certs"; then
-	echo "test-trust: accepted certificates → rc $rc"
-	grep '^  \[' "$log.certs" | head -5
-	fail=1
-fi
-# a certificate without a valid proof fails its build at the kernel check
-for neg in NaiveR Dup Unsorted JsRound Trailing Tampered UnusedInvalid; do
-	if lake build "FVATest.Certs.Neg.$neg" >"$log" 2>&1 || ! grep -q 'declaration type mismatch' "$log"; then
-		echo "test-trust: certificate Neg.$neg built, or failed for another reason"
-		fail=1
-	fi
-done
-# a project relation is read in the project's review surface (10 lines with its spec: budget 5)
-"$fva" trust . --spec-module FVATest.Certs.Custom.Rev.Spec --root-module FVATest.Certs.Custom.Rev \
-	--surface-budget 5 >"$log" 2>&1
-if ! grep -q '^  \[surface\] .* code lines to review, budget 5' "$log" ||
-	! grep -q 'FVATest.Certs.Custom.Rel' "$log"; then
-	echo "test-trust: project relation outside the surface or budget not enforced"
-	fail=1
-fi
 # a relative project directory, from a directory outside it where `lean` finds no toolchain
 # (elan without a default: the nearest `lean-toolchain` alone names one): the toolchain comes from
 # the project, and trust-run works inside the project
@@ -230,23 +89,160 @@ exec '$real' "\$@"
 EOF
 chmod +x "$tmp/bin/lean"
 rel=$(realpath --relative-to="$tmp" "$PWD")
-rc=$(
-	cd "$tmp" || exit 2
-	PATH=$tmp/bin:$PATH "$rel/$fva" trust "$rel" --spec-module FVATest.Cheats.Clean.Spec \
-		--root-module FVATest.Cheats.Clean >"$log.rel" 2>&1
-	echo $?
-)
-if ((rc != 0)); then
-	echo "test-trust: relative project directory → rc $rc, pinned 0"
-	grep -E '^(fva trust|uncaught|error|  [[])' "$log.rel" | head -5
+# shellcheck disable=SC2329 # run through job
+relative() {
+	cd "$tmp" && PATH=$tmp/bin:$PATH "$rel/$fva" trust "$rel" \
+		--spec-module FVATest.Cheats.Clean.Spec --root-module FVATest.Cheats.Clean
+}
+# D38: every run is a background job, FVA_TRUST_JOBS at a time (default nproc / 2, at least 1;
+# each a few GB at most), the longest first; every pinned outcome is checked after
+jobs=${FVA_TRUST_JOBS:-$(($(nproc) / 2))}
+((jobs >= 1)) || jobs=1
+throttle() { while (($(jobs -rp | wc -l) >= jobs)); do wait -n; done; }
+job() { # NAME CMD… → $tmp/NAME.{log,rc,sec}
+	local name=$1
+	shift
+	throttle
+	{
+		local s=$SECONDS
+		"$@" >"$tmp/$name.log" 2>&1
+		echo $? >"$tmp/$name.rc"
+		echo $((SECONDS - s)) >"$tmp/$name.sec"
+	} &
+}
+rc() { cat "$tmp/$1.rc" 2>/dev/null || echo 255; } # a missing rc = a run that died
+tags() { sed -n 's/^  \[\([a-z]*\)\].*/\1/p' "$tmp/$1.log" | sort -u | paste -sd,; }
+t0=$SECONDS
+self=(trust . --spec-module FVA.Self.Spec --root-module FVA.Self "${subjects[@]}")
+job paranoid "$fva" "${self[@]}" --paranoid
+job self "$fva" "${self[@]}"
+# D61: lean4lean decides by its final exception's message alone: a true theorem named like its
+# heartbeat-limit message, printed inside the refutation of a false proof, leaves that a reject
+job decline "$fva" trust . --spec-module FVATest.Cheats.Decline.Spec \
+	--root-module FVATest.Cheats.Decline --paranoid
+# worked examples (U8): each must PASS; `fva explain` runs `fva trust` itself, then shows the
+# saved explanation (U10: rc 0 = trust PASS + every intent check `matches` + the text current);
+# beside them the accepted certificates (U9), one aggregate run, must PASS
+job certs "$fva" trust . --spec-module FVATest.Certs.Spec --root-module FVATest.Certs
+for ex in "${examples[@]}" Mislabeled Planted Relational; do
+	job "ex.$ex" "$fva" explain . --spec-module "FVATest.Examples.$ex.Spec" \
+		--root-module "FVATest.Examples.$ex"
+done
+n=0
+while read -r c want args; do
+	n=$((n + 1))
+	# shellcheck disable=SC2086 # extra arguments split on purpose
+	job "cheat.$n" "$fva" trust . --spec-module "FVATest.Cheats.$c.Spec" \
+		--root-module "FVATest.Cheats.$c" $args
+done <<<"$pinned"
+# D13: an unmarked Prop of the spec module is no claim, and the report lists it apart
+job unmarked "$fva" trust . --spec-module FVATest.Cheats.Unmarked.Spec \
+	--root-module FVATest.Cheats.Unmarked
+# a project relation is read in the project's review surface (10 lines with its spec: budget 5)
+job rev "$fva" trust . --spec-module FVATest.Certs.Custom.Rev.Spec \
+	--root-module FVATest.Certs.Custom.Rev --surface-budget 5
+# a certificate without a valid proof fails its build at the kernel check
+negs=(NaiveR Dup Unsorted JsRound Trailing Tampered UnusedInvalid)
+for neg in "${negs[@]}"; do job "neg.$neg" lake build "FVATest.Certs.Neg.$neg"; done
+job relative relative
+# the spec module declared a subject (which would leave the review surface) = usage error
+job usage "$fva" trust . --spec-module FVATest.Cheats.Clean.Spec \
+	--root-module FVATest.Cheats.Clean --subject FVATest.Cheats.Clean.Spec
+wait
+runs=$(find "$tmp" -maxdepth 1 -name '*.sec' | wc -l)
+slowest=$(for f in "$tmp"/*.sec; do printf '%s %s\n' "$(<"$f")" "$(basename "$f" .sec)"; done |
+	sort -rn | head -3 | awk '{printf "%s%s %s s", (NR > 1 ? ", " : ""), $2, $1}')
+echo "test-trust: $runs runs in $((SECONDS - t0)) s ($jobs at a time); slowest: $slowest"
+grep -A3 'Kernel replay' "$tmp/self.log"
+if (($(rc self) != 0)); then
+	echo "test-trust: self package rc $(rc self)"
+	head -20 "$tmp/self.log"
 	fail=1
 fi
-# the spec module declared a subject (which would leave the review surface) = usage error
-"$fva" trust . --spec-module FVATest.Cheats.Clean.Spec --root-module FVATest.Cheats.Clean \
-	--subject FVATest.Cheats.Clean.Spec >/dev/null 2>&1
-rc=$?
-if ((rc != 2)); then
-	echo "test-trust: spec module as subject → rc $rc, pinned 2"
+grep -A7 'Kernel replay' "$tmp/paranoid.log"
+if (($(rc paranoid) != 0)); then
+	echo "test-trust: self package --paranoid rc $(rc paranoid)"
+	head -20 "$tmp/paranoid.log"
+	fail=1
+fi
+n=0
+while read -r c want args; do
+	n=$((n + 1))
+	got=$(tags "cheat.$n")
+	[[ -z $got ]] && grep -q '^fva trust: PASS' "$tmp/cheat.$n.log" && got=PASS
+	if [[ $got != "$want" ]]; then
+		echo "test-trust: FVATest.Cheats.$c $args → $got, pinned $want"
+		fail=1
+	fi
+done <<<"$pinned"
+if [[ $(tags decline) != link,replay,vacuous ]] ||
+	! grep -q '^  lean4lean (lean): rejected' "$tmp/decline.log"; then
+	echo "test-trust: Decline --paranoid → $(tags decline), $(grep '^  lean4lean (' \
+		"$tmp/decline.log");" "pinned link,replay,vacuous + lean4lean rejected"
+	fail=1
+fi
+if ! grep -q '^Prop definitions without @\[fva_claim\]' "$tmp/unmarked.log" ||
+	! grep -qx '  Cheats.Unmarked.empty' "$tmp/unmarked.log"; then
+	echo "test-trust: Unmarked → the unmarked Prop is not listed apart"
+	fail=1
+fi
+for ex in "${examples[@]}"; do
+	if (($(rc "ex.$ex") != 0)) || ! grep -q '^  Proof check (fva trust): PASS$' "$tmp/ex.$ex.log"; then
+		echo "test-trust: example $ex → explain rc $(rc "ex.$ex")"
+		grep -E '^  (Proof check|STALE)|Intent check|✗' "$tmp/ex.$ex.log" | head -5
+		fail=1
+	fi
+done
+# D5: a proven claim named and documented `clamp` that returns `x`, checked against the
+# requirement R1 (clamp) under neutral names → R1 DIFFERENT, rc 1 (saved text, current)
+l=$tmp/ex.Mislabeled.log
+if (($(rc ex.Mislabeled) != 1)) || ! grep -q '^  Proof check (fva trust): PASS$' "$l" ||
+	! grep -q '^  ✗ R1: DIFFERENT' "$l" || grep -q STALE "$l"; then
+	echo "test-trust: example Mislabeled → explain rc $(rc ex.Mislabeled), pinned 1 with R1 DIFFERENT"
+	grep -E '^  (Proof check|STALE|✗|✓)' "$l" | head -5
+	fail=1
+fi
+# D16: the planted `sumBelow` (compiled code returns 0) shows its kernel value: each saved
+# `sumToSpec` example agrees with the binary, one of them past the fixed inputs 0 and 1
+l=$tmp/ex.Planted.log
+block=$(sed -n '/^Examples.Planted.sumToSpec$/,/^Examples\./p' "$l")
+if grep -q STALE "$l" || grep -q '✗ binary' <<<"$block" ||
+	! grep -qE 'sum_to\(([2-9]|[1-9][0-9]+)\) → [0-9]+ binary agrees' <<<"$block"; then
+	echo "test-trust: example Planted → sumToSpec's examples are stale or disagree with the binary"
+	fail=1
+fi
+# D18: relational claims get rows: a `Returns … → r ≤ n` claim shows a failing case of the
+# binary's result, a decidable claim its decided cases
+l=$tmp/ex.Relational.log
+block=$(sed -n '/^Examples.Relational.sumToAtMost$/,/^Examples\./p' "$l")
+if grep -q STALE "$l" || ! grep -qE '^    sum_to\([0-9]+\) → [0-9]+: the condition fails' <<<"$block" ||
+	! grep -qE '^    a = [0-9]+, b = [0-9]+: the statement holds' "$l"; then
+	echo "test-trust: example Relational → no relational rows (or stale)"
+	fail=1
+fi
+if (($(rc certs) != 0)) || ! grep -q '^fva trust: PASS' "$tmp/certs.log"; then
+	echo "test-trust: accepted certificates → rc $(rc certs)"
+	grep '^  \[' "$tmp/certs.log" | head -5
+	fail=1
+fi
+for neg in "${negs[@]}"; do
+	if (($(rc "neg.$neg") == 0)) || ! grep -q 'declaration type mismatch' "$tmp/neg.$neg.log"; then
+		echo "test-trust: certificate Neg.$neg built, or failed for another reason"
+		fail=1
+	fi
+done
+if ! grep -q '^  \[surface\] .* code lines to review, budget 5' "$tmp/rev.log" ||
+	! grep -q 'FVATest.Certs.Custom.Rel' "$tmp/rev.log"; then
+	echo "test-trust: project relation outside the surface or budget not enforced"
+	fail=1
+fi
+if (($(rc relative) != 0)); then
+	echo "test-trust: relative project directory → rc $(rc relative), pinned 0"
+	grep -E '^(fva trust|uncaught|error|  [[])' "$tmp/relative.log" | head -5
+	fail=1
+fi
+if (($(rc usage) != 2)); then
+	echo "test-trust: spec module as subject → rc $(rc usage), pinned 2"
 	fail=1
 fi
 ((fail)) || echo "test-trust: glue checks + self package + $n cheat runs + 2 usage cases checked"
