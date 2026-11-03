@@ -146,3 +146,8 @@ Per task, median and spread over n runs per cell; no significance claims at n = 
 
 - The first rerun (indices 6–10) is confounded: in every run, `fva trust`'s sandbox hid the bench's package store (a `packagesDir` under the covered home), the build failed, and the agents read FVA's trust and sandbox code until they ran it with `--no-sandbox` (D66). Its figures are reported as measured, with that cause.
 - The second rerun: indices 11–15, seed 8, the vendored FVA at the commit that carries D66 (the store's packages bound read-only in the sandbox); everything else as the addendum above.
+
+## Addendum 2026-11-03 (3) (before the third T7 fva-arm orientation rerun, D68)
+
+- Rerun 2's agents rebuilt `fva` outside the project, as AGENT.md asked, and read FVA's sources to make that copy work (D68). AGENT.md now tells an agent to check with the vendored `lake exe fva trust` and to leave the outside check to the user.
+- The third rerun: indices 16–20, seed 9, the vendored FVA at the commit that carries D68; everything else as the addenda above.
