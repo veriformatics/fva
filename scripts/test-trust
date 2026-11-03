@@ -219,11 +219,12 @@ here=$(basename "$PWD")
 rc=$(
 	cd .. || exit 2
 	"$here/$fva" trust "$here" --spec-module FVATest.Cheats.Clean.Spec \
-		--root-module FVATest.Cheats.Clean >/dev/null 2>&1
+		--root-module FVATest.Cheats.Clean >"$log.rel" 2>&1
 	echo $?
 )
 if ((rc != 0)); then
 	echo "test-trust: relative project directory → rc $rc, pinned 0"
+	grep -E '^(fva trust|  [[])' "$log.rel" | head -5
 	fail=1
 fi
 # the spec module declared a subject (which would leave the review surface) = usage error

@@ -70,4 +70,8 @@ jobs:
       - name: Gate
         env:
           GROUP: ${{ matrix.group }}
-        run: scripts/gate --group "$GROUP"
+        run: df -h / && scripts/gate --group "$GROUP"
+      # free space after the run (the lean lane's parallel steps write the most)
+      - name: Disk
+        if: always()
+        run: df -h /

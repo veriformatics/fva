@@ -6,7 +6,8 @@
 # project's Mathlib and base modules against: sha256 of "h1 h2 h3", the sha256 of the module's
 # .olean, .olean.server and .olean.private ("-" for an absent part). Computed here in bash, apart
 # from fva's Lean digest (FVA/Trust/Olean.lean), so one digest bug cannot pass both.
-# --check [FILE]: rc 1 when FILE (default trust/oleans.tsv) differs from the tree's pins.
+# --check [FILE]: rc 1 when a module this tree holds lacks its pin in FILE (default
+# trust/oleans.tsv) or has other bytes.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 out=trust/oleans.tsv
@@ -54,8 +55,14 @@ gen() {
 
 if [[ ${1:-} == --check ]]; then
 	want=${2:-$out}
-	if ! cmp -s <(gen) "$want"; then
-		echo "make-olean-pins: $want differs from the package .oleans (run scripts/make-olean-pins)" >&2
+	# every module this tree holds must carry its pin; a pinned module this tree has not built (a
+	# package executable's support module, such as Batteries' runLinter before `lake lint`) is
+	# left out of the comparison
+	gen >"$tmp/now"
+	LC_ALL=C comm -23 <(LC_ALL=C sort "$tmp/now") <(LC_ALL=C sort "$want") >"$tmp/extra"
+	if [[ -s $tmp/extra ]]; then
+		echo "make-olean-pins: $want misses or mismatches these package .oleans (run scripts/make-olean-pins):" >&2
+		head -5 "$tmp/extra" >&2
 		exit 1
 	fi
 	exit 0
