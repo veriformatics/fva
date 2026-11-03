@@ -320,8 +320,11 @@ def blobLinkOf (env : Environment) (root : System.FilePath) (m ns : Name) : IO L
            lenMatch := natValue env (ns ++ `len) == some bs.size,
            decodeEq := false, regenerates }
 
-/-- Every environment fact of the report (build, replay, canaries and budget are set later). -/
-def collect (input : Input) : CoreM Report := do
+/-- Every environment fact of the report (build, replay, canaries and budget are set later), and
+the spec closure's project + subject modules to rebuild from source (D65: `(module, imported
+.olean, source)`, `rebuildMismatches`). -/
+def collect (input : Input) :
+    CoreM (Report × Array (Name × System.FilePath × Option System.FilePath)) := do
   let env ← getEnv
   let lifted := liftedModules env
   let blobs := blobModules env
@@ -409,12 +412,15 @@ def collect (input : Input) : CoreM Report := do
   let specClosure := closure #[input.specModule] fun n => some (moduleImports env n)
   let mut reviewModules := #[]
   let mut subjectSyntax := #[]
+  let mut rebuild := #[]
   for m in specClosure do
     let exts := (moduleConsts env m).filter fun n => ((env.find? n).map isSyntaxExt).getD false
     if orig.get? m == some .subject then
       subjectSyntax := subjectSyntax ++ exts.map fun n => s!"{m}: {n}"
-    unless orig.get? m == some .project do continue
+    unless orig.get? m == some .project || orig.get? m == some .subject do continue
     let src ← sourceOf m
+    rebuild := rebuild.push (m, ← IO.FS.realPath (← findOLean m), src)
+    unless orig.get? m == some .project do continue
     let lines ← match src with
       | some f => pure (codeLines env (← IO.FS.readFile f))
       | none => pure 0
@@ -466,13 +472,13 @@ def collect (input : Input) : CoreM Report := do
     if specClosure.contains m then links := links.push (← linkOf env input.root m ns)
   for (m, ns) in blobs.toList do
     if specClosure.contains m then links := links.push (← blobLinkOf env input.root m ns)
-  return { built := true, claims := claims.toList, flags := flags.toList,
-           reviewModules := reviewModules.toList, subjectSyntax := subjectSyntax.toList,
-           unmarked := (unmarked.map (·.toString)).toList,
-           subjectMeaning := meaning.toList.eraseDups,
-           vocabulary := vocabulary.toList,
-           prelude := prelude.toList, tampered := tampered.toList,
-           needsLink := input.subjects.isEmpty, links := links.toList, exportOk := false,
-           replay := [], canaries := [], canarySet := [], budget := none }
+  return ({ built := true, claims := claims.toList, flags := flags.toList,
+            reviewModules := reviewModules.toList, subjectSyntax := subjectSyntax.toList,
+            unmarked := (unmarked.map (·.toString)).toList,
+            subjectMeaning := meaning.toList.eraseDups,
+            vocabulary := vocabulary.toList,
+            prelude := prelude.toList, tampered := tampered.toList,
+            needsLink := input.subjects.isEmpty, links := links.toList, exportOk := false,
+            replay := [], canaries := [], canarySet := [], budget := none }, rebuild)
 
 end FVA.Trust
