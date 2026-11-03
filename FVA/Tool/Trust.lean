@@ -1,6 +1,7 @@
 import Lean
 import FVA.Trust.Canary
 import FVA.Trust.Collect
+import FVA.Trust.Rebuild
 import FVA.Trust.Replay
 import FVA.Trust.Verdict
 import FVA.Tool.BaseManifest
@@ -231,7 +232,7 @@ def run (argv : List String) : IO UInt32 := do
     { root, specModule := spec, rootModule := rootMod, subjects := o.subjects, base,
       trustedPkgs, oleanPins }
   let ctx : Core.Context := { fileName := "<fva trust>", fileMap := default }
-  let (r, _) ← (collect input).toIO ctx { env }
+  let ((r, rebuild), _) ← (collect input).toIO ctx { env }
   -- replay: claims + proofs + the fixed bundle, every run-set kernel on the export
   -- + each lifted module's `decode_eq`: the fact tying `module` to the bytes is replayed by every
   -- run-set kernel even when no proof uses it
@@ -240,15 +241,17 @@ def run (argv : List String) : IO UInt32 := do
     (liftedModules env).toArray.map (fun (_, ns) => ns ++ `decode_eq) ++
     fixedBundle.filter env.contains
   let run := kernels.filter fun k => o.paranoid || defaultKernels.contains k.name
-  let (exportOk, replay, times) ← IO.FS.withTempDir fun tmp => do
+  let (rebuilt, exportOk, replay, times) ← IO.FS.withTempDir fun tmp => do
     let exportPath := tmp / "export.ndjson"
-    -- the exporter reads the project's `.olean`s: sandboxed, the temp dir alone writable
+    -- the rebuild + the exporter read the project's `.olean`s, the rebuild runs its code:
+    -- sandboxed, the temp dir alone writable
     let mode : Sandbox.Mode := match o.sandbox with
       | "off" => .off | "noNet" => .noNet | _ => .full
     let leanPath := (← IO.getEnv "LEAN_PATH").getD ""
     let sandbox ← if mode == .off then pure #[] else
       pure ((← Sandbox.bwrapArgs root (← findSysroot) #[tmp] mode) ++
         #["--setenv", "LEAN_PATH", leanPath])
+    let rebuilt ← rebuildMismatches rebuild (← findSysroot) sandbox tmp o.limit
     let exportOk ← exportDecls rootMod decls exportPath sandbox
     let mut replay := #[]
     let mut times := #[]
@@ -264,7 +267,7 @@ def run (argv : List String) : IO UInt32 := do
           replay := replay.push ({ kernel := k.name, lineage := k.lineage, status := st } :
             KernelRun)
           times := times.push (k.name, ms)
-    return (exportOk, replay, times)
+    return (rebuilt, exportOk, replay, times)
   -- every run-set kernel on every pinned known-false export (cached per sha256 pair)
   let setFile := (o.canarySet.map System.FilePath.mk).getD (defaultCanarySet fvaRoot)
   let pinned := (← readCanaries setFile).filter (·.bad)
@@ -273,7 +276,8 @@ def run (argv : List String) : IO UInt32 := do
   let canaryRuns := (← runCanaries fvaRoot run pinned o.canaryLimit 4).toList.map fun x =>
     ({ kernel := x.kernel, canary := x.canary.name, status := x.status,
        knownAccept := known.contains (x.kernel, x.canary.name) } : CanaryRun)
-  let r := { r with exportOk, replay := replay.toList, budget := o.budget,
+  let r := { r with tampered := r.tampered ++ rebuilt.toList, exportOk, replay := replay.toList,
+                    budget := o.budget,
                     canaries := canaryRuns, canarySet := pinned.toList.map (·.name) }
   let is := issues r
   let v := verdict r

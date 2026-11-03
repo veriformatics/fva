@@ -148,7 +148,9 @@ structure Report where
   /-- `[prelude]` violations: fixed-bundle constants outside the sysroot, modules without `Init`. -/
   prelude : List String
   /-- `[olean]` violations: imported modules counted as Mathlib or FVA base whose compiled files
-  are not the pinned bytes (FVA's Mathlib cache, FVA's own build of its base). -/
+  are not the pinned bytes (FVA's Mathlib cache, FVA's own build of its base), and the spec
+  module + its imports outside Lean core, Mathlib and FVA base whose compiled files are not
+  FVA's build of their source. -/
   tampered : List String
   /-- The project's subjects are generated modules (Lean-native subjects need no link). -/
   needsLink : Bool

@@ -61,6 +61,49 @@ if ! grep -q '^  \[surface\] 14 code lines to review, budget 13' "$tmp/budget.ou
 	fail=1
 fi
 echo '{"surfaceBudget": null}' >"$p/fva.json"
+# D65: the project's own Lake target, run by fva trust's build, rewrites the spec module's .olean
+# with one compiled from another source (a claim's docstring changed; the source on disk keeps
+# its text); FVA rebuilds the spec closure from source, so the bytes must fail. The copy gets its
+# own build directory: a hard-linked .olean would carry the write into the project.
+t=$tmp/tamper
+cp -al "$p" "$t" && rm -r "$t/.lake/build" "$t/lakefile.toml" && cp -a "$p/.lake/build" "$t/.lake/" ||
+	exit 2
+mkdir -p "$tmp/evil/Demo"
+sed 's/wrapped to 32 bits/never wrapped/' "$p/Demo/Spec.lean" >"$tmp/evil/Demo/Spec.lean"
+cmp -s "$p/Demo/Spec.lean" "$tmp/evil/Demo/Spec.lean" && exit 2
+(cd "$p" && lake env lean -DautoImplicit=false -DrelaxedAutoImplicit=false -R "$tmp/evil" \
+	-o "$t/evil.olean" "$tmp/evil/Demo/Spec.lean") >"$tmp/evil.log" 2>&1 || exit 2
+cat >"$t/lakefile.lean" <<'LAKEFILE'
+import Lake
+open Lake DSL
+
+package demo where
+  allowNonModules := true
+  leanOptions := #[⟨`autoImplicit, false⟩, ⟨`relaxedAutoImplicit, false⟩]
+
+require fva from "fva"
+
+@[default_target] lean_lib Demo
+
+/-- After each build of `Demo`: its spec module's `.olean` replaced by `evil.olean`. -/
+@[default_target] target tamper : Unit := do
+  let job ← Demo.fetch
+  job.mapM fun _ => do
+    IO.FS.writeBinFile ".lake/build/lib/lean/Demo/Spec.olean" (← IO.FS.readBinFile "evil.olean")
+LAKEFILE
+(cd "$t" && lake build) >"$tmp/tamper-build.log" 2>&1 || {
+	echo "test-init: the tampering project does not build"
+	tail -5 "$tmp/tamper-build.log"
+	exit 2
+}
+(cd "$t" && "$fva" trust . --spec-module Demo.Spec --root-module Demo) >"$tmp/tamper.out" 2>&1
+if ! grep -q '^  \[olean\] Demo.Spec: ' "$tmp/tamper.out" ||
+	! cmp -s "$t/.lake/build/lib/lean/Demo/Spec.olean" "$t/evil.olean"; then
+	echo "test-init: a Lake target rewriting the spec .olean → $(head -1 "$tmp/tamper.out")," \
+		"pinned [olean] naming Demo.Spec, the rewritten bytes kept" \
+		"($(cmp -s "$t/.lake/build/lib/lean/Demo/Spec.olean" "$t/evil.olean" && echo kept || echo rebuilt))"
+	fail=1
+fi
 # the project, vendored FVA included, builds + replays inside `lake check`'s bwrap sandbox
 # (no --from-export); a proof resting on an extra axiom → rc 1 naming it
 # the cheat copy = hard links (the sandbox only reads), its Proof.lean a new file; both side by side
