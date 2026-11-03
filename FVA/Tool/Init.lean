@@ -17,10 +17,12 @@ namespace FVA.Tool.Init
 
 open Lean
 
-/-- Files and directories of the FVA package that a project vendors (relative to FVA's root). -/
+/-- Files and directories of the FVA package that a project vendors (relative to FVA's root);
+`trust/oleans.tsv` = the `.olean` pins an `fva` built from the vendored copy reads (D67). -/
 def vendored : List String :=
   ["FVA", "FVA.lean", "Main.lean", "lean-toolchain", "lake-manifest.json", "trust/canaries",
-   "scripts/fetch-tools", "scripts/fetch-canaries", "LICENSE", "README.md", "AGENT.md"]
+   "trust/oleans.tsv", "scripts/fetch-tools", "scripts/fetch-canaries", "LICENSE", "README.md",
+   "AGENT.md"]
 
 /-- The vendored package's lakefile: FVA's library and CLI, nothing of its test suite. -/
 def fvaLakefile : String :=

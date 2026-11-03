@@ -39,6 +39,12 @@ cp -a .lake/build "$p/fva/.lake/build"
 	exit 1
 }
 fail=0
+# D67: an fva built from the vendored copy (AGENT.md: the verdict that counts comes from an fva
+# built outside the project) reads the same .olean pins
+if ! cmp -s "$p/fva/trust/oleans.tsv" trust/oleans.tsv; then
+	echo "test-init: the vendored package lacks FVA's .olean pins (trust/oleans.tsv)"
+	fail=1
+fi
 trust() { (cd "$p" && "$fva" trust . --spec-module Demo.Spec --root-module Demo) >"$tmp/$1" 2>&1; }
 echo '{"surfaceBudget": 14}' >"$p/fva.json"
 trust plain.out
