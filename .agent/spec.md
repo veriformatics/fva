@@ -114,6 +114,7 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
 - [ ] D65 project `.olean`s tied to their sources
 - [ ] D66 sandbox sees an outside `packagesDir`
 - [ ] D67 `fva init` vendors the `.olean` pins
+- [ ] D68 agents verify outside the project without reading FVA internals
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
