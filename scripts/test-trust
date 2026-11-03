@@ -214,17 +214,31 @@ if ! grep -q '^  \[surface\] .* code lines to review, budget 5' "$log" ||
 	echo "test-trust: project relation outside the surface or budget not enforced"
 	fail=1
 fi
-# a relative project directory, from its parent: trust-run works inside the project
-here=$(basename "$PWD")
+# a relative project directory, from a directory outside it where `lean` finds no toolchain
+# (elan without a default: the nearest `lean-toolchain` alone names one): the toolchain comes from
+# the project, and trust-run works inside the project
+real=$(command -v lean) || exit 2
+mkdir "$tmp/bin"
+cat >"$tmp/bin/lean" <<EOF
+#!/usr/bin/env bash
+d=\$PWD
+until [[ -e \$d/lean-toolchain ]]; do
+	[[ \$d == / ]] && { echo 'error: no default toolchain configured' >&2; exit 1; }
+	d=\$(dirname "\$d")
+done
+exec '$real' "\$@"
+EOF
+chmod +x "$tmp/bin/lean"
+rel=$(realpath --relative-to="$tmp" "$PWD")
 rc=$(
-	cd .. || exit 2
-	"$here/$fva" trust "$here" --spec-module FVATest.Cheats.Clean.Spec \
+	cd "$tmp" || exit 2
+	PATH=$tmp/bin:$PATH "$rel/$fva" trust "$rel" --spec-module FVATest.Cheats.Clean.Spec \
 		--root-module FVATest.Cheats.Clean >"$log.rel" 2>&1
 	echo $?
 )
 if ((rc != 0)); then
 	echo "test-trust: relative project directory → rc $rc, pinned 0"
-	grep -E '^(fva trust|  [[])' "$log.rel" | head -5
+	grep -E '^(fva trust|uncaught|error|  [[])' "$log.rel" | head -5
 	fail=1
 fi
 # the spec module declared a subject (which would leave the review surface) = usage error

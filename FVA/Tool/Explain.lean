@@ -301,7 +301,7 @@ def evalLean (root : System.FilePath) (spec : String) (cmd : System.FilePath →
     IO.FS.writeFile out ""
     let src := tmp / "FvaExplain.lean"
     IO.FS.writeFile src s!"import {spec}\nimport FVA.Explain\n{cmd out}\n"
-    let sysroot ← Lean.findSysroot
+    let sysroot ← Sandbox.sysrootAt root
     -- the mode `fva trust` would choose (D19: reduced inside an agent sandbox)
     let mode := ((← Sandbox.choose root sysroot).toOption).getD .full
     let a ← Sandbox.spawnArgs root sysroot (sysroot / "bin" / "lake").toString

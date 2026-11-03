@@ -322,7 +322,7 @@ def main (argv : List String) : IO UInt32 := do
     match budget with
     | .ok b => pure { o with budget := b }
     | .error e => IO.eprintln s!"fva trust: fva.json: {e}"; return 2
-  let sysroot ← Lean.findSysroot
+  let sysroot ← Sandbox.sysrootAt root
   -- the sandbox keeps the project root read-only: Lake cannot write a manifest there
   unless ← (root / "lake-manifest.json").pathExists do
     IO.eprintln "fva trust: the project has no lake-manifest.json (run `lake update` once)"

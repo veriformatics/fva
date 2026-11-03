@@ -91,6 +91,14 @@ def bwrapArgs (root sysroot : FilePath) (writable : Array FilePath) (mode : Mode
     #["--remount-ro", "/home", "--remount-ro", "/root", "--setenv", "HOME", "/tmp",
       "--setenv", "PATH", s!"{sysroot / "bin"}:{path}", "--chdir", root.toString]
 
+/-- The toolchain of project `root`: `LEAN_SYSROOT`, else `lean --print-prefix` run in `root`
+(elan without a default toolchain resolves one from the nearest `lean-toolchain` alone, so
+`Lean.findSysroot` fails when FVA runs from outside the project). -/
+def sysrootAt (root : FilePath) : IO FilePath := do
+  if let some r ← IO.getEnv "LEAN_SYSROOT" then return r
+  let out ← IO.Process.run { cmd := "lean", args := #["--print-prefix"], cwd := root }
+  return out.trimAscii.copy
+
 /-- `cmd args` (an absolute binary, or one on the sandbox `PATH`) in the sandbox of project
 `root`, with `env` set inside it. -/
 def spawnArgs (root sysroot : FilePath) (cmd : String) (args : Array String)
