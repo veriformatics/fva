@@ -698,7 +698,7 @@ The arms differ in the evidence.
 - M7: the host was not idle; tokens are primary. Ranges: input tokens bare 0.26–0.49 M, prompted
   0.85–1.67 M, fva 1.65–4.54 M; wall time bare 223–306 s, prompted 460–816 s, fva 481–698 s.
 
-## T7 orientation reruns (D55, ungraded; rubric addenda 2026-11-03 and 2026-11-03 (2))
+## T7 orientation reruns (D55 + D68, ungraded; rubric addenda 2026-11-03, (2) and (3))
 
 Five fva-arm runs each, T7 inputs and prompt, codex-cli 0.163.0, gpt-6.1-sol high; per run, steps
 that read FVA internals (`bench/grade/orientation`: the bench-v2 orientation categories, first
@@ -709,16 +709,21 @@ match wins) and input tokens, against the graded T7 fva runs 1–5.
 | graded runs 1–5 | bench-v2.1 | 12 [10–19] | 3.48 M |
 | rerun 1 (runs 6–10) | + `fva call`, `wasm_step1` stepping concrete calls (D55) | 12 [10–16] | 2.81 M |
 | rerun 2 (runs 11–15) | + the sandbox sees the package store (D66) | 11 [9–12] | 2.06 M |
+| rerun 3 (runs 16–20) | + check with the vendored `fva`, never rebuild it (D68) | 2 [0–2] | 1.12 M |
 
 - Every rerun used `fva call` (1–2 calls per run); none hit the `wasm_step1` failure that all five
-  graded runs hit. The input tokens fell by 41 %; the internal reads did not (target ≤ 3).
+  graded runs hit. In reruns 1 and 2, the input tokens fell by up to 41 %; the internal reads did
+  not (target ≤ 3).
 - Rerun 1: in every run, sandboxed `fva trust` failed to build (the package store under the
   covered home, D66), and the agents read FVA's trust and sandbox code until they ran it with
   `--no-sandbox`.
 - Rerun 2: the agents rebuilt `fva` outside the project, as AGENT.md asked, and then traced its
   canaries, `.olean` pins and sandbox through FVA's sources; the rebuilt copy lacked the pins
-  (D67). Next: D68 (check with the vendored binary; the user's own `fva` gives the verdict that
-  counts).
+  (D67).
+- Rerun 3: every agent ran the vendored `lake exe fva trust` sandboxed (PASS in 5/5 runs), none
+  rebuilt `fva`, and every report says that the user's own `fva` gives the verdict that counts.
+  The target (internal reads ≤ 3 per run, median) holds; input tokens fell by 68 %.
+- Codex quota after each rerun: 31 %, 36 %, 42 % (2026-11-03 01:04 UTC).
 
 ## Plain-English review on the archived fva specs (D56)
 
