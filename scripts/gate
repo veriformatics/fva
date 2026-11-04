@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Full gate (default) or fast gate (--fast): every check this repo grades by, one rc.
-# Prints each step's wall-clock; Lean steps run in sequence (one lake workspace), the rest in parallel.
-# Fast = skips network/history scanners (osv-scanner, gitleaks history); full = CI + closing commits.
+# Prints each step's wall-clock + verdict and appends both to the step ledger (scripts/gate-ledger);
+# Lean steps run in sequence (one lake workspace), the rest in parallel. Fast = latency-bounded:
+# skips the network/history scanners (osv-scanner, gitleaks history) and the mutation table, whose
+# stale rows each unit updates before its commit (fva-mutation.md); full = CI + closing commits.
 # --group G = the full gate's steps of CI group G alone (gate.yml: one job per group, D32);
 # --groups = the group names. A full run fails when a step belongs to no group or gate.yml's
 # matrix misses a group, so the CI fan-out always covers every step.
@@ -30,6 +32,11 @@ case ${1:-} in
 	;;
 esac
 want() { [[ -z $group || " ${groups[$group]} " == *" $1 "* ]]; }
+started=$(date -u +%FT%TZ)
+tree=$(scripts/gate-ledger tree)
+mode=full
+((fast)) && mode=fast
+[[ -n $group ]] && mode=group:$group
 scripts/fetch-tools || exit 1
 export PATH="$PWD/.tools/bin:$PATH"
 logs=$(mktemp -d)
@@ -72,7 +79,8 @@ lean_lane() {
 	if ((! fast)); then run init scripts/test-init; fi
 	# U14 subject demonstrations (fva trust per subject + planted negatives): full gate only
 	if ((! fast)); then run subjects scripts/test-subjects; fi
-	if ((fast)); then run mutation scripts/test-mutation --fast; else run mutation scripts/test-mutation; fi
+	# U12 mutation table current (check mode): full gate only, stale rows = each unit's --update
+	if ((! fast)); then run mutation scripts/test-mutation; fi
 	wait
 }
 lean_lane &
@@ -125,4 +133,6 @@ for rc in "$logs"/*.rc; do
 		sed 's/^/    /' "$logs/$name.out" | tail -20
 	fi
 done
+scripts/gate-ledger append "$logs" "$started" "$tree" "$mode" || echo "gate: step ledger not written"
+((status)) && echo "classify each red before a rerun: scripts/gate-ledger classify <step> product|gate|flake|planted"
 exit "$status"
