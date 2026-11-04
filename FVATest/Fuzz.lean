@@ -2,6 +2,7 @@ import FVA.Tool.Lift
 import FVA.Tool.Blob
 import FVA.Tool.Codex
 import FVA.Tool.Pack
+import FVATest.Fuzz.Mutate
 import FVA.Json
 
 /-!
