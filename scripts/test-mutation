@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Mutation check (U12, docs/contracts/U12-mutation.md) over the verified modules
 # (FVATest/Mutate/config.json). Full (gate, CI): `fvamut check` = FVATest/Mutate/results.tsv
-# current, every survivor ruled, 3 seeded rows replayed; never writes. --fast / --update:
-# `fvamut update` = every stale mutant runs (user ruling: no cap), results.tsv rewritten.
+# current, every survivor ruled, 3 seeded rows replayed; never writes. --update (each unit, before
+# its commit; outside the latency-bounded fast gate): `fvamut update` = every stale mutant runs
+# (user ruling: no cap), results.tsv rewritten.
 # Other arguments pass through (`--files`, `--decls`, `--stages`, `--workers`, `--spot`, `fresh`).
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
@@ -12,7 +13,7 @@ scripts/fetch-corpus >/dev/null || exit 2
 lake build fvamut >/dev/null || exit 2
 mode=check
 case ${1-} in
---fast | --update)
+--update)
 	mode=update
 	shift
 	;;

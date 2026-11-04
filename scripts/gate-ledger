@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# Gate step ledger (template `Execution`: the record of which steps buy signal). One TSV per host,
+# $FVA_GATE_LEDGER/<host>.tsv (default .cache/gate-ledger, gitignored): per-host files let a pool
+# run's file come back by `offload run --get .cache/gate-ledger` without clobbering this host's.
+# Row = run (UTC start) host tree mode step seconds verdict note. tree = the gated working tree's
+# git tree (untracked files included; = HEAD^{tree} on a clean tree); mode = full | fast | group:G.
+# A step row's verdict = ok | rc N; a classification row (mode classify) carries product | gate |
+# flake | planted and covers its step's earlier reds on its tree.
+#   gate-ledger tree                              working-tree tree hash (- outside git)
+#   gate-ledger append LOGS RUN TREE MODE         one row per LOGS/<step>.rc (+ <step>.ms)
+#   gate-ledger classify STEP CLASS [TREE [NOTE]] TREE default or - = STEP's newest open red
+#   gate-ledger reds                              unclassified reds, all hosts
+#   gate-ledger summary                           per step: runs, seconds, reds by class, unique
+# unique = product reds that were their run's only red: catches no other step reported.
+# rc 0 ok, 1 nothing to classify, 2 usage or I/O.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+dir=${FVA_GATE_LEDGER:-.cache/gate-ledger}
+host=$(uname -n)
+file=$dir/${host//[^A-Za-z0-9._-]/_}.tsv
+usage() {
+	sed -n 's/^#   gate-ledger/usage: gate-ledger/p' "$0" >&2
+	exit 2
+}
+
+tree() { # a copy of the index keeps git's stat cache, so only changed files are hashed
+	local tmp
+	tmp=$(mktemp -d) || return 2
+	cp -- "$(git rev-parse --git-path index 2>/dev/null)" "$tmp/index" 2>/dev/null
+	GIT_INDEX_FILE=$tmp/index git add -A >/dev/null 2>&1 && GIT_INDEX_FILE=$tmp/index git write-tree ||
+		echo -
+	rm -rf -- "$tmp"
+}
+
+append() {
+	local logs=$1 run=$2 tree=$3 mode=$4 rc name ms r
+	mkdir -p -- "$dir" || return 2
+	for rc in "$logs"/*.rc; do
+		[[ -e $rc ]] || continue
+		name=$(basename "$rc" .rc)
+		r=$(<"$rc")
+		ms=$(cat -- "$logs/$name.ms" 2>/dev/null) || ms=0
+		printf '%s\t%s\t%s\t%s\t%s\t%d.%01d\t%s\t-\n' "$run" "$host" "$tree" "$mode" "$name" \
+			$((ms / 1000)) $((ms % 1000 / 100)) "$([[ $r == 0 ]] && echo ok || echo "rc $r")"
+	done >>"$file"
+}
+
+ordered() { # every host's rows, oldest first (ISO timestamps sort as text)
+	cat -- "$dir"/*.tsv 2>/dev/null | sort -s -t $'\t' -k1,1
+}
+
+reds() {
+	ordered | awk -F'\t' '
+		$4 == "classify" { delete p[$3, $5]; next }
+		$7 != "ok" { p[$3, $5] = $0 }
+		END { for (k in p) print p[k] }' | sort
+}
+
+classify() {
+	local step=$1 class=$2 tree=${3:-} note=${4:--}
+	case $class in product | gate | flake | planted) ;; *) usage ;; esac
+	[[ $tree != - ]] || tree=
+	[[ -n $tree ]] || tree=$(reds | awk -F'\t' -v s="$step" '$5 == s { t = $3 } END { print t }')
+	if [[ -z $tree ]]; then
+		echo "gate-ledger: no unclassified red of $step" >&2
+		return 1
+	fi
+	mkdir -p -- "$dir" || return 2
+	printf '%s\t%s\t%s\tclassify\t%s\t-\t%s\t%s\n' "$(date -u +%FT%TZ)" "$host" "$tree" "$step" \
+		"$class" "$note" >>"$file"
+}
+
+summary() {
+	ordered | awk -F'\t' '
+		$4 == "classify" {
+			k = $3 SUBSEP $5
+			for (i = 1; i <= n[k]; i++) cls[q[k, i]] = $7
+			n[k] = 0
+			next
+		}
+		{
+			runs[$5]++; sec[$5] += $6
+			if ($7 != "ok") {
+				id = ++nr; step[id] = $5; run[id] = $1 SUBSEP $2; inrun[$1 SUBSEP $2]++
+				k = $3 SUBSEP $5; q[k, ++n[k]] = id
+			}
+		}
+		END {
+			for (id = 1; id <= nr; id++) {
+				s = step[id]; c = (id in cls) ? cls[id] : "?"
+				r[s, c]++; red[s]++
+				if (c == "product" && inrun[run[id]] == 1) uniq[s]++
+			}
+			for (s in runs)
+				printf "%s\t%d\t%.1f\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", s, runs[s], sec[s] / runs[s],
+					sec[s], red[s], r[s, "product"], r[s, "gate"], r[s, "flake"], r[s, "planted"],
+					r[s, "?"], uniq[s]
+		}' | sort -t $'\t' -k4,4gr |
+		{
+			printf 'step\truns\tmean_s\ttotal_s\treds\tproduct\tgate\tflake\tplanted\tunclassified\tunique\n'
+			cat
+		}
+}
+
+case ${1:-} in
+tree) tree ;;
+append)
+	(($# == 5)) || usage
+	append "$2" "$3" "$4" "$5"
+	;;
+classify)
+	(($# >= 3 && $# <= 5)) || usage
+	classify "${@:2}"
+	;;
+reds) reds ;;
+summary) summary ;;
+*) usage ;;
+esac

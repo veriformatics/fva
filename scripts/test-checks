@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Planted-bad inputs for the purpose-built checks (check-format, check-pins, the mutation check via
 # scripts/test-mutation-fixture, the subject matrix via scripts/test-subject-matrix): each must fail.
+# Also the gate's step ledger (scripts/gate-ledger): a red step's row, its classification, the summary.
 # Runs on a throwaway copy so the working tree is never touched.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
@@ -130,6 +131,27 @@ if grep -q '^  \[build\]' "$d/trust.out"; then
 	echo "test-checks: a packagesDir outside the project is hidden from fva trust's sandbox ([build])"
 	fail=1
 fi
+# gate-ledger: one row per step (a red keeps its rc), a classification clears the red + counts in the
+# summary (a planted red: not a unique catch), a red classified twice or an unknown class fails
+d=$tmp/ledger && mkdir -p "$d/logs"
+echo 0 >"$d/logs/a.rc" && echo 1500 >"$d/logs/a.ms" && echo 1 >"$d/logs/b.rc" && echo 230 >"$d/logs/b.ms"
+ledger() { FVA_GATE_LEDGER=$d/l scripts/gate-ledger "$@"; }
+ledger append "$d/logs" 2026-01-01T00:00:00Z t1 fast
+got=$(cut -f3-7 "$d"/l/*.tsv 2>/dev/null | tr '\t\n' ' |')
+want='t1 fast a 1.5 ok|t1 fast b 0.2 rc 1|'
+if [[ $got != "$want" ]]; then
+	echo "test-checks: gate-ledger append → '$got', want '$want'"
+	fail=1
+fi
+got=$(ledger reds | cut -f5)
+ledger classify b planted
+got+=" $(ledger reds | wc -l) $(ledger summary | awk -F'\t' '$1 == "b" { print $5, $9, $11 }')"
+if [[ $got != "b 0 1 1 0" ]]; then
+	echo "test-checks: gate-ledger reds/classify/summary → '$got', want 'b 0 1 1 0'"
+	fail=1
+fi
+expect_fail "gate-ledger classify without an open red" . env FVA_GATE_LEDGER="$d/l" scripts/gate-ledger classify b product
+expect_fail "gate-ledger unknown class" . env FVA_GATE_LEDGER="$d/l" scripts/gate-ledger classify a nonsense t1
 scripts/test-mutation-fixture || fail=1
 scripts/test-subject-matrix || fail=1
 exit "$fail"
