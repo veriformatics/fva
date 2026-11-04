@@ -1,0 +1,7 @@
+{"id":1,"result":{"userAgent":"codex","platformF000001","turn":{"id":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"claims\":[{\"name\":\"claim_1\",\"sudetails\":[\"a\"],\"caveats\":[],\"examples\":[[4,1],[-1]]}]}"}}}
+{""unix"}}
+{"id":2,"result":{"thread":{"id":"0000001","preriew":"","ephemed":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"claims\":[{\"name\":\"claim_1\",\"summary\":\"returns10000001","preview":"","ephemed":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"claims\":[{\"name\":\"claim_0\",\"sum x\",\"details\":[\"a\"],\"caveats\":[],\"ex0,1],[-1]]}]}"}}}
+{"method":"turn/completed","params":{"turn":{"id":"1","status":"completed"}}}

@@ -1,0 +1,11 @@
+{"id":1,"result":{"userAgent":"codex","platamily":method":"turn/-000000000001","turn":{"id":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"claims\":[{\"name\":\"claim_1\",\"summary\":\"returns x\",\"details\":[\"a\"],\"caveats\":[],\"examples\":[[0,1],[-1]]}]}"}}}
+{""unix"}}
+{"id":2,"r{"thre:"turn/-000000000001","turn":{"id":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"claims\":[{\"name\":\"claim_1\",\"summary\":\"returns x\",\"details\":[\"a\"],\"caveats\":[],\"examples\":[[0,1],[-1]]}]}"}}}
+{""unix"}}
+{"id":2,"r{"threadId":"0199f0aa-1111-7000-8000-000000000001","turn":{"id((((":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"claims\":[{\"name\":\"claim_0\",\"summary\":\"returns x\",\"details\":[\"a\"],\"caveats\":[],\"examples\":[[0,1],[-1]]}]}"}}}
+{"metho":"01","turn":{"id((((":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"claims\":[{\"name\":\"claim_0\",\"summary\":\"returns x\",\"details\":[\"a\"],\"caveats\":[],\"examples\":[[0,1],[-1]]}]}"}}}
+{"metho":"1","status":"completed"}}}--------------------------------

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# FVA parses the JSON it reads through FVA.parseJson (D70, FVA/Json.lean): Lean's Json.parse
+# aborts the process on a number like 1e9999999999 (no handler catches it). rc 1 = a Json.parse
+# call in another FVA source file.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+[[ -f FVA/Json.lean ]] || exit 2
+hits=$(grep -rn --include='*.lean' 'Json\.parse\b' FVA Main.lean | grep -v '^FVA/Json\.lean:')
+[[ -z $hits ]] && exit 0
+echo "check-json: Json.parse outside FVA/Json.lean (use FVA.parseJson):"
+echo "$hits"
+exit 1

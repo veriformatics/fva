@@ -1,0 +1,9 @@
+{"id":1,"result":{"userAgent":"codex","platformFam000-000000000001","turn":{"id":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"claims\":[{\"name\":\"claim_1\",\"summary\":\"returns x\",\"details\":[\"a\"],\"caveats\":[],\"examples\":[[5,1],[-1]]}]}"}}}
+{""unix"}}
+{"id":2,"r}
+{"id":2,"result":{"thread":{"id","ephemed":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m*","text":"{\"claims\":[{\"name\":\"claim_1\",\"caveats\":[],\"examples\":[[0,1],[-1]]}]}"}}}
+{"method":"turn/completed","params":{"turn":{"":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"claims\":[{\"name\":\"claim_1\",\"summary\":\"returns x\",\"details\":[\"a\"],\"caveats\":[],\"examples\":[[0,1],[-1]]}]}"}}}
+{"method":"turn/comp

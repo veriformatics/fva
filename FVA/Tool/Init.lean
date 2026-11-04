@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import FVA.Tool.Lift
+import FVA.Json
 
 /-!
 # `fva init`: a new verification project with FVA vendored
@@ -119,7 +120,7 @@ def main (fvaRoot : System.FilePath) (argv : List String) : IO UInt32 := do
   IO.FS.writeFile (dir / "fva" / "lakefile.toml") fvaLakefile
   IO.FS.writeFile (dir / "lakefile.toml") (projectLakefile name o.lib)
   IO.FS.writeFile (dir / "lean-toolchain") (← IO.FS.readFile (fvaRoot / "lean-toolchain"))
-  let fm ← IO.ofExcept (Json.parse (← IO.FS.readFile (fvaRoot / "lake-manifest.json")))
+  let fm ← IO.ofExcept (FVA.parseJson (← IO.FS.readFile (fvaRoot / "lake-manifest.json")))
   IO.FS.writeFile (dir / "lake-manifest.json") ((projectManifest name fm).pretty ++ "\n")
   IO.FS.writeFile (dir / ".gitignore") "/.lake/\n/fva/.lake/\n"
   -- D23: the review-surface budget `fva trust` enforces; null = none (set it once measured)

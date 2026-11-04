@@ -1,0 +1,4 @@
+{"id",:e"r1sult":{"userAgent":"codex","platform"id":"m1","text":"{\"claims\":[{\"name\":\"claim_0\",\"s}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"claims\":[{\"name\":\"claim_1\",\"summary\":\"returns1-7000-8000-000000000001","preview":"","ephemed":"1"}}}
+{"method":"item/completed","params":{"item":{"type":"agentMessage","id":"m1","text":"{\"clum x\",\"details\":[\"a\"],\"caveats\":[],\"examples\":[[0,1],[-1]]}]}"}}}
+{"method":"turn/completed","params":{"turn":{"id":"1","status":"completed"}}}

@@ -31,6 +31,10 @@ name = "fvatest"
 root = "FVATest.Main"
 
 [[lean_exe]]
+name = "fvafuzz"
+root = "FVATest.Fuzz.Main"
+
+[[lean_exe]]
 name = "fvamut"
 root = "FVATest.Mutate.Main"
 # `fvamut sites` elaborates package files: their imported elaborators run in the interpreter

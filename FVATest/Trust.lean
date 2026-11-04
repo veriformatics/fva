@@ -2,6 +2,7 @@ import FVA.Trust.Collect
 import FVA.Trust.Replay
 import FVA.Trust.Canary
 import FVA.Trust.Verdict
+import FVA.Json
 
 /-!
 # Trust glue checks (U7; built with `fvatest`, so `lake test` runs them)
@@ -46,6 +47,13 @@ open FVA.Trust Lean
       List (String × Nat)) do
     unless codeLines env src == n do
       throw <| .userError s!"codeLines {repr src} = {codeLines env src}, pinned {n}"
+
+/-! ## Bounded JSON (D70): an exponent Lean's parser would expand aborts nothing -/
+
+#guard !(FVA.parseJson "[1e9999999999]").isOk
+#guard !(FVA.parseJson "{\"n\": -2.5E+4097}").isOk
+#guard (FVA.parseJson "[1.5e3, 2E-4096, \"1e9999999999\", true, null]").isOk
+#guard (FVA.parseJson "{\"a\\\"e99999\": 0}").isOk
 
 /-! ## Report text (E4): status words, link faults in check order, the canary count, axioms -/
 

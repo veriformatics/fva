@@ -1,0 +1,55 @@
+# Fuzz campaign tier (D70): libFuzzer on each reader of untrusted bytes for a time box, weekly,
+# on demand and on a `ci/fuzz-*` push. A crash input or new coverage comes back as an artifact:
+# commit the crash input under FVATest/Fuzz/crashes/<target>/ (the gate's fuzz-replay step then
+# fails until the reader is fixed) and the grown corpus under FVATest/Fuzz/corpus/<target>/.
+name: fuzz
+
+on:
+  # an agent's on-demand campaign (workflow_dispatch runs the default branch's workflow only)
+  push:
+    branches: ["ci/fuzz-**"]
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Seconds per target
+        default: "1800"
+
+permissions:
+  contents: read
+
+jobs:
+  campaign:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [lift, blob, codex]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
+        with:
+          auto-config: "false"
+          use-mathlib-cache: "true"
+          use-github-cache: "true"
+      - name: libFuzzer
+        run: sudo apt-get install -y -qq clang-18 libclang-rt-18-dev
+      - name: Campaign
+        env:
+          TARGET: ${{ matrix.target }}
+          SECONDS_PER_TARGET: ${{ inputs.seconds || '1800' }}
+          FVA_FUZZ_CC: clang-18
+          FVA_FUZZ_JOBS: "4"
+        run: scripts/fetch-tools && scripts/fuzz-campaign "$TARGET" "$SECONDS_PER_TARGET"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: |
+            FVATest/Fuzz/crashes/${{ matrix.target }}
+            FVATest/Fuzz/corpus/${{ matrix.target }}
+          if-no-files-found: ignore

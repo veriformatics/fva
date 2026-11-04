@@ -1,4 +1,5 @@
 import Lean
+import FVA.Json
 
 /-!
 # Sandbox for project code (trusted glue, D12)
@@ -21,7 +22,7 @@ open Lean System
 def pathDeps (root : FilePath) : IO (Array FilePath) := do
   let m := root / "lake-manifest.json"
   unless ← m.pathExists do return #[]
-  let j ← IO.ofExcept (Json.parse (← IO.FS.readFile m))
+  let j ← IO.ofExcept (FVA.parseJson (← IO.FS.readFile m))
   let pkgs := (j.getObjValAs? (Array Json) "packages").toOption.getD #[]
   let mut out := #[]
   for p in pkgs do
@@ -37,7 +38,7 @@ them, so a manifest cannot name `$HOME` itself into the sandbox. -/
 def externalPackages (root : FilePath) : IO (Array FilePath) := do
   let m := root / "lake-manifest.json"
   unless ← m.pathExists do return #[]
-  let j ← IO.ofExcept (Json.parse (← IO.FS.readFile m))
+  let j ← IO.ofExcept (FVA.parseJson (← IO.FS.readFile m))
   let some d := (j.getObjValAs? String "packagesDir").toOption | return #[]
   let dir : FilePath := if (d : FilePath).isAbsolute then d else root / d
   unless ← dir.isDir do return #[]

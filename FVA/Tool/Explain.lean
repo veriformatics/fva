@@ -3,6 +3,7 @@ import FVA.Tool.Codex
 import FVA.Tool.Trust
 import FVA.Trust.Collect
 import FVA.Tool.Sandbox
+import FVA.Json
 
 /-!
 # `fva explain` (advisory review aid; the verdict stays with `fva trust`)
@@ -326,7 +327,7 @@ def evalLean (root : System.FilePath) (spec : String) (cmd : System.FilePath →
       #["env", "lean", src.toString] #[tmp] (mode := mode)
     let r ← runTimed a.cmd a.args root secs
     let lines := (← IO.FS.readFile out).splitOn "\n" |>.filter (!·.isEmpty)
-    return (lines.toArray.filterMap fun l => (Json.parse l).toOption,
+    return (lines.toArray.filterMap fun l => (FVA.parseJson l).toOption,
       r.any (·.exitCode == 0))
 
 /-- One claim's shape, statement and docstring (`FVA.Explain.shapes`). -/
@@ -873,7 +874,7 @@ def main (argv : List String) : IO UInt32 := do
   let self ← IO.appPath
   let tr ← IO.Process.output { cmd := self.toString, args := #["trust", root.toString,
     "--spec-module", spec, "--json"] ++ (o.root.map fun r => #["--root-module", r]).getD #[] }
-  let t ← match (Json.parse tr.stdout).bind Trust.ofJson with
+  let t ← match (FVA.parseJson tr.stdout).bind Trust.ofJson with
     | .ok t => pure t
     | .error _ =>
       IO.eprintln (s!"fva explain: fva trust gave no report (rc {tr.exitCode}):\n" ++
@@ -917,7 +918,7 @@ def main (argv : List String) : IO UInt32 := do
     | some c => proofStatus t.issues every (c.name :: c.proofs)
     | none => (false, [s!"{r.name} is no longer in the spec"], [])
   let ((rows, checks), saved) ← if !o.force && (← path.pathExists) then do
-      let j ← IO.ofExcept (Json.parse (← IO.FS.readFile path))
+      let j ← IO.ofExcept (FVA.parseJson (← IO.FS.readFile path))
       let rows ← IO.ofExcept (j.getObjValAs? (List Row) "claims")
       let checks := (j.getObjValAs? (List ReqRow) "requirements").toOption.getD []
       let generated := (j.getObjValAs? String "generated").toOption.getD "?"
