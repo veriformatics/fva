@@ -1,0 +1,4 @@
+{"id":7,"method":"item/commandExecution/requestApproval","params":{"command":"ls"}}
+{"id":3,"error":{"code":-32600,"message":"invalid request"}}
+{"method":"error","params":{"error":{"message":"usage limit"}}}
+{"method":"item/completed","params":{"item":{"type":"reasoning","id":"r1","text":"…"}}}

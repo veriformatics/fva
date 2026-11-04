@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# fuzz-campaign TARGET SECONDS (D70, campaign tier): libFuzzer on one reader (lift | blob | codex)
+# for a time box. Seeds: lift = every binary module of the official test scripts
+# (.cache/corpus/testsuite, wasm-tools json-from-wast) + the committed .wasm files; blob = the
+# committed .wasm files; codex = recorded app-server lines (FVATest/Fuzz/seeds/codex/); all +
+# the committed corpus. Crash inputs → FVATest/Fuzz/crashes/TARGET/ (rc 1; the gate's
+# fuzz-replay step then fails until the reader is fixed); FVATest/Fuzz/corpus/TARGET/ = the
+# inputs a merge keeps beyond the seeds (the seeds regenerate from pinned inputs; replay reads
+# the committed ones itself). rc 0 no crash, 1 crash found, 2 setup.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+[[ $# == 2 && $1 =~ ^(lift|blob|codex)$ && $2 =~ ^[0-9]+$ ]] || {
+	echo "usage: scripts/fuzz-campaign lift|blob|codex SECONDS" >&2
+	exit 2
+}
+target=$1 secs=$2
+export PATH="$PWD/.tools/bin:$PATH"
+scripts/fuzz-build >/dev/null || exit 2
+bin=.lake/build/fuzz/fvafuzz-lf
+corpus=FVATest/Fuzz/corpus/$target crashes=FVATest/Fuzz/crashes/$target
+mkdir -p "$corpus" "$crashes"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$tmp/seeds" "$tmp/new" "$tmp/art"
+case $target in
+lift)
+	[[ -d .cache/corpus/testsuite ]] || scripts/fetch-corpus >/dev/null || exit 2
+	for w in .cache/corpus/testsuite/*.wast; do
+		n=$(basename "$w" .wast)
+		mkdir -p "$tmp/wast/$n"
+		wasm-tools json-from-wast "$w" -o "$tmp/wast/$n/$n.json" --wasm-dir "$tmp/wast/$n/" 2>/dev/null || true
+	done
+	find "$tmp/wast" -name '*.wasm' -exec cp -t "$tmp/seeds" {} + 2>/dev/null
+	git ls-files -z '*.wasm' | xargs -0 cp -t "$tmp/seeds" --backup=numbered
+	;;
+blob) git ls-files -z '*.wasm' | xargs -0 cp -t "$tmp/seeds" --backup=numbered ;;
+codex) cp FVATest/Fuzz/seeds/codex/* "$tmp/seeds/" ;;
+esac
+# inputs up to 8 KiB: larger modules cost a render each (≈ 380 executions/s with them, a planted
+# 4-byte condition unfound in 600 s); the committed large ones stay in fuzz-replay
+find "$tmp/seeds" -type f -size +8k -delete
+echo "fuzz-campaign: $target, $secs s, $(find "$tmp/seeds" -type f | wc -l) seeds, $(find "$corpus" -type f | wc -l) corpus files"
+# value profile: comparison feedback for 1- and 2-byte compares (Lean compiles byte equality so).
+# FVA_FUZZ_JOBS independent workers (default half the cores; distinct -seed, one shared corpus
+# directory): one worker over the full seed set needs ≈ 10^6 executions per magic byte (a planted
+# 2-byte panic unfound in 600 s); libFuzzer's -fork mode crashes in its own parent here
+# (SEGV in FuzzWithFork). The first crash stops the rest.
+jobs=${FVA_FUZZ_JOBS:-$(($(nproc) / 2))}
+((jobs >= 1)) || jobs=1
+started=$(date +%s)
+pids=()
+for ((i = 1; i <= jobs; i++)); do
+	FVA_FUZZ_TARGET=$target LEAN_ABORT_ON_PANIC=1 "$bin" -seed="$i" -max_total_time="$secs" \
+		-timeout=10 -rss_limit_mb=2048 -max_len=8192 -use_value_profile=1 -print_final_stats=1 \
+		-artifact_prefix="$tmp/art/" "$tmp/new" "$corpus" "$tmp/seeds" >"$tmp/log.$i" 2>&1 &
+	pids+=($!)
+done
+rc=0
+for ((left = jobs; left > 0; left--)); do
+	wait -n "${pids[@]}" || rc=$?
+	if compgen -G "$tmp/art/*" >/dev/null; then
+		kill "${pids[@]}" 2>/dev/null
+		wait 2>/dev/null
+		break
+	fi
+done
+cat "$tmp"/log.* >"$tmp/log"
+awk '/^stat::number_of_executed_units/ {n += $2} END {print "fuzz-campaign: " n + 0 " executions"}' "$tmp/log"
+grep -E '^==[0-9]+== ERROR|deadly signal|Test unit written' "$tmp/log"
+# the corpus = what a merge over the seeds keeps from the old corpus + this run
+mkdir "$tmp/merged"
+cp "$tmp"/seeds/* "$tmp/merged/"
+sha256sum "$tmp"/seeds/* | cut -d' ' -f1 | sort -u >"$tmp/seed.sha"
+FVA_FUZZ_TARGET=$target "$bin" -merge=1 -timeout=10 -rss_limit_mb=2048 -use_value_profile=1 \
+	"$tmp/merged" "$corpus" "$tmp/new" >"$tmp/merge.log" 2>&1 || {
+	tail -5 "$tmp/merge.log"
+	exit 2
+}
+find "$corpus" -type f -delete
+for f in "$tmp"/merged/*; do
+	h=$(sha256sum "$f" | cut -d' ' -f1)
+	grep -qx "$h" "$tmp/seed.sha" || cp "$f" "$corpus/$h"
+done
+found=0
+for f in "$tmp"/art/*; do
+	[[ -e $f ]] || continue
+	cp "$f" "$crashes/$(basename "$f")"
+	echo "fuzz-campaign: crash input $crashes/$(basename "$f") after $(($(stat -c %Y "$f") - started)) s"
+	found=1
+done
+((found)) && exit 1
+((rc == 0)) || {
+	tail -20 "$tmp/log"
+	exit 2
+}
+echo "fuzz-campaign: $target no crash in $secs s; corpus $(find "$corpus" -type f | wc -l) files"

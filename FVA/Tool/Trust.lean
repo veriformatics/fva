@@ -6,6 +6,7 @@ import FVA.Trust.Replay
 import FVA.Trust.Verdict
 import FVA.Tool.BaseManifest
 import FVA.Tool.Sandbox
+import FVA.Json
 
 /-!
 # `fva trust` (CLI glue)
@@ -321,7 +322,7 @@ def main (argv : List String) : IO UInt32 := do
   -- D23: the project's `fva.json` sets the surface budget; `--surface-budget` overrides it
   let cfg := root / "fva.json"
   let o ← if o.budget.isSome || !(← cfg.pathExists) then pure o else
-    let budget := (Json.parse (← IO.FS.readFile cfg)).bind
+    let budget := (FVA.parseJson (← IO.FS.readFile cfg)).bind
       (·.getObjValAs? (Option Nat) "surfaceBudget")
     match budget with
     | .ok b => pure { o with budget := b }

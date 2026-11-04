@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# fuzz-replay (D70, every gate): the committed fuzz corpus, seeds + every crash input of each reader
+# through `fvafuzz` (the compiled readers as `fva` runs them), panics aborting
+# (LEAN_ABORT_ON_PANIC=1), 8 GiB of address space (the runtime reserves its worker
+# threads' stacks up front: 2 GiB fails thread creation) and 60 s per target. A crash input stays a
+# failure until its reader is fixed. FVA_FUZZ_BIN / FVA_FUZZ_DIR = another runner / corpus root
+# (test-checks' planted cases). rc 0 clean, 1 a reader crashed or timed out, 2 setup.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+bin=${FVA_FUZZ_BIN:-.lake/build/bin/fvafuzz} dir=${FVA_FUZZ_DIR:-FVATest/Fuzz}
+[[ -n ${FVA_FUZZ_BIN:-} ]] || lake build fvafuzz >/dev/null || exit 2
+fail=0 n=0
+for target in lift blob codex; do
+	# + the committed seeds (codex: recorded lines; lift, blob: the tracked .wasm files)
+	mapfile -t files < <({
+		find "$dir/corpus/$target" "$dir/crashes/$target" "$dir/seeds/$target" -type f 2>/dev/null
+		[[ $target == codex || -n ${FVA_FUZZ_DIR:-} ]] || git ls-files '*.wasm'
+	} | LC_ALL=C sort)
+	((${#files[@]})) || continue
+	n=$((n + ${#files[@]}))
+	if ! (ulimit -v 8388608 && LEAN_ABORT_ON_PANIC=1 timeout 60 "$bin" "$target" \
+		"${files[@]}") >/dev/null 2>&1; then
+		# name the first input that fails alone
+		for f in "${files[@]}"; do
+			if ! (ulimit -v 8388608 && LEAN_ABORT_ON_PANIC=1 timeout 60 "$bin" "$target" "$f") \
+				>/dev/null 2>&1; then
+				echo "fuzz-replay: $target crashes on $f"
+				break
+			fi
+		done
+		fail=1
+	fi
+done
+((n)) || {
+	echo "fuzz-replay: no corpus files"
+	exit 2
+}
+echo "fuzz-replay: $n inputs, $([[ $fail == 0 ]] && echo clean || echo FAILED)"
+exit "$fail"

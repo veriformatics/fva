@@ -6,6 +6,7 @@ import FVA.Spec.Cert
 import FVA.Trust.Lines
 import FVA.Spec.ClaimAttr
 import FVA.Trust.Olean
+import FVA.Json
 
 /-!
 # Trust facts from the environment (trusted glue)
@@ -84,7 +85,7 @@ def under (dir p : System.FilePath) : Bool :=
 /-- `name ↦ (url, rev)` of a Lake manifest's git packages, with its packages directory. -/
 def manifestPins (path : System.FilePath) :
     IO (String × Std.HashMap String (String × String)) := do
-  let j ← IO.ofExcept (Json.parse (← IO.FS.readFile path))
+  let j ← IO.ofExcept (FVA.parseJson (← IO.FS.readFile path))
   let dir := (j.getObjValAs? String "packagesDir").toOption.getD ".lake/packages"
   let mut out := {}
   for p in ← IO.ofExcept (j.getObjValAs? (Array Json) "packages") do

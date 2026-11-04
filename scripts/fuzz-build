@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Builds .lake/build/fuzz/fvafuzz-lf (D70): libFuzzer over FVA's readers of untrusted bytes.
+# Lake builds `fvafuzz` (its object list = the readers' import closure); FVA's own C (Lean's
+# output in .lake/build/ir) is compiled again with coverage instrumentation, the rest (Lean's
+# runtime + libraries) linked as Lake builds them, FVATest/Fuzz/shim.c starting Lean once
+# under libFuzzer's main. Needs a clang with libFuzzer (FVA_FUZZ_CC, default clang).
+# rc 0 built, 2 setup.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+cc=${FVA_FUZZ_CC:-clang}
+command -v "$cc" >/dev/null || {
+	echo "fuzz-build: $cc not found" >&2
+	exit 2
+}
+lake build fvafuzz >/dev/null
+lean=$(lean --print-prefix)
+out=.lake/build/fuzz
+rm -rf "$out/obj"
+mkdir -p "$out/obj"
+flags=(-O1 -g -fsanitize=fuzzer-no-link -I"$lean/include" -ffp-contract=off -fPIC)
+objs=()
+while read -r o; do
+	o=${o//\"/}
+	case $o in
+	*/FVATest/Fuzz/Main.c.o.export) continue ;; # its main → libFuzzer's
+	"$PWD"/.lake/build/ir/*)
+		c=${o%.o.export}
+		obj=$out/obj/${c#"$PWD"/.lake/build/ir/}.o
+		mkdir -p "${obj%/*}"
+		"$cc" -c "${flags[@]}" "$c" -o "$obj"
+		objs+=("$obj")
+		;;
+	*) objs+=("$o") ;;
+	esac
+done < <(tr ' ' '\n' <.lake/build/bin/fvafuzz.rsp | grep 'o\.export"\?$')
+((${#objs[@]})) || exit 2
+"$cc" -c "${flags[@]}" FVATest/Fuzz/shim.c -o "$out/obj/shim.o"
+"$cc" -fsanitize=fuzzer -o "$out/fvafuzz-lf" "$out/obj/shim.o" "${objs[@]}" \
+	-L"$lean/lib/lean" -L"$lean/lib" \
+	-Wl,--start-group -lleancpp -lLean -Wl,--end-group -lStd -Wl,--start-group -lInit -lleanrt \
+	-Wl,--end-group -Wl,-Bstatic -lc++ -lc++abi -lgmp -luv -Wl,-Bdynamic -lpthread -ldl -lm
+echo "fuzz-build: $out/fvafuzz-lf (${#objs[@]} objects)"

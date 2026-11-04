@@ -1,0 +1,5 @@
+{"if&":7,"method":"item/comma/requestApproval","params":{"command":"ls"}}
+{"id":3,ew":"","ephemerel":true}}}
+{"method":"turn/started","params":{"threadIessage":"invalid request"}}
+{"method":"error","params":{"error":{"message":"usace limit"}}}
+{"Yme7hod":"item/completed","params":{"item":{"type":"reasoning","id":"r2","text":"…"}}}

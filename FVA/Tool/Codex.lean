@@ -1,4 +1,5 @@
 import Lean.Data.Json
+import FVA.Json
 
 /-!
 # Structured LLM calls through `codex app-server`
@@ -40,22 +41,48 @@ def Session.send (s : Session) (method : String) (params : Json) (notify := fals
   s.out.flush
   return id
 
+/-- One line from the server (untrusted bytes: the D70 fuzz target reads them through here). -/
+inductive Line where
+  /-- A server-to-client request, refused. -/
+  | request (id : Json)
+  /-- An error reply. -/
+  | error (msg : String)
+  /-- A reply or notification. -/
+  | message (m : Json)
+
+/-- Classify one server line. -/
+def Line.parse (line : String) : Except String Line := do
+  let m ← FVA.parseJson line
+  let id := (m.getObjVal? "id").toOption
+  let method := (m.getObjValAs? String "method").toOption
+  if let (some i, some _) := (id, method) then return .request i
+  if method.isNone && (m.getObjVal? "error").isOk then
+    return .error s!"{(m.getObjValD "error").compress.take 500}"
+  return .message m
+
+/-- A message's method, `""` when absent. -/
+def methodOf (m : Json) : String := (m.getObjValAs? String "method").toOption.getD ""
+
+/-- The text of a completed agent message (`item/completed` with an `agentMessage` item). -/
+def agentText (m : Json) : Option String :=
+  let item := (m.getObjValD "params").getObjValD "item"
+  if methodOf m == "item/completed" &&
+      (item.getObjValAs? String "type").toOption == some "agentMessage" then
+    some ((item.getObjValAs? String "text").toOption.getD "")
+  else none
+
 /-- Read messages until one satisfies `pred`; refuse server requests, fail on an error reply. -/
 partial def Session.until (s : Session) (pred : Json → Bool) : IO Json := do
   let line ← s.inp.getLine
   if line.isEmpty then throw <| .userError "codex app-server exited (or timed out)"
-  let m ← IO.ofExcept (Json.parse line)
-  let id := (m.getObjVal? "id").toOption
-  let method := (m.getObjValAs? String "method").toOption
-  if let (some i, some _) := (id, method) then
+  match ← IO.ofExcept (Line.parse line) with
+  | .request i =>
     s.out.putStrLn (Json.mkObj [("id", i), ("error", Json.mkObj
       [("code", toJson (-32601 : Int)), ("message", "unsupported")])]).compress
     s.out.flush
     s.until pred
-  else if method.isNone && (m.getObjVal? "error").isOk then
-    throw <| .userError s!"codex app-server error: {(m.getObjValD "error").compress.take 500}"
-  else if pred m then return m
-  else s.until pred
+  | .error msg => throw <| .userError s!"codex app-server error: {msg}"
+  | .message m => if pred m then return m else s.until pred
 
 /-- Ask `prompt` in a fresh thread; the reply text, constrained by `schema`, parsed as JSON. -/
 def ask (prompt : String) (schema : Json) (model effort : String) (timeoutMs : Nat := 600000) :
@@ -90,17 +117,13 @@ def ask (prompt : String) (schema : Json) (model effort : String) (timeoutMs : N
       ("outputSchema", schema), ("effort", toJson effort)])
     let mut text := ""
     repeat
-      let m ← s.until fun m => ["item/completed", "turn/completed", "error"].contains
-        ((m.getObjValAs? String "method").toOption.getD "")
-      let method := (m.getObjValAs? String "method").toOption.getD ""
+      let m ← s.until fun m => ["item/completed", "turn/completed", "error"].contains (methodOf m)
+      let method := methodOf m
       if method == "error" then
         throw <| .userError s!"codex: {(m.getObjValD "params").compress.take 500}"
-      let item := (m.getObjValD "params").getObjValD "item"
-      if method == "item/completed" &&
-          (item.getObjValAs? String "type").toOption == some "agentMessage" then
-        text := (item.getObjValAs? String "text").toOption.getD ""
+      if let some t := agentText m then text := t
       if method == "turn/completed" then break
-    match Json.parse text with
+    match FVA.parseJson text with
     | .ok j => return j
     | .error _ => throw <| .userError s!"codex: the reply is not JSON: {text.take 300}"
   finally

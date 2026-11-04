@@ -10,11 +10,11 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 declare -A groups=(
-	[lean]="build checks test decoder numerics floatdiff spec difftest lint mutation pins olean-pins"
+	[lean]="build checks test decoder numerics floatdiff spec difftest fuzz-replay lint mutation pins olean-pins"
 	[trust]="build trust"
 	[init]="build init"
 	[subjects]="build subjects"
-	[static]="format-lean shellcheck shfmt spec-lint base-manifest scope notices actionlint zizmor gitleaks-tree gitleaks-history osv-scanner"
+	[static]="format-lean shellcheck shfmt spec-lint base-manifest scope json notices actionlint zizmor gitleaks-tree gitleaks-history osv-scanner"
 )
 fast=0 group=
 case ${1:-} in
@@ -72,6 +72,8 @@ lean_lane() {
 	if ((fast)); then run floatdiff scripts/test-floatdiff --fast; else run floatdiff scripts/test-floatdiff; fi
 	if ((fast)); then run spec scripts/test-spec --fast; else run spec scripts/test-spec; fi
 	if ((fast)); then run difftest scripts/test-difftest --fast; else run difftest scripts/test-difftest; fi
+	# D70: the committed fuzz corpus + every crash input through the compiled readers
+	run fuzz-replay scripts/fuzz-replay
 	run lint lake --wfail lint
 	# fva trust: self package + cheat suite (≈ 5 min, kernel replay dominated): full gate only
 	if ((! fast)); then run trust scripts/test-trust; fi
@@ -91,6 +93,7 @@ run spec-lint .agent/spec-lint &
 run pins scripts/check-pins &
 run base-manifest scripts/make-base-manifest --check &
 run scope scripts/check-scope &
+run json scripts/check-json &
 run notices scripts/check-notices &
 if ((${#workflows[@]})); then
 	run actionlint actionlint "${workflows[@]}" &
