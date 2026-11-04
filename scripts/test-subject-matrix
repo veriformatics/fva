@@ -154,4 +154,36 @@ printf 'fva trust: FAIL\n  [fixture] default planted failure\nRead these: 7 code
 run_case crash-and-failure "$d" 3 'Matrix.Program paranoid crashed, rc 139' \
 	'Matrix.Certificate default trust rc 1'
 
+# D74 verdict reuse: the same closure runs no fva; an edited subject file reruns that subject
+# alone; a FAIL is never reused; a new fva binary or a failing pins check reruns everything
+reuse() { # label want-rc want-new-calls want-message
+	local before n rc
+	before=$(find "$d/calls" -type f | wc -l)
+	(cd "$d" && FVA="$d/fva" FVA_SUBJECT_JOBS=2 FVA_SUBJECT_CACHE="$d/cache" FVA_SUBJECT_SRC="$d/src" \
+		FVA_SUBJECT_PINS="${pins:-true}" "$runner" <"$d/table" >"$d/out" 2>&1)
+	rc=$?
+	n=$(($(find "$d/calls" -type f | wc -l) - before))
+	if ((rc != $2 || n != $3)) || ! grep -qF -- "$4" "$d/out"; then
+		bad "reuse $1: rc $rc (want $2), $n fva runs (want $3), '$4' $(grep -cF -- "$4" "$d/out")×"
+		tail -4 "$d/out"
+	else
+		echo "test-subject-matrix: reuse $1 PASS"
+	fi
+}
+d=$(fresh reuse) || exit 2
+mkdir -p "$d/src/Matrix" && printf 'import Matrix.Lib\n' >"$d/src/Matrix/Program.lean" &&
+	echo lib >"$d/src/Matrix/Lib.lean" && echo cert >"$d/src/Matrix/Certificate.lean" || exit 2
+reuse first 0 4 '0 of 4 runs reused'
+reuse same 0 0 '4 of 4 runs reused'
+echo lib2 >"$d/src/Matrix/Lib.lean"
+reuse import-edited 0 2 '2 of 4 runs reused'
+printf '1\n' >"$d/results/Matrix.Certificate.default.rc"
+echo cert2 >"$d/src/Matrix/Certificate.lean"
+reuse failure 1 2 'Matrix.Certificate default trust rc 1'
+printf '0\n' >"$d/results/Matrix.Certificate.default.rc"
+reuse after-failure 0 1 '3 of 4 runs reused'
+echo '# rebuilt' >>"$d/fva"
+reuse new-fva 0 4 '0 of 4 runs reused'
+pins=false reuse pins-fail 0 4 '0 of 4 runs reused'
+
 ((fail == 0))
