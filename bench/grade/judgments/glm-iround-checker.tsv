@@ -1,0 +1,17 @@
+# T7 checker code beyond the archived .sh/.py/.mjs/.js files (D73): non-blank lines of the selected ranges; file "-" = none
+# run	file	ranges	source	sha256	reason
+bare-glm-iround-1	VERIFICATION.md	104-106	bench/runs/bare-glm-iround-1/work/VERIFICATION.md:104	b45868df751496419cebc436425566e49dac4a2c4aad0519f74631a330cd3007	The report-only reproduction recipe adds Lake proof-building and direct Lean rechecking beside the archived execution checker.
+bare-glm-iround-2	VERIFICATION.md	65-66	bench/runs/bare-glm-iround-2/work/VERIFICATION.md:65	0a01b2c911a9fa96909fd7c09f414fb209fb23341593ba550e221e3f60b1159b	The report-only reproduction recipe adds Lake proof-building beside the archived execution checker.
+bare-glm-iround-3	VERIFICATION.md	103-105	bench/runs/bare-glm-iround-3/work/VERIFICATION.md:103	dbc854a495b7136072ca06ae91065e9ba61de92521afcf16885dc397affd6a3b	The report-only reproduction recipe adds Lake proof-building and direct Lean rechecking beside the archived execution checker.
+bare-glm-iround-4	VERIFICATION.md	107-109	bench/runs/bare-glm-iround-4/work/VERIFICATION.md:107	6b2bcfd0509cccc78760a013b7bdf91031c46ad553a8cd52a91c3991e8b5f443	The report-only reproduction recipe adds Lake proof-building and direct Lean rechecking beside the archived execution checker.
+bare-glm-iround-5	VERIFICATION.md	107-108	bench/runs/bare-glm-iround-5/work/VERIFICATION.md:107	497fd504bb11cb107e8d0010595f86c81fd0cf814292c2b7500c7e3cc5be045e	The report-only reproduction recipe adds Lake proof-building beside the archived execution checker.
+fva-glm-iround-1	VERIFICATION.md	85-86,96-115	bench/runs/fva-glm-iround-1/work/VERIFICATION.md:95	f26b1c1345f0c30bcb7e0778b9c699ddd14c49906971a444f95a401630893c20	The report-only build/hash and self-contained external-checker recipe supply the complete documented check.
+fva-glm-iround-2	VERIFICATION.md	73-74,85-102	bench/runs/fva-glm-iround-2/work/VERIFICATION.md:84	e2a1a237ae8aee51e3e9a85d32bc4a255e2cf87226b7e91ef40e5e5ed80aca1f	The report-only build/hash and external-checker shell/Python recipe supply the documented check.
+fva-glm-iround-3	VERIFICATION.md	87-88,100-123	bench/runs/fva-glm-iround-3/work/VERIFICATION.md:99	b9e6beae60e458d55dba61bda5a134d739099dc7173f83f61f046152a7121340	The report-only build/hash and external-checker shell/Python recipe supply the documented check.
+fva-glm-iround-4	-	-	-	-	The documented one-command check is already implemented in the archived verify.sh.
+fva-glm-iround-5	VERIFICATION.md	84-85,96-101	bench/runs/fva-glm-iround-5/work/VERIFICATION.md:95	f92a6163943918cf6d0b172e608dea5cbc1c30dfb15af566ddfb4ad358970633	The report-only build/hash and external-checker shell recipe supply the documented check.
+prompted-glm-iround-1	-	-	-	-	The complete documented check is already implemented by the archived shell/Python scripts.
+prompted-glm-iround-2	-	-	-	-	The complete documented check is already implemented by the archived shell/Python scripts.
+prompted-glm-iround-3	-	-	-	-	The complete documented check is already implemented by the archived shell/Python scripts.
+prompted-glm-iround-4	-	-	-	-	The complete documented check is already implemented by the archived shell/Python scripts.
+prompted-glm-iround-5	-	-	-	-	The complete documented check is already implemented by the archived shell/Python scripts.

@@ -435,7 +435,7 @@ reported the rest as open; no report over-claimed.
 | M2 link to the artifact | (a) 5: instruction models extracted from the hash-pinned bytes by the run's unverified Python script; run-written Wasm semantics | (a) 5: bytes embedded in Lean and decoded by a run-written decoder that the kernel checks 3 (runs 1, 2, 5; run 2's function bodies cut out by Python), extracted by Python 2 (runs 4, 6); run-written Wasm semantics | (a) 5 (`fva lift`, link checked by `fva trust`) | (a) 2 (runs 2, 4: C generated from the hash-pinned bytes by a run-written lifter); (b) 1 (run 6: hand-written C model of the decoder's entry, 2,000 / 2,000 cases equal to the artifact, beside C-source boundary cases); C source 2 (runs 1, 3; run 1 adds a hand-written model of the literal-only path, 2,000 / 2,000 cases equal) |
 | M3 requirements (3 per run) | 15 weaker | 15 weaker | 11 weaker, 4 not proven, reported (R1 of runs 1–4) | 15 weaker |
 | M4 defect evidence | not applicable (no known defect) | not applicable | not applicable | not applicable |
-| M5 surface, code lines: statement + link/model (checker scripts); generated tables apart | 306 [269–356]: 139 + 175 (291); tables 889 [117–2,654] | 316 [84–332]: 51 + 216 (289); tables 10 [0–636] | 56 [47–99]: 47 + 5 (88); `fva trust` surface 52 [40–101] | 47 [18–53]: 26 + 22 (344) |
+| M5 surface, code lines: statement + link/model (checker scripts); generated tables apart | 306 [269–356]: 139 + 175 (291); tables 889 [117–2,654] | 316 [84–332]: 51 + 216 (289); tables 10 [0–636] | 56 [47–99]: 47 + 5 (88); `fva trust` surface 52 [40–101] | 47 [18–53]: 26 + 22 (344); regenerated 39 [7–51]: 14 + 25 (344) |
 | M6 over-claims | 0 | 0 | 0 | 0 |
 | M7 input tokens (uncached); output tokens; CPU s; wall s | 4.08 M (67 k); 45 k; 399; 1,707 | 3.60 M (81 k); 36 k; 355; 1,275 | 12.64 M (148 k); 57 k; 932; 2,520 | 6.32 M (102 k); 57 k; 30, Frama-C apart; 2,098 |
 | M8 cheats caught / planted | 16 / 20 (15 / 20 when planted in hand-written proofs) | 20 / 20 (20 / 20 when planted in hand-written proofs) | 20 / 20 | 4 / 15 (C3 not applicable) |
@@ -496,6 +496,13 @@ reported the rest as open; no report over-claimed.
   are apart, and helper contracts proven separately are proof steps. Checker scripts = non-blank
   lines of the run-written `.sh`/`.py`/`.mjs`/`.js` files, the extraction scripts and lifters
   that the bare, prompted and tool links rest on included.
+- M5 regenerated (D73; `bench/grade/judged lz4-c`): the checker-script medians reproduce (291 /
+  289 / 88 / 344); the tool partition does not. Its original per-run selections were not
+  recorded, so a grader blind to these figures re-derived them under the rule above
+  (`bench/grade/judgments/lz4-c-m5.tsv`, each range cited + sha256-pinned): headline contracts
+  alone, separately proved helper and internal-callee contracts as proof steps, run-written
+  headers and configuration as link/model. Result 39 [7–51]: 14 + 25; the published 47 [18–53]:
+  26 + 22 stays beside it, its selection unknown.
 - M8: every Lean clean baseline exits 0, so catches count by exit code, each confirmed in its
   log. bare missed C3 in runs 2, 4 and 6 and C2 in run 6. Tool arm: C1 (`admit ensures`) 0 / 5,
   C2 (a false global axiom) 0 / 5, C4 4 / 5. The checks of tool 2 and tool 4 regenerate the
@@ -569,7 +576,7 @@ every input for an executable model of the decoder that they wrote.
 | M2 link to the artifact | (a) 5: instructions extracted from the hash-pinned bytes by the run's script (runs 1, 3, 5, 6) or decoded in Lean from embedded bytes, checked by the kernel (run 4); run-written Wasm semantics | (a) 5: extracted by the run's script (runs 1, 2, 4, 5) or function bytes decoded by a kernel-checked decoder (run 3); run-written Wasm semantics | (a) 5 (`fva lift`, link checked by `fva trust`) | (b) 3 (runs 1, 4, 5: executable Rust models, 2,000 / 2,000 cases equal to the artifact each); (a) 2 (run 4's entry bytes for `n` = 0; run 6: function 7 extracted from the bytes, run-written Verus semantics); (c) 1 (run 3: specification functions only) |
 | M3 requirements (3 per run) | 15 weaker | 15 weaker | 11 weaker, 4 not proven, reported (R1 of runs 1, 2, 4, 5) | 9 faithful for the run's model (runs 1, 4, 5), 3 weaker (run 6), 3 not proven, reported (run 3) |
 | M4 defect evidence | not applicable (no known defect) | not applicable | not applicable | not applicable |
-| M5 surface, code lines: statement + link/model (checker scripts); generated tables apart | 515 [250–770]: 207 + 236 (247); tables 988 | 294 [255–383]: 114 + 182 (256); tables 5 [1–2,476] | 48 [26–132]: 48 + 0 (89); `fva trust` surface 44 [27–106] | 179 [134–516]: 122 + 70 (291) |
+| M5 surface, code lines: statement + link/model (checker scripts); generated tables apart | 515 [250–770]: 207 + 236 (247); tables 988 | 294 [255–383]: 114 + 182 (256); tables 5 [1–2,476] | 48 [26–132]: 48 + 0 (89); `fva trust` surface 44 [27–106] | 179 [134–516]: 122 + 70 (291); regenerated 179 [134–499] |
 | M6 over-claims | 0 | 0 | 0 | 0 (one register note) |
 | M7 input tokens (uncached); output tokens; CPU s; wall s | 4.48 M (66 k); 40 k; 210; 1,243 | 5.84 M (123 k); 63 k; 680; 1,980 | 15.41 M (163 k); 59 k; 1,286; 2,355 | 3.19 M (53 k); 35 k; 58; 1,032 |
 | M8 cheats caught / planted | 17 / 20 (15 / 20 when planted in hand-written proofs) | 17 / 20 (20 / 20 when planted in hand-written proofs) | 20 / 20 | 15 / 20 (14 / 20 when planted in hand-written proofs) |
@@ -619,6 +626,10 @@ every input for an executable model of the decoder that they wrote.
   readability reader's closure (cited `requires`/`ensures` and the specification functions they
   reach, the largest of R1–R3 per run); link/model = the executable model bodies and tool 6's
   run-written Wasm machine (161 lines); tool 6's 3,513-line extracted program apart.
+  Regenerated (D73; `bench/grade/judged lz4-rust`, the recovered reader selections): median
+  179, split 122 + 70 and checker scripts 247 / 256 / 89 / 291 reproduce; the range ends at 499,
+  not 516: the published maximum added tool 6's Wasm machine as 178 physical lines, where the
+  link/model cell and the rule above count its 161 code lines.
 - M8: the three proof cheats went into a script-written module in bare 1, bare 4, bare 6,
   prompted 2, prompted 4 and tool 6. Bare 4's check does not compare that module, so its catches (C1
   and C2 by name) stand. Bare 1, bare 6, prompted 4 and tool 6 caught them by comparing the module
@@ -667,7 +678,7 @@ The arms differ in the evidence.
 | M2 link to the artifact | (c) 5: the artifact executed by the run's script; Lean = exact arithmetic about the input | (c) 5: same (runs 1 and 4 bind the executed output to the Lean counterexample through a theorem their check generates) | (a) 5 (`fva lift`, link checked by `fva trust`) |
 | M3 requirements (1 per run) | 5 not proven, reported | 5 not proven, reported | 5 not proven, reported |
 | M4 defect evidence (known defect) | executed reproducer 5 | executed reproducer 5 | machine-checked on the artifact 5 |
-| M5 surface, code lines: statement (checker code) | 15 [9–20] (52 [48–60]) | 12 [8–17] (149 [116–167]) | 9 [9–12] (22 [8–29]); `fva trust` surface 13 [13–14] |
+| M5 surface, code lines: statement (checker code) | 15 [9–20] (52 [48–60]; regenerated 52 [44–58]) | 12 [8–17] (149 [116–167]; regenerated 131 [98–161]) | 9 [9–12] (22 [8–29]); `fva trust` surface 13 [13–14] |
 | M6 over-claims | 0 | 0 | 0 |
 | M7 input tokens (uncached); output tokens; CPU s; wall s | 0.30 M (24 k); 7.5 k; 33; 265 | 1.41 M (83 k); 19 k; 54; 738 | 3.48 M (95 k); 13 k; 342; 628 |
 | M8 cheats caught / planted | 12 / 20 | 20 / 20 | 20 / 20 |
@@ -691,6 +702,13 @@ The arms differ in the evidence.
 - M5: each arm's Lean statement is short. The bare and prompted runs' link to the binary is their
   checker code (the execution harness), so it is given beside the statement; the fva arm's link is
   FVA's lift and `fva trust`, counted apart as FVA's base.
+  Regenerated (D73; `bench/grade/judged glm-iround`): checker code = the archived
+  `.sh`/`.py`/`.mjs`/`.js` files + the check commands written only in `VERIFICATION.md`
+  (`bench/grade/judgments/glm-iround-checker.tsv`, re-derived by a grader blind to these
+  figures). The fva arm reproduces (22 [8–29]) and so does the bare median (52); bare's range
+  (44–58) and the prompted figure (131 [98–161]) do not, since the original selection was not
+  recorded (counting the runs' `.wat` harness modules as well gives 54 [51–62] and
+  140 [104–167], no match either).
 - M8: every planting went into a hand-written theorem (theorems a run's check generates, as in
   prompted 1 and 4, are checked as module copies and skipped as planting sites; grading ruling).
   Bare runs named C1 by a build warning or a printed axiom list and missed C3 in all five runs, and
