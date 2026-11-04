@@ -9,6 +9,11 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 manifest=bench/subjects/manifest.json
 [[ -r $manifest ]] || exit 2
+# A missing decoder would hash every literal as empty input: no artifact matches, the check passes.
+command -v xxd >/dev/null || {
+	echo "check-notices: xxd not found" >&2
+	exit 2
+}
 declare -A fields
 while IFS=$'\t' read -r sha license upstream version; do
 	fields[$sha]=$license$'\t'$upstream$'\t'$version
@@ -29,7 +34,10 @@ fail=0
 while IFS= read -r -d '' f; do
 	while IFS= read -r hex; do
 		[[ -n $hex ]] || continue
-		sha=$(xxd -r -p <<<"$hex" | sha256sum | cut -d' ' -f1)
+		sha=$(xxd -r -p <<<"$hex" | sha256sum | cut -d' ' -f1) || {
+			echo "check-notices: $f: cannot decode a wasm_bytes% literal" >&2
+			exit 2
+		}
 		[[ -n ${fields[$sha]+x} ]] || continue
 		IFS=$'\t' read -r license upstream version <<<"${fields[$sha]}"
 		ok=0
