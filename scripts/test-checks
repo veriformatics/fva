@@ -67,8 +67,11 @@ fi
 # sha256, license, upstream, version and corresponding source, here or in an ancestor directory
 d=$tmp/notices && mkdir -p "$d/scripts" "$d/bench/subjects" "$d/runs/r1/Proofs"
 cp scripts/check-notices "$d/scripts/" && cp bench/subjects/manifest.json "$d/bench/subjects/"
-printf 'def bytes : Nat := wasm_bytes%% "%s"\n' \
-	"$(xxd -p FVATest/Subjects/Lz4Wasm/lz4-block-codec.wasm | tr -d '\n')" >"$d/runs/r1/Proofs/Lifted.lean"
+hex=$(xxd -p FVATest/Subjects/Lz4Wasm/lz4-block-codec.wasm | tr -d '\n') && [[ -n $hex ]] || {
+	echo "test-checks: xxd cannot dump the lz4-wasm codec (check-notices case setup)"
+	exit 2
+}
+printf 'def bytes : Nat := wasm_bytes%% "%s"\n' "$hex" >"$d/runs/r1/Proofs/Lifted.lean"
 git -C "$d" init -q && git -C "$d" add -A
 expect_fail "embedded artifact without a NOTICE" "$d" scripts/check-notices
 notice=$(jq -r '.subjects[] | select(.id == "lz4-wasm") |
@@ -76,6 +79,14 @@ notice=$(jq -r '.subjects[] | select(.id == "lz4-wasm") |
 	bench/subjects/manifest.json)
 printf '%s\n' "$notice" >"$d/runs/NOTICE" && git -C "$d" add -A
 expect_fail "NOTICE without the corresponding source" "$d" scripts/check-notices
+# a decoder that fails (as a missing xxd did on one gate host) → rc 2, never a silent pass
+mkdir -p "$d/stub" && printf '#!/usr/bin/env bash\nexit 127\n' >"$d/stub/xxd" && chmod +x "$d/stub/xxd"
+(cd "$d" && PATH=$d/stub:$PATH scripts/check-notices) >/dev/null 2>&1
+rc=$?
+if ((rc != 2)); then
+	echo "test-checks: check-notices with a failing xxd → rc $rc, want 2"
+	fail=1
+fi
 printf '%s\ncorresponding source: the .wat\n' "$notice" >"$d/runs/NOTICE" && git -C "$d" add -A
 if ! (cd "$d" && scripts/check-notices) >/dev/null; then
 	echo "test-checks: check-notices failed an ancestor NOTICE naming every field"
