@@ -81,7 +81,9 @@ fi
 
 # every subject's fva trust in default and --paranoid mode, fail closed (scripts/subject-matrix,
 # docs/contracts/U22-subject-matrix.md)
-printf '%s\n' "${subjects[@]}" | FVA=$fva scripts/subject-matrix
+# D74: a host that keeps .cache reuses each (root, mode) PASS whose input closure is unchanged
+# (FVA_SUBJECT_CACHE= runs every subject; CI runners start fresh)
+printf '%s\n' "${subjects[@]}" | FVA=$fva FVA_SUBJECT_CACHE=${FVA_SUBJECT_CACHE-.cache/subjects} scripts/subject-matrix
 rc=$?
 ((rc == 2)) && exit 2
 ((rc == 3)) && crash=1

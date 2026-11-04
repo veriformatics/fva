@@ -4,6 +4,12 @@
 # one result per (root, mode), checked fail-closed. rc 0 = all 2N runs PASS with the pinned surface,
 # 1 = a FAIL (a missing result included), 2 = setup error, 3 = an fva run died by a signal.
 # FVA = the fva binary; FVA_SUBJECT_JOBS caps concurrency.
+# D74 verdict reuse (FVA_SUBJECT_CACHE = a directory, unset = none): a (root, mode) PASS is
+# reused only for an input closure byte-identical to the green run that recorded it: the fva
+# binary, the toolchain's lean/lake/leanexport + kernels, FVA's sources, the build pins (checked
+# against this tree's .oleans first), the canaries, bwrap, this script, the row, and every file of
+# the subject directories its modules import (FVA_SUBJECT_SRC = the source root, default .;
+# FVA_SUBJECT_PINS = the pins check, default scripts/make-olean-pins --check).
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 fva=${FVA:-.lake/build/bin/fva}
@@ -45,6 +51,57 @@ cap=${FVA_SUBJECT_JOBS:-$cpus}
 declare -A wcpu=([default]=2 [paranoid]=6) wmem=([default]=6 [paranoid]=9) jcpu=() jmem=()
 used_cpu=0 used_mem=0
 
+cache=${FVA_SUBJECT_CACHE:-} src=${FVA_SUBJECT_SRC:-.}
+# what every run reads beside its subject; empty = no reuse this run (a pin mismatch included)
+shared_key() {
+	local pins sys b bins=()
+	read -ra pins <<<"${FVA_SUBJECT_PINS:-scripts/make-olean-pins --check}"
+	"${pins[@]}" >/dev/null 2>&1 || return 0
+	sys=$(lean --print-prefix 2>/dev/null) || return 0
+	for b in lean lake leanexport leanchecker leanchecker-paranoid lean4lean nanoda_bin con-leche con-ron; do
+		[[ -f $sys/bin/$b ]] && bins+=("$sys/bin/$b")
+	done
+	{
+		sha256sum "$fva" "$0" lean-toolchain lakefile.toml lake-manifest.json trust/oleans.tsv \
+			trust/canaries/*.tsv "${bins[@]}"
+		find FVA .cache/canaries -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum
+		bwrap --version 2>&1
+	} | sha256sum | cut -d' ' -f1
+}
+# the files a subject's modules reach: each imported module of the source root (its subject
+# directory whole under FVATest/Subjects/, else its file), transitively
+closure() { # module...
+	local -A seen=() files=()
+	local queue=("$@") m f k
+	while ((${#queue[@]})); do
+		m=${queue[0]} queue=("${queue[@]:1}")
+		[[ $m == - || -n ${seen[$m]:-} ]] && continue
+		seen[$m]=1
+		f=$src/${m//.//}.lean
+		[[ -f $f ]] || continue
+		k=${m//.//}.lean
+		[[ $m != FVATest.Subjects.* ]] || k=$(cut -d/ -f1-3 <<<"$k")
+		files[$k]=1
+		# shellcheck disable=SC2207 # module names hold no spaces
+		queue+=($(sed -n 's/^\(public \|meta \|private \)*import \(.*\)$/\2/p' "$f"))
+	done
+	((${#files[@]})) || return 0
+	(cd "$src" && printf '%s\0' "${!files[@]}" | xargs -0 -I{} find {} -type f -print0 |
+		LC_ALL=C sort -z | xargs -0 -r sha256sum)
+}
+shared=
+[[ -z $cache ]] || {
+	mkdir -p "$cache" || exit 2
+	shared=$(shared_key)
+}
+reused=0
+key_of() { # root spec subject surface mode
+	{
+		printf '%s\n' "$shared" "$@"
+		closure "$1" "$2" "$3"
+	} | sha256sum | cut -d' ' -f1
+}
+
 run() { # root spec subject mode → $tmp/<root>.<mode>.{log,s,rc}; the rc file = the recorded result
 	local root=$1 spec=$2 subject=$3 mode=$4 args=() t0=$SECONDS
 	[[ $subject == - ]] || args+=(--subject "$subject")
@@ -60,9 +117,19 @@ reap() {
 	used_cpu=$((used_cpu - jcpu[$pid])) used_mem=$((used_mem - jmem[$pid]))
 	unset 'jcpu[$pid]' 'jmem[$pid]'
 }
+declare -A keys
 for s in "${subjects[@]}"; do
-	read -r root spec subject _ <<<"$s"
+	read -r root spec subject surface <<<"$s"
 	for mode in default paranoid; do
+		id=$root.$mode
+		if [[ -n $shared ]]; then
+			keys[$id]=$(key_of "$root" "$spec" "$subject" "$surface" "$mode")
+			e=$cache/$root.$mode
+			if [[ -f $e.key && $(<"$e.key") == "${keys[$id]}" && -f $e.log ]]; then
+				cp "$e.log" "$tmp/$root.$mode.log" && echo reused >"$tmp/$root.$mode.s" &&
+					echo 0 >"$tmp/$root.$mode.rc" && reused=$((reused + 1)) && continue
+			fi
+		fi
 		c=${wcpu[$mode]} m=${wmem[$mode]}
 		while ((${#jcpu[@]})) && ((${#jcpu[@]} >= cap || used_cpu + c > cpus || used_mem + m > mem)); do
 			reap
@@ -78,7 +145,7 @@ fail=0 crash=0 results=0
 for s in "${subjects[@]}"; do
 	read -r root _ _ surface <<<"$s"
 	for mode in default paranoid; do
-		r=$tmp/$root.$mode
+		id=$root.$mode r=$tmp/$root.$mode
 		rc=$(cat "$r.rc" 2>/dev/null)
 		if [[ ! $rc =~ ^[0-9]+$ ]]; then
 			echo "subject-matrix: missing $root $mode"
@@ -86,7 +153,9 @@ for s in "${subjects[@]}"; do
 			continue
 		fi
 		results=$((results + 1))
-		echo "subject-matrix: $root $mode $(<"$r.s") s"
+		t=$(<"$r.s")
+		[[ $t == reused ]] && echo "subject-matrix: $root $mode reused" || echo "subject-matrix: $root $mode $t s"
+		[[ -z $cache ]] || rm -f "$cache/$root.$mode.key"
 		if ((rc >= 128)); then
 			echo "subject-matrix: $root $mode crashed, rc $rc"
 			crash=1
@@ -98,9 +167,13 @@ for s in "${subjects[@]}"; do
 			echo "subject-matrix: $root $mode surface ≠ pinned $surface lines"
 			grep -E 'Read these|: [0-9]+ lines' "$r.log" | head -6
 			fail=1
+		elif [[ -n ${keys[$id]:-} ]]; then
+			# a green run: record its log, then its key (the key last: a half-written entry misses)
+			cp "$r.log" "$cache/$root.$mode.log" && printf '%s\n' "${keys[$id]}" >"$cache/$root.$mode.key"
 		fi
 	done
 done
+[[ -z $cache ]] || echo "subject-matrix: $reused of $((2 * ${#subjects[@]})) runs reused"
 if ((results != 2 * ${#subjects[@]})); then
 	echo "subject-matrix: $results results for ${#subjects[@]} subjects × 2 modes"
 	fail=1
