@@ -186,14 +186,32 @@ structure Renamer where
   that refer to it. -/
   refs : Std.HashSet String := {}
 
-/-- The renamer for `claims` (numbered in this order) and the other `declared` names. -/
-def Renamer.of (claims declared : List Name) : Renamer := Id.run do
+/-- The words `Renamer.restore` reads: maximal runs of ASCII letters, digits and `_`. -/
+def Renamer.word (c : Char) : Bool := c.isAlphanum || c == '_'
+
+/-- The words of `text`. -/
+def Renamer.words (text : String) : Std.HashSet String := Id.run do
+  let mut out := {}
+  let mut w := ""
+  for c in text.toList ++ [' '] do
+    if Renamer.word c then w := w.push c
+    else if !w.isEmpty then out := out.insert w; w := ""
+  return out
+
+/-- The renamer for `claims` (numbered in this order) and the other `declared` names; a neutral
+name in `avoid` (a word of the texts the model reads) is skipped, since `restore` would turn
+that word back into a project name. -/
+def Renamer.of (claims declared : List Name) (avoid : Std.HashSet String := {}) :
+    Renamer := Id.run do
   let mut r : Renamer := {}
+  let mut k := 0
   for (n, claim) in claims.map (·, true) ++ declared.map (·, false) do
     if let .str _ s := n then
       unless r.map.contains s do
-        let k := r.map.size + 1
-        r := { r with map := r.map.insert s (if claim then s!"claim_{k}" else s!"name_{k}") }
+        let pre := if claim then "claim_" else "name_"
+        k := k + 1
+        while avoid.contains s!"{pre}{k}" do k := k + 1
+        r := { r with map := r.map.insert s s!"{pre}{k}" }
     let cs := n.components.map toString
     for j in List.range cs.length do
       r := { r with refs := r.refs.insert (".".intercalate (cs.drop j)) }
@@ -233,7 +251,7 @@ def Renamer.apply (r : Renamer) (src : String) : String := Id.run do
 /-- Model text with the neutral names back to the author's (last components). -/
 def Renamer.restore (r : Renamer) (text : String) : String := Id.run do
   let back : Std.HashMap String String := r.map.fold (fun m k v => m.insert v k) {}
-  let word (c : Char) := c.isAlphanum || c == '_'
+  let word := Renamer.word
   let cs := text.toList.toArray
   let mut out := ""
   let mut i := 0
@@ -594,11 +612,15 @@ def generate (o : Opts) (root fva : System.FilePath) (t : Trust)
   let spec := o.spec.getD ""
   let names := t.claims.map (·.name)
   let (sh, declared) ← shapes root spec names.toArray t.reviewModules
-  let rn := Renamer.of (names.map String.toName) declared
   let env ← mkEmptyEnvironment
-  let specText ← t.reviewModules.foldlM (init := "") fun acc m => do
+  let srcs ← t.reviewModules.mapM fun m => do
     let src ← try IO.FS.readFile (modFile root m) catch _ => pure ""
-    return acc ++ s!"--- {m}\n{rn.apply (FVA.Trust.stripComments env src)}\n"
+    return (m, FVA.Trust.stripComments env src)
+  let avoid := Renamer.words <| "\n".intercalate <|
+    srcs.map (·.2) ++ names.filterMap fun n => (sh.get? n).map (·.statement)
+  let rn := Renamer.of (names.map String.toName) declared avoid
+  let specText := srcs.foldl (init := "") fun acc (m, src) =>
+    acc ++ s!"--- {m}\n{rn.apply src}\n"
   let vocab ← fvaFiles.take 2 |>.foldlM (init := "") fun acc f => do
     return acc ++ s!"--- {f.fileName.getD ""}\n{← IO.FS.readFile (fva / f)}\n"
   let statements := "\n".intercalate (names.filterMap fun n =>

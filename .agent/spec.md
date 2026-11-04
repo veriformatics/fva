@@ -68,7 +68,7 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
 
 ## Tasks
 
-- [ ] RESUME: finish line (user's MAINTAIN queue request) = every `.agent/deferred.md` row closed by its acceptance check in its own commit, recorded as blocked on the user with what it owes, waiting on its re-open trigger, or routed (`route.md` `Met when`), and the full gate passes on a clean tree at the closing commit. `main` pushed by the user through 974c90a ⇒ no autosquash (the fixup!/amend! commits stay). This run: D53 port committed, row open until MAIN's clean-checkout regeneration (`.scratch/worktrees/porter-d53` detached at the D53 commit, out `.scratch/regen/`, serial T7 → T2 → T3 ≈ 12 h); nixbox gained xxd (offload ae2b220). Next: D72 commit → D69 → D70 → D73 → D53 close → D71 (`--update` on the final tree, pool) → collected AskUserQuestion (draft `.scratch/mq/closing.md`) → close: tick rows `- [x] <sha>`, full gate (CI fan-out + pool), cleanup (worktrees gate + porter-d53 + bench-v2.1, branches wip/d8 + wt/porter-d53), final message names the notify-set edits (offload 081e62f + ae2b220; /opt/openai-codex-0.163.0 restored; `CLAUDE.local.md` mutation line).
+- [ ] RESUME: finish line (user's MAINTAIN queue request) = every `.agent/deferred.md` row closed by its acceptance check in its own commit, recorded as blocked on the user with what it owes, waiting on its re-open trigger, or routed (`route.md` `Met when`), and the full gate passes on a clean tree at the closing commit. `main` pushed by the user through 974c90a ⇒ no autosquash. Committed this run: e70e17c D53 port (row open), 92cfd59 D72, 947842e D75 (CI on ci/d75-b). Uncommitted, each verified (fast gate green), committed in order, each after the previous CI verdict (`.scratch/mq/roster-resume2.md` = staging recipes + message drafts): D69 (`.scratch/d70/stage-d69.sh`, msg `.scratch/d70/msg-d69.txt`), D70 (files = tree 9d5d898 `refs/wip/d71-snapshot` minus D73's bench files; deferred.md minus D70; msg `.scratch/d70/msg-d70.txt` + both codex crash inputs), D73 (msg `.scratch/d73/msg.txt`), D74 (`.scratch/d75/msg-d74.txt`), D76 (`.scratch/d76/msg.txt`). Running: D53 regeneration (systemd `fva-regen-d53`, T7 = published; T2, T3 pending; rematch `.scratch/d53/rematch.sh`), D71 `--update` (pool, `.scratch/worktrees/gate` @9d5d898; then survivor rulings by a non-author teammate). Then: D53 close → collected AskUserQuestion (`.scratch/mq/closing.md`, + D74/D76 now funded) → route → close: tick rows, full gate (CI + pool: D74's reuse measured on the second pool run, D72's nixbox test-checks), cleanup (worktrees gate, porter-d53, bench-v2.1; branches wip/d8, wt/porter-d53; ref refs/wip/d71-snapshot), final message (notify-set edits: offload 081e62f + ae2b220; /opt/openai-codex-0.163.0 restored; `CLAUDE.local.md` mutation line).
 - [ ] D4 `lake check` sandboxed build of an `fva init` project (test-init)
 - [ ] D5 `fva explain`: requirements file as pass-2 intent, neutral identifiers in pass 1
 - [ ] D6 agent packaging (MCP server + skill)
@@ -123,6 +123,9 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
 - [ ] D71 mutation table current
 - [ ] D72 gate tools on every pool host (xxd)
 - [ ] D73 judgment-derived bench figures regenerate
+- [ ] D74 subjects verdict reuse
+- [ ] D75 CI runner disk
+- [ ] D76 structure-aware lift fuzzing
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase

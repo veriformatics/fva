@@ -52,6 +52,13 @@ private def rn : Renamer :=
   "Ex.Toy.claim_2 ∧ Toy.name_3 ∧ Other.helper ∧ «clamp» ∧ clamp'"
 #guard rn.restore "claim_1 holds when name_3 is claim_10; `claim_2`." ==
   "clamp holds when helper is claim_10; `gcd`."
+-- a neutral name skips the words the model reads: D69's renamer property, first counterexample
+-- (the projection `x.claim_1` stays, a project name gets `claim_1`, restore swaps it back wrong)
+private def collision := "x.claim_1x.claim_1«name_2»claim_1«claim_1»"
+private def rnc : Renamer := Renamer.of [`helper.gcd.x, `Ex, `Toy.x.α]
+  [`helper, `claim_1.name_2.claim_1, `get?, `claim_1.f'] (Renamer.words collision)
+#guard rnc.restore (rnc.apply collision) == collision
+#guard rnc.map.get? "x" == some "claim_2"
 
 -- example values (D16): `whnf` reads the definition, never the compiled override, and the
 -- kernel confirms the value by `rfl` (or refuses a wrong one)

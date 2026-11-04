@@ -7,8 +7,10 @@ import FVATest.ValidRun
 import FVATest.Valid
 import FVATest.Trust
 import FVATest.Explain
+import FVATest.Props
 
-/-- Runtime checks (no arguments): the lakefile version matches `FVA.version`.
+/-- Runtime checks (no arguments): the lakefile version matches `FVA.version`; the fixed-seed
+property tests (`FVATest.Props`, D69).
 `reencode <in.wasm> <out.wasm>`: decode, then write the re-encoding (decoder differential, E2).
 `numeric <script.json>…`: run numeric test scripts (U3 E1); prints `name pass fail skip`.
 `spec <script.json>…`: run execution scripts through `Exec.Ref`, with the same tally format
@@ -61,6 +63,6 @@ def main : List String → IO UInt32
     let want := s!"version = \"{FVA.version}\""
     if (lake.splitOn "\n").contains want then
       IO.println s!"fvatest: ok (version {FVA.version})"
-      return 0
+      return ← FVA.Test.Props.run
     IO.eprintln s!"fvatest: lakefile.toml lacks {want}"
     return 1
