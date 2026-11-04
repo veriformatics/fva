@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Summaries consume check outputs, never a table of expected scores.
+set -euo pipefail
+[[ $# == 1 ]] || exit 2
+g=$(realpath -e "$1")
+awk -F '\t' '
+FILENAME ~ /\.claims$/ {
+	run=FILENAME; sub(/.*\//,"",run); sub(/\.claims$/,"",run)
+	key=run SUBSEP $2; arms[key]=run; sub(/-.*/,"",arms[key]); claimed[key]=1; next
+}
+$4 ~ /^axioms=/ {
+	key=$1 SUBSEP $3; valid[key]=($4=="axioms=yes" && $5=="leanchecker=accept" && $6=="con-leche=accept")
+	checked[key]=1
+}
+END {for(k in claimed) {n[arms[k]]++;v[arms[k]]+=valid[k];missing[arms[k]]+=!checked[k]}
+	for(a in n) printf "M1\t%s\t%d / %d\tunconfirmed=%d\n",a,v[a],n[a],missing[a]
+}' "$g/"*.claims "$g/m1.tsv" | sort >"$g/summary.tsv"
+awk -F '\t' '
+ARGIND==1 {baseline[$1]=($3=="rc=0");next}
+$2 ~ /^C[1-4]/ {a=$1;sub(/-.*/,"",a);n[a]++;yes[a]+=($4=="named=yes" || (baseline[$1] && $3!="rc=0"))}
+END {for(a in n) print "M8\t" a "\t" yes[a] " / " n[a]}
+' "$g/m8-base.tsv" "$g/m8.tsv" | sort >>"$g/summary.tsv"
+awk -F '\t' '
+function median(a, n, tmp) {n=asort(a,tmp);return n%2 ? tmp[(n+1)/2] : (tmp[n/2]+tmp[n/2+1])/2}
+{a=$1;sub(/-.*/,"",a);s=$2;sub(/^statement /,"",s);l=$3;sub(/^link-model /,"",l)
+	k=++n[a];statements[a][k]=s+0;links[a][k]=l+0;authored[a][k]=s+l}
+END {for(a in n) printf "M5\t%s\t%g: %g + %g\n",a,median(authored[a]),median(statements[a]),median(links[a])}
+' "$g/m5-split.tsv" | sort >>"$g/summary.tsv"
+# Tool arm: a run is M1-valid when every documented command exits 0; M8 counts the main
+# planting site (no site column, or site m8), C3 n/a apart, catches as for the Lean arms.
+if [[ -s $g/m1-tool.tsv ]]; then
+	awk -F '\t' '{n[$1]=1;if($3!="rc=0") bad[$1]=1}
+	END {for(r in n) {t++;v+=!bad[r]};printf "M1\ttool\t%d / %d runs\n",v,t}' "$g/m1-tool.tsv" >>"$g/summary.tsv"
+	awk -F '\t' '
+	ARGIND==1 {baseline[$1]=($3=="rc=0");next}
+	{for(i=2;i<=NF;i++) if($i ~ /^C[1-4]-/) break
+		site=i>2 ? $2 : "m8";if($(i+1)=="rc=n/a") next
+		k=site=="m8" ? "M8" : "M8-" site;n[k]++
+		yes[k]+=($(i+2)=="named=yes" || (baseline[$1] && $(i+1)!="rc=0"))}
+	END {for(k in n) print k "\ttool\t" yes[k] " / " n[k]}
+	' "$g/m8-tool-base.tsv" "$g/m8-tool.tsv" | sort >>"$g/summary.tsv"
+fi
+cat "$g/summary.tsv"

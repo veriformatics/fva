@@ -1,0 +1,10 @@
+tool-lz4-c-1	verification/memory-annotated.c	-machdep gcc_x86_32 -wp -wp-model Bytes -wp-rte -wp-prover alt-ergo -wp-timeout 30
+tool-lz4-c-1	verification/decoder_wp.c	-machdep gcc_x86_32 -cpp-extra-args=-I./src -wp -wp-model Bytes -wp-fct LZ4_decompress_generic,LZ4_decompress_safe -wp-rte -wp-prover alt-ergo -wp-timeout 10
+tool-lz4-c-1	verification/literals_model.c	-machdep gcc_x86_32 -wp -wp-rte -wp-split -wp-prover alt-ergo -wp-timeout 10
+tool-lz4-c-2	verification/early.c	verification/memory.c -wp -wp-rte -wp-prover qed,alt-ergo -wp-timeout 5
+tool-lz4-c-3	verification/memory.c	-machdep x86_32 -wp -wp-model Bytes -wp-rte -wp-prover alt-ergo -wp-timeout 60
+tool-lz4-c-3	verification/entry.c	-machdep x86_32 -inline-calls LZ4_decompress_safe -wp -wp-fct entry_read,LZ4_decompress_generic,verify_zero_capacity,verify_empty_source -wp-model Bytes -wp-rte -wp-prover alt-ergo -wp-timeout 15
+tool-lz4-c-4	verification/base.c	-machdep x86_32 -wp -wp-rte -wp-split -wp-timeout 10 -wp-par 4 -wp-prover qed,alt-ergo
+tool-lz4-c-6	verification/prefix.c	-machdep x86_32 -wp -wp-rte -wp-timeout 10 -wp-par 8
+tool-lz4-c-6	verification/boundaries.c	-cpp-extra-args=-Isrc -machdep x86_32 -inline-calls LZ4_decompress_safe,LZ4_decompress_generic -wp -wp-model Bytes -wp-fct empty_source,zero_capacity -wp-rte -wp-timeout 10 -wp-par 8
+tool-lz4-c-6	verification/memory.annotated.c	-cpp-extra-args=-Isrc -machdep x86_32 -wp -wp-model Bytes -wp-fct memmove -wp-rte -wp-timeout 10 -wp-par 8

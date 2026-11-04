@@ -421,6 +421,8 @@ decimal places, false on this matrix. Every arm refuted R3 (15 / 15 runs).
 
 ## T2 — lz4-c (seed 2; bare 1, 2, 4–6; prompted 1, 2, 4–6; fva 1–5; tool 1–4, 6)
 
+Regenerate mechanical grades with `bench/grade/regenerate lz4-c` (resource wrapper: `grade/README.md`).
+
 T2 has no known defect: two requirement audits and a differential test found no counterexample to
 its corrected requirements (table at the end of this section), so a run could try to prove them.
 No run proved a requirement over its whole domain. Every run proved statements about parts of it
@@ -553,6 +555,8 @@ accepted in one re-review round before the batch.
 
 ## T3 — lz4-rust (seed 1; bare 1, 3–6; prompted 1–5; fva 1–5; tool 1, 3–6)
 
+Regenerate mechanical grades with `bench/grade/regenerate lz4-rust` (resource wrapper: `grade/README.md`).
+
 T3 is T2's task on the Rust decoder: `lz4_flex::block::decompress_into` of lz4_flex 0.14.0
 (safe decoder, no dictionary) behind a two-line shim, and its WebAssembly build. It has no known
 defect (the same audits as T2, table above), and the tool arm runs Verus. No run proved a requirement
@@ -648,6 +652,8 @@ every input for an executable model of the decoder that they wrote.
   1,045–2,776 s, prompted 1,138–3,226 s, fva 1,977–3,486 s, tool 655–1,167 s.
 
 ## T7 — glm-iround (seed 1; bare, prompted, fva 1–5)
+
+Regenerate mechanical grades with `bench/grade/regenerate glm-iround` (resource wrapper: `grade/README.md`).
 
 T7 is the bug-finding task: GLM 1.0.3's `glm::iround` for `double` (C++ headers, unmodified) built to
 a 66-byte WebAssembly module. R1 (the nearest integer for every finite `x` in [0, 2³¹ − 1]) is false

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# One task, serial checks; run under offload + a memory-capped user scope (README).
+set -euo pipefail
+# shellcheck source=bench/grade/common.sh
+source "$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")/common.sh"
+[[ $# == 1 ]] || {
+	echo 'Usage: bench/grade/regenerate lz4-c|lz4-rust|glm-iround' >&2
+	exit 2
+}
+task=$1
+case $task in
+lz4-c) artifact=lz4-c.wasm ;;
+lz4-rust) artifact=lz4-flex.wasm ;;
+glm-iround) artifact=glm-iround.wasm ;;
+*) exit 2 ;;
+esac
+exec 9>"$FVA_GRADE_OUT/.lock"
+flock 9
+G=$FVA_GRADE_OUT/$task
+mkdir -p "$G"
+# Grade only committed manifests, never the incidental cache's current run set.
+mapfile -t runs < <(cut -f1 "$grade_dir/manifests/m8-$task.tsv")
+for r in "${runs[@]}"; do
+	[[ -d bench/runs/$r/work && -d $FVA_BENCH_HOME/inputs/$task/${r%%-*}-$task ]] || exit 2
+done
+for metric in m1 m5 m8 m8-base m8-alt m1-tool m8-tool m8-tool-base; do : >"$G/$metric.tsv"; done
+rm -f "$G/"*.claims "$G/summary.tsv" "$G/m5-split.tsv"
+export M1_APPEND=1 GRADE_APPEND=1
+# The runner yields before each run, not halfway through a kernel replay.
+for r in "${runs[@]}"; do
+	while (($(awk '/^MemAvailable:/ {print $2}' /proc/meminfo) < 16000000)); do
+		printf 'memory gate: waiting for 16 GB available\n' >&2
+		sleep 30
+	done
+	"$grade_dir/m1.sh" "$task" "$r"
+	"$grade_dir/grade-rest.sh" "$task" "$artifact" "$r"
+done
+if [[ -f $grade_dir/manifests/m8-alt-$task.tsv ]]; then
+	"$grade_dir/m8-alt.sh" "$task" "$artifact" "$grade_dir/manifests/m8-alt-$task.tsv"
+fi
+case $task in
+lz4-c)
+	"$grade_dir/m1-wp.sh" "$task" "$grade_dir/manifests/wp-cmds-$task.tsv"
+	"$grade_dir/m8-tool-lz4-c.sh"
+	"$grade_dir/m8-tool-base.sh" "$task" "$grade_dir/manifests/m8-tool-$task.tsv" 3
+	;;
+lz4-rust)
+	"$grade_dir/m1-verus.sh" "$task" "$grade_dir/manifests/verus-cmds-$task.tsv"
+	"$grade_dir/m8-tool-verus.sh" "$task" "$grade_dir/manifests/m8-tool-$task.tsv"
+	"$grade_dir/m8-tool-base.sh" "$task" "$grade_dir/manifests/m8-tool-$task.tsv"
+	;;
+esac
+"$grade_dir/m5-split" "$task" "$G/m5.tsv" >"$G/m5-split.tsv"
+"$grade_dir/check-output" "$task" "$G"
+"$grade_dir/summarize" "$G"
+printf 'regenerate: %s → %s\n' "$task" "$G"

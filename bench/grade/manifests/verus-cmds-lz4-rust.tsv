@@ -1,0 +1,9 @@
+tool-lz4-rust-4	verification/entry.rs --no-cheating
+tool-lz4-rust-4	verification/bounds.rs --no-cheating
+tool-lz4-rust-4	verification/decoder.rs --no-cheating
+tool-lz4-rust-5	--no-cheating verification/decoder.rs
+tool-lz4-rust-5	--no-cheating --rlimit 60 verification/optimized.rs
+tool-lz4-rust-5	--no-cheating verification/monitor.rs
+tool-lz4-rust-3	verification/format.rs
+tool-lz4-rust-1	--no-cheating verification/model.rs
+tool-lz4-rust-6	--no-cheating verification/machine.rs

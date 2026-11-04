@@ -1,0 +1,15 @@
+fva-lz4-rust-1	python3 scripts/check.py
+bare-lz4-rust-1	bash verification/check.sh
+bare-lz4-rust-3	bash verification/check.sh
+bare-lz4-rust-5	bash verification/check.sh
+prompted-lz4-rust-3	python3 verification/check.py
+prompted-lz4-rust-4	python3 verification/check.py
+fva-lz4-rust-4	bash Verification/check.sh
+prompted-lz4-rust-5	./check.sh
+bare-lz4-rust-4	python3 verification/check.py && lake build && lake env lean verification/Audit.lean
+prompted-lz4-rust-1	python3 verification/check.py
+fva-lz4-rust-3	python3 verification/check.py
+fva-lz4-rust-5	bash verification/check.sh
+fva-lz4-rust-2	lake build && python3 verification/check.py && python3 verification/regression.py
+prompted-lz4-rust-2	./verification/check.sh
+bare-lz4-rust-6	bash verification/check.sh

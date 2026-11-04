@@ -1,0 +1,142 @@
+bare-lz4-c-1	claims=1	missed_candidates=16
+  Proofs/Cases.lean	empty_zero_checked	stem
+  Proofs/Cases.lean	empty_one_checked	stem
+  Proofs/Cases.lean	one_literal_checked	stem
+  Proofs/Cases.lean	one_literal_spare_checked	stem
+  Proofs/Cases.lean	fourteen_literals_checked	stem
+  Proofs/Cases.lean	fifteen_literals_checked	stem
+  Proofs/Cases.lean	overlap_one_checked	stem
+  Proofs/Cases.lean	shortcut_eight_checked	stem
+  Proofs/Cases.lean	zero_offset_checked	stem
+  Proofs/Cases.lean	empty_source_checked	stem
+  Proofs/Cases.lean	truncated_literal_checked	stem
+  Proofs/Cases.lean	missing_extension_checked	stem
+  Proofs/Cases.lean	too_small_checked	stem
+  Proofs/Cases.lean	offset_before_start_checked	stem
+  Proofs/Cases.lean	zero_cap_nonzero_checked	stem
+  Proofs/Cases.lean	zero_cap_two_bytes_checked	stem
+bare-lz4-c-2	claims=14	missed_candidates=0
+bare-lz4-c-4	claims=20	missed_candidates=0
+bare-lz4-c-5	claims=5	missed_candidates=34
+  Proofs/Cases.lean	case1_checked	file
+  Proofs/Cases.lean	case2_checked	file
+  Proofs/Cases.lean	case3_checked	file
+  Proofs/Cases.lean	case4_checked	file
+  Proofs/Cases.lean	case5_checked	file
+  Proofs/Cases.lean	case6_checked	file
+  Proofs/Cases.lean	case7_checked	file
+  Proofs/Cases.lean	case8_checked	file
+  Proofs/Cases.lean	case9_checked	file
+  Proofs/Cases.lean	case10_checked	file
+  Proofs/Cases.lean	case11_checked	file
+  Proofs/Cases.lean	case12_checked	file
+  Proofs/Cases.lean	case13_checked	file
+  Proofs/Cases.lean	case14_checked	file
+  Proofs/Cases.lean	case15_checked	file
+  Proofs/Cases.lean	case16_checked	file
+  Proofs/Cases.lean	case17_checked	file
+  Proofs/Cases.lean	case18_checked	file
+  Proofs/Cases.lean	case19_checked	file
+  Proofs/Cases.lean	case20_checked	file
+  Proofs/Cases.lean	case21_checked	file
+  Proofs/Cases.lean	case22_checked	file
+  Proofs/Cases.lean	case23_checked	file
+  Proofs/Cases.lean	case24_checked	file
+  Proofs/Cases.lean	case25_checked	file
+  Proofs/Cases.lean	case26_checked	file
+  Proofs/Cases.lean	case27_checked	file
+  Proofs/Cases.lean	case28_checked	file
+  Proofs/Cases.lean	case29_checked	file
+  Proofs/Cases.lean	case30_checked	file
+  Proofs/Cases.lean	case31_checked	file
+  Proofs/Cases.lean	case32_checked	file
+  Proofs/Cases.lean	case33_checked	file
+  Proofs/Cases.lean	case34_checked	file
+bare-lz4-c-6	claims=5	missed_candidates=0
+prompted-lz4-c-1	claims=7	missed_candidates=0
+prompted-lz4-c-2	claims=6	missed_candidates=0
+prompted-lz4-c-4	claims=4	missed_candidates=0
+prompted-lz4-c-5	claims=11	missed_candidates=0
+prompted-lz4-c-6	claims=2	missed_candidates=0
+fva-lz4-c-1	claims=10	missed_candidates=4
+  Proofs/Proof.lean	instantiated_eval	file
+  Proofs/Proof.lean	empty_eval	file
+  Proofs/Proof.lean	checked_case	file
+  Proofs/Proof.lean	validation_eval	file
+fva-lz4-c-2	claims=12	missed_candidates=27
+  Proofs/Boundary.lean	decoder_at_instance	file
+  Proofs/Boundary.lean	eqz_ptr	file
+  Proofs/Boundary.lean	eqz_zero	file
+  Proofs/Boundary.lean	lt_zero	file
+  Proofs/Boundary.lean	lt_zero_plain	file
+  Proofs/Boundary.lean	lt_one	file
+  Proofs/Boundary.lean	ne_one	file
+  Proofs/Boundary.lean	one_ne_zero	file
+  Proofs/Boundary.lean	pointer_nat	file
+  Proofs/Boundary.lean	zero_byte	file
+  Proofs/Boundary.lean	zero_bv	file
+  Proofs/Boundary.lean	read_one	file
+  Proofs/Boundary.lean	allocated_mems	file
+  Proofs/Boundary.lean	zero_capacity_run	file
+  Proofs/Proof.lean	call_of_run	file
+  Proofs/Proof.lean	caseStart_decoder	file
+  Proofs/Proof.lean	decodeCase_of_run	file
+  Proofs/Proof.lean	fit_input_small	file
+  Proofs/Proof.lean	fit_output_small	file
+  Proofs/Startup.lean	init_walk	file
+  Proofs/Startup.lean	initialized_empty	file
+  Proofs/Startup.lean	initialized_frame	file
+  Proofs/Startup.lean	walk_unique_empty	file
+  Proofs/Startup.lean	initialized_decoder	file
+  Proofs/Startup.lean	initialized_export	file
+  Proofs/Startup.lean	initialMem_lookup	file
+  Proofs/Startup.lean	initialMem_size	file
+fva-lz4-c-3	claims=3	missed_candidates=15
+  Proofs/Proof.lean	steps_values	file
+  Proofs/Proof.lean	runDet_nil_unique	file
+  Proofs/Proof.lean	init_finished	file
+  Proofs/Proof.lean	initialized_instrs	file
+  Proofs/Proof.lean	initialized_frame	file
+  Proofs/Proof.lean	ready_instance	file
+  Proofs/Proof.lean	instance_unique	file
+  Proofs/Proof.lean	ready_decoder	file
+  Proofs/Proof.lean	ready_export	file
+  Proofs/Proof.lean	empty_run	file
+  Proofs/Proof.lean	instrs_of_observation	file
+  Proofs/Proof.lean	prepared_funcs	file
+  Proofs/Proof.lean	computed_returns	file
+  Proofs/Proof.lean	case_of_computation	file
+  Proofs/Proof.lean	module_instantiable	file
+fva-lz4-c-4	claims=13	missed_candidates=7
+  Proofs/Proof.lean	eq_some_getD	file
+  Proofs/Proof.lean	ready_eq	file
+  Proofs/Proof.lean	pair_instance	file
+  Proofs/Proof.lean	ready_instance	file
+  Proofs/Proof.lean	checkResult_sound	file
+  Proofs/Proof.lean	checkPost_sound	file
+  Proofs/Proof.lean	checkExample_sound	file
+fva-lz4-c-5	claims=2	missed_candidates=24
+  Proofs/Cases.lean	empty_zero_holds	stem
+  Proofs/Cases.lean	empty_room_holds	stem
+  Proofs/Cases.lean	one_literal_holds	stem
+  Proofs/Cases.lean	extended_literals_holds	stem
+  Proofs/Cases.lean	overlap_match_holds	stem
+  Proofs/Cases.lean	extended_match_holds	stem
+  Proofs/Cases.lean	zero_offset_holds	stem
+  Proofs/Cases.lean	source_at_end_holds	stem
+  Proofs/Cases.lean	destination_at_end_holds	stem
+  Proofs/Cases.lean	reject_no_input_holds	stem
+  Proofs/Cases.lean	reject_zero_capacity_holds	stem
+  Proofs/Cases.lean	reject_past_offset_holds	stem
+  Proofs/General.lean	zero_size_run	file
+  Proofs/Proof.lean	no_step_values	file
+  Proofs/Proof.lean	steps_values_end	file
+  Proofs/Proof.lean	must_returns_post	file
+  Proofs/Proof.lean	canonical_instance	file
+  Proofs/Proof.lean	init_returns	file
+  Proofs/Proof.lean	instance_unique	file
+  Proofs/Proof.lean	canonical_mem	file
+  Proofs/Proof.lean	canonical_mem_size	file
+  Proofs/Proof.lean	canonical_func	file
+  Proofs/Proof.lean	checked_case	file
+  Proofs/Trace.lean	checkTrace_sound	file

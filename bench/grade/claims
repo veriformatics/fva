@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Lexical citation scan; MAIN's nonliteral citation rulings live in manifests/claims-review-*.
+set -euo pipefail
+[[ $# == 1 && -d $1 && -f $1/VERIFICATION.md ]] || exit 2
+work=$(realpath -e "$1")
+while IFS= read -r -d '' file; do
+	mod=${file#"$work/"}
+	mod=${mod%.lean}
+	mod=${mod//\//.}
+	awk -v mod="$mod" '
+		NR == FNR {
+			s = $0
+			while (match(s, /[A-Za-z_][A-Za-z0-9_\047.?!]*/)) {
+				word = substr(s, RSTART, RLENGTH); cited[word] = 1
+				split(word, parts, "."); cited[parts[length(parts)]] = 1
+				s = substr(s, RSTART + RLENGTH)
+			}
+			next
+		}
+		match($0, /^[[:space:]]*namespace[[:space:]]+([A-Za-z_][A-Za-z0-9_.]*)/, m) {
+			ns[++depth] = m[1]; next
+		}
+		match($0, /^[[:space:]]*end[[:space:]]+([A-Za-z_][A-Za-z0-9_.]*)[[:space:]]*$/, m) {
+			if (depth && ns[depth] == m[1]) delete ns[depth--]; next
+		}
+		match($0, /^[[:space:]]*(@\[[^]]*\][[:space:]]*)?(private[[:space:]]+|protected[[:space:]]+)?(theorem|lemma)[[:space:]]+([A-Za-z_][A-Za-z0-9_\047.?!]*)/, m) {
+			if (m[2] ~ /^private/) next
+			name = m[4]; full = ""
+			for (i = 1; i <= depth; i++) full = full ns[i] "."
+			full = full name; split(name, parts, ".")
+			if (cited[name] || cited[full] || cited[parts[length(parts)]]) print mod "\t" full
+		}' "$work/VERIFICATION.md" "$file"
+done < <(find "$work" \( -type d \( -name .lake -o -name fva -o -path '*/.verification/lib' \) \) -prune -o -type f -name '*.lean' -print0 |
+	# Path ordering compares components: Certificates/C0.lean precedes Certificates.lean.
+	awk -v RS='\0' -v ORS='\0' '{ key=$0; gsub("/", "\001", key); print key "\t" $0 }' |
+	LC_ALL=C sort -z | cut -z -f2-)

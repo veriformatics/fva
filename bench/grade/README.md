@@ -1,5 +1,88 @@
 # Grading graded runs (rubric M1–M10)
 
+## Regenerate T2, T3 or T7
+
+From the repository root, run one task:
+
+```sh
+offload run --local -- systemd-run --user --scope -q \
+  -p MemoryMax=28G -p MemorySwapMax=0 -p OOMPolicy=continue \
+  bench/grade/regenerate lz4-c
+```
+
+Use `lz4-rust` for T3 or `glm-iround` for T7. The command restores each committed run from
+its prepared inputs and archive. It runs M1, M5, M8 and the clean M8 baselines. It also runs
+the alternative planting sites and the task's Frama-C or Verus checks. Runs are serial. A
+lock prevents overlapping task regenerations in one output directory. Missing Lean claim
+receipts, failed Lean surface extraction or missing/duplicate Lean cheat rows make the command
+exit 2. For the tool arms, a missing or non-numeric M1 status, a missing or duplicate cheat row
+and a missing C0 also make the command exit 2. A complete grading run can still report invalid
+proofs. A run's documented check can generate the files that it proves: `manifests/wp-prep-TASK.tsv`
+names that step (tool-lz4-c-6: `prepare.py` writes the `*.annotated.c` files that its own
+`.gitignore` keeps out of the archive), and `m1-wp.sh` runs it after the rebuild.
+Each run starts when at least 16 GB of memory is available. The external memory cap remains necessary:
+T3's independent kernel can need more than 20 GB.
+
+Inputs come from `${FVA_BENCH_HOME:-$HOME/.cache/fva-bench}`. The cache must contain the
+batch's `inputs/`, `packages-v4.35.0/`, `bin/` and `tools/`. The host must have Lean 4.35.0,
+GNU awk, jq, rsync and the runtimes that the archived checks use. T2 also needs the pinned
+Frama-C bundle and container image (`scripts/fetch-bench-tools frama-c`). The cache is
+read-only to the grading drivers. Archived checks keep their original languages,
+including Python; the new grading drivers do not implement grading in Python.
+
+Outputs go to `${FVA_GRADE_OUT:-<repo>/.scratch/grade}/<task>/`:
+
+- `m1.tsv`: theorem replay logs and statuses. `*.claims` records the claim denominator.
+- `m5.tsv`: declaration closures. `m5-split.tsv` partitions statement, link/model, tables
+  and data. T1's older split is also available through `m5-split lz4-wasm FILE`.
+- `m8.tsv`, `m8-base.tsv`, `m8-alt.tsv`: original sites, clean checks and alternate sites.
+- `m1-tool.tsv`, `m8-tool.tsv`, `m8-tool-base.tsv`: task-specific tool checks.
+- `summary.tsv`: Lean-arm M1, M5 and M8 aggregates. An unconfirmed M1 row is not valid. Tool
+  arms: M1 = runs whose documented commands all exit 0; M8 = the main planting site (`M8-<site>`
+  = an alternate site), C3 `n/a` left out.
+- Per-run projects and logs: inspect them before accepting an M8 catch. A failing clean
+  baseline permits credit by cheat-specific name alone, not by exit code.
+
+`manifests/` records the graded run set, documented commands, alternate sites and the
+reviewed T2 nonliteral claim citations. A scan is not a claim-coverage judgment: review
+`VERIFICATION.md` against `*.claims`. T7's prompted runs 1 and 4 generate observation claims.
+Their copies are replayed in sibling `<run>.observation/` projects. Grader helpers stay outside
+the M8 project. A forged-proof control is not a claim.
+
+Run the fast driver controls with `bench/grade/check-drivers`. Run `bench/grade/check-fidelity`
+to check each task's initial memory and instance lifetime against a stateful fixture. The new
+scripts must pass `shellcheck -x` and `shfmt -d`. These controls do not replace the proof checks.
+
+### Model fidelity
+
+`bench/grade/fidelity lz4-c` and `bench/grade/fidelity lz4-rust` replay the published
+2,000-case samples against the pinned artifact. Run them in a memory-capped offload slot.
+The corpora preserve T2's seeds 27/28 and T3's seed 29 exactly. T2's original generator is
+`.scratch/u15/grade/fid-t2/gen.py` (prefix: 27; literal: 28). T3's is
+`.scratch/u15/grade/fid-t3/fid.py` (29), with `gen_valid` and `mutate` from
+`.scratch/u15/reqcheck/reqcheck.py`. Replay reads the committed input files. The original
+generators are not runtime dependencies. Replaying fixed data avoids changing the sample
+when the generator's implementation changes. No expected
+artifact results are stored. The driver compiles the archived C or Rust model with a small
+native I/O fixture, then `Fidelity.lean` builds WAST assertions from its outputs.
+Wasmtime checks the return and exact bytes: all caller memory for T2; the returned prefix
+for successful T3 calls. `--control` uses the entry model on literal cases (T2), or reduces
+model capacities by one (T3); the artifact comparison must fail.
+
+`acsl-lines FILE[:A-B]…` and `verus-lines FILE.rs…` expose the tool-arm line partitions.
+Their outputs are measurements, not substitutes for the reviewed statement closure.
+`m5-tool lz4-rust` reads the recovered closure selections in `judgments/lz4-rust-m5.tsv`.
+Each row cites the published policy and archived source, and pins that source by SHA-256.
+The command reports physical statement ranges, Verus model-code counts and generated tables.
+It keeps full-file model-code counts and reader-selected physical model ranges separate.
+Their selections and line conventions differ. These measurements do not resolve the missing
+historical normalization ruling. T2's original
+tool partition is not recovered; the command exits 2 when a judgment manifest is unavailable.
+M2 extraction checks use `regen-check.sh TASK ARTIFACT MANIFEST`; its outputs include
+regeneration, byte comparison, clean check and planted-edit statuses for every file.
+
+## Per-run procedure
+
 Per run `R` = `~/.cache/fva-bench/runs/<arm>-<task>-<i>` (its input dir = `~/.cache/fva-bench/inputs/…` as launched):
 
 1. `FVA_BENCH_AUTH_FILE=<the batch's auth.json> bench/grade/archive R bench/runs/<arm>-<task>-<i>` — record: result.json, metadata.json, gzipped events, the agent's created/changed files.

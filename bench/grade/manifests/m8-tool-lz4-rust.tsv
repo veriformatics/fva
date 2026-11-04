@@ -1,0 +1,6 @@
+tool-lz4-rust-1	verification/model.rs	model_complete	verus --no-cheating verification/model.rs && python3 -I verification/check_artifact.py	m8
+tool-lz4-rust-3	verification/format.rs	trace_bounds	verus verification/format.rs && python3 verification/check_artifact.py	m8
+tool-lz4-rust-4	verification/entry.rs	entry_n_zero	bash verification/check.sh	m8
+tool-lz4-rust-5	verification/optimized.rs	caller_layout	bash verification/check.sh	m8
+tool-lz4-rust-6	verification/cases.inc.rs	empty_input_checked	bash verification/check.sh	m8
+tool-lz4-rust-6	verification/machine.rs	zero_length_input_all_placements	bash verification/check.sh	m8alt

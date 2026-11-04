@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Case identity includes initial memory and instance lifetime (T2 persistent, T3 fresh).
+set -euo pipefail
+# shellcheck source=bench/grade/common.sh
+source "$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")/common.sh"
+tmp=$(mktemp -d)
+trap 'rm -rf -- "$tmp"' EXIT
+cat >"$tmp/artifact.wat" <<'WAT'
+(module
+  (memory (export "memory") 32)
+  (global $counter (mut i32) (i32.const 0))
+  (func (export "lz4_decompress") (export "LZ4_decompress_safe")
+    (param $src i32) (param $dst i32) (param i32 i32) (result i32)
+    (global.set $counter (i32.add (global.get $counter) (i32.const 1)))
+    (i32.store8 (local.get $dst)
+      (i32.add (i32.load8_u (i32.add (local.get $src) (i32.const 1))) (global.get $counter)))
+    (i32.const 1)))
+WAT
+wasm-tools parse "$tmp/artifact.wat" -o "$tmp/artifact.wasm"
+awk 'BEGIN {for(i=0;i<2000;i++) print "1 00"}' >"$tmp/cases"
+awk 'BEGIN {for(i=0;i<2000;i++) print "1 31"}' >"$tmp/outputs"
+lake env lean --run "${FVA_GRADE_FIDELITY:-$grade_dir/Fidelity.lean}" \
+	lz4-rust "$tmp/artifact.wasm" "$tmp/cases" "$tmp/outputs" "$tmp/all.wast" >/dev/null
+awk '{print} /assert_return \(invoke \$case "equal"/ {if(++n==2) exit}' "$tmp/all.wast" >"$tmp/two.wast"
+wasmtime wast "$tmp/two.wast"
+# Both planted changes must fail through an executed byte mismatch, not parsing.
+sed 's/(i32.const 37)/(i32.const 38)/' "$tmp/two.wast" >"$tmp/pattern.wast"
+if wasmtime wast "$tmp/pattern.wast" >"$tmp/pattern.log" 2>&1; then exit 1; fi
+grep -q "result 0 didn't match" "$tmp/pattern.log"
+grep -q 'expected[[:space:]]*1 /' "$tmp/pattern.log"
+grep -q '^actual[[:space:]]*0 /' "$tmp/pattern.log"
+awk '/^\(module \$artifact binary/ {if(++n>1) next}
+     /^\(register "artifact"/ {if(n>1) next} {print}' "$tmp/two.wast" >"$tmp/instance.wast"
+if wasmtime wast "$tmp/instance.wast" >"$tmp/instance.log" 2>&1; then exit 1; fi
+grep -q "result 0 didn't match" "$tmp/instance.log"
+grep -q 'expected[[:space:]]*1 /' "$tmp/instance.log"
+grep -q '^actual[[:space:]]*0 /' "$tmp/instance.log"
+awk 'BEGIN {for(i=0;i<2000;i++) print "prefix 131072 1150000 1 1 00"}' >"$tmp/c-cases"
+awk 'BEGIN {for(i=0;i<2000;i++) printf "1 1150000 1150000 %02x\n",(166+i)%256}' >"$tmp/c-outputs"
+lake env lean --run "${FVA_GRADE_FIDELITY:-$grade_dir/Fidelity.lean}" \
+	lz4-c "$tmp/artifact.wasm" "$tmp/c-cases" "$tmp/c-outputs" "$tmp/c-all.wast" >/dev/null
+awk '{print} /assert_return \(invoke \$case "equal"/ {if(++n==2) exit}' "$tmp/c-all.wast" >"$tmp/c-two.wast"
+wasmtime wast "$tmp/c-two.wast"
+printf 'check-fidelity: T2 persistent/0xa5 + T3 fresh/pattern PASS; planted changes rejected\n'

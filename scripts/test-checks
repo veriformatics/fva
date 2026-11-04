@@ -2,6 +2,7 @@
 # Planted-bad inputs for the purpose-built checks (check-format, check-pins, the mutation check via
 # scripts/test-mutation-fixture, the subject matrix via scripts/test-subject-matrix): each must fail.
 # Also the gate's step ledger (scripts/gate-ledger): a red step's row, its classification, the summary.
+# Also the bench grading batteries (bench/grade/check-drivers, check-fidelity) over neutered drivers.
 # Runs on a throwaway copy so the working tree is never touched.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
@@ -152,6 +153,16 @@ if [[ $got != "b 0 1 1 0" ]]; then
 fi
 expect_fail "gate-ledger classify without an open red" . env FVA_GATE_LEDGER="$d/l" scripts/gate-ledger classify b product
 expect_fail "gate-ledger unknown class" . env FVA_GATE_LEDGER="$d/l" scripts/gate-ledger classify a nonsense t1
+# bench grading drivers (D53): each battery passes, and fails once a driver it controls is neutered
+export FVA_GRADE_OUT=$tmp/grade
+bench/grade/check-drivers >/dev/null || fail=1
+bench/grade/check-fidelity >/dev/null || fail=1
+d=$tmp/grade-plant && mkdir -p "$d" && printf '#!/usr/bin/env bash\nexit 0\n' >"$d/pass" && chmod +x "$d/pass"
+expect_fail "check-drivers over a check-output that passes everything" . env FVA_GRADE_OUTPUT_CHECK="$d/pass" bench/grade/check-drivers
+expect_fail "check-drivers over a claims scan that lists nothing" . env FVA_GRADE_CLAIMS="$d/pass" bench/grade/check-drivers
+sed 's/if task == "lz4-rust" then lines := lines.push artifact/if false then lines := lines.push artifact/' \
+	bench/grade/Fidelity.lean >"$d/Fidelity.lean"
+expect_fail "check-fidelity over one shared T3 instance" . env FVA_GRADE_FIDELITY="$d/Fidelity.lean" bench/grade/check-fidelity
 scripts/test-mutation-fixture || fail=1
 scripts/test-subject-matrix || fail=1
 exit "$fail"
