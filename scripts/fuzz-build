@@ -38,5 +38,6 @@ done < <(tr ' ' '\n' <.lake/build/bin/fvafuzz.rsp | grep 'o\.export"\?$')
 "$cc" -fsanitize=fuzzer -o "$out/fvafuzz-lf" "$out/obj/shim.o" "${objs[@]}" \
 	-L"$lean/lib/lean" -L"$lean/lib" \
 	-Wl,--start-group -lleancpp -lLean -Wl,--end-group -lStd -Wl,--start-group -lInit -lleanrt \
-	-Wl,--end-group -Wl,-Bstatic -lc++ -lc++abi -lgmp -luv -Wl,-Bdynamic -lpthread -ldl -lm
+	-Wl,--end-group -Wl,-Bstatic -lc++ -lc++abi -lLake -lLeanExport -lgmp -luv -lssl -lcrypto \
+	-Wl,-Bdynamic -lpthread -ldl -lrt -lm
 echo "fuzz-build: $out/fvafuzz-lf (${#objs[@]} objects)"
