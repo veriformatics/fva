@@ -141,4 +141,15 @@ for bad in hash range coverage; do
 	"$surface_check" lz4-rust "$tmp/judgment.tsv" >"$tmp/judgment.log" 2>&1 || rc=$?
 	[[ $rc == 2 ]]
 done
+# Judged figures (D73) count only pinned sources: one changed sha256 → rc 2.
+judged=${FVA_GRADE_JUDGED:-$g/judged}
+"$judged" glm-iround >/dev/null
+"$judged" lz4-c >/dev/null
+mkdir "$tmp/judgments"
+cp "$g"/judgments/*.tsv "$tmp/judgments/"
+awk -F '\t' 'BEGIN{OFS="\t"} !/^#/ && $2!="-" && !done {$5=sprintf("%064d",0);done=1} {print}' \
+	"$g/judgments/glm-iround-checker.tsv" >"$tmp/judgments/glm-iround-checker.tsv"
+rc=0
+FVA_GRADE_JUDGMENTS=$tmp/judgments "$judged" glm-iround >"$tmp/judged.log" 2>&1 || rc=$?
+[[ $rc == 2 ]]
 printf 'check-drivers: claims, splits, counters, corpora, completion/judgment controls PASS\n'

@@ -78,6 +78,10 @@ It keeps full-file model-code counts and reader-selected physical model ranges s
 Their selections and line conventions differ. These measurements do not resolve the missing
 historical normalization ruling. T2's original
 tool partition is not recovered; the command exits 2 when a judgment manifest is unavailable.
+`judged lz4-c|lz4-rust|glm-iround` prints the judgment-derived M5 figures: checker scripts per
+arm, T2's tool partition from `judgments/lz4-c-m5.tsv`, T3's from `m5-tool`, and T7's checker
+code with the check commands that `judgments/glm-iround-checker.tsv` selects in reports. Each
+judgment row pins its source by SHA-256; a changed source makes the command exit 2.
 M2 extraction checks use `regen-check.sh TASK ARTIFACT MANIFEST`; its outputs include
 regeneration, byte comparison, clean check and planted-edit statuses for every file.
 
