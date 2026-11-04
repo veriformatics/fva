@@ -44,6 +44,11 @@ jobs:
       matrix:
         group: [lean, trust, init, subjects, static]
     steps:
+      # The runner image leaves ≈ 2 GB free once the Mathlib cache and the build are restored; the
+      # init lane's fva init project (vendored FVA, hard-linked Mathlib, its own build) ran the
+      # disk full and hung to the job timeout → drop preinstalled toolchains no step uses
+      - name: Free disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # gitleaks scans history
