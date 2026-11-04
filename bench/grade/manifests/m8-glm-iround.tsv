@@ -1,0 +1,15 @@
+fva-glm-iround-1	bash "$FVA_GRADE_DIR/t7-checks/fva-glm-iround-1.sh"
+bare-glm-iround-2	lake build && python3 check_counterexample.py
+bare-glm-iround-4	lake build && lake env lean Proofs/Counterexample.lean && python3 check_counterexample.py
+fva-glm-iround-3	bash "$FVA_GRADE_DIR/t7-checks/fva-glm-iround-3.sh"
+bare-glm-iround-3	python3 verify_artifact.py && lake build && lake env lean Proofs/Counterexample.lean
+prompted-glm-iround-4	python3 -I check.py
+prompted-glm-iround-1	./check.sh
+fva-glm-iround-2	bash "$FVA_GRADE_DIR/t7-checks/fva-glm-iround-2.sh"
+bare-glm-iround-5	python3 verify.py && lake build
+fva-glm-iround-4	./verify.sh
+prompted-glm-iround-5	python3 check.py
+bare-glm-iround-1	lake build && lake env lean Proofs/Counterexample.lean && python3 check_counterexample.py
+fva-glm-iround-5	bash "$FVA_GRADE_DIR/t7-checks/fva-glm-iround-5.sh"
+prompted-glm-iround-2	./check.sh
+prompted-glm-iround-3	./check.sh

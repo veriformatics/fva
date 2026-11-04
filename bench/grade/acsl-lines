@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# ACSL/C nonblank source lines; optional inclusive FILE:A-B ranges.
+set -euo pipefail
+[[ $# -gt 0 ]] || exit 2
+for arg in "$@"; do
+	file=${arg%%:*}
+	a=1 b=2147483647
+	if [[ $arg == *:* ]]; then
+		range=${arg#*:}
+		a=${range%-*}
+		b=${range#*-}
+	fi
+	awk -v arg="$arg" -v a="$a" -v b="$b" '
+	{
+		s=$0;sub(/^[[:space:]]+/,"",s);sub(/[[:space:]]+$/,"",s);inside=NR>=a && NR<=b
+		if(in_acsl) {if(inside && s!="" && s!="*/") acsl++;if(index(s,"*/")) in_acsl=0;next}
+		if(in_cmt) {if(index(s,"*/")) in_cmt=0;next}
+		if(s ~ /^\/\*@/) {acsl+=inside;in_acsl=!index(substr(s,4),"*/");next}
+		if(s ~ /^\/\/@/) {acsl+=inside;next}
+		if(s ~ /^\/\*/) {in_cmt=!index(substr(s,3),"*/");next}
+		if(s ~ /^\/\// || s=="" || s ~ /^[{}();]*$/) next
+		code+=inside
+	}
+	END {printf "%s\tacsl %d\tc %d\n",arg,acsl,code}
+	' "$file"
+done

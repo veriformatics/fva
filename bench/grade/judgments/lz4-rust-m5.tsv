@@ -1,0 +1,20 @@
+# M9 maximum requirement closure per run; M5 policy = bench/results.md T3/M5.
+# statement/reader-model = physical selected ranges with the reader's explicit omissions.
+# model-exec/model-spec = the original verus-lines code partitions; totals remain separate.
+# run	kind	file	ranges	omit	source	sha256
+tool-lz4-rust-1	statement	verification/model.rs	6-17,19-27,30-38,49-81,302-312	7,31,50	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-1/work/verification/model.rs:302-312	a1c36f315e4713916a7fc76e492bac0aa9c58dd8aa7f77d244c6ff1fda7c104c
+tool-lz4-rust-3	statement	verification/format.rs	6-11,13-17,19-30,61-70,93-100,104-117,120-148,195-200,227-230,243-249,251-256,274-277,279-300,353-358	20,196,244,252,281	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-3/work/verification/format.rs:353-358	4350e92cd17e11ee77a868ca79dced13ba9a8c0fd487333ccbafc77e17ed832d
+tool-lz4-rust-4	statement	verification/decoder.rs	12,15-26,28-38,42-50,52-78,81-89,101-119,435-447,449-452,455-461	16,82,102,436	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-4/work/verification/decoder.rs:455-461	3c79fd27dd6304374e8efb97f891120ab9d1f548c73fb47518d510198790db35
+tool-lz4-rust-5	statement	verification/decoder.rs	6,8-19,41-50,69-82,103-112,171-199,204-231,269-274,299-302	9,105,172,205	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-5/work/verification/decoder.rs:299-302	f41e1efb038f5953f9aee136389e28985df75526f17820fe0a409bf5273c1217
+tool-lz4-rust-5	statement	verification/optimized.rs	118-120,199-207	-	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-5/work/verification/optimized.rs:199-207	6ee58b454c7002ba5f3197c9a9be1cf035095c51ac4b60b72edc630324b9d1f1
+tool-lz4-rust-6	statement	verification/format.rs	5-96	14,19,24,52,64,71,78,86	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-6/work/verification/format.rs:5-96	5ad2644c40a77845345646f39936d517a0a737db2b2cdb8272943513c4992682
+tool-lz4-rust-6	statement	verification/cases.inc.rs	3-12,16-34,38-56,60-79,83-102,106-125,129-148,152-171,175-193,197-216,220-229,233-242,246-255,259-268,272-281,285-294	-	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-6/work/verification/cases.inc.rs:3-294	b70217f19f2f07447890a5572eb10b8262f85f05c8f59e23c0dd96da7ed85f44
+tool-lz4-rust-6	statement	verification/machine.rs	208-214	-	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-6/work/verification/machine.rs:208-214	37e1197a45237fb2dbaf8d3e6805b0be2dfb479de62fe2f3395bdf0d5063d256
+tool-lz4-rust-6	reader-model	verification/machine.rs	11-25,27-196,200-202	44,62,63,52,68,73,81,89,179,188	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-6/work/verification/machine.rs:11-202	37e1197a45237fb2dbaf8d3e6805b0be2dfb479de62fe2f3395bdf0d5063d256
+tool-lz4-rust-1	model-exec	verification/model.rs	-	-	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-1/work/verification/model.rs	a1c36f315e4713916a7fc76e492bac0aa9c58dd8aa7f77d244c6ff1fda7c104c
+tool-lz4-rust-3	model-exec	verification/format.rs	-	-	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-3/work/verification/format.rs	4350e92cd17e11ee77a868ca79dced13ba9a8c0fd487333ccbafc77e17ed832d
+tool-lz4-rust-4	model-exec	verification/decoder.rs	-	-	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-4/work/verification/decoder.rs	3c79fd27dd6304374e8efb97f891120ab9d1f548c73fb47518d510198790db35
+tool-lz4-rust-5	model-exec	verification/decoder.rs	-	-	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-5/work/verification/decoder.rs	f41e1efb038f5953f9aee136389e28985df75526f17820fe0a409bf5273c1217
+tool-lz4-rust-5	model-exec	verification/optimized.rs	-	-	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-5/work/verification/optimized.rs	6ee58b454c7002ba5f3197c9a9be1cf035095c51ac4b60b72edc630324b9d1f1
+tool-lz4-rust-6	model-spec	verification/machine.rs	-	-	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-6/work/verification/machine.rs	37e1197a45237fb2dbaf8d3e6805b0be2dfb479de62fe2f3395bdf0d5063d256
+tool-lz4-rust-6	table	verification/program.inc.rs	4-3516	-	bench/results.md:T3/M5;bench/runs/tool-lz4-rust-6/work/verification/program.inc.rs:4-3516	336f530b1898280f693854819e8e819221e004208d1a493ad670de6cc0226370

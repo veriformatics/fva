@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# Fast structural/behavior controls; no benchmark cache or proof toolchain required.
+set -euo pipefail
+root=$(realpath -e "$(dirname "${BASH_SOURCE[0]}")/../..")
+g=$root/bench/grade
+tmp=$(mktemp -d)
+trap 'rm -rf -- "$tmp"' EXIT
+mkdir -p "$tmp/project/Proofs" "$tmp/project/fva" "$tmp/project/.lake" \
+	"$tmp/project/.verification/lib"
+printf '%s\n' 'Outer.get?! Nested.good privateLemma forbidden first' >"$tmp/project/VERIFICATION.md"
+printf 'theorem first : True := trivial\n' >"$tmp/project/Proofs/Child.lean"
+cat >"$tmp/project/Proofs.lean" <<'LEAN'
+namespace Outer
+@[simp] theorem get?! : True := trivial
+private theorem privateLemma : True := trivial
+namespace Nested
+protected lemma good : True := trivial
+end Nested
+end Outer
+theorem uncited : True := trivial
+LEAN
+for dir in fva .lake .verification/lib; do printf 'theorem forbidden : True := trivial\n' >"$tmp/project/$dir/Bad.lean"; done
+printf 'Proofs.Child\tfirst\nProofs\tOuter.get?!\nProofs\tOuter.Nested.good\n' >"$tmp/expected"
+"${FVA_GRADE_CLAIMS:-$g/claims}" "$tmp/project" >"$tmp/actual"
+cmp "$tmp/expected" "$tmp/actual"
+# Numeric stems, tables, semantics and theorem classification have distinct jobs.
+printf 'bare-lz4-c-1\tdecl\tProofs.Artifact\tTable\tdef\t1\t3\t3\t2\nbare-lz4-c-1\tdecl\tProofs.Wasm\tSemantics\ttheorem\t1\t4\t4\t3\nbare-lz4-c-1\tdecl\tProofs.Spec\tR1\ttheorem\t1\t2\t2\t1\n' >"$tmp/decls"
+printf 'bare-lz4-c-1\tstatement 1\tlink-model 3\ttable 2\tdata 0\tcode 6\n' >"$tmp/expected"
+"$g/m5-split" lz4-c "$tmp/decls" >"$tmp/actual"
+cmp "$tmp/expected" "$tmp/actual"
+cat >"$tmp/a.c" <<'C'
+/* ordinary comment */
+/*@ requires x > 0;
+    ensures result > 0;
+*/
+int f(int x) {
+  return x;
+}
+C
+"$g/acsl-lines" "$tmp/a.c" | cut -f2- >"$tmp/actual"
+printf 'acsl 2\tc 2\n' >"$tmp/expected"
+cmp "$tmp/expected" "$tmp/actual"
+cat >"$tmp/a.rs" <<'RS'
+verus! {
+open spec fn value() -> int {
+    1
+}
+fn run() -> u32
+    ensures result == value(),
+{
+    1
+}
+proof fn sound()
+    ensures value() == 1,
+{
+    assert(value() == 1);
+}
+}
+RS
+"$g/verus-lines" "$tmp/a.rs" >"$tmp/actual"
+printf 'statement 6\tlink-model 1\tproofs 1\n' >"$tmp/expected"
+cmp "$tmp/expected" "$tmp/actual"
+for task in lz4-c lz4-rust glm-iround; do
+	count=$(wc -l <"$g/manifests/m8-$task.tsv")
+	[[ $count == 15 ]]
+	while IFS=$'\t' read -r run _cmd; do [[ -f $root/bench/runs/$run/work/VERIFICATION.md ]]; done <"$g/manifests/m8-$task.tsv"
+done
+(cd "$root" && sha256sum -c "$g/manifests/fidelity.sha256" >/dev/null)
+# Receipt completeness differs from proof validity: rejected proofs still have complete receipts.
+out=$tmp/output
+mkdir -p "$out"
+for table in m1.tsv m5.tsv m8.tsv m8-base.tsv; do : >"$out/$table"; done
+while IFS=$'\t' read -r run _cmd; do
+	printf 'Proofs.Fixture\tFixture.good\n' >"$out/$run.claims"
+	printf '%s\tProofs.Fixture\tFixture.good\taxioms=no(Lean.ofReduceBool)\tleanchecker=reject(1)\tcon-leche=reject(1)\n' "$run" >>"$out/m1.tsv"
+	printf '%s\ttotal\t1\n%s\trc\t0\n' "$run" "$run" >>"$out/m5.tsv"
+	for c in 1 2 3 4; do printf '%s\tC%s-cheat\trc=0\tnamed=no\n' "$run" "$c" >>"$out/m8.tsv"; done
+	printf '%s\tC0-clean\trc=0\tnamed=no\n' "$run" >>"$out/m8-base.tsv"
+done <"$g/manifests/m8-glm-iround.tsv"
+output_check=${FVA_GRADE_OUTPUT_CHECK:-$g/check-output}
+"$output_check" glm-iround "$out" >/dev/null
+for table in m1.tsv m5.tsv m8.tsv m8-base.tsv; do
+	cp "$out/$table" "$tmp/saved"
+	tail -n +2 "$tmp/saved" >"$out/$table"
+	rc=0
+	"$output_check" glm-iround "$out" >"$tmp/incomplete.log" 2>&1 || rc=$?
+	[[ $rc == 2 ]]
+	mv "$tmp/saved" "$out/$table"
+done
+sed '1s/con-leche=reject(1)/con-leche=reject(137)/' "$out/m1.tsv" >"$tmp/crashed"
+mv "$tmp/crashed" "$out/m1.tsv"
+rc=0
+"$output_check" glm-iround "$out" >"$tmp/crashed.log" 2>&1 || rc=$?
+[[ $rc == 2 ]]
+# Tool-arm receipts (lz4-c: WP commands, plantings, C0) are complete only row for row.
+out=$tmp/tool-output
+mkdir -p "$out"
+for table in m1.tsv m5.tsv m8.tsv m8-base.tsv m1-tool.tsv m8-tool.tsv m8-tool-base.tsv; do : >"$out/$table"; done
+while IFS=$'\t' read -r run _cmd; do
+	printf 'Proofs.Fixture\tFixture.good\n' >"$out/$run.claims"
+	printf '%s\tProofs.Fixture\tFixture.good\taxioms=yes\tleanchecker=accept\tcon-leche=accept\n' "$run" >>"$out/m1.tsv"
+	printf '%s\ttotal\t1\n%s\trc\t0\n' "$run" "$run" >>"$out/m5.tsv"
+	for c in 1 2 3 4; do printf '%s\tC%s-cheat\trc=0\tnamed=no\n' "$run" "$c" >>"$out/m8.tsv"; done
+	printf '%s\tC0-clean\trc=0\tnamed=no\n' "$run" >>"$out/m8-base.tsv"
+done <"$g/manifests/m8-lz4-c.tsv"
+while IFS=$'\t' read -r run file _opts; do
+	printf '%s\t%s\trc=0\t[wp] Proved goals: 1 / 1\n' "$run" "$file" >>"$out/m1-tool.tsv"
+done <"$g/manifests/wp-cmds-lz4-c.tsv"
+while IFS=$'\t' read -r run _file _cmd; do
+	for c in 1 2 4; do printf '%s\tC%s-cheat\trc=0\tnamed=no\n' "$run" "$c" >>"$out/m8-tool.tsv"; done
+	printf '%s\tC3-checker-bypass\trc=n/a\tnamed=n/a\n' "$run" >>"$out/m8-tool.tsv"
+	printf '%s\tC0-clean\trc=0\n' "$run" >>"$out/m8-tool-base.tsv"
+done <"$g/manifests/m8-tool-lz4-c.tsv"
+"$output_check" lz4-c "$out" >/dev/null
+for table in m1-tool.tsv m8-tool.tsv m8-tool-base.tsv; do
+	cp "$out/$table" "$tmp/saved"
+	tail -n +2 "$tmp/saved" >"$out/$table"
+	rc=0
+	"$output_check" lz4-c "$out" >"$tmp/incomplete.log" 2>&1 || rc=$?
+	[[ $rc == 2 ]]
+	mv "$tmp/saved" "$out/$table"
+done
+sed '1s/rc=0/prepare failed/' "$out/m1-tool.tsv" >"$tmp/unprepared"
+mv "$tmp/unprepared" "$out/m1-tool.tsv"
+rc=0
+"$output_check" lz4-c "$out" >"$tmp/unprepared.log" 2>&1 || rc=$?
+[[ $rc == 2 ]]
+surface_check=${FVA_GRADE_TOOL_SURFACE:-$g/m5-tool}
+"$surface_check" lz4-rust >"$tmp/tool-surface"
+cut -f1 "$tmp/tool-surface" | sort -u >"$tmp/actual"
+cut -f1 "$g/manifests/verus-cmds-lz4-rust.tsv" | sort -u >"$tmp/expected"
+cmp "$tmp/expected" "$tmp/actual"
+for bad in hash range coverage; do
+	awk -F '\t' -v mode="$bad" 'BEGIN{OFS="\t"}
+		/^#/ {print;next}
+		mode=="coverage" && $1=="tool-lz4-rust-1" {next}
+		!changed && mode=="hash" {$7=sprintf("%064d",0);changed=1}
+		!changed && mode=="range" {$4="1-9999999";changed=1}
+		{print}' "$g/judgments/lz4-rust-m5.tsv" >"$tmp/judgment.tsv"
+	rc=0
+	"$surface_check" lz4-rust "$tmp/judgment.tsv" >"$tmp/judgment.log" 2>&1 || rc=$?
+	[[ $rc == 2 ]]
+done
+printf 'check-drivers: claims, splits, counters, corpora, completion/judgment controls PASS\n'

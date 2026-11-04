@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# The four documented out-of-project checker rebuilds; preserve each run's cache settings.
+set -euo pipefail
+mode=$1
+case $mode in
+1 | 2)
+	lake build
+	sha256sum glm-iround.wasm
+	;;
+3 | 5)
+	sha256sum glm-iround.wasm
+	lake build
+	;;
+*) exit 2 ;;
+esac
+checker=$(mktemp -d)
+trap 'rm -rf -- "$checker"' EXIT
+cp -a --reflink=auto fva/. "$checker/"
+packages=$(jq -er '.packagesDir' lake-manifest.json)
+packages=$(realpath -e "$packages")
+if [[ $mode != 5 ]]; then
+	jq --arg p "$packages" '.packagesDir=$p' "$checker/lake-manifest.json" >"$checker/manifest.tmp"
+	mv "$checker/manifest.tmp" "$checker/lake-manifest.json"
+fi
+if [[ $mode == 1 || $mode == 3 ]]; then
+	encoded=$(jq -Rn --arg p "$packages" '$p')
+	awk -v p="$encoded" -v mode="$mode" '{ print; if ((mode==1 && $0=="allowNonModules = true") ||
+		(mode==3 && $0=="version = \"0.1.0\"")) print "packagesDir = " p }' \
+		"$checker/lakefile.toml" >"$checker/config.tmp"
+	mv "$checker/config.tmp" "$checker/lakefile.toml"
+fi
+if [[ $mode == 5 ]]; then
+	ln -s "$packages" "$checker/.lake/packages"
+fi
+rm -f "$checker/.lake/build/bin/fva"
+if [[ $mode == 1 || $mode == 3 ]]; then
+	rm -f "$checker/.lake/build/bin/"{fva.hash,fva.trace}
+	[[ $mode != 3 ]] || rm -f "$checker/.lake/build/bin/fva.rsp"
+fi
+lake -d "$checker" build fva
+args=(trust . --spec-module Proofs.Spec --root-module Proofs)
+case $mode in
+2)
+	"$checker/.lake/build/bin/fva" "${args[@]}" --surface-budget 30 >FVA-TRUST.txt
+	cat FVA-TRUST.txt
+	;;
+3) "$checker/.lake/build/bin/fva" "${args[@]}" --surface-budget 20 ;;
+*) "$checker/.lake/build/bin/fva" "${args[@]}" ;;
+esac

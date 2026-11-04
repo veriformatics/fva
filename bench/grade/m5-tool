@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Recovered reader selections + the original Verus code counter; physical/code totals stay apart.
+set -euo pipefail
+[[ $# -ge 1 && $# -le 2 ]] || exit 2
+grade=$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")
+repo=$(realpath -e "$grade/../..")
+task=$1
+manifest=${2:-$grade/judgments/$task-m5.tsv}
+[[ -f $manifest ]] || {
+	printf 'm5-tool: no recovered judgments for %s; recover the original closure rulings\n' "$task" >&2
+	exit 2
+}
+commands=$grade/manifests/verus-cmds-$task.tsv
+[[ -f $commands ]] || commands=$grade/manifests/wp-cmds-$task.tsv
+[[ -f $commands ]] || exit 2
+tmp=$(mktemp)
+trap 'rm -f -- "$tmp"' EXIT
+declare -A expected=() covered=() seen=()
+while IFS=$'\t' read -r run _rest; do
+	[[ -z $run || $run == \#* ]] || expected[$run]=1
+done <"$commands"
+while IFS=$'\t' read -r run kind file ranges omit citation hash; do
+	[[ -z $run || $run == \#* ]] && continue
+	[[ -n ${expected[$run]:-} && -n $citation && $hash =~ ^[0-9a-f]{64}$ ]] || exit 2
+	covered[$run]=1
+	source=$(realpath -e "$repo/bench/runs/$run/work/$file") || exit 2
+	[[ $source == "$repo/bench/runs/$run/work/"* ]] || exit 2
+	actual=$(sha256sum "$source")
+	[[ ${actual%% *} == "$hash" ]] || {
+		printf 'm5-tool: judgment source changed: %s %s\n' "$run" "$file" >&2
+		exit 2
+	}
+	key=$run:$kind:$file
+	[[ -z ${seen[$key]:-} ]] || exit 2
+	seen[$key]=1
+	case $kind in
+	statement | reader-model | table)
+		limit=$(awk 'END {print NR}' "$source")
+		n=$(awk -v spans="$ranges" -v omit="$omit" -v limit="$limit" '
+			BEGIN {
+				n=split(spans,parts,",")
+				for(i=1;i<=n;i++) {
+					if(parts[i] !~ /^[1-9][0-9]*(-[1-9][0-9]*)?$/) exit 2
+					k=split(parts[i],ends,"-");a=ends[1];b=(k==1 ? a : ends[2])
+					if(b<a || b>limit) exit 2
+					for(j=a;j<=b;j++) wanted[j]=1
+				}
+				n=split(omit,parts,",")
+				for(i=1;i<=n;i++) if(parts[i]!="-") {
+					if(parts[i] !~ /^[1-9][0-9]*$/) exit 2
+					delete wanted[parts[i]]
+				}
+			}
+			NR in wanted {count++;delete wanted[NR]}
+			END {if(length(wanted)) exit 2;print count+0}
+		' "$source") || exit 2
+		;;
+	model-exec | model-spec)
+		column=2
+		[[ $kind != model-spec ]] || column=1
+		n=$("$grade/verus-lines" "$source" | awk -F '\t' -v c="$column" '
+			NF!=3 || NR!=1 {exit 2} {s=$c;sub(/^[^ ]+ /,"",s);if(s !~ /^[0-9]+$/) exit 2;print s}
+		') || exit 2
+		;;
+	*) exit 2 ;;
+	esac
+	printf '%s\t%s\t%s\n' "$run" "$kind" "$n" >>"$tmp"
+done <"$manifest"
+[[ -s $tmp ]] || exit 2
+for run in "${!expected[@]}"; do
+	[[ -n ${covered[$run]:-} ]] || {
+		printf 'm5-tool: missing judgment for %s\n' "$run" >&2
+		exit 2
+	}
+done
+awk -F '\t' '
+{runs[$1]=1;amount[$1,$2]+=$3;present[$1,$2]=1}
+END {
+	for(r in runs) {
+		if(!present[r,"statement"] || (!present[r,"model-exec"] && !present[r,"model-spec"]) ||
+		   (present[r,"model-spec"] != present[r,"reader-model"])) exit 2
+	}
+	for(r in runs) {
+		s=amount[r,"statement"];e=amount[r,"model-exec"];m=amount[r,"model-spec"];p=amount[r,"reader-model"]
+		printf "%s\tstatement-physical %d\tmodel-code %d\treader-model-physical %d\tcode-model-total %d\treader-model-total %d\ttable-physical %d\n",r,s,e+m,p,s+e+m,s+e+p,amount[r,"table"]
+	}
+}' "$tmp" | sort -t $'\t' -k1,1V

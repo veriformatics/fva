@@ -1,0 +1,15 @@
+bare-lz4-c-1	wasm-tools validate lz4-c.wasm && python3 verification/extract.py --check && python3 verification/cases.py --check && lake build && lake env lean verification/Audit.lean && python3 verification/runtime.py
+bare-lz4-c-2	python3 verification/extract.py --check && wasm-tools validate lz4-c.wasm && lake build && lake env lean Proofs/Cases.lean && lake env lean Proofs/Boundary.lean && lake env lean verification/Audit.lean && python3 verification/check_runtime.py
+bare-lz4-c-4	bash verification/check.sh
+bare-lz4-c-5	bash verification/check.sh
+bare-lz4-c-6	python3 verification/extract.py --check && wasm-tools validate lz4-c.wasm && lake build && lake env lean --run verification/Export.lean --check && python3 verification/replay.py
+prompted-lz4-c-1	./check.sh
+prompted-lz4-c-2	./check.sh
+prompted-lz4-c-4	./check.sh
+prompted-lz4-c-5	python3 verification/check.py
+prompted-lz4-c-6	./check.sh
+fva-lz4-c-1	./verify.sh
+fva-lz4-c-2	bash checks/verify.sh
+fva-lz4-c-3	bash verification/check.sh
+fva-lz4-c-4	bash verification/check.sh
+fva-lz4-c-5	bash verification/check.sh

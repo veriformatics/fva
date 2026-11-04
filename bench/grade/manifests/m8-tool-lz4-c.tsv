@@ -1,0 +1,5 @@
+tool-lz4-c-1	verification/literals_model.c	frama-c --check-wp . verification/memory-annotated.c -machdep gcc_x86_32 -wp -wp-model Bytes -wp-rte -wp-prover alt-ergo -wp-timeout 30 -wp-cache none && frama-c --check-wp . verification/decoder_wp.c -machdep gcc_x86_32 -cpp-extra-args=-I./src -wp -wp-model Bytes -wp-fct LZ4_decompress_generic,LZ4_decompress_safe -wp-rte -wp-prover alt-ergo -wp-timeout 10 -wp-cache none && frama-c --check-wp . verification/literals_model.c -machdep gcc_x86_32 -wp -wp-rte -wp-split -wp-prover alt-ergo -wp-timeout 10 -wp-cache none
+tool-lz4-c-2	verification/early.c	bash verification/check.sh
+tool-lz4-c-3	verification/entry.c	bash verification/check.sh
+tool-lz4-c-4	verification/base.c	bash verification/check.sh
+tool-lz4-c-6	verification/prefix.c	bash verification/check.sh

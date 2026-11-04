@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Verus line classes: contracts/spec items = statement, exec bodies = model, proof bodies apart.
+set -euo pipefail
+[[ $# -gt 0 ]] || exit 2
+awk '
+function trivial(s) {return s=="" || s ~ /^[{}();,\]\[]*$/ || s ~ /^(use |mod |verus!|#\[)/}
+FNR==1 {depth=0; top=0; pending=""; block=0}
+{
+	line=""; s=$0
+	while(length(s)) {
+		if(block) {if(match(s,/\*\//)) {s=substr(s,RSTART+2);block=0} else break}
+		else if(match(s,/\/\*/)) {line=line substr(s,1,RSTART-1);s=substr(s,RSTART+2);block=1}
+		else {line=line s;break}
+	}
+	sub(/\/\/.*/,"",line); s=line; sub(/^[[:space:]]+/,"",s); sub(/[[:space:]]+$/,"",s)
+	cur=(top ? cls[top] : "")
+	if(cur=="" && !trivial(s)) {
+		if(s ~ /\<spec[[:space:]]+fn\>/ || s ~ /^(pub[[:space:]]+)?(struct|enum|const|type|ghost)\>/) pending="statement"
+		else if(s ~ /\<proof[[:space:]]+fn\>/) pending="proof"
+		else if(s ~ /\<fn\>/) pending="link"
+		tot["statement"]++
+	} else if(cur!="" && !trivial(s)) tot[(cur=="link" && s ~ /^proof[[:space:]]*\{/ ? "proof" : cur)]++
+	for(i=1;i<=length(line);i++) {
+		ch=substr(line,i,1)
+		if(ch=="{") {
+			if(cur=="" && pending!="" && !top) {cls[++top]=pending;at[top]=depth;pending=""}
+			else if(top && cls[top]=="link" && line ~ /^[[:space:]]*proof[[:space:]]*\{/) {cls[++top]="proof";at[top]=depth}
+			depth++;cur=(top ? cls[top] : "")
+		} else if(ch=="}") {
+			depth--;while(top && depth<=at[top]) {delete cls[top];delete at[top--]};cur=(top ? cls[top] : "")
+		}
+	}
+}
+END {printf "statement %d\tlink-model %d\tproofs %d\n",tot["statement"],tot["link"],tot["proof"]}
+' "$@"

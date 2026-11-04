@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Frozen declaration classification: T1/T2/T3 policy; T7 contains statement declarations alone.
+set -euo pipefail
+[[ $# == 2 ]] || {
+	echo 'Usage: bench/grade/m5-split TASK m5.tsv' >&2
+	exit 2
+}
+task=$1
+case $task in lz4-wasm | lz4-c | lz4-rust | glm-iround) ;; *) exit 2 ;; esac
+awk -F '\t' -v task="$task" '
+function generated(run, mod) {
+	if (task == "lz4-c") return mod ~ /^Proofs\.(Artifact|Bytes|Code)$/ || mod ~ /^Proofs\.Certificates/
+	if (task != "lz4-rust") return 0
+	if (run == "bare-lz4-rust-3") return mod == "Proofs.Decoder"
+	if (mod == "Proofs.Artifact") return run !~ /^fva-/
+	return (run == "bare-lz4-rust-4" && mod ~ /^Proofs\.(Program|Extraction)$/) ||
+		(run == "prompted-lz4-rust-3" && mod == "Proofs.Program") ||
+		(run == "prompted-lz4-rust-5" && mod == "Proofs.Traces")
+}
+function link(name, mod, run) {
+	if (task == "glm-iround") return 0
+	if (task == "lz4-wasm") return tolower(name) ~ /(encoder(block|output|store|memory)|decoder(block|content|store)|r[12](block|wire|content)|encoded$|badblock|allocation|memory0|memorybytes|bytesat|fresh|preparation|emptystore|nextbyteread|decodedblock|decoded2|initialization|empty_boundary_traps|emptyblocktrap|^r[123]$|r[123]_counterexample$|r3_dependence|artifact|block[12]$|placed|encoderesult|decoderesult|boundaryresult|nonemptyblock|nonemptycontent)/ ||
+		(run ~ /^fva/ && mod == "Proofs.Spec" && name ~ /^(r[123]|empty|init|fresh|prep)/)
+	if (name ~ /^(memory|initialMemory|initial|execute|testMemory|exampleMemory|observe|observation|effect|fill|outputBytes|initialInst|initialStore|initialization|callerStore|caseStore|allocated|initialized|prepared|bytesAt|validModule|instructionAccesses|pendingAccesses|literalValue|arguments|dataSegment|expectedData|byteAt|outcome|accesses|fuel|decoder|project|suffix|zeroCapacityBody)$/) return 1
+	if (task == "lz4-c") return run == "fva-lz4-c-5" && mod ~ /Spec/ && name ~ /^(mk|write|address|width)$/
+	return name ~ /^(initialState|allocation|instructionAccess|runtime|fresh[[:alnum:]_]*|invokeConfig|configSafe|redexSafe|accessSafe|nextAccess|atAccess|run|step|start|state|withBytes|placed|setup|layout)$/
+}
+$2 == "decl" {
+	run=$1; mod=$3; name=$4; kind=$5; n=(task == "lz4-wasm" ? $8 : $9)
+	split(name, parts, "."); short=parts[length(parts)]
+	if (short ~ /^[0-9]+$/ && task == "lz4-wasm") short=name
+	cls="statement"
+	if (task == "lz4-wasm") {
+		if ((run == "prompted-lz4-wasm-3" && mod ~ /^Proofs\.(Wasm|Artifact)$/) ||
+			(kind != "theorem" && link(short,mod,run))) cls="link"
+	} else if (kind == "data") cls="data"
+	else if (generated(run, mod)) cls="table"
+	else if (mod ~ /\.(Wasm|Semantics|Binary)$/ || (task == "lz4-rust" && mod ~ /\.(Machine|Syntax|DecodeWasm)$/)) cls="link"
+	else if (kind != "theorem" && link(short,mod,run)) cls="link"
+	runs[run]=1; acc[run,cls]+=n
+}
+END {
+	for (run in runs) printf "%s\tstatement %d\tlink-model %d\ttable %d\tdata %d\tcode %d\n", run,
+		acc[run,"statement"],acc[run,"link"],acc[run,"table"],acc[run,"data"],
+		acc[run,"statement"]+acc[run,"link"]+acc[run,"table"]
+}' "$2" | sort -t $'\t' -k1,1V

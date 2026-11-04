@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Exact published corpus replay. Native C/Rust files = I/O fixtures, never grader logic.
+set -euo pipefail
+# shellcheck source=bench/grade/common.sh
+source "$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")/common.sh"
+[[ $# -ge 1 && $# -le 2 ]] || exit 2
+task=$1
+control=${2:-}
+[[ -z $control || $control == --control ]] || exit 2
+g=$FVA_GRADE_OUT/$task/fidelity
+[[ -z $control ]] || g+=/control
+mkdir -p "$g"
+sha256sum -c "$grade_dir/manifests/fidelity.sha256"
+case $task in
+lz4-c)
+	artifact=$repo/bench/subjects/wasm/lz4-c.wasm
+	modes=(prefix literal)
+	[[ -z $control ]] || modes=(prefix)
+	;;
+lz4-rust)
+	artifact=$repo/bench/subjects/wasm/lz4-flex.wasm
+	modes=(1 4 5)
+	[[ -z $control ]] || modes=(5)
+	;;
+*) exit 2 ;;
+esac
+hash=$(jq -er --arg f "${artifact#"$repo/"}" '.builds[] | select(.file==$f) | .sha256' bench/subjects/manifest.json)
+printf '%s  %s\n' "$hash" "$artifact" | sha256sum -c -
+for mode in "${modes[@]}"; do
+	if [[ $task == lz4-c ]]; then
+		if [[ $mode == prefix ]]; then
+			source=$repo/bench/runs/tool-lz4-c-6/work/verification/prefix.c
+			flag=MODEL_PREFIX
+		else
+			source=$repo/bench/runs/tool-lz4-c-1/work/verification/literals_model.c
+			flag=MODEL_LITERAL
+		fi
+		gcc -O1 "-D$flag" "-DSRC=\"$source\"" "$grade_dir/fid-t2/model.c" -o "$g/model-$mode"
+		cases=$grade_dir/fid-t2/cases-$mode.txt
+		if [[ -n $control ]]; then cases=$grade_dir/fid-t2/cases-literal.txt; fi
+	else
+		source=$repo/bench/runs/tool-lz4-rust-$mode/work/verification/
+		if [[ $mode == 1 ]]; then source+=model.rs; else source+=decoder.rs; fi
+		sed '/^fn main()/,$d' "$source" >"$g/model-$mode.rs"
+		[[ $mode != 4 ]] || printf '\n}\n' >>"$g/model-$mode.rs"
+		cat "$grade_dir/fid-t3/main-$mode.rs" >>"$g/model-$mode.rs"
+		"$FVA_BENCH_HOME/bin/verus" --no-verify --compile "$g/model-$mode.rs" -o "$g/model-$mode" >"$g/compile-$mode.log" 2>&1
+		cases=$grade_dir/fid-t3/cases.txt
+	fi
+	if [[ -n $control && $task == lz4-rust ]]; then
+		awk '{$1=($1>0 ? $1-1 : 0);print}' "$cases" | "$g/model-$mode" >"$g/$mode.model"
+	else
+		"$g/model-$mode" <"$cases" >"$g/$mode.model"
+	fi
+	lake env lean --run "$grade_dir/Fidelity.lean" "$task" "$artifact" "$cases" "$g/$mode.model" "$g/$mode.wast"
+	wasmtime wast "$g/$mode.wast" >"$g/$mode.wast.log" 2>&1
+	printf '%s\t%s\texact-byte fidelity 2000/2000\n' "$task" "$mode"
+done
