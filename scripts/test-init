@@ -7,7 +7,10 @@
 # project fails in fva trust's sandbox (D12). The project reuses this checkout's
 # Mathlib (hard links) and FVA build (copy), so nothing is fetched or rebuilt.
 # D78: after the shared setup the cases run as 4 lanes side by side (the `lake check` pair, the
-# longest at ≈ 470 s, starts first); a lane that edits a file shared by hard links replaces it.
+# longest at ≈ 470 s, starts first); a lane that edits a file shared by hard links replaces it, a
+# copy that rebuilds a module has its own .lake/build (Lake rewrites .trace, .setup.json, .c + .hash
+# in place), and every file of the project's builds + packages keeps its inode, mtime + size through
+# the lanes.
 # D78 verdict reuse (FVA_INIT_CACHE = a directory, default .cache/init; empty = none): a PASS is
 # reused only for an input closure byte-identical to the green run that recorded it — this script,
 # the fva binary (FVA overrides it), the files `fva init` vendors, the toy example and
@@ -80,8 +83,8 @@ echo '{"surfaceBudget": null}' >"$p/fva.json"
 trust() { (cd "$1" && "$fva" trust . --spec-module Demo.Spec --root-module Demo) >"$tmp/$2" 2>&1; }
 
 # the project, vendored FVA included, builds + replays inside `lake check`'s bwrap sandbox
-# (no --from-export); a proof resting on an extra axiom (the cheat copy below: hard links, since the
-# sandbox only reads, its Proof.lean a new file) → rc 1 naming it; both side by side
+# (no --from-export); a proof resting on an extra axiom (the cheat copy below: its Proof.lean a new
+# file + its own .lake/build, the rest hard links) → rc 1 naming it; both side by side
 lane_check() {
 	local ok rc rc_cheat f=0
 	(cd "$p" && lake check) >"$tmp/check.out" 2>&1 &
@@ -291,9 +294,19 @@ lane() {
 	) >"$tmp/lane-$1.log" 2>&1 &
 	pid[$1]=$!
 }
+# p's build + package files before the lanes (path, inode, mtime, size), compared after them: a write
+# into one through a hard link (a copy's rebuild of Demo.Proof rewrites p's .trace) stales p, and the
+# lanes building p side by side then rebuild it together, one missing the other's .olean; .git dirs
+# left out: Lake's git queries in the packages replace their index by rename (a new inode, p's own)
+pfiles() {
+	find "$p/.lake/build" "$p/.lake/packages" "$p/fva/.lake/build" -name .git -prune -o -type f \
+		-printf '%p\t%i %T@ %s\n'
+}
+pfiles >"$tmp/pfiles.before" || exit 2
 # every copy of p is made before a lane writes into p (lane_budget replaces p/fva.json): the
 # cheat copy first, so the longest lane starts at once
-cp -al "$p" "$tmp/cheat" && rm "$tmp/cheat/Demo/Proof.lean" || exit 2
+cp -al "$p" "$tmp/cheat" && rm -r "$tmp/cheat/Demo/Proof.lean" "$tmp/cheat/.lake/build" &&
+	cp -a "$p/.lake/build" "$tmp/cheat/.lake/" || exit 2
 {
 	cat "$p/Demo/Proof.lean"
 	printf '\naxiom fvaCheatAx : False\ntheorem cheat_uses : 1 = 2 := fvaCheatAx.elim\n'
@@ -318,6 +331,14 @@ for n in check budget sandbox planted; do
 	((rc == 1)) && fail=1
 	((rc > 2)) && setup=1
 done
+pfiles >"$tmp/pfiles.after" || setup=1
+awk -F'\t' 'NR == FNR { a[$1] = $2; next } a[$1] != $2 { print "    " $1; if (++n == 5) exit }' \
+	"$tmp/pfiles.after" "$tmp/pfiles.before" >"$tmp/pfiles.diff"
+if [[ -s $tmp/pfiles.diff ]]; then
+	echo "test-init: a lane wrote into the project's build or package files (first 5):"
+	cat "$tmp/pfiles.diff"
+	fail=1
+fi
 echo "gate-note: run"
 ((setup)) && exit 2
 ((fail)) && exit 1
