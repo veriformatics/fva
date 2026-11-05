@@ -5,9 +5,10 @@
 # Row = run (UTC start) host tree mode step seconds verdict note. tree = the gated working tree's
 # git tree (untracked files included; = HEAD^{tree} on a clean tree); mode = full | fast | group:G.
 # A step row's verdict = ok | rc N; a classification row (mode classify) carries product | gate |
-# flake | planted and covers its step's earlier reds on its tree.
+# flake | planted and covers its step's earlier reds on its tree. A step row's note = the first
+# `gate-note: ` line of its output (e.g. D74's subject-reuse count), else -.
 #   gate-ledger tree                              working-tree tree hash (- outside git)
-#   gate-ledger append LOGS RUN TREE MODE         one row per LOGS/<step>.rc (+ <step>.ms)
+#   gate-ledger append LOGS RUN TREE MODE         one row per LOGS/<step>.rc (+ <step>.ms, .out)
 #   gate-ledger classify STEP CLASS [TREE [NOTE]] TREE default or - = STEP's newest open red
 #   gate-ledger reds                              unclassified reds, all hosts
 #   gate-ledger summary                           per step: runs, seconds, reds by class, unique
@@ -32,6 +33,12 @@ tree() { # a copy of the index keeps git's stat cache, so only changed files are
 	rm -rf -- "$tmp"
 }
 
+step_note() { # LOGS STEP -> the step's first `gate-note: ` text (tabs → spaces), else -
+	local n
+	n=$(sed -n '/^gate-note: /{s///;s/\t/ /g;p;q}' "$1/$2.out" 2>/dev/null)
+	echo "${n:--}"
+}
+
 append() {
 	local logs=$1 run=$2 tree=$3 mode=$4 rc name ms r
 	mkdir -p -- "$dir" || return 2
@@ -40,8 +47,9 @@ append() {
 		name=$(basename "$rc" .rc)
 		r=$(<"$rc")
 		ms=$(cat -- "$logs/$name.ms" 2>/dev/null) || ms=0
-		printf '%s\t%s\t%s\t%s\t%s\t%d.%01d\t%s\t-\n' "$run" "$host" "$tree" "$mode" "$name" \
-			$((ms / 1000)) $((ms % 1000 / 100)) "$([[ $r == 0 ]] && echo ok || echo "rc $r")"
+		printf '%s\t%s\t%s\t%s\t%s\t%d.%01d\t%s\t%s\n' "$run" "$host" "$tree" "$mode" "$name" \
+			$((ms / 1000)) $((ms % 1000 / 100)) "$([[ $r == 0 ]] && echo ok || echo "rc $r")" \
+			"$(step_note "$logs" "$name")"
 	done >>"$file"
 }
 

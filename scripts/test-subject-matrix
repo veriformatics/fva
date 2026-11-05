@@ -155,15 +155,18 @@ run_case crash-and-failure "$d" 3 'Matrix.Program paranoid crashed, rc 139' \
 	'Matrix.Certificate default trust rc 1'
 
 # D74 verdict reuse: the same closure runs no fva; an edited subject file reruns that subject
-# alone; a FAIL is never reused; a new fva binary or a failing pins check reruns everything
+# alone; a FAIL is never reused; a new fva binary or a failing pins check reruns everything; the
+# count is also the gate step's note (D79: the ledger + the gate table keep it)
 reuse() { # label want-rc want-new-calls want-message
-	local before n rc
+	local before n rc note count
 	before=$(find "$d/calls" -type f | wc -l)
 	(cd "$d" && FVA="$d/fva" FVA_SUBJECT_JOBS=2 FVA_SUBJECT_CACHE="$d/cache" FVA_SUBJECT_SRC="$d/src" \
 		FVA_SUBJECT_PINS="${pins:-true}" "$runner" <"$d/table" >"$d/out" 2>&1)
 	rc=$?
 	n=$(($(find "$d/calls" -type f | wc -l) - before))
-	if ((rc != $2 || n != $3)) || ! grep -qF -- "$4" "$d/out"; then
+	note=$(sed -n 's/^gate-note: //p' "$d/out")
+	count=$(sed -n 's/^subject-matrix: \(.* runs reused\)$/\1/p' "$d/out")
+	if ((rc != $2 || n != $3)) || ! grep -qF -- "$4" "$d/out" || [[ -z $note || $note != "$count" ]]; then
 		bad "reuse $1: rc $rc (want $2), $n fva runs (want $3), '$4' $(grep -cF -- "$4" "$d/out")×"
 		tail -4 "$d/out"
 	else

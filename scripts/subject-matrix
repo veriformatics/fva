@@ -173,7 +173,11 @@ for s in "${subjects[@]}"; do
 		fi
 	done
 done
-[[ -z $cache ]] || echo "subject-matrix: $reused of $((2 * ${#subjects[@]})) runs reused"
+# the count also as the gate step's note (scripts/gate-ledger): the gate deletes step logs at exit
+if [[ -n $cache ]]; then
+	n="$reused of $((2 * ${#subjects[@]})) runs reused"
+	printf 'subject-matrix: %s\ngate-note: %s\n' "$n" "$n"
+fi
 if ((results != 2 * ${#subjects[@]})); then
 	echo "subject-matrix: $results results for ${#subjects[@]} subjects × 2 modes"
 	fail=1

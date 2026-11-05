@@ -73,10 +73,24 @@ jobs:
         run: |
           sudo apt-get install -y -qq bubblewrap
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      # D79: subjects reuse the verdicts of main's latest green subjects run (scripts/subject-matrix
+      # still keys each entry by its input closure); main pushes alone save the cache, so a ci/** or
+      # PR run reads it and never writes it
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: matrix.group == 'subjects'
+        with:
+          path: .cache/subjects
+          key: fva-subjects-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: fva-subjects-
       - name: Gate
         env:
           GROUP: ${{ matrix.group }}
         run: df -h / && scripts/gate --group "$GROUP"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: matrix.group == 'subjects' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: .cache/subjects
+          key: fva-subjects-${{ github.run_id }}-${{ github.run_attempt }}
       # free space after the run (the lean lane's parallel steps write the most)
       - name: Disk
         if: always()
