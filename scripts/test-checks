@@ -143,6 +143,29 @@ if grep -q '^  \[build\]' "$d/trust.out"; then
 	echo "test-checks: a packagesDir outside the project is hidden from fva trust's sandbox ([build])"
 	fail=1
 fi
+# test-init verdict reuse (D78; stub fva + lake that record each call and fail): the recorded key's
+# inputs → reused, no run; the fva binary edited → a run, whose failure drops the entry; a failing
+# pins check → no key
+d=$tmp/init-reuse && mkdir -p "$d/bin" "$d/c" || exit 2
+# shellcheck disable=SC2016 # the stub's own $0, expanded when it runs
+printf '#!/bin/sh\necho "$0" >>"%s/calls"\nexit 1\n' "$d" >"$d/bin/lake" &&
+	cp "$d/bin/lake" "$d/fva" && chmod +x "$d/bin/lake" "$d/fva" || exit 2
+init_run() {
+	FVA=$d/fva FVA_PINS_CHECK=${pins:-true} FVA_INIT_CACHE=$d/c FVA_FETCH_CANARIES=true \
+		PATH=$d/bin:$PATH scripts/test-init "$@"
+}
+calls() { cat "$d/calls" 2>/dev/null | wc -l; }
+key=$(init_run --key)
+echo "$key" >"$d/c/key"
+init_run >"$d/out" 2>&1
+got="${#key} $? $(calls) $(grep -c '^gate-note: reused$' "$d/out")"
+echo '# edited' >>"$d/fva"
+init_run >"$d/out" 2>&1
+got+=" $? $(calls) $([[ -e $d/c/key ]] && echo kept || echo dropped) $(pins=false init_run --key | wc -c)"
+if [[ $got != "64 0 0 1 1 1 dropped 0" ]]; then
+	echo "test-checks: test-init reuse → '$got', want '64 0 0 1 1 1 dropped 0'"
+	fail=1
+fi
 # gate-ledger: one row per step (a red keeps its rc; note = the step's first `gate-note: `, else -),
 # a classification clears the red + counts in the summary (a planted red: not a unique catch), a red
 # classified twice or an unknown class fails

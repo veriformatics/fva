@@ -6,10 +6,11 @@
 # FVA = the fva binary; FVA_SUBJECT_JOBS caps concurrency.
 # D74 verdict reuse (FVA_SUBJECT_CACHE = a directory, unset = none): a (root, mode) PASS is
 # reused only for an input closure byte-identical to the green run that recorded it: the fva
-# binary, the toolchain's lean/lake/leanexport + kernels, FVA's sources, the build pins (checked
-# against this tree's .oleans first), the canaries, bwrap, this script, the row, and every file of
-# the subject directories its modules import (FVA_SUBJECT_SRC = the source root, default .;
-# FVA_SUBJECT_PINS = the pins check, default scripts/make-olean-pins --check).
+# binary, this script + scripts/verdict-key's shared inputs (the toolchain's lean/lake/leanexport +
+# kernels, FVA's sources, the build pins checked against this tree's .oleans first, the canaries,
+# bwrap), the row, and every file of the subject directories its modules import
+# (FVA_SUBJECT_SRC = the source root, default .; FVA_SUBJECT_PINS = the pins check, default
+# scripts/make-olean-pins --check).
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 fva=${FVA:-.lake/build/bin/fva}
@@ -53,21 +54,7 @@ used_cpu=0 used_mem=0
 
 cache=${FVA_SUBJECT_CACHE:-} src=${FVA_SUBJECT_SRC:-.}
 # what every run reads beside its subject; empty = no reuse this run (a pin mismatch included)
-shared_key() {
-	local pins sys b bins=()
-	read -ra pins <<<"${FVA_SUBJECT_PINS:-scripts/make-olean-pins --check}"
-	"${pins[@]}" >/dev/null 2>&1 || return 0
-	sys=$(lean --print-prefix 2>/dev/null) || return 0
-	for b in lean lake leanexport leanchecker leanchecker-paranoid lean4lean nanoda_bin con-leche con-ron; do
-		[[ -f $sys/bin/$b ]] && bins+=("$sys/bin/$b")
-	done
-	{
-		sha256sum "$fva" "$0" lean-toolchain lakefile.toml lake-manifest.json trust/oleans.tsv \
-			trust/canaries/*.tsv "${bins[@]}"
-		find FVA .cache/canaries -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum
-		bwrap --version 2>&1
-	} | sha256sum | cut -d' ' -f1
-}
+shared_key() { FVA_PINS_CHECK=${FVA_SUBJECT_PINS:-} scripts/verdict-key "$fva" "$0"; }
 # the files a subject's modules reach: each imported module of the source root (its subject
 # directory whole under FVATest/Subjects/, else its file), transitively
 closure() { # module...
