@@ -38,7 +38,7 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
   - Intent = the requirements file (`requirements.md` beside the spec module or `--requirements F`; `## <id>` per requirement; user-written or agent-drafted + user-approved): pass 2 judges each requirement against the claims it names as stating it → `matches|weaker|stronger|different|vacuous|missing`; rc 0 needs every requirement `matches`. Without the file: each claim vs its docstring, else its name. The model sees neutral names (claims `claim_k`, other review-module names `name_k`, by last component; strings + projections untouched) in pass 1 and in requirement mode's pass 2, its text renamed back for display.
   - Example values never come from the model: inputs = model-proposed + fixed `0`,`1` per argument; spec value = the claim's `Returns` result reduced by `whnf` and confirmed by the kernel (`res = v` by `rfl`; D16: no compiled code, so `implemented_by` cannot change it), each within a deterministic heartbeat budget, past it = too costly (D17) (claims of shape `∀ (x : BitVec n)…, Returns m "f" args res`; D18: `Returns … [outs] → φ` rows = the binary's results with `φ` decided, decidable `∀ x…, φ` rows = `φ` decided; other shapes print their elaborated statement instead); binary value = wasmtime on the pinned `.wasm`.
   - Persistence: result saved beside the spec module (`<spec dir>/fva-explain.json`: LLM text + examples + verdicts + `inputsSha`); a rerun shows it with no LLM call, `--force` alone regenerates. `inputsSha` = the requirements file + review-surface files + the subjects' Lifted modules (numeral = the `.wasm` bytes) + FVA's claim vocabulary (`FVA/Spec/CAbi.lean`, `FVA/Spec/Claims.lean`) + `FVA/Explain.lean` + prompts/schemas + model + effort; mismatch → STALE banner + rc 1. Proof status = fresh `fva trust` every run, never saved.
-  - LLM backend = `gpt-6-luna` via `codex app-server` (JSON-RPC stdio, ephemeral read-only thread, `outputSchema`-constrained reply), both passes.
+  - LLM backend = `gpt-6-luna` via `codex app-server` (JSON-RPC stdio, ephemeral read-only thread, `outputSchema`-constrained reply), both passes. User ruling after D15 + D64 (GPT met the stability acceptance; Claude 160/160 on the replayed pass-2 payload): GPT stays for both passes.
 - Direction (user-approved): FVA supplies what an agent told to "formally verify this repo" does not; proof writing = commodity (`prototype-link-reach:prototype/bench/results.md`: a bare agent matched FVA on proof validity, requirement faithfulness, bug finding + honest reporting). FVA's work goes to:
   - Review surface = the product metric: measured + budgeted by a gate. An unconstrained agent grows specs toward implementation size (parsers, printers, digests restated as spec); reviewed-once shared patterns + base modules shrink the per-project surface.
   - Checker trust: never one checker. Kernel replay + independent kernels + a canary set of known-false proofs per pinned toolchain, since verifiers ship soundness bugs; deterministic kernel checking preferred over solver-backed verification (timeouts, resource limits, version drift).
@@ -68,66 +68,12 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
 
 ## Tasks
 
-- [ ] RESUME: finish line (user's MAINTAIN queue request) = every `.agent/deferred.md` row closed by its acceptance check in its own commit, recorded as blocked on the user with what it owes, waiting on its re-open trigger, or routed (`route.md` `Met when`), and the full gate passes on a clean tree at the closing commit. `main` pushed by the user through 974c90a ⇒ no autosquash. Committed this run (each CI-gated; reds = D71 mutation only, classified): e70e17c D53 port, 92cfd59 D72, 947842e D75, 634f9f1 D69, 853c88e D70, 75e645e D73, 2aa3765 D74, e376c8e D76, 4942fac D53 close (CI 41933361634 pending). D71 committed (table current; `scripts/test-mutation` rc 0); the collected AskUserQuestion (`.scratch/mq/closing.md`: route groups, first scope, explain backend) → route per answers (unpicked routed rows marked `routed → <PHASE>` in deferred.md). Close order: D71 commit → pool full gate #1 (fills `.cache/subjects`; D72's nixbox test-checks) → route/closing commit (tick rows, drop this note) → CI + pool full gate #2 (D74's reuse: `subject-matrix: N of 16 runs reused`). Cleanup: worktrees gate, porter-d53, bench-v2.1; branches wip/d8, wt/porter-d53; ref refs/wip/d71-snapshot. Final message: notify-set edits (offload 081e62f + ae2b220; /opt/openai-codex-0.163.0 restored; `CLAUDE.local.md` mutation line), test-trust 523.8 s vs D38's 8 min (no check enforces it; D74 speeds the dominating step), D73's regenerated-beside-published figures.
-- [ ] D4 `lake check` sandboxed build of an `fva init` project (test-init)
-- [ ] D5 `fva explain`: requirements file as pass-2 intent, neutral identifiers in pass 1
-- [ ] D6 agent packaging (MCP server + skill)
-- [ ] D8 declared Lean-native subjects: instance + coercion audit; mesh repo surface
-- [ ] D11 surface line counts from Lean's own tokenizer
-- [ ] D12 build + export inside bwrap
-- [ ] D13 `@[fva_claim]` claim marker
-- [ ] D15 `fva explain` verdict stability + second model family
-- [ ] D16 example spec values confirmed by the kernel
-- [ ] D17 per-case example budget inside Lean
-- [ ] D18 examples for decidable relational claims
-- [ ] D19 nested-sandbox replay state
-- [ ] D23 surface budget as project config
-- [ ] D24 controlled-language claims evaluation
-- [ ] D25 review ledger + attest
-- [ ] D26 pattern catalog
-- [ ] D27 review page
-- [ ] D28 WASI preview1 model
-- [ ] D29 Wasm exception handling
-- [ ] D30 optimized machine runs memory_copy
-- [ ] D31 stepper completeness
-- [ ] D32 CI gate fan-out on `ci/**`
-- [ ] D33 PFlog theorem
-- [ ] D34 fvamut per-job memory limit
-- [ ] D36 merge-sort `SortedPerm` checker
-- [ ] D37 validator completeness
-- [ ] D38 test-trust in parallel
-- [ ] D39 lz4-wasm decoder + lz4_flex all-input proofs
-- [ ] D40 filterByExpr boundary corollary
-- [ ] D42 bench root from `FVA_BENCH_HOME`
-- [ ] D48 Mathlib `.olean` manifest
-- [ ] D49 base `.olean` verification
-- [ ] D51 managed-language program proofs
-- [ ] D53 bench grading drivers in `bench/grade/`
-- [ ] D54 bench judged metrics under one blinded grader
-- [ ] D55 concrete-call proof command + T7 rerun
-- [ ] D56 `fva explain` on the archived fva-arm specs
-- [ ] D57 NOTICE check for embedded third-party bytes
-- [ ] D58 fvapi client (trigger: fvapi post-PROTOTYPE API)
-- [ ] D59 one lz4 C extension-loop proof
-- [ ] D60 one lz4 C numeric helper module
-- [ ] D61 lean4lean decline patterns on its final exception line
-- [ ] D62 trust-run facts without mapping project `.olean`s in FVA's process
-- [ ] D63 `fva trust --json` on a build failure
-- [ ] D64 pass-2 labels: WEAKER vs DIFFERENT
-- [ ] D65 project `.olean`s tied to their sources
-- [ ] D66 sandbox sees an outside `packagesDir`
-- [ ] D67 `fva init` vendors the `.olean` pins
-- [ ] D68 agents verify outside the project without reading FVA internals
-- [ ] D69 property tests for unproven predicates
-- [ ] D70 fuzz targets + campaign tier
-- [ ] D71 mutation table current
-- [ ] D72 gate tools on every pool host (xxd)
-- [ ] D73 judgment-derived bench figures regenerate
-- [ ] D74 subjects verdict reuse
-- [ ] D75 CI runner disk
-- [ ] D76 structure-aware lift fuzzing
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
 
-MAINTAIN — whole product
+IMPLEMENT — Language + Wasm reach
+> - D28 WASI file I/O is unmodeled (user ruling: deferred this phase; the bench subjects are pure core wasm or call host functions under stated contracts), so whole CLI programs (bustools count, bcftools norm) get per-output certificates only. → reviewed-once WASI preview1 model (files, fds, preopens, args/env); the bustools count-only wasm build (`fromtext` + `count` on upstream test tc0004) lifts and a claim about the bytes it writes to `output.mtx` is proven.
+> - D29 Wasm exception handling is unmodeled (user ruling: deferred), so C++ built with `-fwasm-exceptions` is rejected as unsupported. → `try_table`/`throw`/`throw_ref`/exnref in syntax, decoder, semantics + type-soundness proof; the official exception-handling spec tests pass; a C++ function that throws and catches lifts and its claim is proven.
+> - D30 `memory_copy.wast` through the reference stepper exceeds 900 s (memory as a closure chain over writes + per-byte expansion of `memory.copy`), so `scripts/test-spec` full mode leaves it out. → the optimized machine (U4 contract I1: value stack + zipper + chunked memory, proven against the stepper or `Step`) runs it. Acceptance: `scripts/test-spec memory_copy` reports the pinned 4386/0/64 in < 300 s and the full mode includes it again.
+> - D51 Program proofs for managed languages (Decisions: Language reach, Managed-language link): Python, R, Java and TypeScript get per-output certificates alone; WasmGC lifting (TeaVM, J2Wasm, p2w), bytecode/AST lifting (CPython, R, JVM) and proofs over an interpreter compiled to wasm (Pyodide, webR, QuickJS) are deferred; Waspy/AssemblyScript stay conditional feature-inventory probes on unchanged code. → a research unit picks one route; an all-input claim about one unchanged function of one managed language is proven through it, `fva trust` PASS, and the route's conformance suite (the official WasmGC spec tests, or the interpreter's own tests) passes.
