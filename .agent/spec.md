@@ -68,6 +68,11 @@ FVA also uses fvapi, our formal verification API, when the private fvapi library
 
 ## Tasks
 
+- [ ] RESUME: MAINTAIN deferral-queue request (Phase above = the route target, opened after it). Finish line (its `Met when`): "every row is closed by its acceptance check in its own commit, recorded as blocked on me with what it still owes, waiting on its unmet re-open trigger, or routed (`route.md` `Met when`), and the full gate command passes on a clean working tree at the closing commit".
+  - Rows = all in a finish state (`.agent/deferred.md`): D77 waits on the phase's `--fresh` sweep; D78 closed fdf61f2 + 6c43925 (lane race: the cheat copy's hard-linked build staled the project; CI 42111646642 red, classified `gate`); D79 blocked on the user's `main` push, owes one `ci/*` run printing `16 of 16 runs reused`; D6, D24–D27 routed → PROTOTYPE, D33, D39, D62 → IMPLEMENT; D58 waits on fvapi.
+  - Gates: fdf61f2 pool ×2 rc 0 (init 635.7 s run → 10.2 s reused, subjects 0 → 16 of 16 reused); 6c43925 CI 42126294252 green (6 jobs: build 597, lean 719, trust 1232, init 1217, subjects 2663, static 111 s), pool rc 0 (init 647.8 s run, subjects 67.0 s 16 of 16, trust 445.3 s); `scripts/gate-ledger reds` = 0, nixbox ledger merged.
+  - Work: all committed through 6c43925, no snapshot branch; teammates + their branches: none; remote `ci/d78` (= 6c43925), `ci/d79`; scratch: `.scratch/mq/final.md` (final-message draft, placeholders `<CLOSE> <CI> <CIJOBS> <POOL> <REUSE>`), `.scratch/mq/wait-run.sh ID` (waits on a run, polls every 60 s).
+  - Next: rules upkeep (every `.claude/rules/` file vs `Authoring`; not yet done this request) + this row deleted = the closing commit → its full gate: CI `git push -f origin HEAD:ci/close-2` + `.scratch/mq/wait-run.sh <id>` in the background; pool: back up `.cache/gate-ledger/nixbox.tsv`, `offload run --get .cache/gate-ledger -- bash -c 'lake exe cache get && scripts/gate'`, merge by `sort -u` → `gate-ledger reds` 0 → delete `ci/d78`, `ci/d79`, `ci/close-2` + the `ci/d79` caches (`gh cache list --ref refs/heads/ci/d79` → `gh cache delete`) → fill final.md → `notify-scan` → advisor on final.md → send → `rm -rf .scratch/mq`.
 - See `.agent/deferred.md` for the deferral queue.
 
 ## Phase
