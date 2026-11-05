@@ -130,7 +130,9 @@ for rc in "$logs"/*.rc; do
 	name=$(basename "$rc" .rc)
 	r=$(<"$rc")
 	ms=$(<"$logs/$name.ms")
-	printf '%-16s %5d.%01d  %s\n' "$name" $((ms / 1000)) $((ms % 1000 / 100)) "$([[ $r == 0 ]] && echo ok || echo "FAIL (rc $r)")"
+	note=$(sed -n '/^gate-note: /{s///;p;q}' "$logs/$name.out" 2>/dev/null)
+	printf '%-16s %5d.%01d  %s%s\n' "$name" $((ms / 1000)) $((ms % 1000 / 100)) \
+		"$([[ $r == 0 ]] && echo ok || echo "FAIL (rc $r)")" "${note:+  ($note)}"
 	if [[ $r != 0 ]]; then
 		status=1
 		sed 's/^/    /' "$logs/$name.out" | tail -20
