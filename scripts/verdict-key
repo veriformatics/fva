@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# verdict-key FILE...: the key a reusable gate verdict is recorded under (D74 subjects, D78 init) =
+# sha256 over this script, the named files + what every fva run reads: lean-toolchain, lakefile.toml,
+# lake-manifest.json, trust/oleans.tsv once `scripts/make-olean-pins --check` passes (the build's
+# .oleans = the pins; FVA_PINS_CHECK overrides the command), the canary pins + fetched canaries, the
+# toolchain's lean/lake/leanexport + kernels, every file under FVA/, bwrap's version. Prints nothing
+# (= no reuse) when the pins check fails or no toolchain answers.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+read -ra pins <<<"${FVA_PINS_CHECK:-scripts/make-olean-pins --check}"
+"${pins[@]}" >/dev/null 2>&1 || exit 0
+sys=$(lean --print-prefix 2>/dev/null) || exit 0
+bins=()
+for b in lean lake leanexport leanchecker leanchecker-paranoid lean4lean nanoda_bin con-leche con-ron; do
+	[[ -f $sys/bin/$b ]] && bins+=("$sys/bin/$b")
+done
+{
+	sha256sum "$0" "$@" lean-toolchain lakefile.toml lake-manifest.json trust/oleans.tsv \
+		trust/canaries/*.tsv "${bins[@]}"
+	find FVA .cache/canaries -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum
+	bwrap --version 2>&1
+} | sha256sum | cut -d' ' -f1

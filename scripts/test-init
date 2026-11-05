@@ -6,14 +6,45 @@
 # --from-export) accepts it and rejects an extra axiom; a lakefile target that writes beside its
 # project fails in fva trust's sandbox (D12). The project reuses this checkout's
 # Mathlib (hard links) and FVA build (copy), so nothing is fetched or rebuilt.
+# D78: after the shared setup the cases run as 4 lanes side by side (the `lake check` pair, the
+# longest at ≈ 470 s, starts first); a lane that edits a file shared by hard links replaces it.
+# D78 verdict reuse (FVA_INIT_CACHE = a directory, default .cache/init; empty = none): a PASS is
+# reused only for an input closure byte-identical to the green run that recorded it — this script,
+# the fva binary (FVA overrides it), the files `fva init` vendors, the toy example and
+# scripts/verdict-key's shared inputs; a failing run drops the entry; `--key` prints the key alone.
+# shellcheck disable=SC2329 # the lane_* functions run through lane()
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
-fva=$PWD/.lake/build/bin/fva
+fva=${FVA:-$PWD/.lake/build/bin/fva}
 [[ -x $fva ]] || exit 2
-# the trust runs check the pinned canaries (test-trust fetches them too; this keeps the order free)
-scripts/fetch-canaries || exit 2
+cache=${FVA_INIT_CACHE-.cache/init}
+mapfile -t inputs < <(
+	printf '%s\n' "$fva" "$0" FVA.lean Main.lean scripts/fetch-tools scripts/fetch-canaries LICENSE \
+		README.md AGENT.md
+	find FVATest/Examples/Toy -type f | LC_ALL=C sort
+)
+if [[ ${1:-} == --key ]]; then
+	scripts/verdict-key "${inputs[@]}"
+	exit
+fi
+if [[ -n $cache && -s $cache/key ]]; then
+	key=$(scripts/verdict-key "${inputs[@]}")
+	if [[ -n $key && $(<"$cache/key") == "$key" ]]; then
+		echo "test-init: reused, inputs byte-identical to the green run that recorded $cache/key"
+		echo "gate-note: reused"
+		exit 0
+	fi
+fi
+# the trust runs check the pinned canaries (test-trust fetches them too; this keeps the order free;
+# FVA_FETCH_CANARIES overrides the command)
+read -ra fetch <<<"${FVA_FETCH_CANARIES:-scripts/fetch-canaries}"
+"${fetch[@]}" || exit 2
 tmp=$(mktemp -d "$PWD/.lake/test-init.XXXXXX")
-trap 'rm -rf "$tmp"' EXIT
+green=0
+trap 'rm -rf "$tmp"; ((green)) || [[ -z $cache ]] || rm -f "$cache/key"' EXIT
+# the key of this run's inputs, computed beside it (its pins check alone takes ≈ 30 s)
+scripts/verdict-key "${inputs[@]}" >"$tmp/key" &
+keypid=$!
 # a project named like the package it requires cannot build: init refuses it before writing
 "$fva" init "$tmp/fva" --lib Demo >/dev/null 2>&1
 rc=$?
@@ -45,35 +76,71 @@ if ! cmp -s "$p/fva/trust/oleans.tsv" trust/oleans.tsv; then
 	echo "test-init: the vendored package lacks FVA's .olean pins (trust/oleans.tsv)"
 	fail=1
 fi
-trust() { (cd "$p" && "$fva" trust . --spec-module Demo.Spec --root-module Demo) >"$tmp/$1" 2>&1; }
-echo '{"surfaceBudget": 14}' >"$p/fva.json"
-trust plain.out
-if ! grep -q '^fva trust: PASS' "$tmp/plain.out" ||
-	! grep -q '^Read these: 14 code lines' "$tmp/plain.out"; then
-	echo "test-init: fresh project → $(head -1 "$tmp/plain.out"), surface $(grep '^Read these' "$tmp/plain.out")"
-	fail=1
-fi
-# D23: the project's fva.json budget one line under the surface fails `[surface]`
-echo '{"surfaceBudget": 13}' >"$p/fva.json"
-trust budget.out
-if ! grep -q '^  \[surface\] 14 code lines to review, budget 13' "$tmp/budget.out"; then
-	echo "test-init: fva.json budget 13 → $(head -1 "$tmp/budget.out"), pinned [surface] 14 > 13"
-	fail=1
-fi
 echo '{"surfaceBudget": null}' >"$p/fva.json"
+trust() { (cd "$1" && "$fva" trust . --spec-module Demo.Spec --root-module Demo) >"$tmp/$2" 2>&1; }
+
+# the project, vendored FVA included, builds + replays inside `lake check`'s bwrap sandbox
+# (no --from-export); a proof resting on an extra axiom (the cheat copy below: hard links, since the
+# sandbox only reads, its Proof.lean a new file) → rc 1 naming it; both side by side
+lane_check() {
+	local ok rc rc_cheat f=0
+	(cd "$p" && lake check) >"$tmp/check.out" 2>&1 &
+	ok=$!
+	(cd "$tmp/cheat" && lake check) >"$tmp/cheat.out" 2>&1
+	rc_cheat=$?
+	wait "$ok"
+	rc=$?
+	if ((rc == 2 || rc_cheat == 2)); then
+		tail -5 "$tmp/check.out" "$tmp/cheat.out"
+		exit 2
+	fi
+	if ((rc != 0)); then
+		echo "test-init: lake check on the fresh project → rc $rc"
+		tail -5 "$tmp/check.out"
+		f=1
+	fi
+	if ((rc_cheat != 1)) || ! grep -q "Axiom 'fvaCheatAx' is not permitted" "$tmp/cheat.out"; then
+		echo "test-init: lake check on a proof using an extra axiom → rc $rc_cheat, pinned 1 naming it"
+		tail -5 "$tmp/cheat.out"
+		f=1
+	fi
+	exit "$f"
+}
+
+# the project's surface: 14 lines; D23: its fva.json budget one line under the surface fails
+# `[surface]` (fva.json replaced, never rewritten: the copies share its inode)
+lane_budget() {
+	local f=0
+	rm -f "$p/fva.json" && echo '{"surfaceBudget": 14}' >"$p/fva.json"
+	trust "$p" plain.out
+	if ! grep -q '^fva trust: PASS' "$tmp/plain.out" ||
+		! grep -q '^Read these: 14 code lines' "$tmp/plain.out"; then
+		echo "test-init: fresh project → $(head -1 "$tmp/plain.out"), surface $(grep '^Read these' "$tmp/plain.out")"
+		f=1
+	fi
+	rm -f "$p/fva.json" && echo '{"surfaceBudget": 13}' >"$p/fva.json"
+	trust "$p" budget.out
+	if ! grep -q '^  \[surface\] 14 code lines to review, budget 13' "$tmp/budget.out"; then
+		echo "test-init: fva.json budget 13 → $(head -1 "$tmp/budget.out"), pinned [surface] 14 > 13"
+		f=1
+	fi
+	exit "$f"
+}
+
 # D65: the project's own Lake target, run by fva trust's build, rewrites the spec module's .olean
 # with one compiled from another source (a claim's docstring changed; the source on disk keeps
 # its text); FVA rebuilds the spec closure from source, so the bytes must fail. The copy gets its
 # own build directory: a hard-linked .olean would carry the write into the project.
-t=$tmp/tamper
-cp -al "$p" "$t" && rm -r "$t/.lake/build" "$t/lakefile.toml" && cp -a "$p/.lake/build" "$t/.lake/" ||
-	exit 2
-mkdir -p "$tmp/evil/Demo"
-sed 's/wrapped to 32 bits/never wrapped/' "$p/Demo/Spec.lean" >"$tmp/evil/Demo/Spec.lean"
-cmp -s "$p/Demo/Spec.lean" "$tmp/evil/Demo/Spec.lean" && exit 2
-(cd "$p" && lake env lean -DautoImplicit=false -DrelaxedAutoImplicit=false -R "$tmp/evil" \
-	-o "$t/evil.olean" "$tmp/evil/Demo/Spec.lean") >"$tmp/evil.log" 2>&1 || exit 2
-cat >"$t/lakefile.lean" <<'LAKEFILE'
+# D12: the project's code (here a lakefile build target) runs in the sandbox, so a write beside
+# the project fails the build and leaves no file
+lane_sandbox() {
+	local f=0 t=$tmp/tamper l=$tmp/leak rc
+	mkdir -p "$tmp/evil/Demo"
+	sed 's/wrapped to 32 bits/never wrapped/' "$p/Demo/Spec.lean" >"$tmp/evil/Demo/Spec.lean"
+	cmp -s "$p/Demo/Spec.lean" "$tmp/evil/Demo/Spec.lean" && exit 2
+	(cd "$p" && lake env lean -DautoImplicit=false -DrelaxedAutoImplicit=false -R "$tmp/evil" \
+		-o "$t/evil.olean" "$tmp/evil/Demo/Spec.lean") >"$tmp/evil.log" 2>&1 || exit 2
+	cat >"$t/lakefile.lean" <<'LAKEFILE'
 import Lake
 open Lake DSL
 
@@ -91,53 +158,21 @@ require fva from "fva"
   job.mapM fun _ => do
     IO.FS.writeBinFile ".lake/build/lib/lean/Demo/Spec.olean" (← IO.FS.readBinFile "evil.olean")
 LAKEFILE
-(cd "$t" && lake build) >"$tmp/tamper-build.log" 2>&1 || {
-	echo "test-init: the tampering project does not build"
-	tail -5 "$tmp/tamper-build.log"
-	exit 2
-}
-(cd "$t" && "$fva" trust . --spec-module Demo.Spec --root-module Demo) >"$tmp/tamper.out" 2>&1
-if ! grep -q '^  \[olean\] Demo.Spec: ' "$tmp/tamper.out" ||
-	! cmp -s "$t/.lake/build/lib/lean/Demo/Spec.olean" "$t/evil.olean"; then
-	echo "test-init: a Lake target rewriting the spec .olean → $(head -1 "$tmp/tamper.out")," \
-		"pinned [olean] naming Demo.Spec, the rewritten bytes kept" \
-		"($(cmp -s "$t/.lake/build/lib/lean/Demo/Spec.olean" "$t/evil.olean" && echo kept || echo rebuilt))"
-	fail=1
-fi
-# the project, vendored FVA included, builds + replays inside `lake check`'s bwrap sandbox
-# (no --from-export); a proof resting on an extra axiom → rc 1 naming it
-# the cheat copy = hard links (the sandbox only reads), its Proof.lean a new file; both side by side
-cp -al "$p" "$tmp/cheat" || exit 2
-rm "$tmp/cheat/Demo/Proof.lean"
-{
-	cat "$p/Demo/Proof.lean"
-	printf '\naxiom fvaCheatAx : False\ntheorem cheat_uses : 1 = 2 := fvaCheatAx.elim\n'
-} >"$tmp/cheat/Demo/Proof.lean"
-(cd "$p" && lake check) >"$tmp/check.out" 2>&1 &
-ok=$!
-(cd "$tmp/cheat" && lake check) >"$tmp/cheat.out" 2>&1
-rc_cheat=$?
-wait "$ok"
-rc=$?
-if ((rc == 2 || rc_cheat == 2)); then
-	tail -5 "$tmp/check.out" "$tmp/cheat.out"
-	exit 2
-fi
-if ((rc != 0)); then
-	echo "test-init: lake check on the fresh project → rc $rc"
-	tail -5 "$tmp/check.out"
-	fail=1
-fi
-if ((rc_cheat != 1)) || ! grep -q "Axiom 'fvaCheatAx' is not permitted" "$tmp/cheat.out"; then
-	echo "test-init: lake check on a proof using an extra axiom → rc $rc_cheat, pinned 1 naming it"
-	tail -5 "$tmp/cheat.out"
-	fail=1
-fi
-# D12: the project's code (here a lakefile build target) runs in the sandbox, so a write beside
-# the project fails the build and leaves no file
-l=$tmp/leak
-mkdir -p "$l"
-cat >"$l/lakefile.lean" <<LAKEFILE
+	(cd "$t" && lake build) >"$tmp/tamper-build.log" 2>&1 || {
+		echo "test-init: the tampering project does not build"
+		tail -5 "$tmp/tamper-build.log"
+		exit 2
+	}
+	(cd "$t" && "$fva" trust . --spec-module Demo.Spec --root-module Demo) >"$tmp/tamper.out" 2>&1
+	if ! grep -q '^  \[olean\] Demo.Spec: ' "$tmp/tamper.out" ||
+		! cmp -s "$t/.lake/build/lib/lean/Demo/Spec.olean" "$t/evil.olean"; then
+		echo "test-init: a Lake target rewriting the spec .olean → $(head -1 "$tmp/tamper.out")," \
+			"pinned [olean] naming Demo.Spec, the rewritten bytes kept" \
+			"($(cmp -s "$t/.lake/build/lib/lean/Demo/Spec.olean" "$t/evil.olean" && echo kept || echo rebuilt))"
+		f=1
+	fi
+	mkdir -p "$l"
+	cat >"$l/lakefile.lean" <<LAKEFILE
 import Lake
 open Lake DSL
 
@@ -150,90 +185,148 @@ package leak
   IO.FS.writeFile "$tmp/outside" "written by the build"
   return .nil
 LAKEFILE
-echo 'def x := 1' >"$l/Leak.lean"
-echo '{"version": "1.3.0", "packagesDir": ".lake/packages", "packages": [], "name": "leak",' \
-	'"lakeDir": ".lake"}' >"$l/lake-manifest.json"
-"$fva" trust "$l" --spec-module Leak >"$tmp/leak.out" 2>&1
-rc=$?
-if ((rc != 1)) || [[ -e $tmp/outside ]] || ! grep -q '^  \[build\]' "$tmp/leak.out"; then
-	echo "test-init: a build target writing beside the project → rc $rc, file" \
-		"$([[ -e $tmp/outside ]] && echo written || echo absent); pinned rc 1, [build], absent"
-	fail=1
-fi
-echo '-- edited after vendoring' >>"$p/fva/FVA/Spec/CAbi.lean"
-(cd "$p" && lake build >"$tmp/build2.log" 2>&1) || exit 2
-trust edited.out
-if ! grep -q '^  FVA.Spec.CAbi: [0-9]* lines' "$tmp/edited.out"; then
-	echo "test-init: an edited vendored spec file stayed out of the review surface"
-	fail=1
-fi
-# D48: the project's build rewrites a Mathlib definition the claims use (`Real.sqrt`, the meaning of
-# every `f32.sqrt`/`f64.sqrt` step: + 1), its module's broken proofs stubbed, and writes the
-# recompiled module over the cache's; the module stays in a trusted package, so its bytes must fail
-m=Mathlib/Analysis/Real/Sqrt
-src=$tmp/planted/$m.lean
-mkdir -p "$(dirname "$src")"
-awk '/^@\[irreducible\] noncomputable def sqrt \(x : ℝ\) : ℝ :=$/ { d = 1; print; next }
-	d && /^  NNReal.sqrt \(Real.toNNReal x\)$/ { print $0 " + 1"; d = 0; n = 1; next }
-	{ print } END { exit n ? 0 : 2 }' ".lake/packages/mathlib/$m.lean" >"$src" || {
-	echo "test-init: the planted Real.sqrt edit no longer applies to $m.lean"
-	exit 2
+	echo 'def x := 1' >"$l/Leak.lean"
+	echo '{"version": "1.3.0", "packagesDir": ".lake/packages", "packages": [], "name": "leak",' \
+		'"lakeDir": ".lake"}' >"$l/lake-manifest.json"
+	"$fva" trust "$l" --spec-module Leak >"$tmp/leak.out" 2>&1
+	rc=$?
+	if ((rc != 1)) || [[ -e $tmp/outside ]] || ! grep -q '^  \[build\]' "$tmp/leak.out"; then
+		echo "test-init: a build target writing beside the project → rc $rc, file" \
+			"$([[ -e $tmp/outside ]] && echo written || echo absent); pinned rc 1, [build], absent"
+		f=1
+	fi
+	exit "$f"
 }
-olean=$p/.lake/packages/mathlib/.lake/build/lib/lean/$m.olean
-rm -f "$olean" "$olean.server" "$olean.private"
-# compile; each declaration Lean reports an error in gets its proof replaced by `sorry`
-for round in 1 2 3 4 5; do
-	lake env lean -R "$tmp/planted" -o "$olean" "$src" >"$tmp/planted.log" 2>&1 && break
-	((round < 5)) || exit 2
-	sed -n "s|^$src:\([0-9]*\):[0-9]*: error.*|\1|p" "$tmp/planted.log" | sort -un >"$tmp/planted.err"
-	[[ -s $tmp/planted.err ]] || exit 2
-	awk -v errs="$tmp/planted.err" '
-		BEGIN { while ((getline l < errs) > 0) bad[l] = 1 }
-		{ line[NR] = $0 }
-		END {
-			for (i = 1; i <= NR; i++) {
-				if (line[i] ~ /^[^ \t\/-]/ && line[i] !~ /^(end|namespace|section|open|variable)/) start = i
-				if (bad[i] && start) hit[start] = 1
-			}
-			for (i = 1; i <= NR;) {
-				if (!hit[i]) { print line[i++]; continue }
-				for (j = i; j <= NR && index(line[j], ":=") == 0; j++) print line[j]
-				if (j <= NR) print substr(line[j], 1, index(line[j], ":=") + 1) " sorry"
-				for (j++; j <= NR && (line[j] == "" || line[j] ~ /^[ \t]/); j++) continue
-				print ""
-				i = j
-			}
-		}' "$src" >"$src.new" && mv "$src.new" "$src"
+
+# on the copy q (its own files and builds; Mathlib hard links, each planted file replaced): one
+# vendored spec file edited → reviewed; D48 + D49 below
+lane_planted() {
+	local f=0 m src olean round b bsrc bolean x
+	echo '-- edited after vendoring' >>"$q/fva/FVA/Spec/CAbi.lean"
+	(cd "$q" && lake build >"$tmp/build2.log" 2>&1) || exit 2
+	trust "$q" edited.out
+	if ! grep -q '^  FVA.Spec.CAbi: [0-9]* lines' "$tmp/edited.out"; then
+		echo "test-init: an edited vendored spec file stayed out of the review surface"
+		f=1
+	fi
+	# D48: the project's build rewrites a Mathlib definition the claims use (`Real.sqrt`, the meaning
+	# of every `f32.sqrt`/`f64.sqrt` step: + 1), its module's broken proofs stubbed, and writes the
+	# recompiled module over the cache's; the module stays in a trusted package, so its bytes must fail
+	m=Mathlib/Analysis/Real/Sqrt
+	src=$tmp/planted/$m.lean
+	mkdir -p "$(dirname "$src")"
+	awk '/^@\[irreducible\] noncomputable def sqrt \(x : ℝ\) : ℝ :=$/ { d = 1; print; next }
+		d && /^  NNReal.sqrt \(Real.toNNReal x\)$/ { print $0 " + 1"; d = 0; n = 1; next }
+		{ print } END { exit n ? 0 : 2 }' ".lake/packages/mathlib/$m.lean" >"$src" || {
+		echo "test-init: the planted Real.sqrt edit no longer applies to $m.lean"
+		exit 2
+	}
+	olean=$q/.lake/packages/mathlib/.lake/build/lib/lean/$m.olean
+	rm -f "$olean" "$olean.server" "$olean.private"
+	# compile; each declaration Lean reports an error in gets its proof replaced by `sorry`
+	for round in 1 2 3 4 5; do
+		lake env lean -R "$tmp/planted" -o "$olean" "$src" >"$tmp/planted.log" 2>&1 && break
+		((round < 5)) || exit 2
+		sed -n "s|^$src:\([0-9]*\):[0-9]*: error.*|\1|p" "$tmp/planted.log" | sort -un >"$tmp/planted.err"
+		[[ -s $tmp/planted.err ]] || exit 2
+		awk -v errs="$tmp/planted.err" '
+			BEGIN { while ((getline l < errs) > 0) bad[l] = 1 }
+			{ line[NR] = $0 }
+			END {
+				for (i = 1; i <= NR; i++) {
+					if (line[i] ~ /^[^ \t\/-]/ && line[i] !~ /^(end|namespace|section|open|variable)/) start = i
+					if (bad[i] && start) hit[start] = 1
+				}
+				for (i = 1; i <= NR;) {
+					if (!hit[i]) { print line[i++]; continue }
+					for (j = i; j <= NR && index(line[j], ":=") == 0; j++) print line[j]
+					if (j <= NR) print substr(line[j], 1, index(line[j], ":=") + 1) " sorry"
+					for (j++; j <= NR && (line[j] == "" || line[j] ~ /^[ \t]/); j++) continue
+					print ""
+					i = j
+				}
+			}' "$src" >"$src.new" && mv "$src.new" "$src"
+	done
+	cp "$olean" "$tmp/planted.olean"
+	trust "$q" olean.out
+	if ! grep -q "^  \[olean\] Mathlib.Analysis.Real.Sqrt: compiled files differ" "$tmp/olean.out" ||
+		! cmp -s "$olean" "$tmp/planted.olean"; then
+		echo "test-init: a rewritten Mathlib definition → $(head -1 "$tmp/olean.out"), pinned [olean]" \
+			"naming its module, the planted bytes kept ($(cmp -s "$olean" "$tmp/planted.olean" && echo kept || echo rebuilt))"
+		f=1
+	fi
+	# D49: the build rewrites a vendored base module's compiled file with its source untouched
+	# (`CallReturns`, which `Returns` claims mean, admitting a trap): the module stays base by its
+	# source, so its compiled bytes must fail the pins; the cache's Real.sqrt comes back first
+	for x in "" .server .private; do
+		ln -f "$PWD/.lake/packages/mathlib/.lake/build/lib/lean/$m.olean$x" "$olean$x" || exit 2
+	done
+	b=FVA/Spec/Claims
+	bsrc=$tmp/planted-base/$b.lean
+	mkdir -p "$(dirname "$bsrc")"
+	sed 's/^    | \.trapped _ => False$/    | .trapped _ => True/' "$q/fva/$b.lean" >"$bsrc"
+	cmp -s "$bsrc" "$q/fva/$b.lean" && exit 2
+	bolean=$q/fva/.lake/build/lib/lean/$b.olean
+	lake env lean -R "$tmp/planted-base" -o "$bolean" "$bsrc" >"$tmp/planted-base.log" 2>&1 || exit 2
+	cp "$bolean" "$tmp/planted-base.olean"
+	trust "$q" base.out
+	if ! grep -q "^  \[olean\] FVA.Spec.Claims: compiled files differ" "$tmp/base.out" ||
+		grep -q "^  \[olean\] Mathlib" "$tmp/base.out" || ! cmp -s "$bolean" "$tmp/planted-base.olean"; then
+		echo "test-init: a rewritten base .olean (source unchanged) → $(head -1 "$tmp/base.out"), pinned" \
+			"[olean] naming FVA.Spec.Claims alone, the planted bytes kept"
+		f=1
+	fi
+	exit "$f"
+}
+
+# lane NAME in the background: its output → lane-NAME.log, its seconds → lane-NAME.s
+declare -A pid=()
+lane() {
+	(
+		s=$SECONDS
+		("lane_$1")
+		r=$?
+		echo $((SECONDS - s)) >"$tmp/lane-$1.s"
+		exit "$r"
+	) >"$tmp/lane-$1.log" 2>&1 &
+	pid[$1]=$!
+}
+# every copy of p is made before a lane writes into p (lane_budget replaces p/fva.json): the
+# cheat copy first, so the longest lane starts at once
+cp -al "$p" "$tmp/cheat" && rm "$tmp/cheat/Demo/Proof.lean" || exit 2
+{
+	cat "$p/Demo/Proof.lean"
+	printf '\naxiom fvaCheatAx : False\ntheorem cheat_uses : 1 = 2 := fvaCheatAx.elim\n'
+} >"$tmp/cheat/Demo/Proof.lean"
+lane check
+t=$tmp/tamper
+cp -al "$p" "$t" && rm -r "$t/.lake/build" "$t/lakefile.toml" && cp -a "$p/.lake/build" "$t/.lake/" ||
+	exit 2
+q=$tmp/planted-project
+mkdir -p "$q/.lake" && rsync -a --exclude=/.lake/packages "$p/" "$q/" &&
+	cp -al "$p/.lake/packages" "$q/.lake/packages" || exit 2
+lane budget
+lane sandbox
+lane planted
+setup=0
+for n in check budget sandbox planted; do
+	wait "${pid[$n]}"
+	rc=$?
+	cat "$tmp/lane-$n.log"
+	echo "test-init: lane $n rc $rc, $(cat "$tmp/lane-$n.s" 2>/dev/null) s"
+	((rc == 2)) && setup=1
+	((rc == 1)) && fail=1
+	((rc > 2)) && setup=1
 done
-cp "$olean" "$tmp/planted.olean"
-trust olean.out
-if ! grep -q "^  \[olean\] Mathlib.Analysis.Real.Sqrt: compiled files differ" "$tmp/olean.out" ||
-	! cmp -s "$olean" "$tmp/planted.olean"; then
-	echo "test-init: a rewritten Mathlib definition → $(head -1 "$tmp/olean.out"), pinned [olean]" \
-		"naming its module, the planted bytes kept ($(cmp -s "$olean" "$tmp/planted.olean" && echo kept || echo rebuilt))"
-	fail=1
-fi
-# D49: the build rewrites a vendored base module's compiled file with its source untouched
-# (`CallReturns`, which `Returns` claims mean, admitting a trap): the module stays base by its
-# source, so its compiled bytes must fail the pins; the cache's Real.sqrt comes back first
-for x in "" .server .private; do
-	ln -f "$PWD/.lake/packages/mathlib/.lake/build/lib/lean/$m.olean$x" "$olean$x" || exit 2
-done
-b=FVA/Spec/Claims
-bsrc=$tmp/planted-base/$b.lean
-mkdir -p "$(dirname "$bsrc")"
-sed 's/^    | \.trapped _ => False$/    | .trapped _ => True/' "$p/fva/$b.lean" >"$bsrc"
-cmp -s "$bsrc" "$p/fva/$b.lean" && exit 2
-bolean=$p/fva/.lake/build/lib/lean/$b.olean
-lake env lean -R "$tmp/planted-base" -o "$bolean" "$bsrc" >"$tmp/planted-base.log" 2>&1 || exit 2
-cp "$bolean" "$tmp/planted-base.olean"
-trust base.out
-if ! grep -q "^  \[olean\] FVA.Spec.Claims: compiled files differ" "$tmp/base.out" ||
-	grep -q "^  \[olean\] Mathlib" "$tmp/base.out" || ! cmp -s "$bolean" "$tmp/planted-base.olean"; then
-	echo "test-init: a rewritten base .olean (source unchanged) → $(head -1 "$tmp/base.out"), pinned" \
-		"[olean] naming FVA.Spec.Claims alone, the planted bytes kept"
-	fail=1
-fi
-((fail)) || echo "test-init: fresh project PASS, 14-line surface; edited vendored spec reviewed;" \
+echo "gate-note: run"
+((setup)) && exit 2
+((fail)) && exit 1
+echo "test-init: fresh project PASS, 14-line surface; edited vendored spec reviewed;" \
 	"rewritten Mathlib definition + base .olean [olean]"
-exit "$fail"
+wait "$keypid"
+if [[ -n $cache && -s $tmp/key ]]; then
+	mkdir -p "$cache" && cp "$tmp/key" "$cache/key"
+fi
+# shellcheck disable=SC2034 # read by the EXIT trap
+green=1
+exit 0
