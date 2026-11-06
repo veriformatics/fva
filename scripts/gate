@@ -110,7 +110,7 @@ if [[ -z $group ]] && ((! fast)); then
 	for rc in "$logs"/*.rc; do
 		name=$(basename "$rc" .rc)
 		[[ " ${groups[*]} " == *" $name "* ]] || {
-			echo "gate: step $name belongs to no CI group" >"$logs/ci-groups.out"
+			echo "gate: step $name belongs to no CI group" >>"$logs/ci-groups.out"
 			echo 1 >"$logs/ci-groups.rc"
 		}
 	done
