@@ -1,0 +1,7 @@
+preopen=/sandbox
+created-size=10
+second-prefix=abc
+after-eof=2b00000000
+chunked=6162636465666768696a2b000000005a
+unlinked-open=identity
+namespace=clean

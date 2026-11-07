@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# D30/U26: whole-memory reference mapping, independent of machine representation.
+set -euo pipefail
+out=$(cd "$(dirname "$0")" && pwd)
+{
+	cat <<'WAST'
+;; D30/U26: copy is memmove, fill keeps only the low byte, init reads passive bytes.
+(module
+  (memory 1 2)
+WAST
+	# $seed is a WAT identifier.
+	# shellcheck disable=SC2016
+	printf '  (data $seed "'
+	for ((i = 0; i < 1024; i++)); do printf '\\%02x' "$((i % 251))"; done
+	printf '")\n'
+	cat <<'WAST'
+  (func $reset (memory.init $seed (i32.const 0) (i32.const 0) (i32.const 1024)))
+  (func $verify (param $dst i32) (param $src i32) (param $n i32) (param $fill i32)
+    (result i32) (local $i i32) (local $expected i32)
+    (loop $next
+      (local.set $expected (i32.rem_u (local.get $i) (i32.const 251)))
+      (if (i32.and (i32.ge_u (local.get $i) (local.get $dst))
+                  (i32.lt_u (local.get $i) (i32.add (local.get $dst) (local.get $n))))
+        (then
+          (if (local.get $fill)
+            (then (local.set $expected (i32.and (local.get $src) (i32.const 255))))
+            (else (local.set $expected (i32.rem_u
+              (i32.add (local.get $src) (i32.sub (local.get $i) (local.get $dst)))
+              (i32.const 251)))))))
+      (if (i32.ne (i32.load8_u (local.get $i)) (local.get $expected))
+        (then (return (i32.add (local.get $i) (i32.const 1)))))
+      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+      (br_if $next (i32.lt_u (local.get $i) (i32.const 1024))))
+    (i32.const 0))
+  (func (export "copy") (param i32 i32 i32) (result i32)
+    (call $reset)
+    (memory.copy (local.get 0) (local.get 1) (local.get 2))
+    (call $verify (local.get 0) (local.get 1) (local.get 2) (i32.const 0)))
+  (func (export "fill") (param i32 i32 i32) (result i32)
+    (call $reset)
+    (memory.fill (local.get 0) (local.get 1) (local.get 2))
+    (call $verify (local.get 0) (local.get 1) (local.get 2) (i32.const 1)))
+  (func (export "init") (param i32 i32 i32) (result i32)
+    (call $reset)
+    (memory.init $seed (local.get 0) (local.get 1) (local.get 2))
+    (call $verify (local.get 0) (local.get 1) (local.get 2) (i32.const 0)))
+  (func (export "reset") (call $reset)
+    (i32.store (i32.const 65530) (i32.const 305419896)))
+  (func (export "unchanged") (result i32)
+    (call $verify (i32.const 0) (i32.const 0) (i32.const 0) (i32.const 0)))
+  (func (export "tail") (result i32) (i32.load (i32.const 65530)))
+  (func (export "copy-raw") (param i32 i32 i32)
+    (memory.copy (local.get 0) (local.get 1) (local.get 2)))
+  (func (export "fill-raw") (param i32 i32 i32)
+    (memory.fill (local.get 0) (local.get 1) (local.get 2)))
+  (func (export "init-raw") (param i32 i32 i32)
+    (memory.init $seed (local.get 0) (local.get 1) (local.get 2)))
+  (func (export "grow-zero") (result i32)
+    (drop (memory.grow (i32.const 1)))
+    (i32.or (i32.load (i32.const 65536)) (i32.or
+      (i32.load (i32.const 65791)) (i32.load (i32.const 131068)))))
+)
+WAST
+	for n in 0 1 31 32 33 63 64 65 255 256 257; do
+		for op in copy init; do
+			printf '(assert_return (invoke "%s" (i32.const 255) (i32.const 31) (i32.const %s)) (i32.const 0))\n' "$op" "$n"
+		done
+		printf '(assert_return (invoke "fill" (i32.const 63) (i32.const 511) (i32.const %s)) (i32.const 0))\n' "$n"
+	done
+	for n in 1 32 64 257; do
+		printf '(assert_return (invoke "copy" (i32.const 31) (i32.const 32) (i32.const %s)) (i32.const 0))\n' "$n"
+		printf '(assert_return (invoke "copy" (i32.const 32) (i32.const 31) (i32.const %s)) (i32.const 0))\n' "$n"
+	done
+	cat <<'WAST'
+(assert_return (invoke "reset"))
+(assert_trap (invoke "copy-raw" (i32.const 65530) (i32.const 0) (i32.const 10)) "out of bounds memory access")
+(assert_return (invoke "tail") (i32.const 305419896))
+(assert_trap (invoke "copy-raw" (i32.const 31) (i32.const 65530) (i32.const 10)) "out of bounds memory access")
+(assert_return (invoke "unchanged") (i32.const 0))
+(assert_trap (invoke "fill-raw" (i32.const 65530) (i32.const 7) (i32.const 10)) "out of bounds memory access")
+(assert_return (invoke "tail") (i32.const 305419896))
+(assert_trap (invoke "init-raw" (i32.const 65530) (i32.const 0) (i32.const 10)) "out of bounds memory access")
+(assert_return (invoke "tail") (i32.const 305419896))
+(assert_trap (invoke "init-raw" (i32.const 31) (i32.const 1000) (i32.const 33)) "out of bounds memory access")
+(assert_return (invoke "unchanged") (i32.const 0))
+(assert_trap (invoke "copy-raw" (i32.const 31) (i32.const -1) (i32.const 2)) "out of bounds memory access")
+(assert_return (invoke "unchanged") (i32.const 0))
+(assert_return (invoke "copy-raw" (i32.const 65536) (i32.const 65536) (i32.const 0)))
+(assert_return (invoke "fill-raw" (i32.const 65536) (i32.const 7) (i32.const 0)))
+(assert_return (invoke "init-raw" (i32.const 65536) (i32.const 1024) (i32.const 0)))
+(assert_trap (invoke "copy-raw" (i32.const 65537) (i32.const 0) (i32.const 0)) "out of bounds memory access")
+(assert_trap (invoke "init-raw" (i32.const 31) (i32.const 1025) (i32.const 0)) "out of bounds memory access")
+(assert_return (invoke "unchanged") (i32.const 0))
+(assert_return (invoke "grow-zero") (i32.const 0))
+(assert_return (invoke "tail") (i32.const 305419896))
+WAST
+} >"$out/d30-memory.wast"
+cat >"$out/d30-large-copy.wast" <<'WAST'
+;; D30/U26: >=60 KiB copy; every copied byte checked, not only endpoints.
+(module
+  (memory 2)
+  (func (export "copy-60k") (result i32) (local $i i32)
+    (memory.fill (i32.const 0) (i32.const 90) (i32.const 61440))
+    (memory.fill (i32.const 65536) (i32.const 17) (i32.const 61440))
+    (memory.copy (i32.const 65536) (i32.const 0) (i32.const 61440))
+    (loop $next
+      (if (i32.ne (i32.load8_u (i32.add (i32.const 65536) (local.get $i))) (i32.const 90))
+        (then (return (i32.const 1))))
+      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+      (br_if $next (i32.lt_u (local.get $i) (i32.const 61440))))
+    (i32.or (i32.load8_u (i32.const 61440)) (i32.load8_u (i32.const 126976)))))
+(assert_return (invoke "copy-60k") (i32.const 0))
+WAST

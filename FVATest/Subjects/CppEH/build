@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# D29/U28f: real SDK libc++abi + libunwind; no exception-runtime replacements.
+set -euo pipefail
+root=$(cd "$(dirname "$0")/../../.." && pwd)
+sdk=${WASI_SDK_PATH:-$root/.tools/wasi-sdk}
+out=${1:-$root/FVATest/Subjects/CppEH/eh.wasm}
+"$sdk/bin/clang++" --target=wasm32-wasip1 -std=c++17 -O1 \
+	-fwasm-exceptions -mllvm -wasm-use-legacy-eh=false \
+	-nostartfiles -Wl,--no-entry -Wl,--export=eh -Wl,--strip-debug \
+	-Wl,-z,stack-size=65536 -Wl,--initial-memory=262144 -Wl,--max-memory=262144 \
+	"$root/FVATest/Subjects/CppEH/eh.cpp" -lunwind -o "$out"
+chmod 644 "$out"

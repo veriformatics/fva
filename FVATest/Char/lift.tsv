@@ -10,6 +10,7 @@ FVATest/Examples/Mem/mem.wasm	0	6dfc9f77d5d0f54d0f78cf1fde5b61c1f88e0dfd64d3684f
 FVATest/Examples/Mislabeled/mislabeled.wasm	0	6746847810e3775b94abc18196af4d9492b5b8b94e54b85724061c203db0b0e2
 FVATest/Examples/Rust/rust.wasm	0	0aaf4e4576830b3443a2de77d7cd102a807dd7085f91ec0cb63b834905650250
 FVATest/Examples/Toy/toy.wasm	0	9c27d080b2d884c04aa3de9bfa5f8aba66d66404aecb8b2ffa73301981671101
+FVATest/Subjects/CppEH/eh.wasm	1	-
 FVATest/Subjects/GlmIround/glm-iround.wasm	0	bb95ae9b5f14b5bc56001b2e3e52c14e2e91c71af57ba46db234cd081cab0dca
 FVATest/Subjects/Lz4C/O1/lz4-c-O1.wasm	0	6ec5ba7d2e39d8ba1bbb36fb04ada4424cb42ae74bcee8e5ed88f0b0744cc80e
 FVATest/Subjects/Lz4C/lz4-c.wasm	0	331af03f1825f0daecbe948c100241a60c0db2430bce39666473f817034059d1

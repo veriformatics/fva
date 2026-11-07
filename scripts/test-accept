@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Merged acceptance checks: tester-1's blind suite (scripts/test-accept-lwr, FVATest/Accept/LWR)
+# runs each group of the IDs in FVATest/Accept/LWR/merged (each unit appends the checks it turns
+# green); every listed ID must print `ok ID` once. A row `ID HOST` holds on HOST alone, its
+# `pending ID:` line passing elsewhere (D30.wall = a nixbox wall). The suite's unmerged checks
+# print without deciding the step. rc 0 pass / 1 a merged check not ok / 2 setup.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+list=${FVA_ACCEPT_MERGED:-FVATest/Accept/LWR/merged}
+suite=${FVA_ACCEPT_SUITE:-scripts/test-accept-lwr}
+host=$(hostname -s) || exit 2
+mapfile -t rows < <(grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$list") || exit 2
+((${#rows[@]})) || {
+	echo "test-accept: $list lists no checks"
+	exit 2
+}
+out=$(mktemp) || exit 2
+trap 'rm -f "$out"' EXIT
+for g in $(printf '%s\n' "${rows[@]}" | cut -d. -f1 | sort -u); do
+	"$suite" --group "$g" >>"$out" 2>&1
+	rc=$?
+	# 1 = a check pending or failing, 3 = a check crashed: the merged rows decide; 2 = setup
+	if ((rc == 2 || rc > 3)); then
+		tail -20 "$out"
+		echo "test-accept: $suite --group $g rc $rc"
+		exit 2
+	fi
+done
+cat "$out"
+fail=0
+for r in "${rows[@]}"; do
+	read -r id only extra <<<"$r"
+	if [[ -n $extra ]]; then
+		echo "test-accept: malformed row: $r"
+		exit 2
+	fi
+	if [[ -z $only || $only == "$host" ]]; then
+		n=$(awk -v l="ok $id" '$0 == l' "$out" | wc -l)
+	else
+		n=$(awk -v p="pending $id: " 'index($0, p) == 1' "$out" | wc -l)
+	fi
+	if ((n != 1)); then
+		echo "test-accept: merged $id${only:+ (ok on $only)}: $n matching lines, want 1"
+		fail=1
+	fi
+done
+echo "gate-note: ${#rows[@]} merged checks (host $host)"
+exit "$fail"

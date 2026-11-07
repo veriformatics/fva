@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# Independent oracle: complete command-key sequence + pass/text-format rule from the phase contract.
+set -uo pipefail
+checker=${1:-$(dirname "$0")/check-outcomes}
+[[ -x $checker ]] || exit 2
+root=$(cd "$(dirname "$0")/../../.." && pwd)
+parent=${FVA_ACCEPT_TMP:-$root/.scratch}
+mkdir -p "$parent" || exit 2
+work=$(mktemp -d "$parent/.outcomes.XXXXXX") || exit 2
+trap 'rm -rf "$work"' EXIT
+total=0 bad=0 crash=0 infra=0
+trial() {
+	local id=$1 want=$2 json=$3 trace=$4 rc
+	"$checker" "$json" "$trace" >"$work/result" 2>&1
+	rc=$?
+	total=$((total + 1))
+	if ((rc != want)); then
+		printf 'FAIL outcomes-%s: rc=%s; expected %s\n' "$id" "$rc" "$want"
+		tail -4 "$work/result"
+		bad=$((bad + 1))
+		((rc < 128)) || crash=1
+		if ((rc == 126 || rc == 127)); then infra=1; fi
+	fi
+}
+cat >"$work/script.json" <<'JSON'
+{"commands":[{"line":1,"type":"module"},{"line":2,"type":"register"},{"line":3,"type":"assert_return"},{"line":4,"type":"assert_malformed","module_type":"text"},{"line":5,"type":"assert_malformed","module_type":"binary"},{"line":6,"type":"assert_invalid"},{"line":7,"type":"assert_unlinkable"},{"line":8,"type":"assert_uninstantiable"},{"line":9,"type":"assert_exception"}]}
+JSON
+valid_trace() {
+	jq -r '.commands[] | [.line,.type,
+		(if .type == "assert_malformed" and .module_type == "text"
+		 then "skip: line \(.line): text format" else "pass" end)] | @tsv' "$1" >"$2"
+}
+valid_trace "$work/script.json" "$work/valid" || exit 2
+trial valid 0 "$work/script.json" "$work/valid"
+printf '%s' "$(<"$work/valid")" >"$work/no-final-newline"
+trial no-final-newline 0 "$work/script.json" "$work/no-final-newline"
+: >"$work/empty"
+trial empty-trace 1 "$work/script.json" "$work/empty"
+trial absent-trace 1 "$work/script.json" "$work/absent"
+printf '{"commands":[]}\n' >"$work/no-commands.json"
+trial zero-commands 0 "$work/no-commands.json" "$work/empty"
+printf '{}\n' >"$work/bad-script.json"
+trial invalid-script 2 "$work/bad-script.json" "$work/valid"
+cat "$work/script.json" "$work/script.json" >"$work/multiple.json"
+trial multiple-scripts 2 "$work/multiple.json" "$work/valid"
+jq '.commands[0].line = 1.5' "$work/script.json" >"$work/bad-line.json"
+trial fractional-key 2 "$work/bad-line.json" "$work/valid"
+jq '.commands[0].type = null' "$work/script.json" >"$work/bad-type.json"
+trial null-type 2 "$work/bad-type.json" "$work/valid"
+jq '.commands[1] = .commands[0]' "$work/script.json" >"$work/duplicate-keys.json"
+valid_trace "$work/duplicate-keys.json" "$work/duplicate-keys" || exit 2
+trial duplicate-keys 0 "$work/duplicate-keys.json" "$work/duplicate-keys"
+tail -n +2 "$work/duplicate-keys" >"$work/missing-duplicate"
+trial missing-duplicate 1 "$work/duplicate-keys.json" "$work/missing-duplicate"
+tail -n +2 "$work/valid" >"$work/missing"
+trial missing-row 1 "$work/script.json" "$work/missing"
+{
+	cat "$work/valid"
+	head -1 "$work/valid"
+} >"$work/extra"
+trial extra-row 1 "$work/script.json" "$work/extra"
+{
+	cat "$work/valid"
+	printf '\n'
+} >"$work/blank"
+trial extra-blank-row 1 "$work/script.json" "$work/blank"
+{
+	sed -n '2p' "$work/valid"
+	sed -n '1p' "$work/valid"
+	tail -n +3 "$work/valid"
+} >"$work/reordered"
+trial reordered 1 "$work/script.json" "$work/reordered"
+for kind in wrong-line wrong-type fail unknown pass-prefix text-on-module outside old-outside \
+	dependent import decoder validation text-pass text-wrong-line text-on-binary extra-field; do
+	awk -F '\t' -v kind="$kind" 'BEGIN {OFS="\t"}
+		NR == 1 {
+			if (kind == "wrong-line") $1=999
+			else if (kind == "wrong-type") $2="assert_return"
+			else if (kind == "fail") $3="fail: line 1: planted"
+			else if (kind == "unknown") $3="unknown"
+			else if (kind == "pass-prefix") $3="pass bogus"
+			else if (kind == "text-on-module") $3="skip: line 1: text format"
+			else if (kind == "outside") $3="skip: line 1: outside P\047: struct"
+			else if (kind == "old-outside") $3="skip: line 1: outside wasm2,-simd: error"
+			else if (kind == "dependent") $3="skip: line 1: missing/rejected module"
+			else if (kind == "import") $3="skip: line 1: unavailable import"
+			else if (kind == "decoder") $3="skip: line 1: decoder offset 7: unsupported"
+			else if (kind == "validation") $3="skip: line 1: rejected only by validation"
+			else if (kind == "extra-field") $3="pass\textra"
+		}
+		NR == 4 {
+			if (kind == "text-pass") $3="pass"
+			if (kind == "text-wrong-line") $3="skip: line 99: text format"
+		}
+		NR == 5 && kind == "text-on-binary" {$3="skip: line 5: text format"}
+		{print}' "$work/valid" >"$work/changed"
+	trial "$kind" 1 "$work/script.json" "$work/changed"
+done
+seed=439041101
+for ((i = 0; i < 32; i++)); do
+	seed=$(((seed * 1664525 + 1013904223) & 4294967295))
+	n=$((1 + seed % 31))
+	jq -n --argjson n "$n" --argjson base "$((seed % 100000))" '
+		["module","register","assert_return","assert_invalid","assert_unlinkable",
+		 "assert_uninstantiable","assert_exception","action","assert_malformed"] as $types |
+		{commands:[range(0;$n) | {line:($base+2*.+1),type:$types[.%9],
+		 module_type:(if .%2 == 0 then "text" else "binary" end)}]}' >"$work/generated.json" || exit 2
+	valid_trace "$work/generated.json" "$work/generated" || exit 2
+	trial "property-$i-valid" 0 "$work/generated.json" "$work/generated"
+	awk -F '\t' 'BEGIN {OFS="\t"} NR == 1 {$3="fail: line "$1": planted"} {print}' \
+		"$work/generated" >"$work/changed"
+	trial "property-$i-failure" 1 "$work/generated.json" "$work/changed"
+	tail -n +2 "$work/generated" >"$work/missing"
+	trial "property-$i-missing" 1 "$work/generated.json" "$work/missing"
+	jq '.commands[0].line += 1' "$work/generated.json" >"$work/changed.json"
+	trial "property-$i-key" 1 "$work/changed.json" "$work/generated"
+done
+printf 'outcomes-checks: %s cases; %s failed; fixed seed 439041101\n' "$total" "$bad"
+((crash == 0)) || exit 3
+((infra == 0)) || exit 2
+((bad == 0)) || exit 1

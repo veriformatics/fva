@@ -1,0 +1,14 @@
+Upstream: https://github.com/WebAssembly/testsuite
+Revision: 44f1503f98409fa3737437bf9449a37a5def4210
+License: Apache-2.0 (LICENSE)
+Corresponding source: https://github.com/WebAssembly/testsuite/tree/44f1503f98409fa3737437bf9449a37a5def4210
+
+Unmodified *.wast:
+  tag, throw, throw_ref, try_table,
+  return_call, return_call_indirect, return_call_ref,
+  call_ref, br_on_null, br_on_non_null, ref_as_non_null, local_init
+
+SHA256SUMS pins every vendored source file + LICENSE.
+Source text: raw.githubusercontent.com/WebAssembly/testsuite/<revision>/<name>.wast.
+Oracle diagnostic-message matching alone is disabled for official scripts; the original
+assertions, module bytes, expected results and semantic checks remain unchanged.

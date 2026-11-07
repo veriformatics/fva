@@ -227,6 +227,31 @@ if ((rc != 1)) || ! grep -q "gate.yml's matrix misses group static" "$d/out"; th
 	echo "test-checks: gate.yml's matrix without the static group → rc $rc, want 1 naming it"
 	fail=1
 fi
+# test-accept (merged acceptance checks) over a stub suite printing canned lines: each listed ID
+# prints `ok ID` exactly once, an `ID HOST` row off HOST its `pending ID:` line; suite setup → rc 2
+# shellcheck disable=SC2016 # the stub expands its own variables
+d=$tmp/accept && mkdir -p "$d" &&
+	printf '#!/bin/sh\ncat "$ACCEPT_LINES"\nexit "$ACCEPT_RC"\n' >"$d/suite" && chmod +x "$d/suite" || exit 2
+accept_case() { # label want-rc suite-rc merged-rows suite-lines
+	printf '%s\n' "$4" >"$d/merged" && printf '%s\n' "$5" >"$d/lines" || exit 2
+	env FVA_ACCEPT_SUITE="$d/suite" FVA_ACCEPT_MERGED="$d/merged" ACCEPT_LINES="$d/lines" \
+		ACCEPT_RC="$3" scripts/test-accept >/dev/null 2>&1
+	local rc=$?
+	((rc == $2)) || {
+		echo "test-checks: test-accept $1 → rc $rc, want $2"
+		fail=1
+	}
+}
+h=$(hostname -s)
+accept_case all-ok 0 1 $'A.x\nA.y' $'ok A.x\nok A.y\npending A.z: unmerged'
+accept_case merged-fail 1 1 $'A.x\nA.y' $'ok A.x\nFAIL A.y: wrong count'
+accept_case merged-missing 1 0 $'A.x\nA.y' 'ok A.x'
+accept_case merged-twice 1 0 A.x $'ok A.x\nok A.x'
+accept_case id-prefix 1 0 A.x 'ok A.xy'
+accept_case host-elsewhere 0 1 "A.w not-$h" 'pending A.w: other host'
+accept_case host-here 1 1 "A.w $h" 'pending A.w: this host'
+accept_case host-fail 1 1 "A.w not-$h" 'FAIL A.w: wrong count'
+accept_case suite-setup 2 2 A.x 'ok A.x'
 # bench grading drivers (D53): each battery passes, and fails once a driver it controls is neutered
 export FVA_GRADE_OUT=$tmp/grade
 bench/grade/check-drivers >/dev/null || fail=1

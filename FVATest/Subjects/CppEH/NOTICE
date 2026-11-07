@@ -1,0 +1,17 @@
+eh.cpp + Spec.lean: FVA, Apache-2.0 (repository LICENSE).
+eh.wasm sha256: 4e2fe131b94743ec16e11c868d5d1dc0903956c8edfe1c2d3626c1fec7155292
+
+Compiler/runtime: wasi-sdk 34.0; clang 23.1.0.
+LLVM revision: 895aa2c896ada719451be2e3673c83da8ddf1141
+wasi-libc revision: 2e6fb9d8ee0c
+Runtime libraries: libc++abi + libunwind + SDK C/C++ runtime.
+No local __cxa_* definitions or replacement exception runtimes.
+
+Corresponding source:
+  https://github.com/WebAssembly/wasi-sdk/tree/wasi-sdk-34
+  https://github.com/llvm/llvm-project/tree/895aa2c896ada719451be2e3673c83da8ddf1141
+  https://github.com/WebAssembly/wasi-libc/tree/2e6fb9d8ee0c
+
+Licenses: licenses/LLVM (Apache-2.0 WITH LLVM-exception + legacy notice),
+licenses/wasi-libc (multi-license + component index), licenses/cloudlibc (BSD-2-Clause),
+licenses/musl (MIT + component notices). The wasi-libc index also identifies dlmalloc as CC0.
