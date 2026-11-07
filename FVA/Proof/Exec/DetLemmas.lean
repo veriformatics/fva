@@ -20,8 +20,8 @@ theorem trap_counterexample (H : HostSem) (s : Store) (f : Frame) :
       Step H c c₁ ∧ step c = some c₂ ∧ c₁ ≠ c₂ := by
   refine ⟨⟨s, f, [.trap, .plain .nop, .plain .nop]⟩,
     ⟨s, f, [.trap, .plain .nop]⟩, ⟨s, f, [.trap]⟩, ?_, rfl, ?_⟩
-  · exact Step.seq (vs := []) (rest := [.plain .nop])
-      (Step.trap (.seq [] .hole [.plain .nop]) (by simp [EvalCtx.fill]))
+  · exact StepP.seq (vs := []) (rest := [.plain .nop])
+      (StepP.trap (.seq [] .hole [.plain .nop]) (by simp [EvalCtx.fill]))
   · intro h
     have hh := congrArg Config.instrs h
     cases hh

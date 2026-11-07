@@ -200,12 +200,12 @@ theorem mustW_final {H : HostSem} {R W : Nat → Nat → Prop} {Q : Outcome → 
 
 /-- The successor of a unique computed step is every `Step` successor. -/
 theorem step_eq_of_seq {H : HostSem} {s s' : Store} {f f' : Frame} {l l' : List AInstr}
-    {c : Config} (hu : seqUnique s f [] l = true) (hs : seq s f [] l = .step s' f' l')
+    {c : Config} (hu : seqUnique false s f [] l = true) (hs : seq s f [] l = .step s' f' l')
     (h : Step H ⟨s, f, l⟩ c) : c = ⟨s', f', l'⟩ :=
   step_complete h (by simp only [step, hs]) (by simpa only [uniqueStep] using hu)
 
 theorem mustW_of_seq {H : HostSem} {R W : Nat → Nat → Prop} {Q : Outcome → Prop} {s s' : Store}
-    {f f' : Frame} {l l' : List AInstr} (hu : seqUnique s f [] l = true)
+    {f f' : Frame} {l l' : List AInstr} (hu : seqUnique false s f [] l = true)
     (hs : seq s f [] l = .step s' f' l') (hw : Within R W ⟨s, f, l⟩)
     (h : MustW H R W Q ⟨s', f', l'⟩) : MustW H R W Q ⟨s, f, l⟩ := by
   refine ⟨must_of_seq hu hs h.1, fun c hsteps => ?_⟩
@@ -214,7 +214,7 @@ theorem mustW_of_seq {H : HostSem} {R W : Nat → Nat → Prop} {Q : Outcome →
   · rw [step_eq_of_seq hu hs h₁] at hrest; exact h.2 c hrest
 
 theorem until_of_seq {H : HostSem} {P Q : Config → Prop} {s s' : Store} {f f' : Frame}
-    {l l' : List AInstr} (hu : seqUnique s f [] l = true) (hs : seq s f [] l = .step s' f' l')
+    {l l' : List AInstr} (hu : seqUnique false s f [] l = true) (hs : seq s f [] l = .step s' f' l')
     (hp : P ⟨s, f, l⟩) (h : Until H P Q ⟨s', f', l'⟩) : Until H P Q ⟨s, f, l⟩ :=
   .next hp ⟨⟨s', f', l'⟩, step_sound (by simp only [step, hs])⟩ fun c hc =>
     step_eq_of_seq hu hs hc ▸ h
@@ -257,7 +257,7 @@ theorem within_fill {R W : Nat → Nat → Prop} (C : Context) {c : Config} (h :
 
 theorem mustW_context_seq {H : HostSem} {R W : Nat → Nat → Prop} {Q : Outcome → Prop}
     {s s' : Store} {f f' : Frame} {es es' : List AInstr} (C : Context)
-    (hu : seqUnique s f [] es = true) (hs : seq s f [] es = .step s' f' es')
+    (hu : seqUnique false s f [] es = true) (hs : seq s f [] es = .step s' f' es')
     (hw : Within R W ⟨s, f, es⟩) (hk : MustW H R W Q (C.fill ⟨s', f', es'⟩)) :
     MustW H R W Q (C.fill ⟨s, f, es⟩) := by
   obtain ⟨hu', hs'⟩ := C.seq hu hs
@@ -265,7 +265,7 @@ theorem mustW_context_seq {H : HostSem} {R W : Nat → Nat → Prop} {Q : Outcom
 
 theorem until_context_seq {H : HostSem} {R W : Nat → Nat → Prop} {Q : Config → Prop}
     {s s' : Store} {f f' : Frame} {es es' : List AInstr} (C : Context)
-    (hu : seqUnique s f [] es = true) (hs : seq s f [] es = .step s' f' es')
+    (hu : seqUnique false s f [] es = true) (hs : seq s f [] es = .step s' f' es')
     (hw : Within R W ⟨s, f, es⟩) (hk : Until H (Within R W) Q (C.fill ⟨s', f', es'⟩)) :
     Until H (Within R W) Q (C.fill ⟨s, f, es⟩) := by
   obtain ⟨hu', hs'⟩ := C.seq hu hs
@@ -296,7 +296,8 @@ def footprintStep (stepLemma : Name) (rw : Lean.Expr → MetaM (Lean.Expr × Lea
   let some (s', f', l') := (← whnfR out).consumeMData.app3? ``Out.step
     | throwError m!"footprint step: the next step is not computed: {out}"
   let hs ← r.getProof
-  let hu ← mkFreshExprMVar (← mkEq (← mkAppM ``seqUnique #[s, f, nil, l]) (mkConst ``Bool.true))
+  let u ← mkAppM ``seqUnique #[mkConst ``Bool.false, s, f, nil, l]
+  let hu ← mkFreshExprMVar (← mkEq u (mkConst ``Bool.true))
   let rest ← evalTacticAt stx hu.mvarId!
   unless rest.isEmpty do throwError "footprint step: uniqueness of the step is not shown"
   let next ← mkFreshExprMVar (mkAppN fn (args.pop.push

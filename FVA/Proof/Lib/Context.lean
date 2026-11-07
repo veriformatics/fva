@@ -53,8 +53,8 @@ def Context.fill : Context → Config → Config
     outer.fill ⟨c.store, caller, .frame n c.frame c.instrs :: rest⟩
 
 theorem Context.seq {s s' : Store} {f f' : Frame} {es es' : List AInstr}
-    (C : Context) (hu : seqUnique s f [] es = true) (hs : seq s f [] es = .step s' f' es') :
-    seqUnique (C.fill ⟨s, f, es⟩).store (C.fill ⟨s, f, es⟩).frame []
+    (C : Context) (hu : seqUnique false s f [] es = true) (hs : seq s f [] es = .step s' f' es') :
+    seqUnique false (C.fill ⟨s, f, es⟩).store (C.fill ⟨s, f, es⟩).frame []
       (C.fill ⟨s, f, es⟩).instrs = true ∧
     seq (C.fill ⟨s, f, es⟩).store (C.fill ⟨s, f, es⟩).frame []
       (C.fill ⟨s, f, es⟩).instrs = .step (C.fill ⟨s', f', es'⟩).store
@@ -74,7 +74,7 @@ theorem Context.seq {s s' : Store} {f f' : Frame} {es es' : List AInstr}
 
 theorem must_context_seq {H : HostSem} {Q : Outcome → Prop} {s s' : Store}
     {f f' : Frame} {es es' : List AInstr} (C : Context)
-    (hu : seqUnique s f [] es = true) (hs : seq s f [] es = .step s' f' es')
+    (hu : seqUnique false s f [] es = true) (hs : seq s f [] es = .step s' f' es')
     (hk : Must H Q (C.fill ⟨s', f', es'⟩)) : Must H Q (C.fill ⟨s, f, es⟩) := by
   obtain ⟨hu', hs'⟩ := C.seq hu hs
   exact must_of_seq hu' hs' hk
@@ -99,7 +99,8 @@ elab "wasm_cstep" " [" xs:Lean.Parser.Tactic.simpLemma,* "]" : tactic => withMai
   let some (s', f', l') := (← whnfR out).consumeMData.app3? ``Out.step
     | throwError m!"wasm_cstep: next step not computed: {out}"
   let hs ← r.getProof
-  let hu ← mkFreshExprMVar (← mkEq (← mkAppM ``seqUnique #[s, f, nil, l]) (mkConst ``Bool.true))
+  let u ← mkAppM ``seqUnique #[mkConst ``Bool.false, s, f, nil, l]
+  let hu ← mkFreshExprMVar (← mkEq u (mkConst ``Bool.true))
   let rest ← evalTacticAt stx hu.mvarId!
   unless rest.isEmpty do throwError "wasm_cstep: uniqueness not shown"
   let nextC ← mkAppM ``Context.fill #[C, ← mkAppM ``FVA.Wasm.Exec.Config.mk #[s', f', l']]

@@ -60,6 +60,8 @@ def Explains (H : HostSem) (s : Store) (f : Frame) (es : List AInstr) : Out → 
   | .ret bvs => ∃ j, ∃ L : BlockCtx j,
     es = L.fill (vals bvs.reverse ++ [.plain .return_])
   | .final => es = [.trap] ∨ ∃ ws, es = vals ws
+  | .host a args k => ∃ ft id, s.funcs[a]? = some (.host ft id) ∧
+    args.length = ft.params.length ∧ es = k.fill (vals args ++ [.invoke a])
   | .stuck => True
 
 theorem vals_reverse_split (vs : List Val) (n : Nat) :
@@ -98,7 +100,7 @@ theorem seq_explains (H : HostSem) (s : Store) (f : Frame) (vs : List Val)
         ⟨hv, hr⟩
       exact hne.elim (fun h => h hv) (fun h => h (List.cons.inj hr).2)
     simpa only [EvalCtx.fill, List.append_assoc, List.singleton_append] using
-      (Step.trap (H := H) (s := s) (f := f) (.seq vs.reverse .hole rest) hctx)
+      (StepP.trap (H := H) (fits := false) (s := s) (f := f) (.seq vs.reverse .hole rest) hctx)
   case case3 =>
     intro f vs rest n cont body he ih
     simp only [he, Explains, List.reverse_nil, List.map_nil, List.nil_append] at ih
@@ -106,19 +108,20 @@ theorem seq_explains (H : HostSem) (s : Store) (f : Frame) (vs : List Val)
     rcases ih with rfl | ⟨ws, rfl⟩
     · simpa only [isTrapOnly, Bool.cond_true, EvalCtx.fill, List.append_assoc,
         List.singleton_append] using
-        (Step.seq (vs := vs.reverse) (rest := rest)
-          (Step.trap (H := H) (s := s) (f := f) (.label n cont .hole)
+        (StepP.seq (vs := vs.reverse) (rest := rest)
+          (StepP.trap (H := H) (fits := false) (s := s) (f := f) (.label n cont .hole)
             (by simp [EvalCtx.fill])))
     · simp only [isTrapOnly_vals, Bool.cond_false]
       simpa only [List.append_assoc, List.singleton_append] using
-        (Step.seq (vs := vs.reverse) (rest := rest)
-          (Step.labelExit (H := H) (s := s) (f := f) (n := n) (cont := cont) (vs := ws)))
+        (StepP.seq (vs := vs.reverse) (rest := rest)
+          (StepP.labelExit (H := H) (fits := false) (s := s) (f := f) (n := n) (cont := cont)
+            (vs := ws)))
   case case4 =>
     intro f vs rest n cont body s' f' body' he ih
     simp only [he, Explains, List.reverse_nil, List.map_nil, List.nil_append] at ih
     simp only [atInstr, he, Explains]
     simpa only [List.append_assoc, List.singleton_append] using
-      (Step.seq (vs := vs.reverse) (rest := rest) (Step.label (n := n) (cont := cont) ih))
+      (StepP.seq (vs := vs.reverse) (rest := rest) (StepP.label (n := n) (cont := cont) ih))
   case case5 =>
     intro f vs rest n cont body bvs he hb _
     simp only [atInstr, he, hb, Bool.cond_true, Explains]
@@ -127,12 +130,12 @@ theorem seq_explains (H : HostSem) (s : Store) (f : Frame) (vs : List Val)
     simp only [he, Explains, List.reverse_nil, List.map_nil, List.nil_append, Nat.add_zero] at ih
     simp only [atInstr, he, hb, Bool.cond_false, Explains]
     rcases ih with ⟨j, L, hbody⟩
-    have hs := Step.br (H := H) (s := s) (f := f) (n := n) (cont := cont)
+    have hs := StepP.br (H := H) (fits := false) (s := s) (f := f) (n := n) (cont := cont)
       (vs := (bvs.take n).reverse) (prependInner L (bvs.drop n).reverse)
       (by simp [Nat.min_eq_left (nblt_false.mp hb)])
     rw [prependInner_take, ← hbody] at hs
     simpa only [List.append_assoc, List.singleton_append] using
-      (Step.seq (vs := vs.reverse) (rest := rest) hs)
+      (StepP.seq (vs := vs.reverse) (rest := rest) hs)
   case case7 =>
     intro f vs rest n cont body k bvs he ih
     simp only [he, Explains, List.reverse_nil, List.map_nil, List.nil_append] at ih
@@ -149,17 +152,23 @@ theorem seq_explains (H : HostSem) (s : Store) (f : Frame) (vs : List Val)
     refine ⟨j + 1, .label vs.reverse n cont L rest, ?_⟩
     simp only [BlockCtx.fill, List.append_assoc, List.singleton_append, hbody]
   case case9 =>
+    intro f vs rest n cont body a args k he ih
+    simp only [he, Explains, List.reverse_nil, List.map_nil, List.nil_append] at ih
+    simp only [atInstr, he, Explains]
+    rcases ih with ⟨ft, id, hf, hlen, hbody⟩
+    exact ⟨ft, id, hf, hlen, by simp [HCtx.fill, hbody]⟩
+  case case10 =>
     intro f vs rest n cont body he _
     simp only [atInstr, he, Explains]
-  case case10 =>
+  case case11 =>
     intro f vs rest n fi body he ht _
     simp only [atInstr, he, ht, Bool.cond_true, Explains]
     have hbody := isTrapOnly_eq_true.mp ht
     subst body
     simpa only [List.append_assoc, List.singleton_append] using
-      (Step.seq (vs := vs.reverse) (rest := rest)
-        (Step.trapFrame (H := H) (s := s) (f := f) (n := n) (fi := fi)))
-  case case11 =>
+      (StepP.seq (vs := vs.reverse) (rest := rest)
+        (StepP.trapFrame (H := H) (fits := false) (s := s) (f := f) (n := n) (fi := fi)))
+  case case12 =>
     intro f vs rest n fi body he ht hn ih
     simp only [he, Explains, List.reverse_nil, List.map_nil, List.nil_append] at ih
     simp only [atInstr, he, ht, hn, Bool.cond_false, Bool.cond_true, Explains]
@@ -168,64 +177,82 @@ theorem seq_explains (H : HostSem) (s : Store) (f : Frame) (vs : List Val)
       contradiction
     · have hlen : ws.length = n := by simpa using Nat.beq_eq.mp hn
       simpa only [List.append_assoc, List.singleton_append] using
-        (Step.seq (vs := vs.reverse) (rest := rest)
-          (Step.frameExit (H := H) (s := s) (f := f) (f' := fi) hlen))
-  case case12 =>
+        (StepP.seq (vs := vs.reverse) (rest := rest)
+          (StepP.frameExit (H := H) (fits := false) (s := s) (f := f) (f' := fi) hlen))
+  case case13 =>
     intro f vs rest n fi body he ht hn _
     simp only [atInstr, he, ht, hn, Bool.cond_false, Explains]
-  case case13 =>
+  case case14 =>
     intro f vs rest n fi body s' fi' body' he ih
     simp only [he, Explains, List.reverse_nil, List.map_nil, List.nil_append] at ih
     simp only [atInstr, he, Explains]
     simpa only [List.append_assoc, List.singleton_append] using
-      (Step.seq (vs := vs.reverse) (rest := rest) (Step.frame (f := f) (n := n) ih))
-  case case14 =>
+      (StepP.seq (vs := vs.reverse) (rest := rest) (StepP.frame (f := f) (n := n) ih))
+  case case15 =>
     intro f vs rest n fi body bvs he hb _
     simp only [atInstr, he, hb, Bool.cond_true, Explains]
-  case case15 =>
+  case case16 =>
     intro f vs rest n fi body bvs he hb ih
     simp only [he, Explains, List.reverse_nil, List.map_nil, List.nil_append] at ih
     simp only [atInstr, he, hb, Bool.cond_false, Explains]
     rcases ih with ⟨j, L, hbody⟩
-    have hs := Step.return_ (H := H) (s := s) (f := f) (n := n) (f' := fi)
+    have hs := StepP.return_ (H := H) (fits := false) (s := s) (f := f) (n := n) (f' := fi)
       (vs := (bvs.take n).reverse) (prependInner L (bvs.drop n).reverse)
       (by simp [Nat.min_eq_left (nblt_false.mp hb)])
     rw [prependInner_take, ← hbody] at hs
     simpa only [List.append_assoc, List.singleton_append] using
-      (Step.seq (vs := vs.reverse) (rest := rest) hs)
-  case case16 =>
+      (StepP.seq (vs := vs.reverse) (rest := rest) hs)
+  case case17 =>
     intro f vs rest n fi body k bvs he _
     simp only [atInstr, he, Explains]
-  case case17 =>
+  case case18 =>
+    intro f vs rest n fi body a args k he ih
+    simp only [he, Explains, List.reverse_nil, List.map_nil, List.nil_append] at ih
+    simp only [atInstr, he, Explains]
+    rcases ih with ⟨ft, id, hf, hlen, hbody⟩
+    exact ⟨ft, id, hf, hlen, by simp [HCtx.fill, hbody]⟩
+  case case19 =>
     intro f vs rest n fi body he _
     simp only [atInstr, he, Explains]
-  case case18 =>
+  case case20 =>
     intro f vs rest a ft inst code hf m hb
     dsimp only [m] at hb
     simp only [atInstr, hf, hb, Bool.cond_true, Explains]
-  case case19 =>
+  case case21 =>
     intro f vs rest a ft inst code hf m hb
     dsimp only [m] at hb
     simp only [atInstr, hf, hb, Bool.cond_false, Explains]
-    have hs := Step.invoke (H := H) (f := f) (vs := (vs.take ft.params.length).reverse) hf
+    have hs := StepP.invoke (H := H) (fits := false) (f := f)
+      (vs := (vs.take ft.params.length).reverse) hf
       (by simp [Nat.min_eq_left (nblt_false.mp hb)])
     rw [vals_reverse_split vs ft.params.length]
     simpa only [List.append_assoc, List.singleton_append] using
-      (Step.seq (vs := (vs.drop ft.params.length).reverse) (rest := rest) hs)
-  case case20 =>
+      (StepP.seq (vs := (vs.drop ft.params.length).reverse) (rest := rest) hs)
+  case case22 =>
+    intro f vs rest a ft id hf m hb
+    dsimp only [m] at hb
+    simp only [atInstr, hf, hb, Bool.cond_true, Explains]
+  case case23 =>
+    intro f vs rest a ft id hf m hb
+    dsimp only [m] at hb
+    simp only [atInstr, hf, hb, Bool.cond_false, Explains]
+    refine ⟨ft, id, rfl, by simp [Nat.min_eq_left (nblt_false.mp hb)], ?_⟩
+    rw [vals_reverse_split vs ft.params.length]
+    simp [HCtx.fill, List.append_assoc]
+  case case24 =>
     intro f vs rest a hf
-    simp_all only [atInstr, Explains]
-  case case21 =>
+    simp only [atInstr, hf, Explains]
+  case case25 =>
     intro f vs rest k
     refine ⟨0, .base [] rest, ?_⟩
     simp only [BlockCtx.fill, List.map_nil, List.nil_append, Nat.zero_add,
       List.append_assoc, List.singleton_append]
-  case case22 =>
+  case case26 =>
     intro f vs rest
     refine ⟨0, .base [] rest, ?_⟩
     simp only [BlockCtx.fill, List.map_nil, List.nil_append,
       List.append_assoc, List.singleton_append]
-  case case23 =>
+  case case27 =>
     intro f vs rest i hb hr s' f' stk out hi
     rw [atInstr_plain hb hr, hi]
     simp only [Explains]
@@ -233,25 +260,25 @@ theorem seq_explains (H : HostSem) (s : Store) (f : Frame) (vs : List Val)
     rw [hvs]
     simpa only [List.reverse_append, List.reverse_reverse, List.map_append,
       List.append_assoc, List.singleton_append] using
-      (Step.seq (vs := stk.reverse) (rest := rest) hs)
-  case case24 =>
+      (StepP.seq (vs := stk.reverse) (rest := rest) hs)
+  case case28 =>
     intro f vs rest i hb hr hi
     rw [atInstr_plain hb hr, hi]
     trivial
-  case case25 =>
+  case case29 =>
     intro t f vs rest ht hl hf hi hb hr hp
     cases t <;> simp_all [atInstr, Explains]
-  case case26 =>
+  case case30 =>
     intro f vs
     exact Or.inr ⟨vs.reverse, List.append_nil _⟩
-  case case27 =>
+  case case31 =>
     intro f vs e rest v hv ih
     simp only [seq, hv]
     have he := eq_instr_of_toVal hv
     subst e
     simpa only [List.reverse_cons, List.map_append, List.map_cons, List.map_nil,
       List.append_assoc, List.singleton_append] using ih
-  case case28 =>
+  case case32 =>
     intro f vs e rest hv ih
     simp only [seq, hv]
     exact ih

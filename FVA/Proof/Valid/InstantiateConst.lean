@@ -58,7 +58,7 @@ theorem value_inj {v w : Val} (h : v.instr = w.instr) : v = w := by
   simpa only [Ref.toVal_instr, Option.some.injEq] using hv
 
 theorem value_of_step {H : HostSem} {c : Config} {s : Store} {f : Frame} {v w : Val}
-    (hs : Ref.step c = some ⟨s, f, [w.instr]⟩) (hu : Ref.uniqueStep c = true)
+    (hs : Ref.step c = some ⟨s, f, [w.instr]⟩) (hu : Ref.uniqueStep false c = true)
     (h : Steps H c ⟨s, f, [v.instr]⟩) : v = w := by
   rcases h.cases_head with hc | ⟨mid, h₀, hrest⟩
   · subst c
@@ -121,7 +121,7 @@ theorem constant_value {H : HostSem} {s : Store} {inst : ModuleInst} {C : Contex
     have hs : Ref.step ⟨s, ⟨[], inst⟩, [.plain (.refFunc x)]⟩ =
         some ⟨s, ⟨[], inst⟩, [(Val.ref (.func a)).instr]⟩ := by
       simp [Ref.step, Ref.seq, Ref.toVal, Ref.atInstr, Ref.instrStep, ha, Val.instr]
-    have hu : Ref.uniqueStep ⟨s, ⟨[], inst⟩, [.plain (.refFunc x)]⟩ = true := by
+    have hu : Ref.uniqueStep false ⟨s, ⟨[], inst⟩, [.plain (.refFunc x)]⟩ = true := by
       simp [Ref.uniqueStep, Ref.seqUnique, Ref.toVal, Ref.atUnique, Ref.instrUnique]
     have hv := value_of_step hs hu steps
     simpa [hv, Val.HasType] using hb
@@ -132,7 +132,7 @@ theorem constant_value {H : HostSem} {s : Store} {inst : ModuleInst} {C : Contex
     have hs : Ref.step ⟨s, ⟨[], inst⟩, [.plain (.globalGet x)]⟩ =
         some ⟨s, ⟨[], inst⟩, [gi.value.instr]⟩ := by
       simp [Ref.step, Ref.seq, Ref.toVal, Ref.atInstr, Ref.instrStep, ha, hgi]
-    have hu : Ref.uniqueStep ⟨s, ⟨[], inst⟩, [.plain (.globalGet x)]⟩ = true := by
+    have hu : Ref.uniqueStep false ⟨s, ⟨[], inst⟩, [.plain (.globalGet x)]⟩ = true := by
       simp [Ref.uniqueStep, Ref.seqUnique, Ref.toVal, Ref.atUnique, Ref.instrUnique]
     simpa [value_of_step hs hu steps] using hval
 

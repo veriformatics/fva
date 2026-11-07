@@ -52,7 +52,7 @@ theorem steps_of_runDet {H : HostSem} {n : Nat} {c c' : Config} {vs : List Val}
       exact False.elim ((vals_ne_trap vs) (hv.symm.trans hi.symm))
     | false =>
       simp only [runDet, ht, Bool.cond_false] at hr
-      cases hu : uniqueStep c with
+      cases hu : uniqueStep false c with
       | false => simp only [hu, Bool.cond_false, reduceCtorEq] at hr
       | true =>
         simp only [hu, Bool.cond_true] at hr

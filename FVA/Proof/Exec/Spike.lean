@@ -53,7 +53,7 @@ attribute [local simp] nvFrame nvLabel nvInvoke nvBlock nvLoop nvGet nvSet nvBin
 /-- Execute exactly this many no-choice steps, without exposing states in the proof script. -/
 private def walk : Nat → Config → Option Config
   | 0, c => some c
-  | k + 1, c => bif uniqueStep c then
+  | k + 1, c => bif uniqueStep false c then
       match step c with
       | some d => walk k d
       | none => none
@@ -64,7 +64,7 @@ private theorem must_of_walk {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c
   induction k generalizing c with
   | zero => cases h; exact hc
   | succ k ih =>
-    cases hu : uniqueStep c with
+    cases hu : uniqueStep false c with
     | false => simp only [walk, hu, Bool.cond_false, reduceCtorEq] at h
     | true =>
       simp only [walk, hu, Bool.cond_true] at h

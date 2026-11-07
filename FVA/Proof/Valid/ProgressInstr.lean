@@ -129,7 +129,7 @@ theorem instr_progress {H : HostSem} {s : Store} {f : Frame} {C : Context}
     obtain ⟨v, w, rfl, hv, hw⟩ := two hargs
     obtain ⟨r, rfl⟩ := ref_of_type hv
     obtain ⟨n, rfl⟩ := hasOp_i32.mp hw
-    exact .step .tableGrowFail
+    exact .step (.tableGrowFail nofun)
   case tableFill x tt hx =>
     obtain ⟨v₁, v₂, v₃, rfl, h₁, h₂, h₃⟩ := three hargs
     obtain ⟨i, rfl⟩ := hasOp_i32.mp h₁
@@ -209,7 +209,7 @@ theorem instr_progress {H : HostSem} {s : Store} {f : Frame} {C : Context}
     exact .step (.memorySize ha hmem)
   case memoryGrow lim hm =>
     obtain ⟨n, rfl⟩ := one_i32 hargs
-    exact .step .memoryGrowFail
+    exact .step (.memoryGrowFail nofun)
   case memoryFill lim hm =>
     obtain ⟨d, v, n, rfl⟩ := three_i32 hargs
     obtain ⟨addr, mem, ha, hmem, _⟩ := hf.mems hm
@@ -254,7 +254,7 @@ theorem instr_progress {H : HostSem} {s : Store} {f : Frame} {C : Context}
   case nop => cases hargs; exact .step .nop
   case unreachable t₁ t₂ =>
     simpa only [List.append_nil] using FragmentProgress.step (C := C)
-      (Step.seq (H := H) (s := s) (f := f) (vs := args) (rest := []) Step.unreachable)
+      (StepP.seq (H := H) (s := s) (f := f) (vs := args) (rest := []) StepP.unreachable)
   case block bt body ft hb hs =>
     exact .step (.block ((hf.blockType bt).symm.trans hb)
       (by simpa only [ops, List.length_map] using hargs.length_eq))
@@ -303,7 +303,7 @@ theorem instr_progress {H : HostSem} {s : Store} {f : Frame} {C : Context}
   case call x ft hx =>
     obtain ⟨addr, fi, ha, _, _⟩ := hf.funcs hx
     simpa only [List.append_nil] using FragmentProgress.step (C := C)
-      (Step.seq (H := H) (s := s) (f := f) (vs := args) (rest := []) (Step.call ha))
+      (StepP.seq (H := H) (s := s) (f := f) (vs := args) (rest := []) (StepP.call ha))
   case callIndirect x y tt ft hx he hy =>
     obtain ⟨pre, args, rfl, _, hlast⟩ := typed_split hargs
     obtain ⟨v, rfl⟩ := one_i32 hlast

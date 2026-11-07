@@ -16,7 +16,7 @@ theorem steps_append {H : HostSem} {c c' : Config} (h : Steps H c c')
   | tail h hs ih =>
     exact ih.tail (by
       simpa only [vals, List.map_nil, List.nil_append] using
-        (Step.seq (vs := []) (rest := rest) hs))
+        (StepP.seq (vs := []) (rest := rest) hs))
 
 theorem fill_zero (m : MemInst) (p : Nat) (f : Nat → UInt8) : m.fill p 0 f = m := by
   have h : (fun a => if p ≤ a ∧ a < p + 0 then f (a - p) else m.byte a) = m.byte := by
@@ -71,7 +71,7 @@ theorem memory_init {H : HostSem} {f : Frame} {x da : Nat} {di : DataInst}
       simp only [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hd32]
     have hq' : (BitVec.ofNat 32 q).toNat = q := by
       simp only [BitVec.toNat_ofNat, Nat.mod_eq_of_lt hq32]
-    have hs := Step.memoryInitZero (H := H) (d := .ofNat 32 d) (s' := .ofNat 32 q)
+    have hs := StepP.memoryInitZero (H := H) (fits := false) (d := .ofNat 32 d) (s' := .ofNat 32 q)
       hmap hda hm hdi (by simpa only [hq'] using hq) (by simpa only [hd'] using hd)
     have hz : (Val.i32 (BitVec.ofNat 32 0)).instr = (Val.i32 0).instr := rfl
     simpa only [initInstrs, vi32, hz, fill_zero, setMem_same hm] using
@@ -95,7 +95,7 @@ theorem memory_init {H : HostSem} {f : Frame} {x da : Nat} {di : DataInst}
     let rest := initInstrs (d + 1) (q + 1) n x
     have hs₁ : Step H ⟨s, f, initInstrs d q (n + 1) x⟩
         ⟨s, f, [vi32 d, vi32 b.toNat, .plain (.storePacked .w32 .p8 ⟨0, 0⟩)] ++ rest⟩ := by
-      have h := Step.memoryInit (H := H) (d := .ofNat 32 d) (s' := .ofNat 32 q)
+      have h := StepP.memoryInit (H := H) (fits := false) (d := .ofNat 32 d) (s' := .ofNat 32 q)
         (n := .ofNat 32 (n + 1)) hmap hda hm hdi
         (by rw [hn']; omega) (by simpa only [hq', hn'] using hq)
         (by simpa only [hd', hn'] using hd) (by simpa only [hq'] using hb)
@@ -104,7 +104,7 @@ theorem memory_init {H : HostSem} {f : Frame} {x da : Nat} {di : DataInst}
     have hs₂ : Step H ⟨s, f, [vi32 d, vi32 b.toNat,
         .plain (.storePacked .w32 .p8 ⟨0, 0⟩)]⟩
         ⟨s.setMem 0 (m.write d 1 b.toNat), f, []⟩ := by
-      have h := Step.storePacked (H := H) (w := .w32) (p := .p8) (m := ⟨0, 0⟩)
+      have h := StepP.storePacked (H := H) (fits := false) (w := .w32) (p := .p8) (m := ⟨0, 0⟩)
         (i := .ofNat 32 d) (v := .i32 (.ofNat 32 b.toNat)) (c := b.toNat)
         hmap hm (by simp only [Val.intBits, hb']) (by
           simpa only [hd', PackSize.bits, Nat.reduceDiv, Nat.add_zero] using

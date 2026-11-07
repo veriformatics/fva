@@ -89,7 +89,7 @@ def effect (c : Config) : Effect :=
     | .store t m, _ :: .i32 a :: _, some ma => .write ma (a.toNat + m.offset) t.bytes
     | .storePacked _ p m, _ :: .i32 a :: _, some ma => .write ma (a.toNat + m.offset) (p.bits / 8)
     | .memoryGrow, _, _ | .tableGrow _, _, _ => .grow
-    | _, _, _ => if Ref.instrUnique i vs then .plain else .nan
+    | _, _, _ => if Ref.instrUnique false i vs then .plain else .nan
   | _ => .plain
 
 /-- How a run ended. -/

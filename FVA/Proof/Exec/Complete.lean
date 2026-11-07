@@ -19,7 +19,7 @@ theorem seq_of_final {c : Config} {o : Outcome} (hf : Final c o) :
   | trapped s => rw [hf.2]; rfl
 
 theorem seq_of_step {H : HostSem} {c c' : Config} (hs : Step H c c')
-    (hu : uniqueStep c = true) (hp : seq c.store c.frame [] c.instrs ≠ .stuck) :
+    (hu : uniqueStep false c = true) (hp : seq c.store c.frame [] c.instrs ≠ .stuck) :
     seq c.store c.frame [] c.instrs = .step c'.store c'.frame c'.instrs := by
   have hc := seq_complete hs [] [] (by simpa only [uniqueStep, List.append_nil] using hu)
   simp only [List.append_nil, List.reverse_nil, vals, List.map_nil, List.nil_append] at hc
@@ -28,7 +28,7 @@ theorem seq_of_step {H : HostSem} {c c' : Config} (hs : Step H c c')
 /-- Every finite semantic execution in the deterministic executable domain has a fuel witness.
 Only states with a successor need uniqueness and non-stuckness; terminal traps are included. -/
 theorem run_complete {H : HostSem} {c c' : Config} {o : Outcome}
-    (hu : ∀ d e, Steps H c d → Step H d e → uniqueStep d = true)
+    (hu : ∀ d e, Steps H c d → Step H d e → uniqueStep false d = true)
     (hp : ∀ d e, Steps H c d → Step H d e →
       seq d.store d.frame [] d.instrs ≠ .stuck)
     (hs : Steps H c c') (hf : Final c' o) : ∃ n, run n c = some c' := by
@@ -57,7 +57,7 @@ theorem _root_.FVA.Wasm.Exec.Must.may {H : HostSem} {Q : Outcome → Prop} {c : 
 
 /-- On a unique-step domain, a terminating reference run proves total correctness. -/
 theorem run_must {H : HostSem} {Q : Outcome → Prop} {n : Nat} {c c' : Config}
-    (hu : ∀ d e, Steps H c d → Step H d e → uniqueStep d = true)
+    (hu : ∀ d e, Steps H c d → Step H d e → uniqueStep false d = true)
     (hr : run n c = some c') (hq : ∀ o, Final c' o → Q o) : Must H Q c := by
   induction n generalizing c with
   | zero => simp only [run, reduceCtorEq] at hr
@@ -79,7 +79,7 @@ theorem run_must {H : HostSem} {Q : Outcome → Prop} {n : Nat} {c c' : Config}
 
 /-- Total correctness equals a successful reference run on the deterministic executable domain. -/
 theorem must_iff_run {H : HostSem} {Q : Outcome → Prop} {c : Config}
-    (hu : ∀ d e, Steps H c d → Step H d e → uniqueStep d = true)
+    (hu : ∀ d e, Steps H c d → Step H d e → uniqueStep false d = true)
     (hp : ∀ d e, Steps H c d → Step H d e →
       seq d.store d.frame [] d.instrs ≠ .stuck) :
     Must H Q c ↔ ∃ n c', run n c = some c' ∧ ∀ o, Final c' o → Q o := by
