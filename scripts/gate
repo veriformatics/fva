@@ -10,7 +10,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 declare -A groups=(
-	[lean]="build checks test decoder numerics floatdiff spec difftest fuzz-replay lint mutation pins olean-pins"
+	[lean]="build checks test char decoder numerics floatdiff spec difftest fuzz-replay lint mutation pins olean-pins"
 	[trust]="build trust"
 	[init]="build init"
 	[subjects]="build subjects"
@@ -61,12 +61,17 @@ mapfile -t shells < <(
 mapfile -t workflows < <(git ls-files -co --exclude-standard -- '.github/workflows/*.yml')
 
 lean_lane() {
-	run build lake --wfail build
+	# the executables the parallel steps below run (fvatest: test-checks + test-char beside
+	# `lake test`), as gate.yml's build job builds them
+	run build bash -c 'lake --wfail build && lake --wfail build fvatest fvafuzz'
 	# the .olean pins (D48): the package files the Mathlib cache delivered
 	run olean-pins scripts/make-olean-pins --check &
 	# the planted checks need the built fvamut; they run beside the rest of this lane
 	run checks scripts/test-checks &
 	run test lake --wfail test
+	# characterization goldens (official-script outcomes, CLI help, lifts): beside the rest, once
+	# fvatest + fva are built
+	if ((fast)); then run char scripts/test-char --fast & else run char scripts/test-char & fi
 	run decoder scripts/test-decoder
 	run numerics scripts/test-numerics
 	if ((fast)); then run floatdiff scripts/test-floatdiff --fast; else run floatdiff scripts/test-floatdiff; fi

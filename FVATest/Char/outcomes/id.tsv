@@ -1,0 +1,7 @@
+1	module	pass	valid
+26	assert_malformed	skip:text format	not-run:malformed
+27	assert_malformed	skip:text format	not-run:malformed
+28	assert_malformed	skip:text format	not-run:malformed
+29	assert_malformed	skip:text format	not-run:malformed
+30	assert_malformed	skip:text format	not-run:malformed
+31	assert_malformed	skip:text format	not-run:malformed

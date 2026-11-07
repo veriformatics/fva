@@ -1,0 +1,124 @@
+3	module	skip:outside-profile	invalid
+204	assert_return	skip:missing/rejected module	-
+205	assert_return	skip:missing/rejected module	-
+206	assert_return	skip:missing/rejected module	-
+207	assert_return	skip:missing/rejected module	-
+208	assert_return	skip:missing/rejected module	-
+209	assert_return	skip:missing/rejected module	-
+210	assert_return	skip:missing/rejected module	-
+211	assert_return	skip:missing/rejected module	-
+212	assert_return	skip:missing/rejected module	-
+213	assert_return	skip:missing/rejected module	-
+214	assert_return	skip:missing/rejected module	-
+215	assert_return	skip:missing/rejected module	-
+217	assert_return	skip:missing/rejected module	-
+218	assert_return	skip:missing/rejected module	-
+219	assert_return	skip:missing/rejected module	-
+220	assert_return	skip:missing/rejected module	-
+222	assert_return	skip:missing/rejected module	-
+223	assert_return	skip:missing/rejected module	-
+225	assert_return	skip:missing/rejected module	-
+226	assert_return	skip:missing/rejected module	-
+228	assert_return	skip:missing/rejected module	-
+229	assert_return	skip:missing/rejected module	-
+230	assert_return	skip:missing/rejected module	-
+231	assert_return	skip:missing/rejected module	-
+233	assert_return	skip:missing/rejected module	-
+234	assert_return	skip:missing/rejected module	-
+235	assert_return	skip:missing/rejected module	-
+237	assert_return	skip:missing/rejected module	-
+238	assert_return	skip:missing/rejected module	-
+239	assert_return	skip:missing/rejected module	-
+240	assert_return	skip:missing/rejected module	-
+241	assert_return	skip:missing/rejected module	-
+243	assert_return	skip:missing/rejected module	-
+244	assert_return	skip:missing/rejected module	-
+245	assert_return	skip:missing/rejected module	-
+247	assert_return	skip:missing/rejected module	-
+248	assert_return	skip:missing/rejected module	-
+249	assert_return	skip:missing/rejected module	-
+251	assert_return	skip:missing/rejected module	-
+252	assert_return	skip:missing/rejected module	-
+253	assert_return	skip:missing/rejected module	-
+255	assert_return	skip:missing/rejected module	-
+256	assert_return	skip:missing/rejected module	-
+258	assert_return	skip:missing/rejected module	-
+259	assert_return	skip:missing/rejected module	-
+261	assert_return	skip:missing/rejected module	-
+262	assert_return	skip:missing/rejected module	-
+263	assert_trap	skip:missing/rejected module	-
+265	assert_return	skip:missing/rejected module	-
+266	assert_return	skip:missing/rejected module	-
+267	assert_return	skip:missing/rejected module	-
+268	assert_return	skip:missing/rejected module	-
+270	assert_return	skip:missing/rejected module	-
+272	assert_return	skip:missing/rejected module	-
+273	assert_return	skip:missing/rejected module	-
+274	assert_return	skip:missing/rejected module	-
+276	assert_return	skip:missing/rejected module	-
+277	assert_return	skip:missing/rejected module	-
+278	assert_return	skip:missing/rejected module	-
+280	assert_return	skip:missing/rejected module	-
+281	assert_return	skip:missing/rejected module	-
+282	assert_return	skip:missing/rejected module	-
+285	assert_invalid	pass	invalid
+290	assert_invalid	pass	invalid
+295	module	pass	valid
+296	module	pass	valid
+299	assert_invalid	pass	invalid
+304	assert_invalid	pass	invalid
+309	assert_invalid	pass	invalid
+314	assert_invalid	pass	invalid
+319	assert_invalid	pass	invalid
+324	assert_invalid	pass	invalid
+329	assert_invalid	pass	invalid
+334	assert_invalid	pass	invalid
+339	assert_invalid	pass	invalid
+344	assert_invalid	pass	invalid
+349	assert_invalid	pass	invalid
+354	assert_invalid	pass	invalid
+359	assert_invalid	pass	invalid
+364	assert_invalid	pass	invalid
+369	assert_invalid	pass	invalid
+373	module	skip:outside-profile	invalid
+374	module	skip:outside-profile	invalid
+377	assert_invalid	pass	invalid
+381	module	pass	valid
+385	assert_malformed	pass	not-run:malformed
+398	assert_malformed	pass	not-run:malformed
+411	module	pass	valid
+415	assert_malformed	pass	not-run:malformed
+427	assert_malformed	pass	not-run:malformed
+441	assert_invalid	pass	invalid
+446	assert_invalid	pass	invalid
+454	assert_invalid	pass	invalid
+462	assert_invalid	pass	invalid
+472	assert_invalid	pass	invalid
+477	assert_invalid	pass	invalid
+485	assert_invalid	pass	invalid
+493	assert_invalid	pass	invalid
+503	assert_invalid	pass	invalid
+512	assert_invalid	pass	invalid
+522	assert_invalid	pass	invalid
+532	assert_invalid	pass	invalid
+542	assert_invalid	pass	invalid
+552	assert_invalid	pass	invalid
+562	assert_invalid	pass	invalid
+572	assert_invalid	pass	invalid
+582	assert_invalid	pass	invalid
+591	assert_invalid	pass	invalid
+600	assert_invalid	pass	invalid
+610	assert_invalid	pass	invalid
+629	module	pass	valid
+632	register	pass	-
+634	module	skip:outside-profile	malformed
+659	assert_return	skip:missing/rejected module	-
+660	assert_return	skip:missing/rejected module	-
+661	assert_return	skip:missing/rejected module	-
+663	assert_return	skip:missing/rejected module	-
+664	assert_return	skip:missing/rejected module	-
+667	assert_invalid	pass	invalid
+675	assert_invalid	skip:decode-error	malformed
+686	assert_malformed	skip:text format	not-run:malformed
+693	assert_malformed	skip:text format	not-run:malformed
+700	assert_malformed	skip:text format	not-run:malformed

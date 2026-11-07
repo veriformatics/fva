@@ -1,0 +1,4 @@
+1	module	pass	valid
+2	assert_return	pass	-
+2	assert_return	fail	-
+3	assert_trap	fail	-

@@ -1,0 +1,10 @@
+Usage: fva init <directory> [--lib Name] [--wasm file.wasm]
+
+Create a verification project: FVA vendored in fva/, a lakefile, and templates for the
+spec and the proofs. With --wasm, also the artifact and its lifted module.
+
+Options:
+  --lib Name         The library name, a Lean module name (default Verified).
+  --wasm file.wasm   Copy this artifact into the project and lift it.
+
+Exit status: 0 when the project is written, 2 for a usage or setup error.

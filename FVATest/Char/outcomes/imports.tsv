@@ -1,0 +1,218 @@
+3	module	skip:outside-profile	unsupported
+19	register	skip:register rejected module	-
+21	module	pass	valid
+22	register	pass	-
+23	module	pass	valid
+24	register	pass	-
+26	module	pass	valid
+27	register	pass	-
+28	module	pass	valid
+29	register	pass	-
+35	module	skip:outside-profile	unsupported
+97	assert_return	skip:missing/rejected module	-
+98	assert_return	skip:missing/rejected module	-
+101	assert_invalid	pass	invalid
+109	module	pass	valid
+116	assert_return	pass	-
+119	module	pass	valid
+126	assert_return	pass	-
+128	module	skip:unavailable import	valid
+129	module	skip:unavailable import	valid
+130	module	skip:unavailable import	valid
+131	module	skip:unavailable import	valid
+132	module	skip:unavailable import	valid
+133	module	skip:unavailable import	valid
+134	module	skip:unavailable import	valid
+137	assert_unlinkable	skip:unavailable import	valid
+141	assert_unlinkable	pass	valid
+146	assert_unlinkable	skip:unavailable import	valid
+150	assert_unlinkable	skip:unavailable import	valid
+154	assert_unlinkable	skip:unavailable import	valid
+158	assert_unlinkable	skip:unavailable import	valid
+162	assert_unlinkable	skip:unavailable import	valid
+166	assert_unlinkable	skip:unavailable import	valid
+170	assert_unlinkable	skip:unavailable import	valid
+174	assert_unlinkable	skip:unavailable import	valid
+178	assert_unlinkable	skip:unavailable import	valid
+182	assert_unlinkable	skip:unavailable import	valid
+186	assert_unlinkable	skip:unavailable import	valid
+190	assert_unlinkable	skip:unavailable import	valid
+194	assert_unlinkable	skip:unavailable import	valid
+198	assert_unlinkable	skip:unavailable import	valid
+202	assert_unlinkable	skip:unavailable import	valid
+206	assert_unlinkable	skip:unavailable import	valid
+211	assert_unlinkable	skip:unavailable import	valid
+215	assert_unlinkable	pass	valid
+219	assert_unlinkable	pass	valid
+223	assert_unlinkable	skip:unavailable import	valid
+227	assert_unlinkable	pass	valid
+231	assert_unlinkable	pass	valid
+235	assert_unlinkable	pass	valid
+240	assert_unlinkable	skip:outside-profile	unsupported
+244	assert_unlinkable	skip:outside-profile	unsupported
+248	assert_unlinkable	skip:outside-profile	unsupported
+252	assert_unlinkable	skip:outside-profile	unsupported
+256	assert_unlinkable	skip:outside-profile	unsupported
+263	module	pass	valid
+283	assert_return	pass	-
+284	assert_return	pass	-
+285	assert_return	pass	-
+286	assert_return	pass	-
+287	assert_return	pass	-
+288	assert_return	pass	-
+289	assert_return	pass	-
+291	module	skip:unavailable import	valid
+292	module	skip:unavailable import	valid
+293	module	skip:unavailable import	valid
+296	assert_unlinkable	skip:unavailable import	valid
+300	assert_unlinkable	pass	valid
+305	assert_unlinkable	skip:unavailable import	valid
+309	assert_unlinkable	skip:unavailable import	valid
+313	assert_unlinkable	skip:unavailable import	valid
+317	assert_unlinkable	skip:unavailable import	valid
+321	assert_unlinkable	skip:unavailable import	valid
+325	assert_unlinkable	skip:unavailable import	valid
+329	assert_unlinkable	skip:unavailable import	valid
+333	assert_unlinkable	skip:unavailable import	valid
+337	assert_unlinkable	skip:unavailable import	valid
+341	assert_unlinkable	skip:unavailable import	valid
+345	assert_unlinkable	skip:unavailable import	valid
+349	assert_unlinkable	skip:unavailable import	valid
+354	assert_unlinkable	skip:unavailable import	valid
+358	assert_unlinkable	pass	valid
+362	assert_unlinkable	pass	valid
+366	assert_unlinkable	pass	valid
+370	assert_unlinkable	pass	valid
+374	assert_unlinkable	pass	valid
+381	module	pass	valid
+393	assert_trap	pass	-
+394	assert_return	pass	-
+395	assert_return	pass	-
+396	assert_trap	pass	-
+397	assert_trap	pass	-
+398	module	pass	valid
+410	assert_trap	pass	-
+411	assert_return	pass	-
+412	assert_return	pass	-
+413	assert_trap	pass	-
+414	assert_trap	pass	-
+415	module	pass	valid
+416	module	pass	valid
+417	module	pass	valid
+418	module	pass	valid
+419	module	pass	valid
+420	module	pass	valid
+421	module	pass	valid
+422	module	pass	valid
+423	module	pass	valid
+424	module	pass	valid
+425	module	pass	valid
+426	module	pass	valid
+427	module	pass	valid
+428	module	pass	valid
+429	module	pass	valid
+430	module	pass	valid
+431	module	pass	valid
+432	module	pass	valid
+433	module	pass	valid
+434	module	pass	valid
+435	module	pass	valid
+436	module	pass	valid
+437	module	pass	valid
+438	module	pass	valid
+441	assert_unlinkable	skip:unavailable import	valid
+445	assert_unlinkable	pass	valid
+450	assert_unlinkable	pass	valid
+454	assert_unlinkable	pass	valid
+458	assert_unlinkable	pass	valid
+462	assert_unlinkable	pass	valid
+466	assert_unlinkable	pass	valid
+470	assert_unlinkable	pass	valid
+475	assert_unlinkable	skip:unavailable import	valid
+479	assert_unlinkable	skip:unavailable import	valid
+483	assert_unlinkable	pass	valid
+487	assert_unlinkable	pass	valid
+494	module	pass	valid
+501	assert_return	pass	-
+502	assert_return	pass	-
+503	assert_return	pass	-
+504	assert_trap	pass	-
+506	module	pass	valid
+507	module	pass	valid
+513	assert_return	pass	-
+514	assert_return	pass	-
+515	assert_return	pass	-
+516	assert_trap	pass	-
+518	module	pass	valid
+520	module	pass	valid
+521	module	pass	valid
+522	module	pass	valid
+523	module	pass	valid
+524	module	pass	valid
+525	module	pass	valid
+526	module	pass	valid
+527	module	pass	valid
+528	module	pass	valid
+529	module	pass	valid
+530	module	pass	valid
+531	module	pass	valid
+532	module	pass	valid
+533	module	pass	valid
+534	module	pass	valid
+535	module	pass	valid
+536	module	pass	valid
+539	assert_unlinkable	skip:unavailable import	valid
+543	assert_unlinkable	pass	valid
+548	assert_unlinkable	pass	valid
+552	assert_unlinkable	pass	valid
+556	assert_unlinkable	pass	valid
+560	assert_unlinkable	pass	valid
+564	assert_unlinkable	pass	valid
+568	assert_unlinkable	pass	valid
+572	assert_unlinkable	pass	valid
+576	assert_unlinkable	pass	valid
+580	assert_unlinkable	pass	valid
+584	assert_unlinkable	pass	valid
+588	assert_unlinkable	pass	valid
+592	assert_unlinkable	pass	valid
+596	assert_unlinkable	pass	valid
+600	assert_unlinkable	pass	valid
+604	assert_unlinkable	pass	valid
+608	assert_unlinkable	pass	valid
+612	assert_unlinkable	pass	valid
+616	assert_unlinkable	pass	valid
+620	assert_unlinkable	pass	valid
+624	assert_unlinkable	pass	valid
+629	assert_unlinkable	skip:unavailable import	valid
+633	assert_unlinkable	skip:unavailable import	valid
+637	assert_unlinkable	pass	valid
+641	assert_unlinkable	pass	valid
+645	assert_unlinkable	pass	valid
+649	assert_unlinkable	pass	valid
+654	assert_unlinkable	pass	valid
+658	assert_unlinkable	pass	valid
+662	module	pass	valid
+666	assert_return	pass	-
+667	assert_return	pass	-
+668	assert_return	pass	-
+669	assert_return	pass	-
+670	assert_return	pass	-
+676	assert_malformed	skip:text format	not-run:malformed
+680	assert_malformed	skip:text format	not-run:malformed
+684	assert_malformed	skip:text format	not-run:malformed
+688	assert_malformed	skip:text format	not-run:malformed
+693	assert_malformed	skip:text format	not-run:malformed
+697	assert_malformed	skip:text format	not-run:malformed
+701	assert_malformed	skip:text format	not-run:malformed
+705	assert_malformed	skip:text format	not-run:malformed
+710	assert_malformed	skip:text format	not-run:malformed
+714	assert_malformed	skip:text format	not-run:malformed
+718	assert_malformed	skip:text format	not-run:malformed
+722	assert_malformed	skip:text format	not-run:malformed
+727	assert_malformed	skip:text format	not-run:malformed
+731	assert_malformed	skip:text format	not-run:malformed
+735	assert_malformed	skip:text format	not-run:malformed
+739	assert_malformed	skip:text format	not-run:malformed
+746	module	pass	valid
+747	register	pass	-
+749	assert_unlinkable	pass	valid

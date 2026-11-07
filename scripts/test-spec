@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Official validation + execution scripts; exact counts prevent shrinking runs.
-# Four workers; --fast omits bulk + memory_fill. memory_copy validates without executing (D30).
+# Four workers; --fast omits bulk + memory_fill.
 # Validation columns: module unlinkable uninstantiable invalid malformed outside undecodable.
 # Differential columns: valid invalid undecoded (binary candidates; wasm2,-simd oracle).
 # FVA_SPEC_COUNTS=<file> records actual rows without bypassing comparison; names select scripts.
@@ -50,14 +50,14 @@ LEAN
 	exit 0
 fi
 # script pass fail skip; longest scripts first keeps the parallel tail short.
-pinned="memory_copy 97 0 4353
+pinned="memory_copy 4450 0 0
 memory_fill 100 0 0
 bulk 117 0 0
 address 259 0 1
 align 115 0 50
 annotations 10 0 64
-binary 20 0 109
-binary-leb128 33 0 58
+binary 128 0 1
+binary-leb128 91 0 0
 block 208 0 15
 br 97 0 0
 br_if 118 0 1
@@ -66,7 +66,7 @@ call_indirect 161 0 11
 comments 8 0 0
 const 702 0 76
 conversions 619 0 0
-custom 3 0 8
+custom 11 0 0
 data 62 0 6
 elem 122 0 32
 endianness 69 0 0
@@ -85,18 +85,18 @@ float_misc 471 0 0
 forward 5 0 0
 func 151 0 24
 func_ptrs 36 0 0
-global 45 0 79
+global 49 0 75
 i32 458 0 2
 i64 414 0 2
 id 1 0 6
 if 217 0 24
-imports 182 0 36
+imports 143 0 75
 inline-module 1 0 0
 int_exprs 108 0 0
 int_literals 31 0 20
 labels 29 0 0
 left-to-right 96 0 0
-linking 133 0 30
+linking 120 0 43
 load 84 0 13
 local_get 36 0 0
 local_set 53 0 0
@@ -392,7 +392,7 @@ diff_script() {
 # Exported for the xargs child shells.
 # shellcheck disable=SC2329
 run_script() {
-	local name=$1 start=$SECONDS rc diff_rc validation_only=${FVA_SPEC_VALIDATE_ONLY-0}
+	local name=$1 start=$SECONDS rc diff_rc
 	mkdir -p "$work/$name"
 	if ! wasm-tools json-from-wast "$root/.cache/corpus/testsuite/$name.wast" \
 		-o "$work/$name/$name.json" --wasm-dir "$work/$name/" 2>"$work/$name.err"; then
@@ -400,8 +400,7 @@ run_script() {
 		: >"$work/$name.infra"
 		return 1
 	fi
-	if [[ $name == memory_copy ]]; then validation_only=1; fi
-	FVA_SPEC_VALIDATE_ONLY=$validation_only timeout 900s \
+	timeout 900s \
 		"$root/.lake/build/bin/fvatest" spec "$work/$name/$name.json" \
 		>"$work/$name.out" 2>>"$work/$name.err"
 	rc=$?

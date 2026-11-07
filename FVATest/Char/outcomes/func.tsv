@@ -1,0 +1,175 @@
+3	module	pass	valid
+241	assert_return	pass	-
+242	assert_return	pass	-
+243	assert_return	pass	-
+245	assert_return	pass	-
+248	assert_return	pass	-
+249	assert_return	pass	-
+251	assert_return	pass	-
+255	assert_return	pass	-
+256	assert_return	pass	-
+257	assert_return	pass	-
+258	assert_return	pass	-
+259	assert_return	pass	-
+260	assert_return	pass	-
+261	assert_return	pass	-
+262	assert_return	pass	-
+263	assert_return	pass	-
+266	assert_return	pass	-
+269	assert_return	pass	-
+272	assert_return	pass	-
+275	assert_return	pass	-
+278	assert_return	pass	-
+281	assert_return	pass	-
+284	assert_return	pass	-
+287	assert_return	pass	-
+291	assert_return	pass	-
+298	assert_return	pass	-
+299	assert_return	pass	-
+300	assert_return	pass	-
+301	assert_return	pass	-
+302	assert_return	pass	-
+303	assert_return	pass	-
+304	assert_return	pass	-
+305	assert_return	pass	-
+308	assert_return	pass	-
+309	assert_return	pass	-
+310	assert_return	pass	-
+312	assert_return	pass	-
+313	assert_return	pass	-
+314	assert_return	pass	-
+315	assert_return	pass	-
+316	assert_return	pass	-
+317	assert_return	pass	-
+318	assert_return	pass	-
+321	assert_return	pass	-
+322	assert_return	pass	-
+324	assert_return	pass	-
+325	assert_return	pass	-
+326	assert_return	pass	-
+327	assert_return	pass	-
+328	assert_return	pass	-
+329	assert_return	pass	-
+330	assert_return	pass	-
+333	assert_return	pass	-
+334	assert_return	pass	-
+336	assert_return	pass	-
+337	assert_return	pass	-
+338	assert_return	pass	-
+339	assert_return	pass	-
+340	assert_return	pass	-
+343	assert_return	pass	-
+347	assert_return	pass	-
+348	assert_return	pass	-
+349	assert_return	pass	-
+350	assert_return	pass	-
+351	assert_return	pass	-
+352	assert_return	pass	-
+353	assert_return	pass	-
+354	assert_return	pass	-
+355	assert_return	pass	-
+358	assert_return	pass	-
+361	assert_return	pass	-
+364	assert_return	pass	-
+367	assert_return	pass	-
+368	assert_return	pass	-
+369	assert_return	pass	-
+370	assert_return	pass	-
+372	assert_return	pass	-
+375	assert_return	pass	-
+378	assert_return	pass	-
+381	assert_return	pass	-
+384	assert_return	pass	-
+388	assert_return	pass	-
+392	assert_return	pass	-
+396	assert_return	pass	-
+401	assert_return	pass	-
+414	assert_return	pass	-
+415	assert_return	pass	-
+416	assert_return	pass	-
+417	assert_return	pass	-
+422	module	pass	valid
+436	assert_invalid	pass	invalid
+448	assert_malformed	skip:text format	not-run:malformed
+459	module	pass	valid
+483	assert_return	pass	-
+484	assert_return	pass	-
+485	assert_return	pass	-
+488	module	pass	valid
+551	assert_return	pass	-
+552	assert_return	pass	-
+553	assert_return	pass	-
+554	assert_return	pass	-
+560	assert_malformed	skip:text format	not-run:malformed
+567	assert_malformed	skip:text format	not-run:malformed
+574	assert_malformed	skip:text format	not-run:malformed
+581	assert_malformed	skip:text format	not-run:malformed
+588	assert_malformed	skip:text format	not-run:malformed
+595	assert_malformed	skip:text format	not-run:malformed
+602	assert_malformed	skip:text format	not-run:malformed
+609	assert_malformed	skip:text format	not-run:malformed
+616	assert_malformed	skip:text format	not-run:malformed
+623	assert_malformed	skip:text format	not-run:malformed
+631	assert_invalid	pass	invalid
+635	assert_invalid	pass	invalid
+647	assert_invalid	pass	invalid
+651	assert_invalid	pass	invalid
+655	assert_invalid	pass	invalid
+660	assert_invalid	skip:decode-error	malformed
+671	assert_invalid	pass	invalid
+675	assert_invalid	pass	invalid
+679	assert_invalid	pass	invalid
+687	assert_invalid	pass	invalid
+691	assert_invalid	pass	invalid
+695	assert_invalid	pass	invalid
+699	assert_invalid	pass	invalid
+703	assert_invalid	pass	invalid
+708	assert_invalid	pass	invalid
+714	assert_invalid	pass	invalid
+720	assert_invalid	pass	invalid
+726	assert_invalid	pass	invalid
+732	assert_invalid	pass	invalid
+738	assert_invalid	pass	invalid
+744	assert_invalid	pass	invalid
+751	assert_invalid	pass	invalid
+757	assert_invalid	pass	invalid
+763	assert_invalid	pass	invalid
+769	assert_invalid	pass	invalid
+775	assert_invalid	pass	invalid
+781	assert_invalid	pass	invalid
+788	assert_invalid	pass	invalid
+794	assert_invalid	pass	invalid
+800	assert_invalid	pass	invalid
+806	assert_invalid	pass	invalid
+812	assert_invalid	pass	invalid
+818	assert_invalid	pass	invalid
+824	assert_invalid	pass	invalid
+830	assert_invalid	pass	invalid
+836	assert_invalid	pass	invalid
+843	assert_invalid	pass	invalid
+849	assert_invalid	pass	invalid
+855	assert_invalid	pass	invalid
+861	assert_invalid	pass	invalid
+867	assert_invalid	pass	invalid
+873	assert_invalid	pass	invalid
+879	assert_invalid	pass	invalid
+885	assert_invalid	pass	invalid
+891	assert_invalid	pass	invalid
+898	assert_invalid	pass	invalid
+904	assert_invalid	pass	invalid
+910	assert_invalid	pass	invalid
+916	assert_invalid	pass	invalid
+922	assert_invalid	pass	invalid
+928	assert_invalid	pass	invalid
+938	assert_malformed	skip:text format	not-run:malformed
+942	assert_malformed	skip:text format	not-run:malformed
+946	assert_malformed	skip:text format	not-run:malformed
+950	assert_malformed	skip:text format	not-run:malformed
+954	assert_malformed	skip:text format	not-run:malformed
+958	assert_malformed	skip:text format	not-run:malformed
+965	assert_malformed	skip:text format	not-run:malformed
+969	assert_malformed	skip:text format	not-run:malformed
+973	assert_malformed	skip:text format	not-run:malformed
+978	assert_malformed	skip:text format	not-run:malformed
+982	assert_malformed	skip:text format	not-run:malformed
+986	assert_malformed	skip:text format	not-run:malformed

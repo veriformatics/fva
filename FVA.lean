@@ -18,6 +18,9 @@ import FVA.Impl.Valid
 import FVA.Impl.Numerics.Float
 import FVA.Impl.Exec.Ref
 import FVA.Impl.Exec.Access
+import FVA.Impl.Exec.Imports
+import FVA.Impl.Exec.Chunks
+import FVA.Impl.Exec.Machine
 import FVA.Lifted
 import FVA.Proof.Decode.Reader
 import FVA.Proof.Decode.Name
@@ -47,6 +50,9 @@ import FVA.Proof.Exec.Access
 import FVA.Proof.Exec.Choice
 import FVA.Proof.Exec.Spike
 import FVA.Proof.Exec.Instantiate
+import FVA.Proof.Exec.Imports
+import FVA.Proof.Exec.Chunks
+import FVA.Proof.Exec.Machine
 import FVA.Proof.Pin.Decode
 import FVA.Proof.Pin.Exec
 import FVA.Proof.Valid.Validator

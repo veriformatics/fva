@@ -1,0 +1,3 @@
+Usage: fva decode <file.wasm>...
+
+Show a summary of each .wasm file that FVA decodes.

@@ -1,0 +1,23 @@
+Usage: fva <command> [options]
+
+FVA checks formal proofs about compiled WebAssembly programs.
+
+Commands:
+  help      Show this help.
+  init      Create a verification project with FVA in it.
+  version   Show the FVA version.
+  decode    Show a summary of each .wasm file that FVA decodes.
+  lift      Write a Lean module that holds a .wasm file and its decoded syntax.
+  difftest  Compare the Lean semantics with wasmtime on the exported functions of .wasm
+            files.
+  trust     Check that a project's claims are proven, about the artifact, with a small
+            spec.
+  explain   Explain a project's claims in plain English and compare them with your
+            requirements.
+  blob      Write a Lean module that holds the bytes of a file.
+  certify   Write a certificate: a claim that an output file stands in a relation to an
+            input file, and its proof by a verified checker.
+  call      Write the claim and the proof of what one call of an exported function
+            returns.
+
+Run "fva <command> --help" to see the arguments and options of a command.

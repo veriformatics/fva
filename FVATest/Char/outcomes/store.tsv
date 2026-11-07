@@ -1,0 +1,68 @@
+3	module	pass	valid
+44	assert_return	pass	-
+45	assert_return	pass	-
+47	assert_return	pass	-
+48	assert_return	pass	-
+49	assert_return	pass	-
+50	assert_return	pass	-
+52	assert_return	pass	-
+54	assert_return	pass	-
+55	assert_return	pass	-
+58	assert_malformed	skip:text format	not-run:malformed
+65	assert_malformed	skip:text format	not-run:malformed
+73	assert_malformed	skip:text format	not-run:malformed
+81	assert_malformed	skip:text format	not-run:malformed
+88	assert_malformed	skip:text format	not-run:malformed
+96	assert_malformed	skip:text format	not-run:malformed
+103	assert_malformed	skip:text format	not-run:malformed
+112	assert_invalid	pass	invalid
+116	assert_invalid	pass	invalid
+120	assert_invalid	pass	invalid
+124	assert_invalid	pass	invalid
+128	assert_invalid	pass	invalid
+132	assert_invalid	pass	invalid
+136	assert_invalid	pass	invalid
+140	assert_invalid	pass	invalid
+144	assert_invalid	pass	invalid
+150	assert_invalid	pass	invalid
+159	assert_invalid	pass	invalid
+168	assert_invalid	pass	invalid
+178	assert_invalid	pass	invalid
+188	assert_invalid	pass	invalid
+198	assert_invalid	pass	invalid
+208	assert_invalid	pass	invalid
+218	assert_invalid	pass	invalid
+228	assert_invalid	pass	invalid
+238	assert_invalid	pass	invalid
+248	assert_invalid	pass	invalid
+258	assert_invalid	pass	invalid
+268	assert_invalid	pass	invalid
+278	assert_invalid	pass	invalid
+288	assert_invalid	pass	invalid
+298	assert_invalid	pass	invalid
+308	assert_invalid	pass	invalid
+317	assert_invalid	pass	invalid
+326	assert_invalid	pass	invalid
+335	assert_invalid	pass	invalid
+344	assert_invalid	pass	invalid
+354	assert_invalid	pass	invalid
+364	assert_invalid	pass	invalid
+380	assert_invalid	pass	invalid
+399	assert_invalid	pass	invalid
+400	assert_invalid	pass	invalid
+401	assert_invalid	pass	invalid
+402	assert_invalid	pass	invalid
+403	assert_invalid	pass	invalid
+404	assert_invalid	pass	invalid
+405	assert_invalid	pass	invalid
+406	assert_invalid	pass	invalid
+407	assert_invalid	pass	invalid
+409	assert_invalid	pass	invalid
+410	assert_invalid	pass	invalid
+411	assert_invalid	pass	invalid
+412	assert_invalid	pass	invalid
+413	assert_invalid	pass	invalid
+414	assert_invalid	pass	invalid
+415	assert_invalid	pass	invalid
+416	assert_invalid	pass	invalid
+417	assert_invalid	pass	invalid

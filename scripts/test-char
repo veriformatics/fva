@@ -1,0 +1,280 @@
+#!/usr/bin/env bash
+# Direct runner trace + CLI help + tracked Wasm lift goldens. No observation reuse.
+# 0 pass / 1 behavior mismatch / 2 setup / 3 program-under-test crash.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+root=$PWD
+export PATH="$root/.tools/bin:$PATH"
+export LC_ALL=C
+started=$SECONDS
+regen=false
+fast=false
+for arg in "$@"; do
+	case $arg in
+	--regen)
+		if $regen; then exit 2; fi
+		regen=true
+		;;
+	--fast)
+		if $fast; then exit 2; fi
+		fast=true
+		;;
+	--help)
+		printf '%s\n' 'Usage: scripts/test-char [--fast | --regen]' \
+			'--fast omits bulk and memory_fill, as scripts/test-spec does.' \
+			'--regen observes the full corpus and rewrites its goldens.'
+		exit 0
+		;;
+	*) exit 2 ;;
+	esac
+done
+if $fast && $regen; then
+	echo 'test-char: regenerate the full corpus' >&2
+	exit 2
+fi
+for tool in lake nice jq sha256sum git timeout xargs wasm-tools; do
+	command -v "$tool" >/dev/null || {
+		echo "test-char: missing $tool" >&2
+		exit 2
+	}
+done
+jobs=${FVA_CHAR_JOBS-4}
+[[ $jobs =~ ^[1-9][0-9]*$ ]] || {
+	echo 'test-char: invalid FVA_CHAR_JOBS' >&2
+	exit 2
+}
+mkdir -p .cache || exit 2
+work=$(mktemp -d "$root/.cache/char-run.XXXXXX") || exit 2
+trap 'rm -rf "$work"' EXIT
+mkdir -p "$work/actual/outcomes" "$work/actual/help" || exit 2
+# Bootstrap is separate: shared corpus/tool/package symlinks remain read-only.
+awk '/^[[:space:]]*"testsuite\/.*\.wast / {
+	gsub(/"/, ""); print $3 "  .cache/corpus/" $1
+}' scripts/fetch-corpus >"$work/corpus.sha256"
+if [[ ! -s $work/corpus.sha256 ]] || ! sha256sum -c --status "$work/corpus.sha256"; then
+	echo 'test-char: corpus absent or unpinned; run scripts/fetch-corpus' >&2
+	exit 2
+fi
+nice -n 10 lake build fvatest fva >"$work/build.log" 2>&1
+rc=$?
+if ((rc)); then
+	tail -20 "$work/build.log" >&2
+	exit 2
+fi
+scripts/test-char-fixture >"$work/fixtures.log" 2>&1
+rc=$?
+if ((rc)); then
+	cat "$work/fixtures.log" >&2
+	exit "$rc"
+fi
+awk -v fast="$fast" '
+/^pinned="/ {active=1; sub(/^pinned="/, "")}
+active {
+	last=($0 ~ /"$/); sub(/"$/, "")
+	if (NF != 4) exit 2
+	if (!(fast == "true" && $1 ~ /^(bulk|memory_fill)$/)) print $1
+	if (last) {done=1; exit}
+}
+END {if (!done) exit 2}
+' scripts/test-spec >"$work/names" || exit 2
+if [[ ! -s $work/names ]] || [[ $(sort -u "$work/names" | wc -l) != "$(wc -l <"$work/names")" ]]; then
+	echo 'test-char: empty or duplicate official script list' >&2
+	exit 2
+fi
+# shellcheck disable=SC2329
+run_outcome() {
+	local name=$1 begin=$SECONDS rc mode=execution
+	local dir=$work/input/$1
+	local -a files
+	if ! mkdir -p "$dir"; then
+		echo 2 >"$work/$name.rc"
+		return 2
+	fi
+	if ! wasm-tools json-from-wast "$root/.cache/corpus/testsuite/$name.wast" \
+		-o "$dir/$name.json" --wasm-dir "$dir/" >"$work/$name.convert" 2>&1; then
+		cat "$work/$name.convert" >&2
+		echo 2 >"$work/$name.rc"
+		return 2
+	fi
+	FVA_SPEC_OUTCOMES="$work/$name.trace" \
+		nice -n 10 timeout 900s "$root/.lake/build/bin/fvatest" spec "$dir/$name.json" \
+		>"$work/$name.stdout" 2>"$work/$name.err"
+	rc=$?
+	if ((rc == 124 || rc >= 128)); then
+		rc=3
+	elif ((rc > 1)); then
+		rc=2
+	else
+		rc=0
+	fi
+	if ((rc)); then
+		cat "$work/$name.err" >&2
+		echo "$rc" >"$work/$name.rc"
+		return "$rc"
+	fi
+	if ! jq -r '.commands[] | [.line, .type, (.module_type // "binary"),
+		(.filename // "-")] | @tsv' "$dir/$name.json" >"$work/$name.meta" ||
+		! jq -r --arg dir "$dir" '.commands[]
+		| select(.type == "module" or .type == "assert_invalid" or
+			.type == "assert_unlinkable" or .type == "assert_uninstantiable")
+		| select((.module_type // "binary") == "binary")
+		| $dir + "/" + .filename' "$dir/$name.json" >"$work/$name.candidates"; then
+		echo 2 >"$work/$name.rc"
+		return 2
+	fi
+	mapfile -t files <"$work/$name.candidates"
+	: >"$work/$name.valid"
+	if ((${#files[@]})); then
+		nice -n 10 timeout 60s "$root/.lake/build/bin/fvatest" validate "${files[@]}" \
+			>"$work/$name.valid" 2>>"$work/$name.err"
+		rc=$?
+		if ((rc == 124 || rc >= 128)); then
+			rc=3
+		elif ((rc > 1)); then
+			rc=2
+		else
+			rc=0
+		fi
+		if ((rc)); then
+			cat "$work/$name.err" >&2
+			echo "$rc" >"$work/$name.rc"
+			return "$rc"
+		fi
+	fi
+	if ! cmp -s <(cut -f1 "$work/$name.valid") "$work/$name.candidates"; then
+		echo "test-char: $name validator candidate count/order mismatch" >&2
+		echo 1 >"$work/$name.rc"
+		return 1
+	fi
+	bash "$root/FVATest/Char/normalize-outcomes" "$work/$name.meta" "$work/$name.valid" \
+		"$work/$name.trace" "$work/actual/outcomes/$name.tsv"
+	rc=$?
+	if ((rc)); then
+		echo "$rc" >"$work/$name.rc"
+		return "$rc"
+	fi
+	awk -v name="$name" -v mode="$mode" '
+	$1 == name && NF == 4 {p=$2; f=$3; s=$4; count++}
+	$1 == "validation" && $2 == name && NF == 9 {
+		v=$3 "\t" $4 "\t" $5 "\t" $6 "\t" $7 "\t" $8 "\t" $9; validation++
+	}
+	END {
+		if (count != 1 || validation != 1) exit 1
+		print name "\t" mode "\t" p "\t" f "\t" s "\t" v
+	}' "$work/$name.stdout" >"$work/$name.row"
+	rc=$?
+	printf '%s\n' "$rc" >"$work/$name.rc"
+	printf '%s %s\n' "$((SECONDS - begin))" "$name" >"$work/$name.time"
+	return "$rc"
+}
+export -f run_outcome
+export root work
+# shellcheck disable=SC2016
+xargs -r -P "$jobs" -n 1 bash -c 'run_outcome "$1"' _ <"$work/names"
+worker_rc=$?
+rc=0
+if ((worker_rc)); then rc=1; fi
+printf '# script\tmode\tpass\tfail\tskip\tmodule\tunlinkable\tuninstantiable\tinvalid\tmalformed\toutside\tundecodable\n' \
+	>"$work/actual/scripts.tsv"
+while IFS= read -r name; do
+	if [[ ! -f $work/$name.rc ]]; then
+		rc=3
+	elif [[ $(<"$work/$name.rc") == 3 ]]; then
+		rc=3
+	elif [[ $(<"$work/$name.rc") == 2 && $rc != 3 ]]; then
+		rc=2
+	fi
+	[[ -f $work/$name.row ]] && cat "$work/$name.row" >>"$work/actual/scripts.tsv"
+done <"$work/names"
+if ((rc)); then
+	echo "test-char: runner capture rc=$rc" >&2
+	exit "$rc"
+fi
+
+capture_help() {
+	local label=$1 rc
+	shift
+	nice -n 10 timeout 60s lake exe fva "$@" >"$work/actual/help/$label.stdout" \
+		2>"$work/actual/help/$label.stderr"
+	rc=$?
+	if ((rc == 124 || rc >= 128)); then return 3; fi
+	if ((rc == 126 || rc == 127)); then return 2; fi
+	printf '%s\n' "$rc" >"$work/actual/help/$label.rc"
+}
+capture_help help help
+rc=$?
+((rc == 0)) || exit "$rc"
+awk '/^Commands:/ {active=1; next} active && /^  [a-z][a-z-]* +/ {print $1}' \
+	"$work/actual/help/help.stdout" >"$work/actual/help/commands.txt"
+[[ -s $work/actual/help/commands.txt ]] || {
+	echo 'test-char: no advertised commands' >&2
+	exit 1
+}
+while IFS= read -r command; do
+	capture_help "$command-help" "$command" --help
+	rc=$?
+	((rc == 0)) || exit "$rc"
+done <"$work/actual/help/commands.txt"
+printf '# path\trc\tsha256 (namespace CharLift; - = no module)\n' >"$work/actual/lift.tsv"
+git ls-files -z '*.wasm' >"$work/wasm-list" || exit 2
+[[ -s $work/wasm-list ]] || {
+	echo 'test-char: no tracked Wasm files' >&2
+	exit 2
+}
+lifts=0
+while IFS= read -r -d '' wasm; do
+	rm -f "$work/CharLift.lean"
+	nice -n 10 timeout 60s lake exe fva lift "$wasm" "$work/CharLift.lean" --ns CharLift \
+		>"$work/lift.stdout" 2>"$work/lift.stderr"
+	rc=$?
+	if ((rc == 124 || rc >= 128)); then
+		cat "$work/lift.stderr" >&2
+		exit 3
+	fi
+	if ((rc == 126 || rc == 127)); then
+		cat "$work/lift.stderr" >&2
+		exit 2
+	fi
+	hash=-
+	if [[ -f $work/CharLift.lean ]]; then
+		hash=$(sha256sum "$work/CharLift.lean") || exit 2
+		hash=${hash%% *}
+	fi
+	printf '%s\t%s\t%s\n' "$wasm" "$rc" "$hash" >>"$work/actual/lift.tsv"
+	lifts=$((lifts + 1))
+done <"$work/wasm-list"
+
+if $regen; then
+	for target in outcomes help lift.tsv scripts.tsv; do
+		if [[ -L FVATest/Char/$target ]]; then
+			echo "test-char: golden symlink $target" >&2
+			exit 2
+		fi
+	done
+	for dir in outcomes help; do
+		rm -rf "FVATest/Char/$dir" || exit 2
+		cp -r "$work/actual/$dir" "FVATest/Char/$dir" || exit 2
+	done
+	cp "$work/actual/"{lift.tsv,scripts.tsv} FVATest/Char/ || exit 2
+	echo 'test-char: goldens regenerated; review the diff'
+else
+	expected=$root/FVATest/Char
+	if $fast; then
+		expected=$work/expected
+		mkdir -p "$expected" || exit 2
+		cp -r FVATest/Char/{outcomes,help,lift.tsv} "$expected/" || exit 2
+		rm -f "$expected/outcomes/"{bulk,memory_fill}.tsv
+		awk -F '\t' '$1 !~ /^(bulk|memory_fill)$/' FVATest/Char/scripts.tsv >"$expected/scripts.tsv"
+	fi
+	bash FVATest/Char/compare-goldens "$expected" "$work/actual"
+	rc=$?
+fi
+commands=$(wc -l <"$work/actual/help/commands.txt")
+rows=$(wc -l "$work/actual/outcomes/"*.tsv | tail -1 | awk '{print $1}')
+mode=full
+if $fast; then mode=fast; fi
+printf 'test-char: %s; %s scripts, %s commands, %s help calls, %s lifts; %ss; rc=%s\n' \
+	"$mode" "$(wc -l <"$work/names")" "$rows" "$((commands + 1))" "$lifts" "$((SECONDS - started))" "$rc"
+echo 'test-char: slowest scripts (seconds name):'
+sort -nr "$work/"*.time | head -5
+exit "$rc"
