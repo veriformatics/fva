@@ -32,6 +32,64 @@ theorem stepN_add (a b : Nat) (c : Config) : stepN (a + b) c = (stepN a c).bind 
 theorem stepN_one {c c' : Config} (h : Ref.step c = some c') : stepN 1 c = some c' := by
   simp [stepN, h]
 
+/-- `k` reference steps, each from a configuration that is no choice point under policy `fits`. -/
+def stepNU (fits : Bool) : Nat → Config → Option Config
+  | 0, c => some c
+  | k + 1, c => bif Ref.uniqueStep fits c then (Ref.step c).bind (stepNU fits k) else none
+
+theorem stepNU_add (fits : Bool) (a b : Nat) (c : Config) :
+    stepNU fits (a + b) c = (stepNU fits a c).bind (stepNU fits b) := by
+  induction a generalizing c with
+  | zero => simp [stepNU]
+  | succ a ih =>
+    rw [show a + 1 + b = (a + b) + 1 by omega]
+    simp only [stepNU]
+    cases Ref.uniqueStep fits c <;> cases Ref.step c <;> simp [ih]
+
+theorem stepNU_one {fits : Bool} {c c' : Config} (hu : Ref.uniqueStep fits c = true)
+    (h : Ref.step c = some c') : stepNU fits 1 c = some c' := by
+  simp [stepNU, hu, h]
+
+theorem stepNU_stepN {fits : Bool} : ∀ {k : Nat} {c c' : Config},
+    stepNU fits k c = some c' → stepN k c = some c'
+  | 0, _, _, h => h
+  | k + 1, c, c', h => by
+    simp only [stepNU] at h
+    cases hu : Ref.uniqueStep fits c
+    · simp [hu] at h
+    · simp only [hu, Bool.cond_true] at h
+      cases hs : Ref.step c with
+      | none => simp [hs] at h
+      | some c₁ =>
+        simp only [hs, Option.bind_some] at h
+        simp only [stepN, hs, Option.bind_some]
+        exact stepNU_stepN h
+
+/-- A step from a configuration unique under `fits` is that step under `fits`. -/
+theorem stepNU_of_one {fits : Bool} {c c' : Config} (h : stepN 1 c = some c')
+    (hu : Ref.uniqueStep fits c = true) : stepNU fits 1 c = some c' := by
+  simp only [stepN, Option.bind_eq_some_iff] at h
+  obtain ⟨c₁, h₁, h₂⟩ := h
+  simp only [Option.some.injEq] at h₂
+  subst h₂
+  exact stepNU_one hu h₁
+
+theorem uniqueStep_focus {fits : Bool} {S : Store} {f : Frame} {stk : List Val} {i : Instr}
+    {rest : List AInstr} (hv : Ref.toVal (.plain i) = none)
+    (hu : Ref.instrUnique fits i stk = true) :
+    Ref.uniqueStep fits ⟨S, f, vals stk.reverse ++ .plain i :: rest⟩ = true := by
+  simp only [Ref.uniqueStep, Ref.seqUnique_vals, List.reverse_reverse, List.append_nil,
+    Ref.seqUnique, hv, Ref.atUnique, hu]
+
+/-- One step at a plain instruction no policy makes a choice point (`rfl` decides both). -/
+theorem stepNU_plain {fits : Bool} {S : Store} {f : Frame} {stk : List Val} {i : Instr}
+    {rest : List AInstr} {c' : Config}
+    (h : Ref.step ⟨S, f, vals stk.reverse ++ .plain i :: rest⟩ = some c')
+    (hv : Ref.toVal (.plain i) = none := by rfl)
+    (hu : Ref.instrUnique fits i stk = true := by rfl) :
+    stepNU fits 1 ⟨S, f, vals stk.reverse ++ .plain i :: rest⟩ = some c' :=
+  stepNU_one (uniqueStep_focus hv hu) h
+
 /-- One control entry around instructions `es` running in frame `f`. -/
 def layer : Ctl → Frame → List AInstr → Frame × List AInstr
   | .label n cont saved rest, f, es => (f, vals saved.reverse ++ [.label n cont es] ++ rest)
@@ -99,6 +157,70 @@ theorem stepN_wrap {S S' : Store} {f f' : Frame} {es es' : List AInstr} (ctl : L
 
 theorem abs_eq_wrapC (m : MState) :
     m.abs = wrapC m.store.abs m.ctl m.frame (vals m.stack.reverse ++ m.code) := rfl
+
+theorem seqUnique_layer (fits : Bool) (S : Store) (c : Ctl) (f : Frame) (es : List AInstr) :
+    Ref.seqUnique fits S (layer c f es).1 [] (layer c f es).2 = Ref.seqUnique fits S f [] es := by
+  cases c with
+  | label n cont saved rest =>
+    simp only [layer, List.append_assoc, Ref.seqUnique_vals, List.singleton_append,
+      Ref.seqUnique, Ref.toVal, Ref.atUnique]
+  | frame n caller saved rest =>
+    simp only [layer, List.append_assoc, Ref.seqUnique_vals, List.singleton_append,
+      Ref.seqUnique, Ref.toVal, Ref.atUnique]
+
+/-- The control stack's layers keep the next redex: uniqueness = the innermost one's. -/
+theorem uniqueStep_wrapC (fits : Bool) (S : Store) (ctl : List Ctl) (f : Frame)
+    (es : List AInstr) :
+    Ref.uniqueStep fits (wrapC S ctl f es) = Ref.uniqueStep fits ⟨S, f, es⟩ := by
+  induction ctl generalizing f es with
+  | nil => rfl
+  | cons c ctl ih =>
+    have h := ih (layer c f es).1 (layer c f es).2
+    simp only [wrapC, Ref.uniqueStep] at h ⊢
+    rw [wrap_cons, h, seqUnique_layer]
+
+theorem stepNU_wrap {fits : Bool} {S S' : Store} {f f' : Frame} {es es' : List AInstr}
+    (ctl : List Ctl) (k : Nat) (h : stepNU fits k ⟨S, f, es⟩ = some ⟨S', f', es'⟩) :
+    stepNU fits k (wrapC S ctl f es) = some (wrapC S' ctl f' es') := by
+  induction k generalizing S f es with
+  | zero =>
+    simp only [stepNU, Option.some.injEq, Config.mk.injEq] at h
+    obtain ⟨rfl, rfl, rfl⟩ := h
+    rfl
+  | succ k ih =>
+    simp only [stepNU] at h ⊢
+    rw [uniqueStep_wrapC]
+    cases hu : Ref.uniqueStep fits ⟨S, f, es⟩
+    · simp [hu] at h
+    · simp only [hu, Bool.cond_true] at h ⊢
+      cases hs : Ref.step ⟨S, f, es⟩ with
+      | none => simp [hs] at h
+      | some c₁ =>
+        rw [hs] at h
+        simp only [Option.bind_some] at h
+        rw [step_wrap ctl (show Ref.step ⟨S, f, es⟩ = some ⟨c₁.store, c₁.frame, c₁.instrs⟩ from hs)]
+        simp only [Option.bind_some]
+        exact ih h
+
+/-- Machine step `m → m'` = `k` reference steps between the abstractions, each no choice point
+under every policy the first is unique under (contract U27 T5). -/
+def Sim (m m' : MState) : Prop :=
+  ∃ k, stepN k m.abs = some m'.abs ∧
+    ∀ fits, Ref.uniqueStep fits m.abs = true → stepNU fits k m.abs = some m'.abs
+
+theorem Sim.zero {m m' : MState} (h : stepN 0 m.abs = some m'.abs) : Sim m m' :=
+  ⟨0, h, fun _ _ => h⟩
+
+theorem Sim.one {m m' : MState} (h : stepN 1 m.abs = some m'.abs) : Sim m m' :=
+  ⟨1, h, fun _ hu => stepNU_of_one h hu⟩
+
+theorem Sim.ofU {m m' : MState} {k : Nat} (h : ∀ fits, stepNU fits k m.abs = some m'.abs) :
+    Sim m m' :=
+  ⟨k, stepNU_stepN (h false), fun fits _ => h fits⟩
+
+theorem Sim.notUnique {m m' : MState} {k : Nat} (h : stepN k m.abs = some m'.abs)
+    (hu : ∀ fits, Ref.uniqueStep fits m.abs = false) : Sim m m' :=
+  ⟨k, h, fun fits h' => by rw [hu] at h'; cases h'⟩
 
 theorem instrStep_mems {S S' : Store} {f f' : Frame} {i : Instr} {stk stk' : List Val}
     {out : List AInstr} (h : Ref.instrStep S f i stk = some (S', f', stk', out))
@@ -397,7 +519,7 @@ unchanged. -/
 theorem sim_one {m m' : MState} (hc : m'.ctl = m.ctl)
     (h : Ref.step ⟨m.store.abs, m.frame, vals m.stack.reverse ++ m.code⟩ =
       some ⟨m'.store.abs, m'.frame, vals m'.stack.reverse ++ m'.code⟩) :
-    ∃ k, stepN k m.abs = some m'.abs := ⟨1, sim_inner (stepN_one h) hc⟩
+    Sim m m' := Sim.one (sim_inner (stepN_one h) hc)
 
 theorem write_cover {mm : MMem} (hi : mm.Inv) {ea k : Nat} (h : ¬ mm.size < ea + k) :
     ea + k ≤ 2 ^ (mm.depth + W) := by
@@ -419,7 +541,7 @@ theorem sim_store {m m' : MState} {t : NumType} {ma : MemArg} {v : Val} {x : Bit
     (hstk : m.stack = v :: .i32 x :: stk) (hm : m.mem0 = some (a, mm)) (hnb : v.numBits t = some c)
     (h : (bif Nat.blt mm.size (x.toNat + ma.offset + t.bytes) then some (m.cont stk [.trap] rest)
       else some ((m.setMem a (mm.write (x.toNat + ma.offset) t.bytes c)).cont stk [] rest)) =
-        some m') : m'.Inv ∧ ∃ k, stepN k m.abs = some m'.abs := by
+        some m') : m'.Inv ∧ Sim m m' := by
   have hst := instrStep_store (stk := stk) (x := x) (ma := ma) (mem0_abs_some hm) hnb
   rw [abs_size, ← hstk] at hst
   cases hb : Nat.blt mm.size (x.toNat + ma.offset + t.bytes)
@@ -447,7 +569,7 @@ theorem sim_storePacked {m m' : MState} {w : Width} {p : PackSize} {ma : MemArg}
     (h : (bif Nat.blt mm.size (x.toNat + ma.offset + p.bits / 8) then
         some (m.cont stk [.trap] rest)
       else some ((m.setMem a (mm.write (x.toNat + ma.offset) (p.bits / 8) c)).cont stk [] rest)) =
-        some m') : m'.Inv ∧ ∃ k, stepN k m.abs = some m'.abs := by
+        some m') : m'.Inv ∧ Sim m m' := by
   have hst := instrStep_storePacked (stk := stk) (x := x) (ma := ma) (p := p)
     (mem0_abs_some hm) hnb
   rw [abs_size, ← hstk] at hst
@@ -496,11 +618,12 @@ theorem mem0_of {S : Store} {f : Frame} {a : Nat} {x : MemInst} (hf : f.inst.mem
     (hS : S.mems[a]? = some x) : Ref.mem0 S f = some (a, x) := by
   simp [Ref.mem0, hf, hS]
 
-theorem fill_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) {v : Val} {c : Nat}
+theorem fill_loop {fits : Bool}
+    {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) {v : Val} {c : Nat}
     (hc : v.intBits .w32 = some c) (stk : List Val) (rest : List AInstr) :
     ∀ (k : Nat) (S : Store) (mm : MMem) (d n : BitVec 32), n.toNat = k → mm.Inv →
       S.mems[a]? = some mm.abs → d.toNat + k ≤ mm.size →
-      stepN (2 * k + 1) ⟨S, f, vals (.i32 n :: v :: .i32 d :: stk).reverse ++
+      stepNU fits (2 * k + 1) ⟨S, f, vals (.i32 n :: v :: .i32 d :: stk).reverse ++
           .plain .memoryFill :: rest⟩ =
         some ⟨S.setMem a (mm.fill d.toNat k (c % 256)).abs, f, vals stk.reverse ++ rest⟩
   | 0, S, mm, d, n, hn, hmi, hS, hb => by
@@ -509,7 +632,7 @@ theorem fill_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) {v : Va
     simp only [Bool.cond_false, Nat.beq_refl, Bool.cond_true] at hf
     have hfill : mm.fill d.toNat 0 (c % 256) = mm := rfl
     rw [hfill, setMem_self hS]
-    exact stepN_one (by simpa using step_instr rest hf rfl)
+    exact stepNU_plain (by simpa using step_instr rest hf rfl)
   | k + 1, S, mm, d, n, hn, hmi, hS, hb => by
     have hsz : mm.size ≤ 2 ^ 32 := by
       have := hmi.2.2.2; simp only [MMem.size]; omega
@@ -537,7 +660,7 @@ theorem fill_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) {v : Va
       rw [hsz1, BitVec.toNat_ofNat]
       have := Nat.mod_le (d.toNat + 1) (2 ^ 32)
       omega
-    have ih := fill_loop hfa hc stk rest k (S.setMem a (mm.abs.write d.toNat 1 c))
+    have ih := fill_loop (fits := fits) hfa hc stk rest k (S.setMem a (mm.abs.write d.toNat 1 c))
       (mm.write d.toNat 1 c)
       (BitVec.ofNat 32 (d.toNat + 1)) (BitVec.ofNat 32 k)
       (by rw [BitVec.toNat_ofNat]; omega) hmi1 hS1 hd1
@@ -559,8 +682,8 @@ theorem fill_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) {v : Va
         some ⟨S.setMem a (mm.abs.write d.toNat 1 c), f, vals (.i32 (BitVec.ofNat 32 k) :: v ::
           .i32 (BitVec.ofNat 32 (d.toNat + 1)) :: stk).reverse ++ .plain .memoryFill :: rest⟩ := by
       rw [h2]; simp [vals, vi32]
-    rw [show 2 * (k + 1) + 1 = 1 + (1 + (2 * k + 1)) by ring, stepN_add, stepN_one e1,
-      Option.bind_some, stepN_add, stepN_one e2, Option.bind_some, ih, setMem_setMem, heq]
+    rw [show 2 * (k + 1) + 1 = 1 + (1 + (2 * k + 1)) by ring, stepNU_add, stepNU_plain e1,
+      Option.bind_some, stepNU_add, stepNU_plain e2, Option.bind_some, ih, setMem_setMem, heq]
 
 theorem instrStep_copy {S : Store} {f : Frame} {n s d : BitVec 32} {stk : List Val} {a : Nat}
     {mem : MemInst} (hm : Ref.mem0 S f = some (a, mem)) :
@@ -579,11 +702,12 @@ theorem instrStep_copy {S : Store} {f : Frame} {n s d : BitVec 32} {stk : List V
 
 /-- One byte moved by the stepper: `loadPacked` of the byte at `src`, then `storePacked` at
 `dst`, both `i32` addresses below `2^32`. -/
-theorem move_byte {S : Store} {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a)
+theorem move_byte {fits : Bool}
+    {S : Store} {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a)
     {mm : MMem} (hmi : mm.Inv) (hS : S.mems[a]? = some mm.abs) {dst src : BitVec 32}
     (hd : dst.toNat + 1 ≤ mm.size) (hs : src.toNat + 1 ≤ mm.size) (stk : List Val)
     (rest : List AInstr) :
-    stepN 2 ⟨S, f, vals stk.reverse ++ [(Val.i32 dst).instr, (Val.i32 src).instr,
+    stepNU fits 2 ⟨S, f, vals stk.reverse ++ [(Val.i32 dst).instr, (Val.i32 src).instr,
         .plain (.loadPacked .w32 .p8 .u ⟨0, 0⟩), .plain (.storePacked .w32 .p8 ⟨0, 0⟩)] ++ rest⟩ =
       some ⟨S.setMem a (mm.write dst.toNat 1 (mm.byte src.toNat)).abs, f,
         vals stk.reverse ++ rest⟩ := by
@@ -610,21 +734,29 @@ theorem move_byte {S : Store} {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = som
     simp only [packedVal] at this
     simpa [vals] using this
   have e2 := step_instr rest hsp rfl
-  rw [show (2 : Nat) = 1 + 1 by rfl, stepN_add, stepN_one e1, Option.bind_some, stepN_one]
-  rw [e2, MMem.abs_write hmi.1 (by simpa using hwc)]
+  have hu1 : Ref.uniqueStep fits ⟨S, f, vals stk.reverse ++ [(Val.i32 dst).instr,
+      (Val.i32 src).instr, .plain (.loadPacked .w32 .p8 .u ⟨0, 0⟩),
+      .plain (.storePacked .w32 .p8 ⟨0, 0⟩)] ++ rest⟩ = true := by
+    have := uniqueStep_focus (fits := fits) (S := S) (f := f) (stk := .i32 src :: .i32 dst :: stk)
+      (i := .loadPacked .w32 .p8 .u ⟨0, 0⟩) (rest := .plain (.storePacked .w32 .p8 ⟨0, 0⟩) :: rest)
+      rfl rfl
+    simpa [vals] using this
+  rw [show (2 : Nat) = 1 + 1 by rfl, stepNU_add, stepNU_one hu1 e1, Option.bind_some,
+    stepNU_plain e2, MMem.abs_write hmi.1 (by simpa using hwc)]
   simp
 
 theorem write1_eq_writeBytes (mm : MMem) (d b : Nat) (hb : b < 256) (bs : List Nat) :
     (mm.write d 1 b).writeBytes (d + 1) bs = mm.writeBytes d (b :: bs) := by
   simp only [MMem.write, MMem.writeBytes, Nat.mod_eq_of_lt hb]
 
-theorem copy_up_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (stk : List Val)
+theorem copy_up_loop {fits : Bool}
+    {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (stk : List Val)
     (rest : List AInstr) :
     ∀ (k : Nat) (S : Store) (mm : MMem) (d s n : BitVec 32) (src : List Nat), n.toNat = k →
       mm.Inv → S.mems[a]? = some mm.abs → (k = 0 ∨ d.toNat ≤ s.toNat) →
       s.toNat + k ≤ mm.size → d.toNat + k ≤ mm.size → src.length = k →
       (∀ i < k, mm.byte (s.toNat + i) = src.getD i 0) → (∀ b ∈ src, b < 256) →
-      stepN (3 * k + 1) ⟨S, f, vals (.i32 n :: .i32 s :: .i32 d :: stk).reverse ++
+      stepNU fits (3 * k + 1) ⟨S, f, vals (.i32 n :: .i32 s :: .i32 d :: stk).reverse ++
           .plain .memoryCopy :: rest⟩ =
         some ⟨S.setMem a (mm.writeBytes d.toNat src).abs, f, vals stk.reverse ++ rest⟩
   | 0, S, mm, d, s, n, src, hn, hmi, hS, _, hs, hd, hl, _, _ => by
@@ -634,7 +766,7 @@ theorem copy_up_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (stk
     rw [List.length_eq_zero_iff.mp hl]
     simp only [MMem.writeBytes]
     rw [setMem_self hS]
-    exact stepN_one (by simpa using step_instr rest hc rfl)
+    exact stepNU_plain (by simpa using step_instr rest hc rfl)
   | k + 1, S, mm, d, s, n, src, hn, hmi, hS, hds, hs, hd, hl, hsrc, hlt => by
     have hsz : mm.size ≤ 2 ^ 32 := by
       have := hmi.2.2.2; simp only [MMem.size]; omega
@@ -655,7 +787,7 @@ theorem copy_up_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (stk
           ([vi32 (d.toNat + 1), vi32 (s.toNat + 1), vi32 (k + 1 - 1), .plain .memoryCopy] ++
             rest)⟩ := by
       rw [step_instr rest hc rfl]; simp
-    have e2 := move_byte hfa hmi hS (dst := d) (src := s) (by omega) (by omega) stk
+    have e2 := move_byte (fits := fits) hfa hmi hS (dst := d) (src := s) (by omega) (by omega) stk
       ([vi32 (d.toNat + 1), vi32 (s.toNat + 1), vi32 (k + 1 - 1), .plain .memoryCopy] ++ rest)
     rw [hb0] at e2
     have hblt : b < 256 := hlt b (by simp)
@@ -666,7 +798,7 @@ theorem copy_up_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (stk
     have hmi1 : (mm.write d.toNat 1 b).Inv := MMem.write_inv hmi (by omega) b
     have hS1 : (S.setMem a (mm.write d.toNat 1 b).abs).mems[a]? =
         some (mm.write d.toNat 1 b).abs := mems_setMem hS
-    have ih := copy_up_loop hfa stk rest k (S.setMem a (mm.write d.toNat 1 b).abs)
+    have ih := copy_up_loop (fits := fits) hfa stk rest k (S.setMem a (mm.write d.toNat 1 b).abs)
       (mm.write d.toNat 1 b) (BitVec.ofNat 32 (d.toNat + 1)) (BitVec.ofNat 32 (s.toNat + 1))
       (BitVec.ofNat 32 k) tail (by rw [BitVec.toNat_ofNat]; omega) hmi1 hS1
       (by
@@ -699,21 +831,22 @@ theorem copy_up_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (stk
         subst htail
         simp only [MMem.writeBytes, MMem.write, Nat.mod_eq_of_lt hblt]
       · rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega), write1_eq_writeBytes mm _ _ hblt]
-    rw [show 3 * (k + 1) + 1 = 1 + (2 + (3 * k + 1)) by ring, stepN_add, stepN_one e1,
-      Option.bind_some, stepN_add, e2, Option.bind_some]
+    rw [show 3 * (k + 1) + 1 = 1 + (2 + (3 * k + 1)) by ring, stepNU_add, stepNU_plain e1,
+      Option.bind_some, stepNU_add, e2, Option.bind_some]
     rw [show vals stk.reverse ++ ([vi32 (d.toNat + 1), vi32 (s.toNat + 1), vi32 (k + 1 - 1),
         .plain .memoryCopy] ++ rest) = vals (.i32 (BitVec.ofNat 32 k) ::
           .i32 (BitVec.ofNat 32 (s.toNat + 1)) :: .i32 (BitVec.ofNat 32 (d.toNat + 1)) ::
           stk).reverse ++ .plain .memoryCopy :: rest by simp [vals, vi32]]
     rw [ih, setMem_setMem, hwb]
 
-theorem copy_down_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (stk : List Val)
+theorem copy_down_loop {fits : Bool}
+    {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (stk : List Val)
     (rest : List AInstr) :
     ∀ (k : Nat) (S : Store) (mm : MMem) (d s n : BitVec 32) (src : List Nat), n.toNat = k →
       mm.Inv → S.mems[a]? = some mm.abs → s.toNat < d.toNat →
       s.toNat + k ≤ mm.size → d.toNat + k ≤ mm.size → src.length = k →
       (∀ i < k, mm.byte (s.toNat + i) = src.getD i 0) → (∀ b ∈ src, b < 256) →
-      stepN (3 * k + 1) ⟨S, f, vals (.i32 n :: .i32 s :: .i32 d :: stk).reverse ++
+      stepNU fits (3 * k + 1) ⟨S, f, vals (.i32 n :: .i32 s :: .i32 d :: stk).reverse ++
           .plain .memoryCopy :: rest⟩ =
         some ⟨S.setMem a (mm.writeBytes d.toNat src).abs, f, vals stk.reverse ++ rest⟩
   | 0, S, mm, d, s, n, src, hn, hmi, hS, _, hs, hd, hl, _, _ => by
@@ -724,7 +857,7 @@ theorem copy_down_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (s
     subst hsrc
     simp only [MMem.writeBytes]
     rw [setMem_self hS]
-    exact stepN_one (by simpa using step_instr rest hc rfl)
+    exact stepNU_plain (by simpa using step_instr rest hc rfl)
   | k + 1, S, mm, d, s, n, src, hn, hmi, hS, hsd, hs, hd, hl, hsrc, hlt => by
     have hsz : mm.size ≤ 2 ^ 32 := by
       have := hmi.2.2.2; simp only [MMem.size]; omega
@@ -751,7 +884,7 @@ theorem copy_down_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (s
           ([(Val.i32 d).instr, (Val.i32 s).instr, vi32 (k + 1 - 1), .plain .memoryCopy] ++
             rest)⟩ := by
       rw [step_instr rest hc rfl]; simp [vi32]
-    have e2 := move_byte hfa hmi hS (dst := BitVec.ofNat 32 (d.toNat + k))
+    have e2 := move_byte (fits := fits) hfa hmi hS (dst := BitVec.ofNat 32 (d.toNat + k))
       (src := BitVec.ofNat 32 (s.toNat + k)) (by rw [hdk]; omega) (by rw [hsk]; omega) stk
       ([(Val.i32 d).instr, (Val.i32 s).instr, vi32 (k + 1 - 1), .plain .memoryCopy] ++ rest)
     rw [hdk, hsk, hbk] at e2
@@ -762,7 +895,8 @@ theorem copy_down_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (s
       simp only [hmm₁, MMem.size, (MMem.write_fields mm (d.toNat + k) 1 _).1]
     have hmi1 : mm₁.Inv := MMem.write_inv hmi (by omega) _
     have hS1 : (S.setMem a mm₁.abs).mems[a]? = some mm₁.abs := mems_setMem hS
-    have ih := copy_down_loop hfa stk rest k (S.setMem a mm₁.abs) mm₁ d s (BitVec.ofNat 32 k)
+    have ih := copy_down_loop (fits := fits) hfa stk rest k (S.setMem a mm₁.abs) mm₁ d s
+      (BitVec.ofNat 32 k)
       (src.take k) (by rw [BitVec.toNat_ofNat]; omega) hmi1 hS1 hsd (by omega) (by omega)
       (by simp [hl])
       (by
@@ -801,8 +935,8 @@ theorem copy_down_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) (s
           · have h3 : ¬ (d.toNat + k ≤ x ∧ x < d.toNat + k + 1) := by omega
             have h4 : ¬ (d.toNat ≤ x ∧ x < d.toNat + (k + 1)) := by omega
             simp only [h3, h4, ↓reduceIte]
-    rw [show 3 * (k + 1) + 1 = 1 + (2 + (3 * k + 1)) by ring, stepN_add, stepN_one e1,
-      Option.bind_some, stepN_add, e2, Option.bind_some]
+    rw [show 3 * (k + 1) + 1 = 1 + (2 + (3 * k + 1)) by ring, stepNU_add, stepNU_plain e1,
+      Option.bind_some, stepNU_add, e2, Option.bind_some]
     rw [show vals stk.reverse ++ ([(Val.i32 d).instr, (Val.i32 s).instr, vi32 (k + 1 - 1),
         .plain .memoryCopy] ++ rest) = vals (.i32 (BitVec.ofNat 32 k) :: .i32 s :: .i32 d ::
           stk).reverse ++ .plain .memoryCopy :: rest by simp [vals, vi32]]
@@ -825,12 +959,13 @@ theorem instrStep_init {S : Store} {f : Frame} {x : Nat} {n s d : BitVec 32} {st
 
 theorem setMem_datas (S : Store) (a : Nat) (x : MemInst) : (S.setMem a x).datas = S.datas := rfl
 
-theorem init_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) {x da : Nat}
+theorem init_loop {fits : Bool}
+    {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) {x da : Nat}
     {di : DataInst} (hx : f.inst.datas[x]? = some da) (stk : List Val) (rest : List AInstr) :
     ∀ (k : Nat) (S : Store) (mm : MMem) (d s n : BitVec 32), n.toNat = k → mm.Inv →
       S.mems[a]? = some mm.abs → S.datas[da]? = some di → s.toNat + k ≤ di.data.length →
       d.toNat + k ≤ mm.size → s.toNat + k ≤ 2 ^ 32 →
-      stepN (2 * k + 1) ⟨S, f, vals (.i32 n :: .i32 s :: .i32 d :: stk).reverse ++
+      stepNU fits (2 * k + 1) ⟨S, f, vals (.i32 n :: .i32 s :: .i32 d :: stk).reverse ++
           .plain (.memoryInit x) :: rest⟩ =
         some ⟨S.setMem a (mm.init d.toNat ((di.data.drop s.toNat).take k)).abs, f,
           vals stk.reverse ++ rest⟩
@@ -840,7 +975,7 @@ theorem init_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) {x da :
     simp only [Bool.or_false, Bool.cond_false, Nat.beq_refl, Bool.cond_true] at hc
     simp only [List.take_zero, MMem.init, List.map_nil, MMem.writeBytes]
     rw [setMem_self hS]
-    exact stepN_one (by simpa using step_instr rest hc rfl)
+    exact stepNU_plain (by simpa using step_instr rest hc rfl)
   | k + 1, S, mm, d, s, n, hn, hmi, hS, hD, hs, hd, hsn => by
     have hsz : mm.size ≤ 2 ^ 32 := by
       have := hmi.2.2.2; simp only [MMem.size]; omega
@@ -871,7 +1006,7 @@ theorem init_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) {x da :
       simp only [hmm₁, MMem.size, (MMem.write_fields mm d.toNat 1 _).1]
     have hmi1 : mm₁.Inv := MMem.write_inv hmi (by omega) _
     have hS1 : (S.setMem a mm₁.abs).mems[a]? = some mm₁.abs := mems_setMem hS
-    have ih := init_loop hfa hx stk rest k (S.setMem a mm₁.abs) mm₁
+    have ih := init_loop (fits := fits) hfa hx stk rest k (S.setMem a mm₁.abs) mm₁
       (BitVec.ofNat 32 (d.toNat + 1)) (BitVec.ofNat 32 (s.toNat + 1)) (BitVec.ofNat 32 k)
       (by rw [BitVec.toNat_ofNat]; omega) hmi1 hS1 (by rw [setMem_datas]; exact hD)
       (by rw [BitVec.toNat_ofNat]; have := Nat.mod_le (s.toNat + 1) (2 ^ 32)
@@ -903,8 +1038,8 @@ theorem init_loop {f : Frame} {a : Nat} (hfa : f.inst.mems[0]? = some a) {x da :
           Nat.mod_eq_of_lt (by omega)]
         simp only [MMem.init, List.map_cons, hmm₁]
         exact write1_eq_writeBytes mm _ _ hbl _
-    rw [show 2 * (k + 1) + 1 = 1 + (1 + (2 * k + 1)) by ring, stepN_add, stepN_one e1,
-      Option.bind_some, stepN_add, stepN_one e2, Option.bind_some]
+    rw [show 2 * (k + 1) + 1 = 1 + (1 + (2 * k + 1)) by ring, stepNU_add, stepNU_plain e1,
+      Option.bind_some, stepNU_add, stepNU_plain e2, Option.bind_some]
     rw [show vals stk.reverse ++ [] ++ ([vi32 (d.toNat + 1), vi32 (s.toNat + 1), vi32 (k + 1 - 1),
         .plain (.memoryInit x)] ++ rest) = vals (.i32 (BitVec.ofNat 32 k) ::
           .i32 (BitVec.ofNat 32 (s.toNat + 1)) :: .i32 (BitVec.ofNat 32 (d.toNat + 1)) ::
@@ -924,17 +1059,18 @@ theorem mem0_parts {m : MState} {a : Nat} {mm : MMem} (h : m.mem0 = some (a, mm)
 /-- A bulk machine step: the innermost configuration runs `k` reference steps to its result. -/
 theorem sim_bulk {m : MState} {a : Nat} {mm' : MMem} {stk : List Val} {rest : List AInstr}
     {k : Nat} (hi : m.Inv) (hmi' : mm'.Inv)
-    (h : stepN k ⟨m.store.abs, m.frame, vals m.stack.reverse ++ m.code⟩ =
+    (h : ∀ fits, stepNU fits k ⟨m.store.abs, m.frame, vals m.stack.reverse ++ m.code⟩ =
       some ⟨m.store.abs.setMem a mm'.abs, m.frame, vals stk.reverse ++ rest⟩) :
-    ((m.setMem a mm').cont stk [] rest).Inv ∧
-      ∃ k, stepN k m.abs = some ((m.setMem a mm').cont stk [] rest).abs := by
-  refine ⟨setMem_inv hi hmi', k, sim_inner ?_ rfl⟩
+    ((m.setMem a mm').cont stk [] rest).Inv ∧ Sim m ((m.setMem a mm').cont stk [] rest) := by
+  refine ⟨setMem_inv hi hmi', Sim.ofU (k := k) fun fits => ?_⟩
+  rw [abs_eq_wrapC, abs_eq_wrapC]
+  apply stepNU_wrap
   simp only [MState.cont, setMem_abs, List.nil_append]
-  exact h
+  exact h fits
 
 theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
     (hi : m.Inv) (hc : m.code = .plain i :: rest) (hv : Ref.toVal (.plain i) = none)
-    (h : m.stepPlain i rest = some m') : m'.Inv ∧ ∃ k, stepN k m.abs = some m'.abs := by
+    (h : m.stepPlain i rest = some m') : m'.Inv ∧ Sim m m' := by
   fun_cases MState.stepPlain m i rest
   case case1 bt body =>
     simp only [MState.stepPlain, Option.bind_eq_some_iff, MState.enter] at h
@@ -946,7 +1082,7 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
         by_contra hh
         rw [MMem.blt_true (by omega)] at hlt
         contradiction
-      refine ⟨hi, 1, ?_⟩
+      refine ⟨hi, Sim.one ?_⟩
       rw [abs_eq_wrapC, abs_eq_wrapC, hc]
       apply stepN_one
       apply step_wrap
@@ -965,7 +1101,7 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
     · simp only [hlt, Bool.cond_false, Option.some.injEq] at h
       subst h
       have hle := le_of_blt_false hlt
-      refine ⟨hi, 1, ?_⟩
+      refine ⟨hi, Sim.one ?_⟩
       rw [abs_eq_wrapC, abs_eq_wrapC, hc]
       apply stepN_one
       apply step_wrap
@@ -980,7 +1116,7 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
   case case3 l =>
     simp only [MState.stepPlain, Option.map_eq_some_iff] at h
     obtain ⟨⟨stk', code', ctl'⟩, hb, rfl⟩ := h
-    refine ⟨hi, 1, ?_⟩
+    refine ⟨hi, Sim.one ?_⟩
     rw [abs_eq_wrapC, abs_eq_wrapC, hc]
     apply stepN_one
     have hs : Ref.seq m.store.abs m.frame [] (vals m.stack.reverse ++ .plain (.br l) :: rest) =
@@ -990,7 +1126,7 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
   case case4 =>
     simp only [MState.stepPlain, Option.map_eq_some_iff] at h
     obtain ⟨⟨f', stk', code', ctl'⟩, hb, rfl⟩ := h
-    refine ⟨hi, 1, ?_⟩
+    refine ⟨hi, Sim.one ?_⟩
     rw [abs_eq_wrapC, abs_eq_wrapC, hc]
     apply stepN_one
     have hs : Ref.seq m.store.abs m.frame [] (vals m.stack.reverse ++ .plain .return_ :: rest) =
@@ -1072,10 +1208,12 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
       · simp only [hb, hz, Bool.cond_false, Option.map_eq_some_iff] at h
         obtain ⟨c, hcb, rfl⟩ := h
         have hle := le_of_blt_false hb
-        have hl := fill_loop hfa hcb stk rest n.toNat m.store.abs mm d n rfl hmi hS hle
-        rw [← hstk] at hl
         refine sim_bulk hi (MMem.writeBytes_inv hmi (by simpa using hle)
-          (fun x hx => by simp only [List.mem_replicate] at hx; omega)) (k := 2 * n.toNat + 1) ?_
+          (fun x hx => by simp only [List.mem_replicate] at hx; omega)) (k := 2 * n.toNat + 1)
+          fun fits => ?_
+        have hl := fill_loop (fits := fits) hfa hcb stk rest n.toNat m.store.abs mm d n rfl hmi hS
+          hle
+        rw [← hstk] at hl
         rw [hc]
         exact hl
       · simp only [hb, hz, Bool.cond_false, Bool.cond_true, Option.some.injEq] at h hf
@@ -1105,12 +1243,14 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
       have hlen := MMem.readBytes_length mm s.toNat n.toNat
       have hlt := MMem.readBytes_lt mm s.toNat n.toNat
       refine sim_bulk hi (MMem.writeBytes_inv hmi (by rw [hlen]; omega) hlt)
-        (k := 3 * n.toNat + 1) ?_
+        (k := 3 * n.toNat + 1) fun fits => ?_
       rw [hc, hstk]
       by_cases hds : d.toNat ≤ s.toNat
-      · exact copy_up_loop hfa stk rest n.toNat m.store.abs mm d s n _ rfl hmi hS (Or.inr hds)
+      · exact copy_up_loop (fits := fits) hfa stk rest n.toNat m.store.abs mm d s n _ rfl hmi hS
+          (Or.inr hds)
           (by omega) (by omega) hlen (fun i hi' => (hsrc i hi').symm) hlt
-      · exact copy_down_loop hfa stk rest n.toNat m.store.abs mm d s n _ rfl hmi hS (by omega)
+      · exact copy_down_loop (fits := fits) hfa stk rest n.toNat m.store.abs mm d s n _ rfl hmi hS
+          (by omega)
           (by omega) (by omega) hlen (fun i hi' => (hsrc i hi').symm) hlt
     · simp only [hb, Bool.cond_true] at h hcp
       subst h
@@ -1139,9 +1279,10 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
           obtain ⟨y, -, rfl⟩ := hb'
           exact y.toNat_lt
         refine sim_bulk hi (MMem.writeBytes_inv hmi (by simp; omega) hbytes)
-          (k := 2 * n.toNat + 1) ?_
+          (k := 2 * n.toNat + 1) fun fits => ?_
         rw [hc, hstk]
-        exact init_loop hfa hdx stk rest n.toNat m.store.abs mm d s n rfl hmi hS hD hb1.1 hb1.2
+        exact init_loop (fits := fits) hfa hdx stk rest n.toNat m.store.abs mm d s n rfl hmi hS hD
+          hb1.1 hb1.2
           (by have := le_of_blt_false hw; norm_num at this ⊢; omega)
       · simp only [hw, Bool.cond_true] at h
         exact absurd h (by simp)
@@ -1208,7 +1349,7 @@ theorem step_invoke_inner {S : Store} {f : Frame} {stk : List Val} {rest : List 
 /-- Contract U26 T1: every machine step is `k` reference steps between the abstractions, and
 keeps the machine invariant. -/
 theorem step_sim {m m' : MState} (hi : m.Inv) (h : m.step = some m') :
-    m'.Inv ∧ ∃ k, stepN k m.abs = some m'.abs := by
+    m'.Inv ∧ Sim m m' := by
   rcases m with ⟨st, f, stk, code, ctl⟩
   cases code with
   | cons e rest =>
@@ -1216,7 +1357,7 @@ theorem step_sim {m m' : MState} (hi : m.Inv) (h : m.step = some m') :
     | some v =>
       simp only [MState.step, hv, Option.some.injEq] at h
       subst h
-      refine ⟨hi, 0, ?_⟩
+      refine ⟨hi, Sim.zero ?_⟩
       have he := Ref.eq_instr_of_toVal hv
       subst he
       simp only [stepN, abs_eq_wrapC, vals_cons_reverse, List.append_assoc, List.singleton_append]
@@ -1232,7 +1373,7 @@ theorem step_sim {m m' : MState} (hi : m.Inv) (h : m.step = some m') :
           cases hlt : Nat.blt stk.length ft.params.length
           · simp only [hlt, Bool.cond_false, Option.some.injEq] at h
             subst h
-            refine ⟨hi, 1, ?_⟩
+            refine ⟨hi, Sim.one ?_⟩
             rw [abs_eq_wrapC, abs_eq_wrapC]
             apply stepN_one
             exact step_wrap ctl (step_invoke_inner (S := st.abs) (f := f) (rest := rest) hf
@@ -1246,7 +1387,10 @@ theorem step_sim {m m' : MState} (hi : m.Inv) (h : m.step = some m') :
           subst h
           refine ⟨hi, ?_⟩
           obtain ⟨k, hk⟩ := trap_collapse st.abs ctl f stk rest
-          exact ⟨k, by rw [abs_eq_wrapC]; exact hk⟩
+          refine Sim.notUnique (by rw [abs_eq_wrapC]; exact hk) fun fits => ?_
+          rw [abs_eq_wrapC, uniqueStep_wrapC]
+          simp only [Ref.uniqueStep, Ref.seqUnique_vals, List.reverse_reverse, List.append_nil]
+          rfl
         · simp [hb] at h
       | _ => simp [MState.step, hv] at h
   | nil =>
@@ -1257,7 +1401,7 @@ theorem step_sim {m m' : MState} (hi : m.Inv) (h : m.step = some m') :
       | label n cont saved rest =>
         simp only [MState.step, Option.some.injEq] at h
         subst h
-        refine ⟨hi, 1, ?_⟩
+        refine ⟨hi, Sim.one ?_⟩
         rw [abs_eq_wrapC, abs_eq_wrapC]
         apply stepN_one
         simp only [wrapC, wrap_cons, Ref.step, List.append_nil]
@@ -1269,7 +1413,7 @@ theorem step_sim {m m' : MState} (hi : m.Inv) (h : m.step = some m') :
         · simp [hb] at h
         · simp only [hb, Bool.cond_true, Option.some.injEq] at h
           subst h
-          refine ⟨hi, 1, ?_⟩
+          refine ⟨hi, Sim.one ?_⟩
           rw [abs_eq_wrapC, abs_eq_wrapC]
           apply stepN_one
           simp only [wrapC, wrap_cons, Ref.step, List.append_nil]
@@ -1329,7 +1473,7 @@ theorem run_sim : ∀ (n : Nat) {m m' : MState} {b : Bool}, m.Inv → m.run n = 
       exact ⟨hi, 0, rfl⟩
     | some m₁ =>
       rw [hs] at h
-      obtain ⟨hi₁, k₁, hk₁⟩ := step_sim hi hs
+      obtain ⟨hi₁, k₁, hk₁, -⟩ := step_sim hi hs
       obtain ⟨hi', k₂, hk₂⟩ := run_sim n hi₁ h
       exact ⟨hi', k₁ + k₂, by rw [stepN_add, hk₁, Option.bind_some, hk₂]⟩
 

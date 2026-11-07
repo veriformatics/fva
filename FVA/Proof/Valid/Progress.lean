@@ -40,7 +40,7 @@ theorem ainstr_progress {H : HostSem} (hH : ValidHost H) {s : Store} {C : Contex
     simp only [List.map_nil, List.nil_append] at hp
     cases hp with
     | values vs => exact .step .labelExit
-    | trap => exact .step (Step.trap (.label n cont .hole) (by simp [EvalCtx.fill]))
+    | trap => exact .step (StepP.trap (.label n cont .hole) (by simp [EvalCtx.fill]))
     | @branch k j vs ts L ht hlen =>
       cases j with
       | zero =>

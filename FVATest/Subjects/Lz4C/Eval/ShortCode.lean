@@ -56,7 +56,7 @@ theorem short_instr_step (st : Store) (f : Frame) (vs : List Val) :
 
 theorem short_toVal : toVal (.plain mainLoop) = none := by rw [short_main_code]; rfl
 
-theorem short_unique (vs : List Val) : instrUnique mainLoop vs = true := by
+theorem short_unique (vs : List Val) : instrUnique false mainLoop vs = true := by
   rw [short_main_code]; rfl
 
 theorem short_ne_br (k : Nat) : mainLoop ≠ .br k := by rw [short_main_code]; intro h; cases h

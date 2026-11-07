@@ -45,7 +45,7 @@ theorem FragmentProgress.prepend {H : HostSem} {s : Store} {f : Frame} {C : Cont
           List.length_nil, Nat.add_zero] at hn
         exact hp (List.length_eq_zero_iff.mp (by omega))
       simpa only [EvalCtx.fill, List.append_nil] using
-        FragmentProgress.step (C := C) (Step.trap (H := H) (s := s) (f := f)
+        FragmentProgress.step (C := C) (StepP.trap (H := H) (s := s) (f := f)
           (.seq pre .hole []) hne)
   | branch L ht hlen =>
     simpa only [surround_fill, List.append_nil] using
@@ -55,7 +55,7 @@ theorem FragmentProgress.prepend {H : HostSem} {s : Store} {f : Frame} {C : Cont
       FragmentProgress.return_ (H := H) (s := s) (f := f) (surround L pre []) ht hlen
   | step hs =>
     simpa only [List.append_nil] using FragmentProgress.step (C := C)
-      (Step.seq (vs := pre) (rest := []) hs)
+      (StepP.seq (vs := pre) (rest := []) hs)
 
 theorem FragmentProgress.append_or_values {H : HostSem} {s : Store} {f : Frame}
     {C : Context} {es : List AInstr} (h : FragmentProgress H s f C es)
@@ -66,7 +66,7 @@ theorem FragmentProgress.append_or_values {H : HostSem} {s : Store} {f : Frame}
     right
     by_cases hp : post = []
     · subst post; exact .trap
-    · apply FragmentProgress.step (Step.trap (.seq [] .hole post) ?_)
+    · apply FragmentProgress.step (StepP.trap (.seq [] .hole post) ?_)
       intro he
       have hn := congrArg List.length he
       simp only [EvalCtx.fill, List.map_nil, List.length_append,

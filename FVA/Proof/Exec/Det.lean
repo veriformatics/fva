@@ -13,8 +13,9 @@ namespace FVA.Wasm.Exec.Ref
 
 open FVA.Wasm FVA.Wasm.Exec FVA.Wasm.Num
 
-theorem seqUnique_vals (s : Store) (f : Frame) (vs ws : List Val) (es : List AInstr) :
-    seqUnique s f vs (vals ws ++ es) = seqUnique s f (ws.reverse ++ vs) es := by
+theorem seqUnique_vals (fits : Bool) (s : Store) (f : Frame) (vs ws : List Val)
+    (es : List AInstr) :
+    seqUnique fits s f vs (vals ws ++ es) = seqUnique fits s f (ws.reverse ++ vs) es := by
   induction ws generalizing vs with
   | nil => rfl
   | cons w ws ih =>
@@ -30,8 +31,8 @@ theorem seqTraps_vals (vs : List Val) (es : List AInstr) :
     simp only [vals, List.map_cons, List.cons_append, seqTraps, toVal_instr, ih]
 
 theorem num_instr_complete {i : Instr} {args : List Val} {r : Option Val}
-    (s : Store) (f : Frame) (stk : List Val) (hr : r ∈ numResults i args)
-    (hu : instrUnique i (args.reverse ++ stk) = true) :
+    {fits : Bool} (s : Store) (f : Frame) (stk : List Val) (hr : r ∈ numResults i args)
+    (hu : instrUnique fits i (args.reverse ++ stk) = true) :
     instrStep s f i (args.reverse ++ stk) = some (s, f, stk, numOut r) := by
   unfold numResults at hr
   split at hr
@@ -77,9 +78,9 @@ theorem num_instr_complete {i : Instr} {args : List Val} {r : Option Val}
     rw [implPromote_unique (ofBits_wf f32fmt_sane _) hz hu]
     rfl
 
-theorem seqUnique_eval_trap (s : Store) (f : Frame) (E : EvalCtx) :
+theorem seqUnique_eval_trap (fits : Bool) (s : Store) (f : Frame) (E : EvalCtx) :
     ∀ (stk : List Val) (rest : List AInstr),
-      seqUnique s f stk (E.fill [.trap] ++ rest) = false := by
+      seqUnique fits s f stk (E.fill [.trap] ++ rest) = false := by
   induction E with
   | hole => intro stk rest; rfl
   | seq vs inner tail ih =>
@@ -92,9 +93,9 @@ theorem seqUnique_eval_trap (s : Store) (f : Frame) (E : EvalCtx) :
     simpa only [List.append_nil] using ih [] []
 
 set_option maxHeartbeats 1000000 in
-theorem seq_complete {H : HostSem} {c c' : Config} (h : Step H c c') :
+theorem seq_complete {H : HostSem} {fits : Bool} {c c' : Config} (h : StepP H fits c c') :
     ∀ (stk : List Val) (rest : List AInstr),
-      seqUnique c.store c.frame stk (c.instrs ++ rest) = true →
+      seqUnique fits c.store c.frame stk (c.instrs ++ rest) = true →
       seq c.store c.frame stk (c.instrs ++ rest) =
           .step c'.store c'.frame (vals stk.reverse ++ c'.instrs ++ rest) ∨
         seq c.store c.frame stk (c.instrs ++ rest) = .stuck := by
@@ -126,13 +127,42 @@ theorem seq_complete {H : HostSem} {c c' : Config} (h : Step H c c') :
     simp_all [toVal, atInstr, instrStep, tableAt, mem0, Bool.cond_eq_ite, Nat.blt_eq,
       Nat.beq_eq, Nat.ble_eq]
     all_goals split_ifs <;> first | omega | simp_all
-  case tableGrow | tableGrowFail | memoryGrow | memoryGrowFail | invokeHost |
-      invokeHostTrap | invokeHostDiverge | trapFrame =>
+  case memoryGrow s f a mem mem' n hma hm hg =>
+    left
+    simp only [List.cons_append, List.nil_append, seq, toVal_instr]
+    simp_all [toVal, atInstr, instrStep, mem0]
+  case memoryGrowFail s f n hfail =>
+    simp only [List.cons_append, List.nil_append, seqUnique, toVal_instr, atUnique,
+      instrUnique] at hu
+    have hno := hfail hu
+    simp only [List.cons_append, List.nil_append, seq, toVal_instr]
+    cases hma : f.inst.mems[0]? with
+    | none => right; simp_all [toVal, atInstr, instrStep, mem0]
+    | some a =>
+      cases hm : s.mems[a]? with
+      | none => right; simp_all [toVal, atInstr, instrStep, mem0]
+      | some mem => left; simp_all [toVal, atInstr, instrStep, mem0, hno a mem hma hm]
+  case tableGrow s f x ta t t' r n hta ht hg =>
+    left
+    simp only [List.cons_append, List.nil_append, seq, toVal_instr]
+    simp_all [toVal, atInstr, instrStep, tableAt]
+  case tableGrowFail s f x r n hfail =>
+    simp only [List.cons_append, List.nil_append, seqUnique, toVal_instr, atUnique,
+      instrUnique] at hu
+    have hno := hfail hu
+    simp only [List.cons_append, List.nil_append, seq, toVal_instr]
+    cases hta : f.inst.tables[x]? with
+    | none => right; simp_all [toVal, atInstr, instrStep, tableAt]
+    | some ta =>
+      cases ht : s.tables[ta]? with
+      | none => right; simp_all [toVal, atInstr, instrStep, tableAt]
+      | some t => left; simp_all [toVal, atInstr, instrStep, tableAt, hno ta t hta ht]
+  case invokeHost | invokeHostTrap | invokeHostDiverge | trapFrame =>
     simp only [List.append_assoc, seqUnique_vals, List.cons_append, List.nil_append,
-      seqUnique, toVal_instr] at hu
-    simp_all [toVal, seqUnique, atUnique, instrUnique]
+      seqUnique] at hu
+    simp_all [toVal, seqUnique, atUnique]
   case trap s f E hne =>
-    have ht := seqUnique_eval_trap s f E stk rest
+    have ht := seqUnique_eval_trap fits s f E stk rest
     rw [ht] at hu
     contradiction
   case block s f bt body ft vs hft hlen =>
@@ -229,8 +259,8 @@ theorem seq_complete {H : HostSem} {c c' : Config} (h : Step H c c') :
     cases hd : s.datas[da]? <;>
       simp_all [toVal, atInstr, instrStep, mem0, Bool.cond_eq_ite, Nat.blt_eq]
 
-theorem step_complete {H : HostSem} {c c₁ c₂ : Config} (h₁ : Step H c c₁) (h₂ : step c = some c₂)
-    (hu : uniqueStep c = true) : c₁ = c₂ := by
+theorem step_complete {H : HostSem} {fits : Bool} {c c₁ c₂ : Config} (h₁ : StepP H fits c c₁)
+    (h₂ : step c = some c₂) (hu : uniqueStep fits c = true) : c₁ = c₂ := by
   have hc := seq_complete h₁ [] [] (by simpa only [uniqueStep, List.append_nil] using hu)
   simp only [List.append_nil, List.reverse_nil, vals, List.map_nil, List.nil_append] at hc
   unfold step at h₂
@@ -241,7 +271,7 @@ theorem step_complete {H : HostSem} {c c₁ c₂ : Config} (h₁ : Step H c c₁
     contradiction
 
 theorem must_of_step {H : HostSem} {Q : Outcome → Prop} {c c' : Config} (h : step c = some c')
-    (hu : uniqueStep c = true) (hc' : Must H Q c') : Must H Q c := by
+    (hu : uniqueStep false c = true) (hc' : Must H Q c') : Must H Q c := by
   refine Must.next ⟨c', step_sound h⟩ ?_
   intro c₁ hs
   have he := step_complete hs h hu
@@ -477,7 +507,7 @@ theorem runDet_must {H : HostSem} {Q : Outcome → Prop} {n : Nat} {c c' : Confi
       exact must_trap ht (hQ (.trapped c.store) ⟨rfl, rfl⟩)
     | false =>
       simp only [runDet, ht, Bool.cond_false] at h
-      cases hu : uniqueStep c with
+      cases hu : uniqueStep false c with
       | false => simp only [hu, Bool.cond_false, reduceCtorEq] at h
       | true =>
         simp only [hu, Bool.cond_true] at h
@@ -523,7 +553,7 @@ theorem _root_.FVA.Wasm.Exec.vals_ne_trap (vs : List Val) : vals vs ≠ [.trap] 
 theorem no_step_values {H : HostSem} {s : Store} {f : Frame} {vs : List Val} {c : Config} :
     ¬Step H ⟨s, f, vals vs⟩ c := by
   intro hs
-  have hu : seqUnique s f [] (vals vs ++ []) = true := by
+  have hu : seqUnique false s f [] (vals vs ++ []) = true := by
     rw [seqUnique_vals]
     rfl
   have hc := seq_complete hs [] [] hu

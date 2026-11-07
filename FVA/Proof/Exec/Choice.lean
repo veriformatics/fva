@@ -291,12 +291,12 @@ theorem step_plug_host_at {H : HostSem} {s s' : Store} {f : Frame} {a id : Nat}
   | label n cont body =>
     have hb := step_plug_host_seq (f := f) hf hH [] body h
     rw [List.reverse_nil, show vals ([] : List Val) = [] from rfl, List.nil_append] at hb
-    have hs := Step.seq (vs := stk.reverse) (rest := rest) (Step.label (n := n) (cont := cont) hb)
+    have hs := StepP.seq (vs := stk.reverse) (rest := rest) (StepP.label (n := n) (cont := cont) hb)
     simpa only [atPlug, List.append_assoc, List.singleton_append] using hs
   | frame n fi body =>
     have hb := step_plug_host_seq (f := fi) hf hH [] body h
     rw [List.reverse_nil, show vals ([] : List Val) = [] from rfl, List.nil_append] at hb
-    have hs := Step.seq (vs := stk.reverse) (rest := rest) (Step.frame (f := f) (n := n) hb)
+    have hs := StepP.seq (vs := stk.reverse) (rest := rest) (StepP.frame (f := f) (n := n) hb)
     simpa only [atPlug, List.append_assoc, List.singleton_append] using hs
   | invoke b =>
     obtain ⟨hb, hm, hargs⟩ := h
@@ -306,8 +306,8 @@ theorem step_plug_host_at {H : HostSem} {s s' : Store} {f : Frame} {a id : Nat}
       rw [← hargs, List.length_reverse, List.length_take, Nat.min_eq_left hm]
     have hsplit : stk.reverse = (stk.drop ft.params.length).reverse ++ args := by
       rw [← hargs, ← List.reverse_append, List.take_append_drop]
-    have hstep := Step.seq (vs := (stk.drop ft.params.length).reverse) (rest := rest)
-      (Step.invokeHost (f := f) hf hlen hH)
+    have hstep := StepP.seq (vs := (stk.drop ft.params.length).reverse) (rest := rest)
+      (StepP.invokeHost (fits := false) (f := f) hf hlen hH)
     simp only [atPlug]
     rw [hsplit]
     simpa only [vals, List.map_append, List.append_assoc, List.singleton_append] using hstep
@@ -466,12 +466,12 @@ theorem step_plug_fbinop_at {H : HostSem} {s : Store} {f : Frame} {w : Width} {o
   | label n cont body =>
     have hb := step_plug_fbinop_seq (H := H) (s := s) (f := f) hr [] body h
     rw [List.reverse_nil, show vals ([] : List Val) = [] from rfl, List.nil_append] at hb
-    have hs := Step.seq (vs := stk.reverse) (rest := rest) (Step.label (n := n) (cont := cont) hb)
+    have hs := StepP.seq (vs := stk.reverse) (rest := rest) (StepP.label (n := n) (cont := cont) hb)
     simpa only [atPlug, List.append_assoc, List.singleton_append] using hs
   | frame n fi body =>
     have hb := step_plug_fbinop_seq (H := H) (s := s) (f := fi) hr [] body h
     rw [List.reverse_nil, show vals ([] : List Val) = [] from rfl, List.nil_append] at hb
-    have hs := Step.seq (vs := stk.reverse) (rest := rest) (Step.frame (f := f) (n := n) hb)
+    have hs := StepP.seq (vs := stk.reverse) (rest := rest) (StepP.frame (f := f) (n := n) hb)
     simpa only [atPlug, List.append_assoc, List.singleton_append] using hs
   | plain i =>
     obtain ⟨hi, hm, hargs⟩ := h
@@ -481,8 +481,8 @@ theorem step_plug_fbinop_at {H : HostSem} {s : Store} {f : Frame} {w : Width} {o
       rw [← hargs, List.length_reverse, List.length_take, Nat.min_eq_left hm]
     have hsplit : stk.reverse = (stk.drop 2).reverse ++ args := by
       rw [← hargs, ← List.reverse_append, List.take_append_drop]
-    have hstep := Step.seq (vs := (stk.drop 2).reverse) (rest := rest)
-      (Step.num (H := H) (s := s) (f := f) hr)
+    have hstep := StepP.seq (vs := (stk.drop 2).reverse) (rest := rest)
+      (StepP.num (H := H) (fits := false) (s := s) (f := f) hr)
     simp only [atPlug]
     rw [hsplit]
     simpa only [vals, List.map_append, List.append_assoc, List.singleton_append] using hstep

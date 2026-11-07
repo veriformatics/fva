@@ -82,7 +82,8 @@ def run (c : Config) (cap : Nat) : Except String (Config × Nat) := Id.run do
   let mut c := c
   for k in [0:cap] do
     if seqTraps c.instrs then return .ok (⟨c.store, c.frame, [.trap]⟩, k)
-    unless uniqueStep c do return .error "the call reaches a choice point (several successors)"
+    unless uniqueStep false c do
+      return .error "the call reaches a choice point (several successors)"
     match seq c.store c.frame [] c.instrs with
     | .step s f es => c := ⟨s, f, es⟩
     | .final => return .ok (c, k)

@@ -18,7 +18,7 @@ open FVA.Wasm FVA.Wasm.Exec
 /-- `k` unique steps from `c`. -/
 def walk : Nat → Config → Option Config
   | 0, c => some c
-  | k + 1, c => bif uniqueStep c then (step c).bind (walk k) else none
+  | k + 1, c => bif uniqueStep false c then (step c).bind (walk k) else none
 
 @[simp] theorem walk_zero (c : Config) : walk 0 c = some c := rfl
 
@@ -28,7 +28,7 @@ theorem walk_add (a b : Nat) (c : Config) : walk (a + b) c = (walk a c).bind (wa
   | succ a ih =>
     rw [Nat.add_right_comm]
     simp only [walk]
-    cases uniqueStep c <;> simp only [Bool.cond_false, Bool.cond_true, Option.bind_none]
+    cases uniqueStep false c <;> simp only [Bool.cond_false, Bool.cond_true, Option.bind_none]
     cases step c <;> simp [ih]
 
 /-- Splits a walk at its first `a` steps. -/
@@ -41,7 +41,7 @@ theorem must_of_walk {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' : Conf
   induction k generalizing c with
   | zero => cases h; exact hc
   | succ k ih =>
-    cases hu : uniqueStep c with
+    cases hu : uniqueStep false c with
     | false => simp only [walk, hu, Bool.cond_false, reduceCtorEq] at h
     | true =>
       simp only [walk, hu, Bool.cond_true] at h
@@ -57,7 +57,7 @@ theorem steps_of_walk {H : HostSem} {k : Nat} {c c' : Config} (h : walk k c = so
   induction k generalizing c with
   | zero => cases h; exact Relation.ReflTransGen.refl
   | succ k ih =>
-    cases hu : uniqueStep c with
+    cases hu : uniqueStep false c with
     | false => simp only [walk, hu, Bool.cond_false, reduceCtorEq] at h
     | true =>
       simp only [walk, hu, Bool.cond_true] at h
@@ -74,7 +74,7 @@ theorem may_of_walk {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' : Confi
 
 /-- `must_of_step` with the successor left implicit, so a tactic computes it from the step. -/
 theorem must_of_step' {H : HostSem} {Q : Outcome → Prop} {c : Config}
-    (hu : uniqueStep c = true) (hs : (step c).isSome = true)
+    (hu : uniqueStep false c = true) (hs : (step c).isSome = true)
     (h : ∀ c', step c = some c' → Must H Q c') : Must H Q c := by
   obtain ⟨c', hc'⟩ := Option.isSome_iff_exists.mp hs
   exact must_of_step hc' hu (h c' hc')
@@ -148,11 +148,11 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
     (rest : List AInstr) (h : toVal e = none) : seq s f vs (e :: rest) = atInstr s f vs e rest := by
   rw [seq, h]
 @[wasm_step] theorem seqUnique_nil (s : Store) (f : Frame) (vs : List Val) :
-    seqUnique s f vs [] = true := by
+    seqUnique false s f vs [] = true := by
   rw [seqUnique]
 @[wasm_step] theorem seqUnique_cons_none {s : Store} {f : Frame} {vs : List Val} {e : AInstr}
     (rest : List AInstr) (h : toVal e = none) :
-    seqUnique s f vs (e :: rest) = atUnique s f vs e := by
+    seqUnique false s f vs (e :: rest) = atUnique false s f vs e := by
   rw [seqUnique, h]
 @[wasm_step] theorem seqTraps_nil : seqTraps [] = false := by
   rw [seqTraps]
@@ -166,7 +166,8 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
     (rest : List AInstr) : seq s f vs (v.instr :: rest) = seq s f (v :: vs) rest := by
   rw [seq, toVal_instr]
 @[wasm_step] theorem seqUnique_cons_val (s : Store) (f : Frame) (vs : List Val) (v : Val)
-    (rest : List AInstr) : seqUnique s f vs (v.instr :: rest) = seqUnique s f (v :: vs) rest := by
+    (rest : List AInstr) :
+    seqUnique false s f vs (v.instr :: rest) = seqUnique false s f (v :: vs) rest := by
   rw [seqUnique, toVal_instr]
 @[wasm_step] theorem seqTraps_cons_val (v : Val) (rest : List AInstr) :
     seqTraps (v.instr :: rest) = seqTraps rest := by
@@ -185,14 +186,14 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
   rw [seq]; simp [toVal, Nat.blt_eq, this]
 @[wasm_step] theorem seqUnique_cons_i32 (s : Store) (f : Frame) (vs : List Val) (n : Nat)
     (rest : List AInstr) (h : n < 2 ^ 32) :
-    seqUnique s f vs (.plain (.iconst .w32 n) :: rest) =
-      seqUnique s f (.i32 (BitVec.ofNat 32 n) :: vs) rest := by
+    seqUnique false s f vs (.plain (.iconst .w32 n) :: rest) =
+      seqUnique false s f (.i32 (BitVec.ofNat 32 n) :: vs) rest := by
   have : n < 4294967296 := h
   rw [seqUnique]; simp [toVal, Nat.blt_eq, this]
 @[wasm_step] theorem seqUnique_cons_i64 (s : Store) (f : Frame) (vs : List Val) (n : Nat)
     (rest : List AInstr) (h : n < 2 ^ 64) :
-    seqUnique s f vs (.plain (.iconst .w64 n) :: rest) =
-      seqUnique s f (.i64 (BitVec.ofNat 64 n) :: vs) rest := by
+    seqUnique false s f vs (.plain (.iconst .w64 n) :: rest) =
+      seqUnique false s f (.i64 (BitVec.ofNat 64 n) :: vs) rest := by
   have : n < 18446744073709551616 := h
   rw [seqUnique]; simp [toVal, Nat.blt_eq, this]
 @[wasm_step] theorem seqTraps_cons_i32 (n : Nat) (rest : List AInstr) (h : n < 2 ^ 32) :
@@ -207,18 +208,20 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
 -- the non-value cases of the mutual walkers, likewise propositional
 @[wasm_step] theorem atUnique_label (s : Store) (f : Frame) (vs : List Val) (n : Nat)
     (cont : List Instr) (body : List AInstr) :
-    atUnique s f vs (.label n cont body) = seqUnique s f [] body := by unfold atUnique; rfl
+    atUnique false s f vs (.label n cont body) = seqUnique false s f [] body := by
+  unfold atUnique; rfl
 @[wasm_step] theorem atUnique_frame (s : Store) (f : Frame) (vs : List Val) (n : Nat) (fi : Frame)
-    (body : List AInstr) : atUnique s f vs (.frame n fi body) = seqUnique s fi [] body := by
+    (body : List AInstr) :
+    atUnique false s f vs (.frame n fi body) = seqUnique false s fi [] body := by
   unfold atUnique; rfl
 @[wasm_step] theorem atUnique_invoke (s : Store) (f : Frame) (vs : List Val) (a : Nat) :
-    atUnique s f vs (.invoke a) = match s.funcs[a]? with
+    atUnique false s f vs (.invoke a) = match s.funcs[a]? with
       | some (.host ..) => false
       | _ => true := by unfold atUnique; rfl
 @[wasm_step] theorem atUnique_plain (s : Store) (f : Frame) (vs : List Val) (i : Instr) :
-    atUnique s f vs (.plain i) = instrUnique i vs := by unfold atUnique; rfl
+    atUnique false s f vs (.plain i) = instrUnique false i vs := by unfold atUnique; rfl
 @[wasm_step] theorem atUnique_trap (s : Store) (f : Frame) (vs : List Val) :
-    atUnique s f vs .trap = false := by unfold atUnique; rfl
+    atUnique false s f vs .trap = false := by unfold atUnique; rfl
 @[wasm_step] theorem atTrap_trap : atTrap .trap = true := by unfold atTrap; rfl
 @[wasm_step] theorem atTrap_label (n : Nat) (cont : List Instr) (body : List AInstr) :
     atTrap (.label n cont body) = seqTraps body := by unfold atTrap; rfl
@@ -240,6 +243,7 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
         else .step s f (vals vs.reverse ++ vals (bvs.take n).reverse ++ cont.map .plain ++ rest)
       | .br (k + 1) bvs => .br k bvs
       | .ret bvs => .ret bvs
+      | .host a args k => .host a args (.seq vs.reverse (.label n cont k) rest)
       | .stuck => .stuck := by unfold atInstr; rfl
 @[wasm_step] theorem atInstr_frame (s : Store) (f : Frame) (vs : List Val) (n : Nat) (fi : Frame)
     (body rest : List AInstr) :
@@ -251,6 +255,7 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
       | .ret bvs => bif Nat.blt bvs.length n then .stuck
         else .step s f (vals vs.reverse ++ vals (bvs.take n).reverse ++ rest)
       | .br _ _ => .stuck
+      | .host a args k => .host a args (.seq vs.reverse (.frame n fi k) rest)
       | .stuck => .stuck := by unfold atInstr; rfl
 @[wasm_step] theorem atInstr_invoke (s : Store) (f : Frame) (vs : List Val) (a : Nat)
     (rest : List AInstr) :
@@ -260,7 +265,11 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
         else .step s f (vals (vs.drop ft.params.length).reverse ++
           [.frame ft.results.length ⟨(vs.take ft.params.length).reverse ++ code.localDefaults, inst⟩
             [.label ft.results.length [] (code.body.map .plain)]] ++ rest)
-      | _ => .stuck := by unfold atInstr; rfl
+      | some (.host ft _) =>
+        bif Nat.blt vs.length ft.params.length then .stuck
+        else .host a (vs.take ft.params.length).reverse
+          (.seq (vs.drop ft.params.length).reverse .hole rest)
+      | none => .stuck := by unfold atInstr; rfl
 @[wasm_step] theorem atInstr_br (s : Store) (f : Frame) (vs : List Val) (k : Nat)
     (rest : List AInstr) : atInstr s f vs (.plain (.br k)) rest = .br k vs := by unfold atInstr; rfl
 @[wasm_step] theorem atInstr_return (s : Store) (f : Frame) (vs : List Val) (rest : List AInstr) :
@@ -352,7 +361,7 @@ attribute [wasm_step] Nat.reducePow Nat.reduceLT Nat.reduceGT Nat.reduceLeDiff N
 large literals (recursion as deep as `4294967295`), while `seq`-level rewrites stay cheap. -/
 theorem must_of_seq {H : HostSem} {Q : Outcome → Prop} {s : Store} {f : Frame}
     {l : List AInstr} {s' : Store} {f' : Frame} {l' : List AInstr}
-    (hu : seqUnique s f [] l = true) (hs : seq s f [] l = .step s' f' l')
+    (hu : seqUnique false s f [] l = true) (hs : seq s f [] l = .step s' f' l')
     (h : Must H Q ⟨s', f', l'⟩) : Must H Q ⟨s, f, l⟩ :=
   must_of_step (by simp only [step, hs]) (by simpa only [uniqueStep] using hu) h
 
@@ -390,7 +399,7 @@ elab "wasm_step1" " [" xs:Lean.Parser.Tactic.simpLemma,* "]" : tactic => withMai
   let { ctx, simprocs, .. } ← mkSimpContext stx (eraseLocal := false)
   let nil ← mkListLit (mkConst ``Val) []
   let e ← mkAppM ``seq #[s, f, nil, l]
-  let u ← mkAppM ``seqUnique #[s, f, nil, l]
+  let u ← mkAppM ``seqUnique #[mkConst ``Bool.false, s, f, nil, l]
   let tt := mkConst ``Bool.true
   let (r, _) ← simp e ctx simprocs
   let out ← instantiateMVars r.expr

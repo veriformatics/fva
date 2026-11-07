@@ -303,6 +303,33 @@ def instrStep (s : Store) (f : Frame) (i : Instr) (stk : List Val) :
     | none => [.trap])
   | _, _ => none
 
+/-- The context of a host call: the values + code around it, the labels and frames it sits in
+(`fill` puts a sequence in its place). -/
+inductive HCtx where
+  | hole
+  | seq (vs : List Val) (k : HCtx) (rest : List AInstr)
+  | label (n : Nat) (cont : List Instr) (k : HCtx)
+  | frame (n : Nat) (fi : Frame) (k : HCtx)
+
+/-- The sequence with `es` in the context's hole. -/
+def HCtx.fill : HCtx → List AInstr → List AInstr
+  | .hole, es => es
+  | .seq vs k rest, es => vals vs ++ k.fill es ++ rest
+  | .label n cont k, es => [.label n cont (k.fill es)]
+  | .frame n fi k, es => [.frame n fi (k.fill es)]
+
+/-- The store after a host call on `s` with outcome `o` (a divergent call keeps `s`). -/
+def hostStore (s : Store) : HostOutcome → Store
+  | .returned s' _ | .trapped s' => s'
+  | .diverged => s
+
+/-- The sequence after host call `invoke a` on `args` in context `k` has outcome `o` (a
+divergent call stays in place). -/
+def HCtx.result (k : HCtx) (a : Nat) (args : List Val) : HostOutcome → List AInstr
+  | .returned _ vs => k.fill (vals vs)
+  | .trapped _ => k.fill [.trap]
+  | .diverged => k.fill (vals args ++ [.invoke a])
+
 /-- What one attempted step yields. -/
 inductive Out where
   /-- A step to this store, frame and sequence. -/
@@ -313,7 +340,9 @@ inductive Out where
   | ret (vs : List Val)
   /-- Only values remain, or only `trap`. -/
   | final
-  /-- No rule applies (invalid code, a host call). -/
+  /-- `invoke a` of a host function is next, on arguments `vs` (in order), in context `k`. -/
+  | host (a : Nat) (vs : List Val) (k : HCtx)
+  /-- No rule applies (invalid code). -/
   | stuck
 
 /-- `[trap]`. -/
@@ -342,6 +371,7 @@ def atInstr (s : Store) (f : Frame) (vs : List Val) (e : AInstr) (rest : List AI
       else .step s f (vals vs.reverse ++ vals (bvs.take n).reverse ++ cont.map .plain ++ rest)
     | .br (k + 1) bvs => .br k bvs
     | .ret bvs => .ret bvs
+    | .host a args k => .host a args (.seq vs.reverse (.label n cont k) rest)
     | .stuck => .stuck
   | .frame n fi body =>
     match seq s fi [] body with
@@ -352,6 +382,7 @@ def atInstr (s : Store) (f : Frame) (vs : List Val) (e : AInstr) (rest : List AI
     | .ret bvs => bif Nat.blt bvs.length n then .stuck
       else .step s f (vals vs.reverse ++ vals (bvs.take n).reverse ++ rest)
     | .br _ _ => .stuck
+    | .host a args k => .host a args (.seq vs.reverse (.frame n fi k) rest)
     | .stuck => .stuck
   | .invoke a =>
     match s.funcs[a]? with
@@ -361,7 +392,11 @@ def atInstr (s : Store) (f : Frame) (vs : List Val) (e : AInstr) (rest : List AI
       else .step s f (vals (vs.drop m).reverse ++
         [.frame ft.results.length ⟨(vs.take m).reverse ++ code.localDefaults, inst⟩
           [.label ft.results.length [] (code.body.map .plain)]] ++ rest)
-    | _ => .stuck
+    | some (.host ft _) =>
+      let m := ft.params.length
+      bif Nat.blt vs.length m then .stuck
+      else .host a (vs.take m).reverse (.seq (vs.drop m).reverse .hole rest)
+    | none => .stuck
   | .plain (.br k) => .br k vs
   | .plain .return_ => .ret vs
   | .plain i => match instrStep s f i vs with

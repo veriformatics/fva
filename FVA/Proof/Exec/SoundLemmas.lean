@@ -118,89 +118,89 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
       Bool.cond_true, Bool.cond_false, Option.some.injEq, Prod.mk.injEq, reduceCtorEq]
   case case1 | case2 | case3 | case4 | case5 | case6 | case7 | case8 =>
     rcases h with ⟨r, hr, rfl, rfl, rfl, rfl⟩
-    exact ⟨_, rfl, Step.num (numStep_mem hr)⟩
+    exact ⟨_, rfl, StepP.num (numStep_mem hr)⟩
   case case9 r stk =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     refine ⟨[.ref r], rfl, ?_⟩
     cases hr : r.isNull <;>
-      simpa [hr] using (Step.refIsNull (H := H) (s := s) (f := f) (r := r))
+      simpa [hr] using (StepP.refIsNull (H := H) (s := s) (f := f) (r := r))
   case case10 =>
     rcases h with ⟨a, ha, rfl, rfl, rfl, rfl⟩
-    exact ⟨[], rfl, Step.refFunc ha⟩
+    exact ⟨[], rfl, StepP.refFunc ha⟩
   case case11 =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
-    exact ⟨[_], rfl, Step.drop⟩
+    exact ⟨[_], rfl, StepP.drop⟩
   case case12 ts c v₂ v₁ stk =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     refine ⟨[v₁, v₂, .i32 c], rfl, ?_⟩
     by_cases hc : c = 0 <;>
-      simpa [hc] using (Step.select (H := H) (s := s) (f := f) (ts := ts)
+      simpa [hc] using (StepP.select (H := H) (s := s) (f := f) (ts := ts)
         (v₁ := v₁) (v₂ := v₂) (c := c))
   case case13 =>
     rcases h with ⟨v, hv, rfl, rfl, rfl, rfl⟩
-    exact ⟨[], rfl, Step.localGet hv⟩
+    exact ⟨[], rfl, StepP.localGet hv⟩
   case case14 x v stk hx =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
-    exact ⟨[_], rfl, Step.localSet (by simpa only [Nat.blt_eq, decide_eq_true_eq] using hx)⟩
+    exact ⟨[_], rfl, StepP.localSet (by simpa only [Nat.blt_eq, decide_eq_true_eq] using hx)⟩
   case case16 =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
-    exact ⟨[_], rfl, Step.localTee⟩
+    exact ⟨[_], rfl, StepP.localTee⟩
   case case17 x a ha =>
     rcases h with ⟨g, hg, rfl, rfl, rfl, rfl⟩
-    exact ⟨[], rfl, Step.globalGet ha hg⟩
+    exact ⟨[], rfl, StepP.globalGet ha hg⟩
   case case19 x v stk a ha =>
     rcases h with ⟨g, hg, rfl, rfl, rfl, rfl⟩
-    exact ⟨[_], rfl, Step.globalSet ha hg⟩
+    exact ⟨[_], rfl, StepP.globalSet ha hg⟩
   case case23 =>
     rcases h with ⟨⟨a, t⟩, ht, rfl, rfl, rfl, rfl⟩
     rcases tableAt_eq_some.mp ht with ⟨ha, ht⟩
-    exact ⟨[], rfl, Step.tableSize ha ht⟩
+    exact ⟨[], rfl, StepP.tableSize ha ht⟩
   case case33 x a ha =>
     rcases h with ⟨e, he, rfl, rfl, rfl, rfl⟩
-    exact ⟨[], rfl, Step.elemDrop ha he⟩
+    exact ⟨[], rfl, StepP.elemDrop ha he⟩
   case case43 =>
     rcases h with ⟨⟨a, mem⟩, hm, rfl, rfl, rfl, rfl⟩
     rcases mem0_eq_some.mp hm with ⟨ha, hm⟩
-    exact ⟨[], rfl, Step.memorySize ha hm⟩
+    exact ⟨[], rfl, StepP.memorySize ha hm⟩
   case case49 x a ha =>
     rcases h with ⟨di, hdi, rfl, rfl, rfl, rfl⟩
-    exact ⟨[], rfl, Step.dataDrop ha hdi⟩
+    exact ⟨[], rfl, StepP.dataDrop ha hdi⟩
   case case51 =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
-    exact ⟨[], rfl, Step.nop⟩
+    exact ⟨[], rfl, StepP.nop⟩
   case case52 =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
-    exact ⟨[], rfl, Step.unreachable⟩
+    exact ⟨[], rfl, StepP.unreachable⟩
   case case55 bt thn els c stk =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     refine ⟨[.i32 c], rfl, ?_⟩
     by_cases hc : c = 0
-    · subst c; simpa using (Step.ifFalse (H := H) (s := s) (f := f)
+    · subst c; simpa using (StepP.ifFalse (H := H) (s := s) (f := f)
         (bt := bt) (thn := thn) (els := els))
     · have hb : (c == 0) = false := beq_eq_false_iff_ne.mpr hc
       rw [hb]
-      exact Step.ifTrue hc
+      exact StepP.ifTrue hc
   case case56 l c stk =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     refine ⟨[.i32 c], rfl, ?_⟩
     by_cases hc : c = 0
-    · subst c; simpa using (Step.brIfFalse (H := H) (s := s) (f := f) (l := l))
+    · subst c; simpa using (StepP.brIfFalse (H := H) (s := s) (f := f) (l := l))
     · have hb : (c == 0) = false := beq_eq_false_iff_ne.mpr hc
       rw [hb]
-      exact Step.brIfTrue hc
+      exact StepP.brIfTrue hc
   case case57 =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
-    exact ⟨[_], rfl, Step.brTable⟩
+    exact ⟨[_], rfl, StepP.brTable⟩
   case case58 =>
     rcases h with ⟨a, ha, rfl, rfl, rfl, rfl⟩
-    exact ⟨[], rfl, Step.call ha⟩
+    exact ⟨[], rfl, StepP.call ha⟩
   case case59 x y i stk =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     refine ⟨[.i32 i], rfl, ?_⟩
     cases ht : callTarget s f x y i with
-    | some a => exact Step.callIndirect (callTarget_eq_some.mp ht)
+    | some a => exact StepP.callIndirect (callTarget_eq_some.mp ht)
     | none =>
-      apply Step.callIndirectTrap
+      apply StepP.callIndirectTrap
       intro a ha
       have := callTarget_eq_some.mpr ha
       simp only [ht, reduceCtorEq] at this
@@ -209,26 +209,26 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     rcases tableAt_eq_some.mp ht with ⟨ha, ht⟩
     cases hr : t.elem[i.toNat]? <;> simp only [hr, Prod.mk.injEq] at h
     · rcases h with ⟨rfl, rfl, rfl, rfl⟩
-      exact ⟨[_], rfl, Step.tableGetTrap ha ht (by simpa using hr)⟩
+      exact ⟨[_], rfl, StepP.tableGetTrap ha ht (by simpa using hr)⟩
     · rcases h with ⟨rfl, rfl, rfl, rfl⟩
-      exact ⟨[_], rfl, Step.tableGet ha ht hr⟩
+      exact ⟨[_], rfl, StepP.tableGet ha ht hr⟩
   case case22 x r i stk =>
     rcases h with ⟨⟨a, t⟩, ht, h⟩
     rcases tableAt_eq_some.mp ht with ⟨ha, ht⟩
     cases hb : Nat.blt i.toNat t.elem.length <;>
       simp only [hb, Bool.cond_true, Bool.cond_false, Prod.mk.injEq] at h
     · rcases h with ⟨rfl, rfl, rfl, rfl⟩
-      exact ⟨[_, _], rfl, Step.tableSetTrap ha ht (nblt_false.mp hb)⟩
+      exact ⟨[_, _], rfl, StepP.tableSetTrap ha ht (nblt_false.mp hb)⟩
     · rcases h with ⟨rfl, rfl, rfl, rfl⟩
-      exact ⟨[_, _], rfl, Step.tableSet ha ht (nblt_true.mp hb)⟩
+      exact ⟨[_, _], rfl, StepP.tableSet ha ht (nblt_true.mp hb)⟩
   case case24 x n r stk =>
     rcases h with ⟨⟨a, t⟩, ht, h⟩
     rcases tableAt_eq_some.mp ht with ⟨ha, ht⟩
     cases hg : t.grow n.toNat r <;> simp only [hg, Prod.mk.injEq] at h
     · rcases h with ⟨rfl, rfl, rfl, rfl⟩
-      exact ⟨[_, _], rfl, Step.tableGrowFail⟩
+      exact ⟨[_, _], rfl, StepP.tableGrowFail nofun⟩
     · rcases h with ⟨rfl, rfl, rfl, rfl⟩
-      exact ⟨[_, _], rfl, Step.tableGrow ha ht hg⟩
+      exact ⟨[_, _], rfl, StepP.tableGrow ha ht hg⟩
   case case25 x n r i stk =>
     rcases h with ⟨⟨a, t⟩, ht, h⟩
     rcases tableAt_eq_some.mp ht with ⟨ha, ht⟩
@@ -237,7 +237,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     · rename_i hb
       rcases Prod.mk.inj h with ⟨rfl, h⟩
       rcases h with ⟨⟩
-      exact ⟨[_, _, _], rfl, Step.tableFillTrap ha ht (nblt_true.mp hb)⟩
+      exact ⟨[_, _, _], rfl, StepP.tableFillTrap ha ht (nblt_true.mp hb)⟩
     · rename_i hb
       have hb := nblt_false.mp hb
       split at h
@@ -247,17 +247,17 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
           simpa using Nat.beq_eq.mp hz
         subst n
         cases h
-        exact ⟨[_, _, _], rfl, Step.tableFillZero ha ht (by simpa using hb)⟩
+        exact ⟨[_, _, _], rfl, StepP.tableFillZero ha ht (by simpa using hb)⟩
       · rename_i hn
         cases h
         have hn : 0 < n.toNat := Nat.pos_of_ne_zero (by
           simpa only [← Bool.not_eq_true, Nat.beq_eq] using hn)
-        exact ⟨[_, _, _], rfl, Step.tableFill ha ht hn hb⟩
+        exact ⟨[_, _, _], rfl, StepP.tableFill ha ht hn hb⟩
   case case26 x y n src dst stk tx Tx ty Ty hty htx hb =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     rcases tableAt_eq_some.mp htx with ⟨hx, hTx⟩
     rcases tableAt_eq_some.mp hty with ⟨hy, hTy⟩
-    refine ⟨[_, _, _], rfl, Step.tableCopyTrap hx hy ?_⟩
+    refine ⟨[_, _, _], rfl, StepP.tableCopyTrap hx hy ?_⟩
     simp only [Bool.or_eq_true, nblt_true] at hb
     exact hb.elim (fun h => Or.inl ⟨Ty, hTy, h⟩) (fun h => Or.inr ⟨Tx, hTx, h⟩)
   case case27 x y n src dst stk tx Tx ty Ty hty htx hb hz =>
@@ -269,7 +269,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
       simpa using Nat.beq_eq.mp hz
     subst n
     simp only [Bool.or_eq_false_iff, nblt_false] at hb
-    exact ⟨[_, _, _], rfl, Step.tableCopyZero hx hy hTx hTy hb.1 hb.2⟩
+    exact ⟨[_, _, _], rfl, StepP.tableCopyZero hx hy hTx hTy hb.1 hb.2⟩
   case case28 x y n src dst stk tx Tx ty Ty hty htx hb hn hdir =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     rcases tableAt_eq_some.mp htx with ⟨hx, hTx⟩
@@ -277,7 +277,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     simp only [Bool.or_eq_false_iff, nblt_false] at hb
     have hn : 0 < n.toNat := Nat.pos_of_ne_zero (by
       simpa only [← Bool.not_eq_true, Nat.beq_eq] using hn)
-    exact ⟨[_, _, _], rfl, Step.tableCopyUp hx hy hTx hTy hn hb.1 hb.2
+    exact ⟨[_, _, _], rfl, StepP.tableCopyUp hx hy hTx hTy hn hb.1 hb.2
       (by simpa only [Nat.ble_eq, decide_eq_true_eq] using hdir)⟩
   case case29 x y n src dst stk tx Tx ty Ty hty htx hb hn hdir =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
@@ -286,7 +286,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     simp only [Bool.or_eq_false_iff, nblt_false] at hb
     have hn : 0 < n.toNat := Nat.pos_of_ne_zero (by
       simpa only [← Bool.not_eq_true, Nat.beq_eq] using hn)
-    exact ⟨[_, _, _], rfl, Step.tableCopyDown hx hy hTx hTy hn hb.1 hb.2
+    exact ⟨[_, _, _], rfl, StepP.tableCopyDown hx hy hTx hTy hn hb.1 hb.2
       (by simpa only [← Bool.not_eq_true, Nat.ble_eq, Nat.not_le] using hdir)⟩
   case case31 x y n src dst stk tx t ea hea htx =>
     rcases h with ⟨e, he, h⟩
@@ -295,7 +295,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     split at h
     · rename_i hb
       cases h
-      refine ⟨[_, _, _], rfl, Step.tableInitTrap hx hea ?_⟩
+      refine ⟨[_, _, _], rfl, StepP.tableInitTrap hx hea ?_⟩
       simp only [Bool.or_eq_true, nblt_true] at hb
       exact hb.elim (fun h => Or.inl ⟨e, he, h⟩) (fun h => Or.inr ⟨t, ht, h⟩)
     · rename_i hb
@@ -307,14 +307,14 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
           simpa using Nat.beq_eq.mp hz
         subst n
         cases h
-        exact ⟨[_, _, _], rfl, Step.tableInitZero hx hea ht he hb.1 hb.2⟩
+        exact ⟨[_, _, _], rfl, StepP.tableInitZero hx hea ht he hb.1 hb.2⟩
       · rename_i hn
         have hn : 0 < n.toNat := Nat.pos_of_ne_zero (by
       simpa only [← Bool.not_eq_true, Nat.beq_eq] using hn)
         split at h
         · rename_i r hr
           cases h
-          exact ⟨[_, _, _], rfl, Step.tableInit hx hea ht he hn hb.1 hb.2 hr⟩
+          exact ⟨[_, _, _], rfl, StepP.tableInit hx hea ht he hn hb.1 hb.2 hr⟩
         · rename_i hr
           have hbad : e.elem.length ≤ src.toNat := by simpa using hr
           omega
@@ -323,47 +323,47 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     rcases mem0_eq_some.mp hm with ⟨ha, hm⟩
     simp only [cond] at h
     split at h <;> rename_i hb <;> cases h
-    · exact ⟨[_], rfl, Step.loadTrap ha hm (nblt_true.mp hb)⟩
-    · exact ⟨[_], rfl, Step.load ha hm (nblt_false.mp hb)⟩
+    · exact ⟨[_], rfl, StepP.loadTrap ha hm (nblt_true.mp hb)⟩
+    · exact ⟨[_], rfl, StepP.load ha hm (nblt_false.mp hb)⟩
   case case36 w p sx m i stk =>
     rcases h with ⟨⟨a, mem⟩, hm, h⟩
     rcases mem0_eq_some.mp hm with ⟨ha, hm⟩
     simp only [cond] at h
     split at h <;> rename_i hb <;> cases h
-    · exact ⟨[_], rfl, Step.loadPackedTrap ha hm (nblt_true.mp hb)⟩
-    · exact ⟨[_], rfl, Step.loadPacked ha hm (nblt_false.mp hb)⟩
+    · exact ⟨[_], rfl, StepP.loadPackedTrap ha hm (nblt_true.mp hb)⟩
+    · exact ⟨[_], rfl, StepP.loadPacked ha hm (nblt_false.mp hb)⟩
   case case37 t m v i stk a mem c hv hm ea hb =>
     dsimp only [ea] at hb
     simp only [hb, Bool.cond_true, Option.some.injEq, Prod.mk.injEq] at h
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     rcases mem0_eq_some.mp hm with ⟨ha, hm⟩
-    exact ⟨[_, _], rfl, Step.storeTrap ha hm hv (nblt_true.mp hb)⟩
+    exact ⟨[_, _], rfl, StepP.storeTrap ha hm hv (nblt_true.mp hb)⟩
   case case38 t m v i stk a mem c hv hm ea hb =>
     dsimp only [ea] at hb
     simp only [hb, Bool.cond_false, Option.some.injEq, Prod.mk.injEq] at h
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     rcases mem0_eq_some.mp hm with ⟨ha, hm⟩
-    exact ⟨[_, _], rfl, Step.store ha hm hv (nblt_false.mp hb)⟩
+    exact ⟨[_, _], rfl, StepP.store ha hm hv (nblt_false.mp hb)⟩
   case case40 w p m v i stk a mem c hv hm ea hb =>
     dsimp only [ea] at hb
     simp only [hb, Bool.cond_true, Option.some.injEq, Prod.mk.injEq] at h
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     rcases mem0_eq_some.mp hm with ⟨ha, hm⟩
-    exact ⟨[_, _], rfl, Step.storePackedTrap ha hm hv (nblt_true.mp hb)⟩
+    exact ⟨[_, _], rfl, StepP.storePackedTrap ha hm hv (nblt_true.mp hb)⟩
   case case41 w p m v i stk a mem c hv hm ea hb =>
     dsimp only [ea] at hb
     simp only [hb, Bool.cond_false, Option.some.injEq, Prod.mk.injEq] at h
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     rcases mem0_eq_some.mp hm with ⟨ha, hm⟩
-    exact ⟨[_, _], rfl, Step.storePacked ha hm hv (nblt_false.mp hb)⟩
+    exact ⟨[_, _], rfl, StepP.storePacked ha hm hv (nblt_false.mp hb)⟩
   case case44 n stk =>
     rcases h with ⟨⟨a, mem⟩, hm, h⟩
     rcases mem0_eq_some.mp hm with ⟨ha, hm⟩
     cases hg : mem.grow n.toNat <;> simp only [hg, Prod.mk.injEq] at h
     · rcases h with ⟨rfl, rfl, rfl, rfl⟩
-      exact ⟨[_], rfl, Step.memoryGrowFail⟩
+      exact ⟨[_], rfl, StepP.memoryGrowFail nofun⟩
     · rcases h with ⟨rfl, rfl, rfl, rfl⟩
-      exact ⟨[_], rfl, Step.memoryGrow ha hm hg⟩
+      exact ⟨[_], rfl, StepP.memoryGrow ha hm hg⟩
   case case45 n v d stk =>
     rcases h with ⟨⟨a, mem⟩, hm, h⟩
     rcases mem0_eq_some.mp hm with ⟨ha, hm⟩
@@ -371,7 +371,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     split at h
     · rename_i hb
       cases h
-      exact ⟨[_, _, _], rfl, Step.memoryFillTrap ha hm (nblt_true.mp hb)⟩
+      exact ⟨[_, _, _], rfl, StepP.memoryFillTrap ha hm (nblt_true.mp hb)⟩
     · rename_i hb
       have hb := nblt_false.mp hb
       split at h
@@ -381,12 +381,12 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
           simpa using Nat.beq_eq.mp hz
         subst n
         cases h
-        exact ⟨[_, _, _], rfl, Step.memoryFillZero ha hm (by simpa using hb)⟩
+        exact ⟨[_, _, _], rfl, StepP.memoryFillZero ha hm (by simpa using hb)⟩
       · rename_i hn
         cases h
         have hn : 0 < n.toNat := Nat.pos_of_ne_zero (by
           simpa only [← Bool.not_eq_true, Nat.beq_eq] using hn)
-        exact ⟨[_, _, _], rfl, Step.memoryFill ha hm hn hb⟩
+        exact ⟨[_, _, _], rfl, StepP.memoryFill ha hm hn hb⟩
   case case46 n src dst stk =>
     rcases h with ⟨⟨a, mem⟩, hm, h⟩
     rcases mem0_eq_some.mp hm with ⟨ha, hm⟩
@@ -394,7 +394,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     split at h
     · rename_i hb
       cases h
-      exact ⟨[_, _, _], rfl, Step.memoryCopyTrap ha hm (by
+      exact ⟨[_, _, _], rfl, StepP.memoryCopyTrap ha hm (by
         simpa only [Bool.or_eq_true, nblt_true] using hb)⟩
     · rename_i hb
       simp only [Bool.or_eq_false_iff, nblt_false] at hb
@@ -405,14 +405,14 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
           simpa using Nat.beq_eq.mp hz
         subst n
         cases h
-        exact ⟨[_, _, _], rfl, Step.memoryCopyZero ha hm hb.1 hb.2⟩
+        exact ⟨[_, _, _], rfl, StepP.memoryCopyZero ha hm hb.1 hb.2⟩
       · rename_i hn
         have hn : 0 < n.toNat := Nat.pos_of_ne_zero (by
       simpa only [← Bool.not_eq_true, Nat.beq_eq] using hn)
         split at h <;> rename_i hdir <;> cases h
-        · exact ⟨[_, _, _], rfl, Step.memoryCopyUp ha hm hn hb.1 hb.2
+        · exact ⟨[_, _, _], rfl, StepP.memoryCopyUp ha hm hn hb.1 hb.2
             (by simpa only [Nat.ble_eq, decide_eq_true_eq] using hdir)⟩
-        · exact ⟨[_, _, _], rfl, Step.memoryCopyDown ha hm hn hb.1 hb.2
+        · exact ⟨[_, _, _], rfl, StepP.memoryCopyDown ha hm hn hb.1 hb.2
             (by simpa only [← Bool.not_eq_true, Nat.ble_eq, Nat.not_le] using hdir)⟩
   case case47 x n src dst stk a mem da hda hm =>
     rcases h with ⟨di, hdi, h⟩
@@ -421,7 +421,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     split at h
     · rename_i hb
       cases h
-      refine ⟨[_, _, _], rfl, Step.memoryInitTrap ha hda hm ?_⟩
+      refine ⟨[_, _, _], rfl, StepP.memoryInitTrap ha hda hm ?_⟩
       simp only [Bool.or_eq_true, nblt_true] at hb
       exact hb.elim (fun h => Or.inl ⟨di, hdi, h⟩) Or.inr
     · rename_i hb
@@ -433,14 +433,14 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
           simpa using Nat.beq_eq.mp hz
         subst n
         cases h
-        exact ⟨[_, _, _], rfl, Step.memoryInitZero ha hda hm hdi hb.1 hb.2⟩
+        exact ⟨[_, _, _], rfl, StepP.memoryInitZero ha hda hm hdi hb.1 hb.2⟩
       · rename_i hn
         have hn : 0 < n.toNat := Nat.pos_of_ne_zero (by
       simpa only [← Bool.not_eq_true, Nat.beq_eq] using hn)
         split at h
         · rename_i b hbyte
           cases h
-          exact ⟨[_, _, _], rfl, Step.memoryInit ha hda hm hdi hn hb.1 hb.2 hbyte⟩
+          exact ⟨[_, _, _], rfl, StepP.memoryInit ha hda hm hdi hn hb.1 hb.2 hbyte⟩
         · rename_i hbyte
           have hbad : di.data.length ≤ src.toNat := by simpa using hbyte
           omega
@@ -451,7 +451,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     · contradiction
     · rename_i hb
       cases h
-      refine ⟨(stk.take ft.params.length).reverse, ?_, Step.block hft ?_⟩
+      refine ⟨(stk.take ft.params.length).reverse, ?_, StepP.block hft ?_⟩
       · simp
       · simp [Nat.min_eq_left (nblt_false.mp hb)]
   case case54 bt body =>
@@ -461,7 +461,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
     · contradiction
     · rename_i hb
       cases h
-      refine ⟨(stk.take ft.params.length).reverse, ?_, Step.loop hft ?_⟩
+      refine ⟨(stk.take ft.params.length).reverse, ?_, StepP.loop hft ?_⟩
       · simp
       · simp [Nat.min_eq_left (nblt_false.mp hb)]
 

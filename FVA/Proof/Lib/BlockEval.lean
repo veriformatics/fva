@@ -20,8 +20,8 @@ def BContext.fill : BContext → Config → Config
       C.fill ⟨c.store, caller, vals vs ++ (.frame n c.frame c.instrs :: rest)⟩
 
 theorem BContext.seq {s s' : Store} {f f' : Frame} {es es' : List AInstr}
-    (C : BContext) (hu : seqUnique s f [] es = true) (hs : seq s f [] es = .step s' f' es') :
-    seqUnique (C.fill ⟨s, f, es⟩).store (C.fill ⟨s, f, es⟩).frame []
+    (C : BContext) (hu : seqUnique false s f [] es = true) (hs : seq s f [] es = .step s' f' es') :
+    seqUnique false (C.fill ⟨s, f, es⟩).store (C.fill ⟨s, f, es⟩).frame []
       (C.fill ⟨s, f, es⟩).instrs = true ∧
     seq (C.fill ⟨s, f, es⟩).store (C.fill ⟨s, f, es⟩).frame []
       (C.fill ⟨s, f, es⟩).instrs = .step (C.fill ⟨s', f', es'⟩).store
@@ -67,7 +67,7 @@ theorem BContext.within {R W : Nat → Nat → Prop} (C : BContext) {c : Config}
 def blockEval : Nat → Store → Frame → List AInstr → Option (Config × List (Option Access))
   | 0, s, f, es => some (⟨s, f, es⟩, [])
   | k + 1, s, f, es =>
-    bif seqUnique s f [] es then
+    bif seqUnique false s f [] es then
       match seq s f [] es with
       | .step s' f' es' => (blockEval k s' f' es').map fun (c, trace) =>
           (c, seqAccess s f [] es :: trace)
@@ -92,7 +92,7 @@ theorem blockEval_until {H : HostSem} {R W : Nat → Nat → Prop} {Q : Config �
     rcases he with ⟨rfl, rfl⟩
     exact hq
   | succ k ih =>
-    cases hu : seqUnique s f [] es with
+    cases hu : seqUnique false s f [] es with
     | false => simp only [blockEval, hu, Bool.cond_false, reduceCtorEq] at he
     | true =>
       cases hs : seq s f [] es <;>

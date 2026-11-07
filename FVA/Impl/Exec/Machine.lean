@@ -1,4 +1,4 @@
-import FVA.Impl.Exec.Ref
+import FVA.Impl.Exec.Det
 import FVA.Impl.Exec.Chunks
 
 /-!
@@ -207,6 +207,46 @@ def run : Nat → MState → MState × Bool
 def ofInvoke (s : MStore) (a : Nat) (args : List Val) : MState :=
   { store := s, frame := ⟨[], {}⟩, stack := args.reverse, code := [.invoke a], ctl := [] }
 
+/-- The next step is no choice point of the spec under growth policy `fits` (U27): a value, a
+control exit, a plain instruction `Ref.instrUnique` admits, or a call of a module function; a
+host call or a trap is one. -/
+def uniq (fits : Bool) (m : MState) : Bool :=
+  match m.code with
+  | e :: _ => match Ref.toVal e with
+    | some _ => true
+    | none => match e with
+      | .plain i => Ref.instrUnique fits i m.stack
+      | .invoke a => match m.store.base.funcs[a]? with
+        | some (.wasm ..) => true
+        | _ => false
+      | _ => false
+  | [] => true
+
+/-- Run up to `fuel` steps while each is no choice point under `fits`: the last state reached
+and whether fuel ran out. -/
+def runU (fits : Bool) : Nat → MState → MState × Bool
+  | 0, m => (m, true)
+  | n + 1, m => bif m.uniq fits then
+      match m.step with
+      | some m' => runU fits n m'
+      | none => (m, false)
+    else (m, false)
+
+/-- At a host call on enough values: the host id, its arity and the code after the call. -/
+def hostCall (m : MState) : Option (Nat × Nat × List AInstr) :=
+  match m.code with
+  | .invoke a :: rest => match m.store.base.funcs[a]? with
+    | some (.host ft id) =>
+      bif Nat.blt m.stack.length ft.params.length then none
+      else some (id, ft.params.length, rest)
+    | _ => none
+  | _ => none
+
+/-- The machine resumed after a host call on its `k` top values: the call's result
+instructions `out` (values or `trap`) in its place, the store `ms` the host left. -/
+def hostResume (m : MState) (ms : MStore) (out rest : List AInstr) (k : Nat) : MState :=
+  { m with store := ms, stack := m.stack.drop k, code := out ++ rest }
+
 /-- How a run ended: only values remain, only `trap` remains, or neither (stuck). -/
 inductive Ending where
   | returned (vs : List Val)
@@ -221,6 +261,41 @@ def ending (m : MState) : Ending :=
   | _, _, _ => .stuck
 
 end MState
+
+/-- An executable host call's result on machine stores: values or a trap. -/
+inductive MHostOut where
+  | returned (vs : List Val)
+  | trapped
+
+/-- The spec outcome of a machine host result whose store is `ms`. -/
+def MHostOut.spec (ms : MStore) : MHostOut → HostOutcome
+  | .returned vs => .returned ms.abs vs
+  | .trapped => .trapped ms.abs
+
+/-- The instructions a machine host result leaves in the call's place. -/
+def MHostOut.out : MHostOut → List AInstr
+  | .returned vs => vals vs
+  | .trapped => [.trap]
+
+/-- A process on the machine with executable host `X` (U27): unique core steps (`fits = true`)
+and host calls; stops at an exit, a final or stuck state, a choice point, a host call `X`
+leaves undefined, or when fuel runs out (`true`). -/
+def sysRun {St : Type} (exited : St → Option Nat)
+    (X : St → Nat → MStore → List Val → Option (St × MStore × MHostOut)) :
+    Nat → St × MState → St × MState × Bool
+  | 0, (σ, m) => (σ, m, true)
+  | n + 1, (σ, m) =>
+    match exited σ with
+    | some _ => (σ, m, false)
+    | none => match m.hostCall with
+      | some (id, k, rest) => match X σ id m.store (m.stack.take k).reverse with
+        | some (τ, ms, r) => sysRun exited X n (τ, m.hostResume ms r.out rest k)
+        | none => (σ, m, false)
+      | none => bif m.uniq true then
+          match m.step with
+          | some m' => sysRun exited X n (σ, m')
+          | none => (σ, m, false)
+        else (σ, m, false)
 
 /-- A spec memory as a trie (bytes `[0, size)`; a valid memory reads zero past its size). -/
 def MMem.ofMemInst (m : MemInst) : MMem :=
