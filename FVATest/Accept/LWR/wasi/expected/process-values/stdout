@@ -1,0 +1,11 @@
+argc=5
+arg=alpha
+arg=two words
+arg=
+arg=--looks-like-option
+arg=βeta
+envc=2
+env=FVA_ALPHA=one
+env=FVA_EMPTY=
+stdin=pipe-input
+

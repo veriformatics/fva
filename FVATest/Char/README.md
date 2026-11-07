@@ -13,7 +13,7 @@ Implementation bodies stay unread.
 | Full official scripts | 82 scripts; 27,373 command rows | PASS, rc 0; all command tallies agree with runner summaries |
 | Fast official scripts | 80 scripts; 27,156 command rows; excludes only bulk + memory_fill | PASS, rc 0 |
 | CLI help | 12 invocations; stdout + stderr + exit status | Byte-exact; `help --help` returns 2, the other 11 return 0 |
-| Tracked Wasm lifts | 19 files; namespace `CharLift` | All return 0 and produce a SHA-256-pinned module |
+| Tracked Wasm lifts | 20 files; namespace `CharLift` | 19 return 0 with a SHA-256-pinned module; `FVATest/Subjects/CppEH/eh.wasm` (exception handling: outside the profile until U28) returns 1 |
 | Comparator + trace-join controls | 16 cases, including skip reason classes and a direct same-line runner fixture | PASS |
 | Full / fast wall time | Full comparison 61 s; fast comparison 52 s | Every selected script, help call and lift executes afresh |
 

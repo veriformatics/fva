@@ -1,0 +1,404 @@
+#!/usr/bin/env bash
+# Blind acceptance of .agent/spec.md 3ed6b36: Language + Wasm reach.
+# rc 0 all pass / 1 assertion or pending / 2 setup / 3 crash.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+root=$PWD
+fixtures=$root/FVATest/Accept/LWR
+export PATH="$root/.tools/bin:$PATH"
+group=all
+record=
+while (($#)); do
+	case $1 in
+	--group)
+		(($# >= 2)) || exit 2
+		group=$2
+		shift 2
+		;;
+	--record)
+		(($# >= 2)) || exit 2
+		record=$2
+		shift 2
+		;;
+	-h | --help)
+		echo 'Usage: scripts/test-accept-lwr [--group U25|D30|D29|CppEH|D28|D51] [--record DIR]'
+		exit 0
+		;;
+	*)
+		echo "test-accept-lwr: unknown argument: $1" >&2
+		exit 2
+		;;
+	esac
+done
+case $group in all | U25 | D30 | D29 | CppEH | D28 | D51) ;; *) exit 2 ;; esac
+mkdir -p "$root/.scratch" || exit 2
+work=$(mktemp -d "$root/.scratch/accept-lwr.XXXXXX") || exit 2
+trap 'rm -rf "$work"' EXIT
+if [[ -n $record ]]; then
+	mkdir -p "$record" || exit 2
+	record=$(cd "$record" && pwd) || exit 2
+else
+	record=$work/logs
+	mkdir -p "$record" || exit 2
+fi
+ok=0 bad=0 pending=0 infra=0 crashed=0
+last_rc=0 last_ms=0 last_log=
+selected() { [[ $group == all || $group == "$1" ]]; }
+pass() {
+	echo "ok $1"
+	ok=$((ok + 1))
+}
+fail() {
+	echo "FAIL $1: $2"
+	bad=$((bad + 1))
+}
+need() {
+	echo "pending $1: needs $2"
+	pending=$((pending + 1))
+}
+run() {
+	local id=$1 begin end
+	shift
+	printf '%q ' "$@" >"$record/$id.command"
+	printf '\n' >>"$record/$id.command"
+	begin=$(date +%s%N)
+	"$@" >"$record/$id.out" 2>&1
+	last_rc=$?
+	end=$(date +%s%N)
+	last_ms=$(((end - begin) / 1000000))
+	last_log=$record/$id.out
+	printf '%s\n' "$last_rc" >"$record/$id.rc"
+	printf '%s\n' "$last_ms" >"$record/$id.wall-ms"
+}
+execution_error() {
+	local id=$1 protocol=${2:-process}
+	if ((last_rc == 124 || last_rc >= 128)) || [[ $protocol == script && $last_rc == 3 ]]; then
+		fail "$id" "program crashed or reached execution limit (rc=$last_rc)"
+		crashed=1
+		return 0
+	fi
+	if ((last_rc == 126 || last_rc == 127)) || [[ $protocol == script && $last_rc == 2 ]]; then
+		fail "$id" "setup or program unavailable (rc=$last_rc)"
+		infra=1
+		return 0
+	fi
+	return 1
+}
+# Run invokes the composed battery indirectly; dynamic locals isolate the canary flags.
+# shellcheck disable=SC2329
+check_status_protocol() {
+	local protocol rc recognized want want_infra want_crash n=0
+	local bad=0 infra=0 crashed=0 last_rc=0
+	while read -r protocol rc want want_infra want_crash; do
+		bad=0 infra=0 crashed=0 last_rc=$rc
+		if execution_error status-canary "$protocol" >/dev/null; then recognized=0; else recognized=1; fi
+		if [[ $recognized != "$want" || $infra != "$want_infra" || $crashed != "$want_crash" || $bad != "$((1 - recognized))" ]]; then
+			echo "status contract: $protocol rc=$rc -> $recognized/$infra/$crashed; expected $want/$want_infra/$want_crash"
+			return 1
+		fi
+		n=$((n + 1))
+	done <<'CASES'
+process 0 1 0 0
+process 2 1 0 0
+process 3 1 0 0
+script 1 1 0 0
+script 2 0 1 0
+script 3 0 0 1
+process 124 0 0 1
+process 139 0 0 1
+process 126 0 1 0
+process 127 0 1 0
+CASES
+	printf 'status-protocol: %s cases passed\n' "$n"
+}
+# shellcheck disable=SC2329
+check_outcomes_battery() {
+	FVA_ACCEPT_TMP="$work" "$fixtures/test-outcomes" || return "$?"
+	check_status_protocol
+}
+runner_case() {
+	local id=$1 file=$2 expected=$3 mode=${4:-plain}
+	local dir count row p f s excluded=0 oracle_rc=0 module outcome_rc=0
+	local official=false binary_invalid=false trace_required=false
+	local -a oracle_flags=()
+	case $mode in
+	plain) ;;
+	official)
+		official=true
+		trace_required=true
+		;;
+	binary-invalid) binary_invalid=true ;;
+	outcomes) trace_required=true ;;
+	*)
+		fail "$id" "unknown fixture mode: $mode"
+		infra=1
+		return
+		;;
+	esac
+	if [[ $expected == reject ]] && ! $binary_invalid; then oracle_rc=1; fi
+	# Upstream diagnostic strings differ across validators; assertion semantics stay checked.
+	if $official; then oracle_flags+=(--ignore-error-messages); fi
+	dir=$work/$id
+	mkdir -p "$dir" || {
+		infra=1
+		fail "$id" 'cannot create fixture directory'
+		return
+	}
+	run "$id.oracle" wasmtime wast -W exceptions=y,tail-call=y,function-references=y,gc=y \
+		"${oracle_flags[@]}" "$file"
+	if ((last_rc != oracle_rc)); then
+		fail "$id" "oracle fixture sanity failed (rc=$last_rc)"
+		infra=1
+		return
+	fi
+	run "$id.convert" wasm-tools json-from-wast "$file" -o "$dir/$id.json" --wasm-dir "$dir/"
+	if ((last_rc)); then
+		fail "$id" "fixture conversion rc=$last_rc"
+		infra=1
+		return
+	fi
+	if $binary_invalid; then
+		module=$(jq -r '.commands[0].filename' "$dir/$id.json")
+		run "$id.syntax-oracle" wasm-tools print "$dir/$module" -o "$dir/invalid.wat"
+		if ((last_rc)); then
+			fail "$id" 'syntax control did not decode'
+			infra=1
+			return
+		fi
+		run "$id.validation-oracle" wasm-tools validate --features=wasm2,-simd "$dir/$module"
+		if ((last_rc != 1)); then
+			fail "$id" 'validation control did not reject'
+			infra=1
+			return
+		fi
+	fi
+	count=$(jq '.commands | length' "$dir/$id.json") || {
+		fail "$id" 'cannot count converted commands'
+		infra=1
+		return
+	}
+	if $official; then
+		excluded=$(jq '[.commands[] | select(.type == "assert_malformed" and .module_type == "text")] | length' \
+			"$dir/$id.json")
+		jq -r '.commands[] | select(.type == "assert_malformed" and .module_type == "text") |
+			"text-format malformed: line \(.line) \(.text)"' "$dir/$id.json" >"$record/$id.exclusions"
+	fi
+	: >"$dir/outcomes.tsv"
+	run "$id" env FVA_SPEC_VALIDATE_ONLY=0 FVA_SPEC_OUTCOMES="$dir/outcomes.tsv" \
+		timeout "${FVA_ACCEPT_CASE_TIMEOUT:-180}s" nice -n 10 \
+		"$root/.lake/build/bin/fvatest" spec "$dir/$id.json"
+	if execution_error "$id" script; then return; fi
+	cp "$dir/outcomes.tsv" "$record/$id.outcomes" || {
+		fail "$id" 'cannot record per-command outcomes'
+		infra=1
+		return
+	}
+	if $trace_required; then
+		(
+			run "$id.outcome-check" "$fixtures/check-outcomes" "$dir/$id.json" "$dir/outcomes.tsv"
+			exit "$last_rc"
+		)
+		outcome_rc=$?
+		if ((outcome_rc == 2)); then infra=1; fi
+		if ((outcome_rc == 3 || outcome_rc >= 128)); then crashed=1; fi
+	fi
+	row=$(awk -v id="$id" '$1 == id && NF == 4 {print $2, $3, $4}' "$last_log")
+	read -r p f s <<<"$row"
+	if [[ ! $p =~ ^[0-9]+$ || ! $f =~ ^[0-9]+$ || ! $s =~ ^[0-9]+$ ]]; then
+		fail "$id" "missing unique runner count row (rc=$last_rc)"
+	elif $binary_invalid && [[ $last_rc == 0 && $row == '0 0 1' ]]; then
+		need "$id" 'U28a: malformed assertion must reject decoded binaries, including validation-invalid ones'
+	elif [[ $expected == pass && $last_rc == 0 && $row == "$((count - excluded)) 0 $excluded" && $outcome_rc == 0 ]]; then
+		pass "$id"
+	elif [[ $expected == reject && $last_rc == 1 && $f == 1 && $s == 0 && $((p + f)) == "$count" && $outcome_rc == 0 ]]; then
+		pass "$id"
+	else
+		fail "$id" "runner $p/$f/$s rc=$last_rc; expected $expected over $count commands, $excluded named text skips; trace rc=$outcome_rc"
+	fi
+}
+compare_capture() {
+	local got=$1 want=$2 f
+	for f in stdout stderr exit layout; do
+		cmp -s "$got/$f" "$want/$f" || return 1
+	done
+	# Git carries empty layouts, not empty directories.
+	if [[ ! -d $want/tree ]]; then
+		[[ ! -s $want/layout ]]
+		return
+	fi
+	while IFS= read -r -d '' f; do
+		cmp -s "$got/tree/$f" "$want/tree/$f" || return 1
+	done < <(/usr/bin/find "$want/tree" -type f -printf '%P\0')
+}
+for tool in lake jq wasmtime wasm-tools timeout nice date cmp; do
+	command -v "$tool" >/dev/null || {
+		echo "FAIL setup: missing $tool"
+		exit 2
+	}
+done
+run setup nice -n 10 lake build fvatest fva
+if ((last_rc)); then
+	echo "FAIL setup: lake build rc=$last_rc"
+	tail -10 "$last_log"
+	exit 2
+fi
+
+if selected U25; then
+	for kind in function global memory table malformed module; do
+		runner_case "U25.$kind-false" "$fixtures/planted/u25-$kind-false.wast" reject
+		runner_case "U25.$kind-true" "$fixtures/u25-$kind-true.wast" pass
+	done
+	runner_case U25.malformed-invalid "$fixtures/planted/u25-malformed-invalid.wast" reject binary-invalid
+	runner_case U25.outcome-protocol "$fixtures/u25-module-true.wast" pass outcomes
+fi
+
+if selected D30; then
+	runner_case D30.memory-boundaries "$fixtures/d30-memory.wast" pass
+	runner_case D30.large-copy "$fixtures/d30-large-copy.wast" pass
+	counts=$work/memory-copy.counts
+	run D30.memory-copy env FVA_SPEC_COUNTS="$counts" FVA_SPEC_VALIDATE_ONLY=0 \
+		nice -n 10 scripts/test-spec memory_copy
+	copy_ms=$last_ms copy_rc=$last_rc
+	copy_row=$(awk '$1 == "memory_copy" {print $0}' "$counts" 2>/dev/null)
+	if execution_error D30.memory-copy script; then
+		:
+	elif [[ $copy_rc == 0 && $copy_row == 'memory_copy 4450 0 0' ]]; then
+		pass D30.memory-copy
+	else fail D30.memory-copy "${copy_row:-no counts}; rc=$copy_rc; expected memory_copy 4450 0 0"; fi
+	printf '# wall D30.memory-copy %s ms (%s)\n' "$copy_ms" "$(hostname)"
+	if [[ $copy_rc != 0 || $copy_row != 'memory_copy 4450 0 0' ]]; then
+		fail D30.wall 'memory_copy did not execute all 4450 commands'
+	elif [[ $(hostname -s) != nixbox ]]; then
+		need D30.wall 'U26: nixbox, prebuilt runner/corpus, no concurrent heavy job; desktop wall is observation only'
+	elif ((copy_ms >= 300000)); then
+		fail D30.wall "$copy_ms ms >= 300000 ms"
+	else pass D30.wall; fi
+	counts=$work/full.counts
+	run D30.full-mode env FVA_SPEC_COUNTS="$counts" FVA_SPEC_VALIDATE_ONLY=0 nice -n 10 scripts/test-spec
+	full_row=$(awk '$1 == "memory_copy" {print $0}' "$counts" 2>/dev/null)
+	if execution_error D30.full-mode script; then
+		:
+	elif [[ $last_rc == 0 && $full_row == 'memory_copy 4450 0 0' ]]; then
+		pass D30.full-mode
+	else fail D30.full-mode "${full_row:-no memory_copy row}; rc=$last_rc; expected memory_copy 4450 0 0"; fi
+	printf '# wall D30.full-mode %s ms\n' "$last_ms"
+fi
+
+if selected D29; then
+	run D29.outcomes-validator check_outcomes_battery
+	if execution_error D29.outcomes-validator script; then
+		:
+	elif ((last_rc == 0)); then
+		pass D29.outcomes-validator
+	else fail D29.outcomes-validator "outcome-validator battery rc=$last_rc"; fi
+	for stem in handlers rethrow-tail typed-refs rec-imports; do
+		runner_case "D29.$stem" "$fixtures/d29-$stem.wast" pass
+	done
+	for stem in return trap; do
+		runner_case "D29.assert-exception-$stem" "$fixtures/planted/d29-exception-$stem.wast" reject
+	done
+	# The child shell expands $1.
+	# shellcheck disable=SC2016
+	run D29.official-source-pins bash -c 'cd "$1" && sha256sum --quiet -c SHA256SUMS' _ "$fixtures/official"
+	if ((last_rc)); then
+		fail D29.official-source-pins 'official source bytes differ from the pinned revision'
+		infra=1
+	else pass D29.official-source-pins; fi
+	for name in tag throw throw_ref try_table return_call return_call_indirect return_call_ref \
+		call_ref br_on_null br_on_non_null ref_as_non_null local_init; do
+		runner_case "D29.official-$name" "$fixtures/official/$name.wast" pass official
+	done
+fi
+
+if selected CppEH || [[ $group == D29 ]]; then
+	cpp=$root/FVATest/Subjects/CppEH
+	run D29.cpp-build "$cpp/build" "$work/eh.wasm"
+	if ((last_rc == 0)) && cmp -s "$cpp/eh.wasm" "$work/eh.wasm"; then
+		pass D29.cpp-build
+	else fail D29.cpp-build "build rc=$last_rc or shipped bytes differ"; fi
+	smoke_good=true
+	for x in 0 1 2 3 2147483647 2147483648 4294967294 4294967295; do
+		expected=$(((x % 2 == 0 ? x + 1 : x ^ 2779096485) & 4294967295))
+		if ((expected >= 2147483648)); then expected=$((expected - 4294967296)); fi
+		arg=$x
+		# --invoke parses i32 arguments as signed decimal; preserve their input bits.
+		if ((arg >= 2147483648)); then arg=$((arg - 4294967296)); fi
+		run "D29.cpp-oracle-$x" wasmtime run -W exceptions=y,tail-call=y,function-references=y,gc=y \
+			--invoke eh "$cpp/eh.wasm" "$arg"
+		if ((last_rc != 0)) || [[ $(head -1 "$last_log") == Error:* ]]; then smoke_good=false; fi
+		# wasmtime's --invoke warnings go to stderr; only its exact numeric result counts.
+		actual=$(awk '/^-?[0-9]+$/ {print}' "$last_log")
+		[[ $actual == "$expected" ]] || smoke_good=false
+	done
+	if $smoke_good; then pass D29.cpp-oracle; else fail D29.cpp-oracle 'an input disagrees with the unsigned contract'; fi
+	run D29.cpp-lift "$root/.lake/build/bin/fva" lift "$cpp/eh.wasm" "$work/Lifted.lean" --ns Subjects.CppEH.Lifted
+	if execution_error D29.cpp-lift; then
+		:
+	elif ((last_rc == 0)) && [[ -s $work/Lifted.lean ]]; then
+		pass D29.cpp-lift
+	else fail D29.cpp-lift "lift rc=$last_rc; needs U28a/U28f"; fi
+	for mode in default paranoid; do
+		if [[ ! -f $cpp/Proof.lean || ! -f $cpp/Lifted.lean ]]; then
+			need "D29.cpp-trust-$mode" 'U27+U29b: SysMust under the declared WASI environment E; exact vocabulary pending'
+			continue
+		fi
+		opts=()
+		[[ $mode != paranoid ]] || opts+=(--paranoid)
+		run "D29.cpp-trust-$mode" "$root/.lake/build/bin/fva" trust "$root" \
+			--spec-module FVATest.Subjects.CppEH.Spec --root-module FVATest.Subjects.CppEH.Proof \
+			--subject FVATest.Subjects.CppEH.Lifted "${opts[@]}"
+		if execution_error "D29.cpp-trust-$mode"; then
+			:
+		elif ((last_rc == 0)); then
+			pass "D29.cpp-trust-$mode"
+		else fail "D29.cpp-trust-$mode" "trust rc=$last_rc"; fi
+	done
+fi
+
+if selected D28; then
+	wasi=$fixtures/wasi
+	run D28.wasi-build "$wasi/build" "$work/wasi-build"
+	if ((last_rc)); then
+		echo "FAIL setup: WASI build rc=$last_rc"
+		tail -10 "$last_log"
+		exit 2
+	fi
+	run D28.declared-imports "$wasi/check-imports" "$work/wasi-build"
+	if ((last_rc == 0)); then
+		pass D28.declared-imports
+	else fail D28.declared-imports "declared-call coverage mismatch (rc=$last_rc)"; fi
+	run D28.cli-help "$root/.lake/build/bin/fva" help
+	if ((last_rc)); then
+		echo "FAIL setup: fva help rc=$last_rc"
+		exit 2
+	fi
+	has_run=false
+	if awk '$1 == "run" {found=1} END {exit !found}' "$last_log"; then has_run=true; fi
+	for name in process-empty process-values files exit7; do
+		run "D28.oracle-$name" "$wasi/run-case" wasmtime "$name" "$work/wasi-build" "$work/oracle-$name"
+		if ((last_rc == 0)) && compare_capture "$work/oracle-$name" "$wasi/expected/$name"; then
+			pass "D28.oracle-$name"
+		else fail "D28.oracle-$name" "wasmtime differs from committed stdout/stderr/exit/files (harness rc=$last_rc)"; fi
+		if ! $has_run; then
+			need "D28.run-$name" 'U29b: fva run public CLI'
+			continue
+		fi
+		run "D28.run-$name" timeout 300s "$wasi/run-case" fva "$name" "$work/wasi-build" "$work/fva-$name"
+		if execution_error "D28.run-$name" script; then
+			:
+		elif ((last_rc == 0)) && compare_capture "$work/fva-$name" "$wasi/expected/$name"; then
+			pass "D28.run-$name"
+		else fail "D28.run-$name" "fva run differs from oracle stdout/stderr/exit/files (harness rc=$last_rc)"; fi
+	done
+	need D28.bustools 'U29f: public subject, SysMust statement + B/golden corollary, default + paranoid trust'
+fi
+if selected D51; then
+	need D51.java-all-input 'U30/U31: unchanged Java function, selected WasmGC route + all-input claim + trust'
+	need D51.gc-conformance 'U30/U31: route-specific official WasmGC suite selector'
+fi
+printf 'test-accept-lwr: %s checks; %s ok; %s FAIL; %s pending\n' \
+	"$((ok + bad + pending))" "$ok" "$bad" "$pending"
+((crashed == 0)) || exit 3
+((infra == 0)) || exit 2
+((bad == 0 && pending == 0)) || exit 1
+exit 0

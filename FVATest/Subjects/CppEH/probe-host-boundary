@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Characterization, not acceptance: expose a reached host import in the unrestricted Returns goal.
+set -uo pipefail
+root=$(cd "$(dirname "$0")/../../.." && pwd)
+mkdir -p "$root/.scratch" || exit 2
+work=$(mktemp -d "$root/.scratch/cpp-host.XXXXXX") || exit 2
+trap 'rm -rf "$work"' EXIT
+{
+	cat <<'WAST'
+(module
+  (func (export "environ_get") (param i32 i32) (result i32) (i32.const 0))
+  (func (export "environ_sizes_get") (param i32 i32) (result i32)
+    (loop (br 0)) (i32.const 0))
+  (func (export "clock_time_get") (param i32 i64 i32) (result i32) (i32.const 0))
+  (func (export "fd_close") (param i32) (result i32) (i32.const 0))
+  (func (export "fd_seek") (param i32 i64 i32 i32) (result i32) (i32.const 0))
+  (func (export "fd_write") (param i32 i32 i32 i32) (result i32) (i32.const 0))
+  (func (export "proc_exit") (param i32) (unreachable)))
+(register "wasi_snapshot_preview1")
+WAST
+	printf '(module binary "'
+	od -An -v -tx1 "$root/FVATest/Subjects/CppEH/eh.wasm" | tr -d ' \n' | sed -E 's/(..)/\\\1/g'
+	printf '")\n'
+} >"$work/prefix"
+for branch in even odd; do
+	cp "$work/prefix" "$work/$branch.wast"
+	if [[ $branch == even ]]; then
+		printf '%s\n' '(assert_return (invoke "eh" (i32.const 0)) (i32.const 1))' >>"$work/$branch.wast"
+	else
+		printf '%s\n' '(assert_return (invoke "eh" (i32.const 1)) (i32.const -1515870812))' >>"$work/$branch.wast"
+	fi
+	timeout 3s "$root/.tools/bin/wasmtime" wast \
+		-W exceptions=y,tail-call=y,function-references=y,gc=y "$work/$branch.wast" \
+		>"$work/$branch.log" 2>&1
+	rc=$?
+	printf '%s same-host rc=%s\n' "$branch" "$rc"
+	if [[ $branch == even && $rc != 0 || $branch == odd && $rc != 124 ]]; then
+		tail -8 "$work/$branch.log"
+		exit 1
+	fi
+done
+echo 'Reached host import: odd input diverges in environ_sizes_get; even input returns.'
+echo 'Even after linking imports, all-host termination fails; a stated environment can restrict it.'

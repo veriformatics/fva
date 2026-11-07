@@ -10,7 +10,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 declare -A groups=(
-	[lean]="build checks test char decoder numerics floatdiff spec difftest fuzz-replay lint mutation pins olean-pins"
+	[lean]="build checks test char accept decoder numerics floatdiff spec difftest fuzz-replay lint mutation pins olean-pins"
 	[trust]="build trust"
 	[init]="build init"
 	[subjects]="build subjects"
@@ -52,11 +52,12 @@ run() { # name cmd... -> logs/name.{out,rc,sec}, when the selected group has the
 	echo $((($(date +%s%N) - t0) / 1000000)) >"$logs/$name.ms"
 }
 
-# bash scripts by shebang (scripts/ also holds data such as Batteries' nolints.json)
+# bash scripts by shebang (scripts/ also holds data such as Batteries' nolints.json); one awk pass:
+# a fork per file costs ≈ 5 s over FVATest's ≈ 1,600 files
+# shellcheck disable=SC2016 # awk's own $0
 mapfile -t shells < <(
-	git ls-files -co --exclude-standard -- 'scripts/*' 'bench/*' ':!:bench/runs/**' | while IFS= read -r f; do
-		head -n1 -- "$f" | grep -qx '#!/usr/bin/env bash' && printf '%s\n' "$f"
-	done
+	git ls-files -co --exclude-standard -z -- 'scripts/*' 'bench/*' 'FVATest/*' ':!:bench/runs/**' |
+		xargs -0 -r awk 'FNR == 1 { if ($0 == "#!/usr/bin/env bash") print FILENAME; nextfile }'
 )
 mapfile -t workflows < <(git ls-files -co --exclude-standard -- '.github/workflows/*.yml')
 
@@ -72,6 +73,8 @@ lean_lane() {
 	# characterization goldens (official-script outcomes, CLI help, lifts): beside the rest, once
 	# fvatest + fva are built
 	if ((fast)); then run char scripts/test-char --fast & else run char scripts/test-char & fi
+	# the acceptance checks merged so far (FVATest/Accept/LWR/merged): full gate only
+	if ((! fast)); then run accept scripts/test-accept & fi
 	run decoder scripts/test-decoder
 	run numerics scripts/test-numerics
 	if ((fast)); then run floatdiff scripts/test-floatdiff --fast; else run floatdiff scripts/test-floatdiff; fi

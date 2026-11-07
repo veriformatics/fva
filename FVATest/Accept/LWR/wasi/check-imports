@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# D28/U29b: coverage includes exactly the 20 declared calls, not accidental extra imports.
+set -uo pipefail
+(($# == 1)) || exit 2
+src=$(cd "$(dirname "$0")" && pwd)
+build=$(cd "$1" && pwd) || exit 2
+work=$(mktemp -d "$build/.imports.XXXXXX") || exit 2
+trap 'rm -rf "$work"' EXIT
+for name in process files exit7; do
+	wasm-tools print "$build/$name.wasm" -o "$work/$name.wat" || exit 2
+	awk -F '"' '$1 ~ /^  [(]import / {
+		if ($2 != "wasi_snapshot_preview1") exit 1
+		print $4
+	}' "$work/$name.wat" >>"$work/imports" || exit 1
+done
+LC_ALL=C sort -u "$work/imports" >"$work/actual"
+if ! cmp -s "$src/imports" "$work/actual"; then
+	diff -u "$src/imports" "$work/actual"
+	exit 1
+fi
+printf 'declared WASI imports: %s\n' "$(wc -l <"$work/actual")"

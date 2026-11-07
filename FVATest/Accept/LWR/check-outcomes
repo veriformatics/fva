@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Dedicated P' scripts: one tally per JSON command; only named text-malformed exclusions.
+set -uo pipefail
+(($# == 2)) || {
+	echo "Usage: $0 SCRIPT.json OUTCOMES.tsv" >&2
+	exit 2
+}
+json=$1 trace=$2
+[[ -f $json ]] || exit 2
+if [[ ! -f $trace ]]; then
+	echo 'missing per-command outcomes' >&2
+	exit 1
+fi
+errors=$(jq -nr --slurpfile script "$json" --rawfile trace "$trace" '
+  if ($script|length) != 1 then error("one JSON script required") else . end |
+  ($script[0].commands) as $commands |
+  if ($commands|type) != "array" then error("commands must be an array")
+  elif any($commands[]; (.line|type) != "number" or .line < 0 or .line != (.line|floor)
+    or (.type|type) != "string" or .type == "") then error("invalid command key")
+  else . end |
+  ($trace | split("\n") | if .[-1] == "" then .[:-1] else . end | map(split("\t"))) as $rows |
+  [
+    (if ($rows|length) != ($commands|length) then
+      "outcome rows \($rows|length) != commands \($commands|length)" else empty end),
+    (range(0; $commands|length) as $i |
+      $commands[$i] as $cmd | $rows[$i] as $row |
+      if ($row|length) < 3 then "command \($i): missing TSV fields"
+      elif $row[0] != ($cmd.line|tostring) or $row[1] != $cmd.type then
+        "command \($i): line/type does not match the JSON command"
+      else
+        ($row[2:]|join("\t")) as $outcome |
+        ($cmd.type == "assert_malformed" and $cmd.module_type == "text") as $text |
+        ("skip: line \($cmd.line): ") as $prefix |
+        if $text then
+          if $outcome == ($prefix + "text format") then empty
+          else "line \($cmd.line): text malformed must be a named text-format exclusion" end
+        elif $outcome == "pass" then empty
+        elif $outcome|startswith("fail:") then
+          "line \($cmd.line): runner reported failure: \($outcome)"
+        elif $outcome|startswith("skip:") then
+          "line \($cmd.line): forbidden skip in a dedicated P-prime script: \($outcome)"
+        else "line \($cmd.line): unknown outcome \($outcome|tojson)" end
+      end)
+  ] | .[]')
+rc=$?
+((rc == 0)) || exit 2
+if [[ -n $errors ]]; then
+	printf '%s\n' "$errors" >&2
+	exit 1
+fi
+count=$(jq '.commands | length' "$json") || exit 2
+printf 'outcomes: %s commands; every non-text command passed\n' "$count"

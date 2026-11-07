@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Identical WASI inputs; only the runner's documented argument layout differs.
+set -uo pipefail
+(($# == 4)) || {
+	echo "Usage: $0 wasmtime|fva CASE BUILD_DIR OUT_DIR" >&2
+	exit 2
+}
+engine=$1 name=$2 build=$3 out=$4
+src=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$src/../../../.." && pwd)
+mkdir -p "$out/tree" || exit 2
+: >"$out/stdin"
+flags=() args=()
+case $name in
+process-empty) program=process ;;
+process-values)
+	program=process
+	flags=(--env FVA_ALPHA=one --env FVA_EMPTY=)
+	args=(alpha 'two words' '' --looks-like-option 'βeta')
+	printf 'pipe-input\n' >"$out/stdin"
+	;;
+files)
+	program=files
+	flags=(--dir "$out/tree::/sandbox")
+	printf 'old-data\n' >"$out/tree/seed.txt"
+	;;
+exit7) program=exit7 ;;
+*)
+	echo "Unknown WASI case: $name" >&2
+	exit 2
+	;;
+esac
+case $engine in
+wasmtime) cmd=("$root/.tools/bin/wasmtime" run "${flags[@]}" "$build/$program.wasm" "${args[@]}") ;;
+fva) cmd=("${FVA_ACCEPT_FVA:-$root/.lake/build/bin/fva}" run "$build/$program.wasm" "${flags[@]}" -- "${args[@]}") ;;
+*)
+	echo "Unknown runner: $engine" >&2
+	exit 2
+	;;
+esac
+printf '%q ' "${cmd[@]}" >"$out/command"
+printf '\n' >>"$out/command"
+# A pipe, not regular-file stdin: read prefixes are legal at the host boundary.
+cat "$out/stdin" | "${cmd[@]}" >"$out/stdout" 2>"$out/stderr"
+rc=$?
+printf '%s\n' "$rc" >"$out/exit"
+(cd "$out/tree" && /usr/bin/find . -mindepth 1 -printf '%y %P\n' | LC_ALL=C sort) >"$out/layout"
+if ((rc == 126 || rc == 127)); then exit 2; fi
+if ((rc >= 128)); then exit 3; fi
+exit 0

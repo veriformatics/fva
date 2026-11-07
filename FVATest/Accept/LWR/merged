@@ -1,0 +1,21 @@
+# Gate-merged acceptance checks (scripts/test-accept): `ID [HOST]`, each unit appending the checks
+# it turns green; red at 3ed6b36 = credited. Green there = controls of the planted cases, merged with
+# them: U25 function/global/memory/table/module-true, D30.memory-boundaries.
+U25.function-false
+U25.function-true
+U25.global-false
+U25.global-true
+U25.memory-false
+U25.memory-true
+U25.table-false
+U25.table-true
+U25.malformed-false
+U25.malformed-true
+U25.module-false
+U25.module-true
+U25.outcome-protocol
+D30.memory-boundaries
+D30.large-copy
+D30.memory-copy
+D30.wall nixbox
+D30.full-mode

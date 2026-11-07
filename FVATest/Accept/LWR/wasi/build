@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+src=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$src/../../../.." && pwd)
+sdk=${WASI_SDK_PATH:-$root/.tools/wasi-sdk}
+(($# == 1)) || {
+	echo "Usage: $0 OUTDIR" >&2
+	exit 2
+}
+mkdir -p "$1"
+for name in process files exit7; do
+	"$sdk/bin/clang" --target=wasm32-wasip1 -std=c11 -O1 \
+		-Wall -Wextra -Werror -Wno-unused-function -nostartfiles \
+		-Wl,--no-entry -Wl,--export=_start -Wl,--strip-debug \
+		-Wl,-z,stack-size=65536 -Wl,--initial-memory=262144 \
+		"$src/$name.c" -o "$1/$name.wasm"
+done
