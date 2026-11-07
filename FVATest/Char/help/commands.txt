@@ -1,0 +1,11 @@
+help
+init
+version
+decode
+lift
+difftest
+trust
+explain
+blob
+certify
+call

@@ -1,0 +1,21 @@
+Usage: fva trust <project> --spec-module <M> [options]
+
+Build the project, then check that each claim of the spec module is proven, about the
+artifact, with a small spec. The report shows what you must read.
+
+Options:
+  --spec-module M       The module that states the claims (required).
+  --root-module R       The module that imports the proofs (default: the spec module's
+                        parent, for example Demo for Demo.Spec).
+  --subject M           Count the Lean module M as a subject. You can give this option
+                        more than once.
+  --paranoid            Replay the proofs with every bundled kernel.
+  --no-sandbox          Run the project's code without the bwrap sandbox. Use this
+                        only inside a container that you trust.
+  --surface-budget N    Fail when the review surface has more than N code lines.
+  --json                Write the report as JSON.
+  --kernel-limit S      Stop a kernel replay after S seconds (default 1200).
+  --canary-limit S      Stop a canary check after S seconds (default 60).
+
+Exit status: 0 when the verdict is PASS, 1 when it is FAIL, 2 for a usage or setup
+error.

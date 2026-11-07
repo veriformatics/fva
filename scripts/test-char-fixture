@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Golden comparison + trace-join controls; the runner fixture includes two false assertions.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+export PATH="$PWD/.tools/bin:$PATH"
+compare=${FVA_CHAR_COMPARE-$PWD/FVATest/Char/compare-goldens}
+normalize=${FVA_CHAR_NORMALIZE-$PWD/FVATest/Char/normalize-outcomes}
+[[ -f $compare && -f $normalize ]] || exit 2
+mkdir -p .cache || exit 2
+work=$(mktemp -d "$PWD/.cache/char-fixture.XXXXXX") || exit 2
+trap 'rm -rf "$work"' EXIT
+mkdir -p "$work/expected/"{outcomes,help} || exit 2
+printf '1\tmodule\tpass\tvalid\n' >"$work/expected/outcomes/probe.tsv"
+printf 'Usage: fva\n' >"$work/expected/help/help.stdout"
+printf 'probe.wasm\t0\t0123456789abcdef\n' >"$work/expected/lift.tsv"
+printf 'probe\texecution\t1\t0\t0\n' >"$work/expected/scripts.tsv"
+passed=0
+failed=0
+check_case() {
+	local name=$1 expected=$2 rc
+	shift 2
+	"$@" >"$work/case.out" 2>&1
+	rc=$?
+	if ((rc == expected)); then
+		printf 'test-char-fixture: %s rc=%s PASS\n' "$name" "$rc"
+		passed=$((passed + 1))
+	else
+		printf 'test-char-fixture: %s expected=%s actual=%s FAIL\n' "$name" "$expected" "$rc"
+		cat "$work/case.out"
+		failed=$((failed + 1))
+	fi
+}
+run_case() { check_case "$1" "$2" bash "$compare" "$work/expected" "$work/actual"; }
+reset_actual() {
+	rm -rf "$work/actual"
+	cp -r "$work/expected" "$work/actual"
+}
+reset_actual
+run_case identical 0
+printf '1\tmodule\tskip:outside-profile\tunsupported\n' >"$work/actual/outcomes/probe.tsv"
+run_case command-outcome 1
+reset_actual
+printf X >>"$work/actual/help/help.stdout"
+run_case help-byte 1
+reset_actual
+printf 'probe.wasm\t0\t1123456789abcdef\n' >"$work/actual/lift.tsv"
+run_case lift-hash 1
+reset_actual
+printf 'probe\texecution\t0\t0\t1\n' >"$work/actual/scripts.tsv"
+run_case aggregate-count 1
+reset_actual
+rm "$work/actual/outcomes/probe.tsv"
+run_case missing-command-file 1
+reset_actual
+printf extra >"$work/actual/help/extra.stdout"
+run_case added-help-file 1
+reset_actual
+rm -r "$work/actual/outcomes"
+run_case incomplete-capture 2
+
+printf '1\tmodule\tbinary\tprobe.wasm\n2\tassert_return\tbinary\t-\n2\tassert_return\tbinary\t-\n3\tassert_trap\tbinary\t-\n' \
+	>"$work/meta.seed"
+printf 'probe.wasm\tvalid\n' >"$work/valid.seed"
+printf '1\tmodule\tpass\n2\tassert_return\tpass\n2\tassert_return\tfail: wrong result\ncontinuation\n3\tassert_trap\tfail: no trap\n' \
+	>"$work/trace.seed"
+reset_trace() {
+	cp "$work/meta.seed" "$work/meta"
+	cp "$work/valid.seed" "$work/valid"
+	cp "$work/trace.seed" "$work/trace"
+	rm -f "$work/normalized"
+}
+run_normalize() { bash "$normalize" "$work/meta" "$work/valid" "$work/trace" "$work/normalized"; }
+normalize_exact() { run_normalize && cmp -s FVATest/Char/observer.tsv "$work/normalized"; }
+reset_trace
+check_case trace-exact-same-line 0 normalize_exact
+head -3 "$work/trace.seed" >"$work/trace"
+check_case trace-missing-command 1 run_normalize
+reset_trace
+sed '1s/^1/99/' "$work/trace.seed" >"$work/trace"
+check_case trace-wrong-identity 1 run_normalize
+reset_trace
+: >"$work/valid"
+check_case trace-missing-validation 1 run_normalize
+reset_trace
+sed '1s/pass/mystery/' "$work/trace.seed" >"$work/trace"
+check_case trace-unknown-outcome 1 run_normalize
+reset_trace
+cat "$work/valid.seed" >>"$work/valid"
+check_case trace-duplicate-validation 1 run_normalize
+
+skip_classes() {
+	printf '7\tassert_malformed\tbinary\tbad.wasm\n7\tassert_malformed\ttext\tbad.wat\n7\tmodule\tbinary\tprobe.wasm\n7\tregister\tbinary\t-\n7\tmodule\tbinary\tother.wasm\n7\taction\tbinary\t-\n' >"$work/meta"
+	printf 'probe.wasm\tunsupported\nother.wasm\tmalformed\n' >"$work/valid"
+	printf '7\tassert_malformed\tskip: line 7: assert_malformed\n7\tassert_malformed\tskip: line 7: assert_malformed\n7\tmodule\tskip: line 7: outside wasm2,-simd: error: proposal disabled (at offset 0x1)\n7\tregister\tskip: line 7: register rejected module\n7\tmodule\tskip: line 7: decoder offset 17: unsupported\n7\taction\tskip: line 7: validation-only\n' >"$work/trace"
+	printf '7\tassert_malformed\tskip:assert_malformed:binary\tnot-run:malformed\n7\tassert_malformed\tskip:assert_malformed:text\tnot-run:malformed\n7\tmodule\tskip:outside-profile\tunsupported\n7\tregister\tskip:register rejected module\t-\n7\tmodule\tskip:decode-error\tmalformed\n7\taction\tskip:validation-only\t-\n' >"$work/skip.expected"
+	run_normalize && cmp -s "$work/skip.expected" "$work/normalized"
+}
+check_case trace-skip-reason-classes 0 skip_classes
+
+[[ -x .lake/build/bin/fvatest ]] || exit 2
+mkdir -p "$work/observer" || exit 2
+wasm-tools json-from-wast FVATest/Char/observer.wast -o "$work/observer/observer.json" \
+	--wasm-dir "$work/observer/" || exit 2
+jq -r '.commands[] | [.line, .type, (.module_type // "binary"),
+	(.filename // "-")] | @tsv' "$work/observer/observer.json" >"$work/observer.meta" || exit 2
+observe_fixture() {
+	local rc
+	FVA_SPEC_OUTCOMES="$work/observer.trace" \
+		.lake/build/bin/fvatest spec "$work/observer/observer.json" >"$work/observer.stdout"
+	rc=$?
+	((rc == 1)) || return 1
+	.lake/build/bin/fvatest validate "$work/observer/observer.0.wasm" >"$work/observer.valid" || return
+	bash "$normalize" "$work/observer.meta" "$work/observer.valid" \
+		"$work/observer.trace" "$work/observer.tsv" || return
+	cmp -s FVATest/Char/observer.tsv "$work/observer.tsv" &&
+		grep -Fxq 'observer 2 2 0' "$work/observer.stdout"
+}
+check_case runner-hook-same-line-failures 0 observe_fixture
+printf 'test-char-fixture: %s passed, %s failed\n' "$passed" "$failed"
+((failed == 0))

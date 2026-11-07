@@ -1,0 +1,51 @@
+1	module	pass	valid
+37	assert_return	pass	-
+38	assert_return	pass	-
+39	assert_return	pass	-
+40	assert_return	pass	-
+41	assert_return	pass	-
+42	assert_return	pass	-
+43	assert_return	pass	-
+44	assert_return	pass	-
+45	assert_return	pass	-
+46	assert_return	pass	-
+47	assert_return	pass	-
+49	assert_return	pass	-
+50	assert_return	pass	-
+51	assert_return	pass	-
+52	assert_return	pass	-
+53	assert_return	pass	-
+54	assert_return	pass	-
+55	assert_return	pass	-
+56	assert_return	pass	-
+57	assert_return	pass	-
+58	assert_return	pass	-
+59	assert_return	pass	-
+61	assert_return	pass	-
+62	assert_return	pass	-
+63	assert_return	pass	-
+64	assert_return	pass	-
+66	assert_return	pass	-
+67	assert_return	pass	-
+68	assert_return	pass	-
+69	assert_return	pass	-
+72	assert_malformed	skip:text format	not-run:malformed
+76	assert_malformed	skip:text format	not-run:malformed
+80	assert_malformed	skip:text format	not-run:malformed
+84	assert_malformed	skip:text format	not-run:malformed
+88	assert_malformed	skip:text format	not-run:malformed
+92	assert_malformed	skip:text format	not-run:malformed
+96	assert_malformed	skip:text format	not-run:malformed
+100	assert_malformed	skip:text format	not-run:malformed
+104	assert_malformed	skip:text format	not-run:malformed
+108	assert_malformed	skip:text format	not-run:malformed
+113	assert_malformed	skip:text format	not-run:malformed
+117	assert_malformed	skip:text format	not-run:malformed
+121	assert_malformed	skip:text format	not-run:malformed
+125	assert_malformed	skip:text format	not-run:malformed
+129	assert_malformed	skip:text format	not-run:malformed
+133	assert_malformed	skip:text format	not-run:malformed
+137	assert_malformed	skip:text format	not-run:malformed
+141	assert_malformed	skip:text format	not-run:malformed
+145	assert_malformed	skip:text format	not-run:malformed
+149	assert_malformed	skip:text format	not-run:malformed

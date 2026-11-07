@@ -1,0 +1,20 @@
+Usage: fva call <Lifted.lean> <export> [<type>:<value>]... --spec <file.lean>
+       --proof <file.lean> [options]
+
+Call the exported function on the arguments with FVA's reference interpreter, then
+write a spec module with the claim of what the call returns and a proof module that
+proves it in the kernel. Then run lake build and fva trust. Give the paths relative to
+the project root, without `..`. An argument is i32:<n> or i64:<n> (decimal or 0x hex;
+a minus sign wraps), or f32:0x<bits> or f64:0x<bits>. The module must have no imports,
+globals, element or data segments and no start function. To keep the claim in a spec
+module that has other claims, move the claim there.
+
+Options:
+  --name N         The claim's name (default <export>_call).
+  --ns Ns          The namespace of the claim and its proof (default: the lifted
+                   module's namespace without its last part).
+  --max-steps K    Stop the call after K steps (default 1000000).
+  --force          Replace the spec and proof files when they exist.
+
+Exit status: 0 when the files are written, 1 when the call traps or does not finish,
+2 for a usage error or an unsupported module.

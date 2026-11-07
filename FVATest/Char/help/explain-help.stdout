@@ -1,0 +1,20 @@
+Usage: fva explain <project> --spec-module <M> [options]
+
+Explain each claim in plain English, then compare the claims with your requirements.
+The requirements file has one "## <id>" line before each requirement. Without a
+requirements file, each claim is compared with its author's docstring. The model
+explains the claims without their names. The text is saved beside the spec module and
+shown again without a model call. A signed-in codex CLI writes the text.
+
+Options:
+  --spec-module M    The module that states the claims (required).
+  --root-module R    The module that imports the proofs.
+  --requirements F   Use the requirements file F (default: requirements.md beside the
+                     spec module, when it exists).
+  --model M          Use the model M.
+  --effort E         Use the reasoning effort E (default medium).
+  --force            Write the text again.
+  --json             Write the result as JSON.
+
+Exit status: 0 when the trust verdict is PASS, each requirement (or else each claim's
+docstring) matches and the saved text is current, 1 otherwise, 2 for a usage error.

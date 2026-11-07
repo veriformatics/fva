@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Join the runner's direct trace to JSON metadata + binary-validator verdicts.
+set -uo pipefail
+(($# == 4)) || exit 2
+awk -F '\t' '
+FILENAME == ARGV[1] {
+	if (NF != 4 || $1 !~ /^[0-9]+$/) {print "test-char: malformed command metadata" > "/dev/stderr"; bad=1}
+	n++; line[n]=$1; kind[n]=$2; format[n]=$3; file[n]=$4; next
+}
+FILENAME == ARGV[2] {
+	path=$1; sub(/^.*\//, "", path)
+	if (NF != 2 || $2 !~ /^(valid|invalid|malformed|unsupported)$/ || path in verdict) {
+		print "test-char: malformed or duplicate validator row" > "/dev/stderr"; bad=1
+	}
+	verdict[path]=$2; next
+}
+FILENAME == ARGV[3] {
+	# Tool diagnostics can contain continuation lines; only trace records have this prefix.
+	if ($1 !~ /^[0-9]+$/ || NF < 3) next
+	i++
+	if (i>n || $1 != line[i] || $2 != kind[i]) {
+		print "test-char: runner trace/command identity mismatch at " i > "/dev/stderr"; bad=1
+	}
+	outcome=$3
+	if (outcome == "pass") normalized="pass"
+	else if (outcome ~ /^fail:/) normalized="fail"
+	else if (outcome ~ /^skip:/) {
+		sub(/^skip: */, "", outcome)
+		sub(/^line [0-9]+: */, "", outcome)
+		if (outcome ~ /^outside wasm2,-simd:/) reason="outside-profile"
+		else if (outcome == "assert_malformed") reason="assert_malformed:" format[i]
+		else if (outcome ~ /^decoder offset /) reason="decode-error"
+		else {split(outcome, parts, ": "); reason=parts[1]}
+		normalized="skip:" reason
+	} else {print "test-char: unknown runner outcome at " i > "/dev/stderr"; bad=1}
+	validation="-"
+	if (kind[i] == "assert_malformed") validation="not-run:malformed"
+	else if (kind[i] ~ /^(module|assert_invalid|assert_unlinkable|assert_uninstantiable)$/) {
+		if (format[i] != "binary") validation="not-run:text"
+		else if (!(file[i] in verdict)) {
+			print "test-char: missing binary-validator row for " file[i] > "/dev/stderr"; bad=1
+		} else validation=verdict[file[i]]
+	}
+	print line[i] "\t" kind[i] "\t" normalized "\t" validation
+}
+END {
+	if (!n || i != n) {print "test-char: incomplete command trace " i "/" n > "/dev/stderr"; bad=1}
+	exit (bad ? 1 : 0)
+}' "$1" "$2" "$3" >"$4"

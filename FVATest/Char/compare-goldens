@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Compare generated captures only; source files beside the goldens are not captures.
+set -uo pipefail
+(($# == 2)) || exit 2
+expected=$1
+actual=$2
+[[ -d $actual ]] || exit 2
+work=$(mktemp -d "$actual/.compare.XXXXXX") || exit 2
+trap 'rm -rf "$work"' EXIT
+inventory() {
+	local root=$1
+	[[ -d $root/outcomes && -d $root/help && -f $root/lift.tsv && -f $root/scripts.tsv ]] || return 2
+	(cd "$root" && printf '%s\n' lift.tsv scripts.tsv &&
+		find outcomes help -type f -print) | LC_ALL=C sort
+}
+inventory "$expected" >"$work/expected" || exit 2
+inventory "$actual" >"$work/actual" || exit 2
+rc=0
+if ! diff -u --label expected-files --label actual-files "$work/expected" "$work/actual"; then
+	rc=1
+fi
+while IFS= read -r name; do
+	[[ -f $expected/$name && -f $actual/$name ]] || continue
+	if ! cmp -s "$expected/$name" "$actual/$name"; then
+		printf 'test-char: mismatch %s\n' "$name"
+		diff -u --label "golden/$name" --label "actual/$name" "$expected/$name" "$actual/$name"
+		rc=1
+	fi
+done < <(sort -u "$work/expected" "$work/actual")
+exit "$rc"

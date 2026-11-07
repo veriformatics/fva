@@ -1,0 +1,11 @@
+Usage: fva certify <project> --relation R --input I --output O --ns Ns [options]
+
+Write a certificate: a claim that the output file stands in the relation R to the input
+file, and its proof by the verified checker of R. Then run lake build and fva trust.
+Give the files relative to the project, without `..`.
+
+Options:
+  --relation-module M   The module that defines R (needed for a relation outside FVA).
+  --sound-module P      The module that proves R's checker sound (same condition).
+
+Exit status: 0 when the files are written, 2 for a usage error or a missing file.

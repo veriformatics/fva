@@ -197,3 +197,12 @@ Check set fixed before reading the phase diff (c736868…HEAD): L1 correctness o
 | L4 | conformance | pass: one commit per unit with measurements + teammates; Tasks ticked per commit; no push; worktrees `tester-1`/`tester-2` + their branches removed at the closing commit | accepted |
 | L5 | security | finding: `runKernel` matches decline patterns anywhere in a kernel's output, and lean4lean's log names every declaration it checks, so a project can name a theorem «deterministic timeout» and turn lean4lean's rejection of another declaration into a decline (the two older patterns already allowed this); bounded: a decline removes one kernel's veto, the replay rule still fails on any other kernel's rejection and needs a non-Lean accept | accepted → deferred D61 |
 
+
+## Language + Wasm reach — mutation survivors (MAIN-drafted rulings in `FVATest/Mutate/rulings.tsv`, reviewer `MAIN`; a `consultant` rules each row before the phase close)
+
+| row | mutant | MAIN draft | ruling |
+|---|---|---|---|
+| M26-1 | `Chunks.lean` `W:LIT:0` (6 → 7) | equivalent: leaf width = cost parameter, every machine theorem generic in W (the mutant passed the proofs stage), `abs` unchanged | open |
+| M26-2 | `Chunks.lean` `Chunks.get:LIT:2` (depth-0 node → 1) | equivalent: `Chunks.WF` excludes depth-0 nodes; `MMem.Inv` holds for every machine memory | open |
+| M26-3 | `Chunks.lean` `MMem.alloc:LIT:0` (65536 → 65537, inconclusive) | resource: at most one level deeper, `Cover` is an upper bound, cost only; inconclusive = `alloc_inv` unfolding `depthFor` | open |
+| M26-4 | `Machine.lean` `MMem.ofMemInst` EQN:0, LIT:0, GIB:0 (zero-byte skip) | unspecified: U26 contract "runner glue (unproven, fixtures only)"; its one call converts the all-zero spectest memory | open |

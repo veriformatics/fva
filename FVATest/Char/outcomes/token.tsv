@@ -1,0 +1,61 @@
+4	assert_malformed	skip:text format	not-run:malformed
+8	assert_malformed	skip:text format	not-run:malformed
+15	module	pass	valid
+18	module	pass	valid
+21	module	pass	valid
+24	module	pass	valid
+27	module	pass	valid
+30	module	pass	valid
+33	module	pass	valid
+38	module	pass	valid
+43	module	pass	valid
+47	module	pass	valid
+54	module	pass	valid
+58	module	pass	valid
+62	module	pass	valid
+66	module	pass	valid
+70	module	pass	valid
+74	module	pass	valid
+82	module	pass	valid
+86	assert_malformed	skip:text format	not-run:malformed
+92	assert_malformed	skip:text format	not-run:malformed
+98	module	pass	valid
+102	assert_malformed	skip:text format	not-run:malformed
+108	assert_malformed	skip:text format	not-run:malformed
+114	module	pass	valid
+118	assert_malformed	skip:text format	not-run:malformed
+124	assert_malformed	skip:text format	not-run:malformed
+130	module	pass	valid
+133	module	pass	valid
+140	module	pass	valid
+144	assert_malformed	skip:text format	not-run:malformed
+150	module	pass	valid
+154	assert_malformed	skip:text format	not-run:malformed
+160	module	pass	valid
+164	assert_malformed	skip:text format	not-run:malformed
+170	module	pass	valid
+174	assert_malformed	skip:text format	not-run:malformed
+180	module	pass	valid
+184	assert_malformed	skip:text format	not-run:malformed
+190	module	pass	valid
+194	assert_malformed	skip:text format	not-run:malformed
+200	module	pass	valid
+204	assert_malformed	skip:text format	not-run:malformed
+210	module	pass	valid
+214	assert_malformed	skip:text format	not-run:malformed
+220	module	pass	valid
+224	assert_malformed	skip:text format	not-run:malformed
+230	module	pass	valid
+234	assert_malformed	skip:text format	not-run:malformed
+240	module	pass	valid
+244	assert_malformed	skip:text format	not-run:malformed
+250	module	pass	valid
+254	assert_malformed	skip:text format	not-run:malformed
+260	module	pass	valid
+264	assert_malformed	skip:text format	not-run:malformed
+270	module	pass	valid
+274	assert_malformed	skip:text format	not-run:malformed
+282	assert_malformed	skip:text format	not-run:malformed
+288	assert_malformed	skip:text format	not-run:malformed
+294	assert_malformed	skip:text format	not-run:malformed
+300	assert_malformed	skip:text format	not-run:malformed

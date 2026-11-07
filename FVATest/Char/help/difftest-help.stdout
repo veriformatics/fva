@@ -1,0 +1,16 @@
+Usage: fva difftest <file.wasm>... [options]
+
+Run each exported function on generated inputs. The Lean semantics predicts every result,
+and wasmtime checks each prediction.
+
+Options:
+  --cases N      Run N cases for each function (default 32).
+  --seed S       Use seed S for the inputs (default 1).
+  --fuel F       Drop a case when the Lean run takes more than F steps (default 300000).
+  --export NAME  Test only the export NAME. You can give this option more than once.
+  --jobs J       Run J wasmtime processes at the same time (default 8).
+  --keep DIR     Write the WAST scripts to DIR and keep them.
+  --json         Write the report as JSON.
+
+Exit status: 0 when wasmtime agrees with every prediction, 1 when it does not or a file
+cannot be tested, 2 for a usage error, 3 when wasmtime cannot run (not found or crashed).
