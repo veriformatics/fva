@@ -1,0 +1,127 @@
+# Mutation update shards (user ruling: updates run sharded over GitHub-hosted runners; D84): a
+# `ci/mut-*` push of a tree whose mutation table is stale. One build, a plan
+# (scripts/mutation-plan), then one runner per shard: an ad-hoc `scripts/test-mutation update`
+# over the shard's files + declarations writes the content-keyed execution cache, uploaded per
+# shard; scripts/mutation-ci downloads the caches and runs the full `--update` that writes
+# results.tsv. One worker per runner: fvamut caps each stage at memLimitMiB (8 GiB), the runner
+# has 16 GB. The plan's `local` part (declarations too large for one runner) runs on the pushing
+# host (`scripts/mutation-plan N --local`).
+name: mutation
+
+on:
+  push:
+    branches: ["ci/mut-**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SHARDS: "60"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
+        with:
+          auto-config: "false"
+          use-mathlib-cache: "true"
+          use-github-cache: "true"
+      - name: Build
+        run: lake --wfail build && lake --wfail build fvatest fvafuzz
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .lake/build
+          key: fva-build-${{ github.sha }}
+
+  plan:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+      indices: ${{ steps.plan.outputs.indices }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
+        with:
+          auto-config: "false"
+          use-mathlib-cache: "true"
+          use-github-cache: "true"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .lake/build
+          key: fva-build-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Plan
+        id: plan
+        run: |
+          scripts/fetch-tools && scripts/fetch-subjects
+          scripts/mutation-plan "$SHARDS" >plan.json
+          jq -c '{total, local: .local, shards: [.shards[] | {mutants, files: (.files | length), decls: (.decls | length)}]}' plan.json
+          {
+            echo "plan=$(jq -c .shards plan.json)"
+            echo "indices=$(jq -c .indices plan.json)"
+          } >>"$GITHUB_OUTPUT"
+
+  shard:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.indices) }}
+    steps:
+      - name: Free disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
+        with:
+          auto-config: "false"
+          use-mathlib-cache: "true"
+          use-github-cache: "true"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .lake/build
+          key: fva-build-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: Mutants
+        timeout-minutes: 345
+        env:
+          PLAN: ${{ needs.plan.outputs.plan }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          scripts/fetch-tools && scripts/fetch-subjects || exit 2
+          mapfile -t files < <(jq -r --argjson i "$SHARD" '.[$i].files[]' <<<"$PLAN")
+          mapfile -t decls < <(jq -r --argjson i "$SHARD" '.[$i].decls[]' <<<"$PLAN")
+          echo "shard $SHARD: ${#files[@]} files, ${#decls[@]} declarations"
+          ((${#files[@]})) || exit 0
+          # rc 1 = findings (unruled survivors: rulings come with the table); 2 setup, 3 crash
+          rc=0
+          scripts/test-mutation update --workers 1 --files "${files[@]}" --decls "${decls[@]}" \
+            >mutation.log 2>&1 || rc=$?
+          tail -40 mutation.log
+          ((rc <= 1))
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: mutate-exec-${{ matrix.shard }}
+          path: |
+            .cache/mutate/exec
+            mutation.log
+          # .cache is a dot directory: upload-artifact skips those by default
+          include-hidden-files: true
+          if-no-files-found: ignore

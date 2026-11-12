@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Subjects stay outside git; verify cached bytes as well as new downloads.
+# Fetchables stay outside git (Decisions: Repository contents): upstream subjects, FVA's published
+# builds + archives (veriformatics/fva-artifacts), each by id; verify cached bytes as well as new
+# downloads. A build or archive caches under its file's basename.
 set -euo pipefail
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)
 manifest=$root/bench/subjects/manifest.json
@@ -30,6 +32,10 @@ jq -e '
     (.file | test("^[A-Za-z0-9][A-Za-z0-9_.-]*$")) and
     (.sha256 | test("^[0-9a-f]{64}$")) and
     ([.name, .version, .upstream, .url, .license] | all(type == "string" and length > 0))) and
+  ([(.subjects + (.builds // []) + (.archives // []))[].id] | length == (unique | length)) and
+  all(((.builds // []) + (.archives // []))[];
+    (.id | test("^[a-z0-9][a-z0-9-]*$")) and (.sha256 | test("^[0-9a-f]{64}$")) and
+    (.url == null or (.url | test("^https://")))) and
   (.subjects as $s | all($s[]; .extract == null or
     (.extract.from as $parent | any($s[]; .id == $parent and .extract == null))))
 ' "$manifest" >/dev/null || {
@@ -42,11 +48,13 @@ trap '[[ -z $tmp ]] || rm -rf -- "$tmp"' EXIT
 
 fetch() {
 	local id=$1 row file sha out parent member parent_file
-	row=$(jq -ce --arg id "$id" '.subjects[] | select(.id == $id)' "$manifest") || {
-		echo "fetch-bench: subject not found: $id" >&2
+	row=$(jq -ce --arg id "$id" \
+		'[(.subjects + (.builds // []) + (.archives // []))[] | select(.id == $id and .url != null)][0]
+		 // empty' "$manifest") || {
+		echo "fetch-bench: nothing to fetch for id: $id" >&2
 		exit 1
 	}
-	file=$(jq -r .file <<<"$row")
+	file=$(jq -r '.file | split("/") | last' <<<"$row")
 	sha=$(jq -r .sha256 <<<"$row")
 	out=$cache/$id/$file
 	if [[ ! -f $out ]]; then

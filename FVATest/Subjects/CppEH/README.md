@@ -7,8 +7,12 @@ its bitwise XOR with `0xa5a5a5a5`. Unsigned arithmetic has no signed-overflow ca
 
 ## Build
 
-Run `FVATest/Subjects/CppEH/build`. It uses the pinned `.tools/wasi-sdk`. Set `WASI_SDK_PATH`
-only when the SDK is at another path. An optional output path keeps the shipped file unchanged.
+`eh.wasm` is not committed: it links third-party runtime code (Decisions: Repository contents).
+`scripts/fetch-subjects` places the pinned build (sha256 `4e2fe131…`, release `subject-builds-v1` of
+veriformatics/fva-artifacts, with its notice `NOTICE-eh.txt` and the runtime licenses
+`license-*.txt`). Run `FVATest/Subjects/CppEH/build` to rebuild it. It uses the pinned
+`.tools/wasi-sdk`. Set `WASI_SDK_PATH` only when the SDK is at another path. An optional output
+path keeps the placed file unchanged.
 
 Exact compiler command (`SDK=.tools/wasi-sdk`):
 

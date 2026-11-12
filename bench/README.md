@@ -45,7 +45,7 @@ Subject metadata = `subjects/manifest.json`, six entries: lz4 v1.10.0 archive, l
 
 ## Standalone wasm
 
-`subjects/build-lz4 [OUTPUT_DIR]` defaults to `.cache/bench/wasm/`. `subjects/wasm/` = the pinned outputs, committed with `NOTICE` (lz4 BSD-2-Clause, lz4_flex MIT, Rust core MIT/Apache-2.0), so the gate's difftest runs without the build toolchains. Each call extracts fresh pinned sources and uses a fresh Cargo target dir. `subjects/lz4.sha256` pins outputs; `tests/check-build` builds twice, compares bytes, checks pins, drives exports in Wasmtime.
+`subjects/build-lz4 [OUTPUT_DIR]` defaults to `.cache/bench/wasm/`. `subjects/wasm/` = the pinned outputs, committed with `NOTICE` (lz4 BSD-2-Clause, lz4_flex MIT, Rust core MIT/Apache-2.0), so the gate's difftest runs without the build toolchains; they leave the repo with U33 M4 (fetched like the other builds). The other pinned builds (`wasm-pflog/`, `wasm-glm/`, the proof subjects' copies) and the archived runs (`runs/`) are not committed: `scripts/fetch-subjects` and `bench/fetch-runs` fetch them from the `veriformatics/fva-artifacts` releases that `subjects/manifest.json` pins by sha256. Each call extracts fresh pinned sources and uses a fresh Cargo target dir. `subjects/lz4.sha256` pins outputs; `tests/check-build` builds twice, compares bytes, checks pins, drives exports in Wasmtime.
 
 - C = unmodified `lib/lz4.c`, `LZ4_FREESTANDING=1`, authored `c-memory.c` memcpy/memmove/memset, clang wasm32 target, `-O2`, no libc/WASI.
 - Rust = unmodified crate, no_std, defaults off; safe-encode/safe-decode/checked-decode on; no allocation. Minimal C-ABI shim; pinned rust-toolchain.toml + Cargo.lock; `--release --frozen`, opt-level 2, LTO, one codegen unit, panic abort.

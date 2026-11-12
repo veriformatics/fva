@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Direct runner trace + CLI help + tracked Wasm lift goldens. No observation reuse.
+# Direct runner trace + CLI help + Wasm lift goldens (tracked + placed subjects). No observation reuse.
 # 0 pass / 1 behavior mismatch / 2 setup / 3 program-under-test crash.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
@@ -216,9 +216,12 @@ while IFS= read -r command; do
 	((rc == 0)) || exit "$rc"
 done <"$work/actual/help/commands.txt"
 printf '# path\trc\tsha256 (namespace CharLift; - = no module)\n' >"$work/actual/lift.tsv"
-git ls-files -z '*.wasm' >"$work/wasm-list" || exit 2
+# every Wasm file FVA ships or tests: tracked + the third-party subjects scripts/fetch-subjects places
+scripts/fetch-subjects || exit 2
+{ git ls-files -z '*.wasm' && scripts/fetch-subjects --paths | grep -z '\.wasm$'; } | LC_ALL=C sort -zu >"$work/wasm-list" ||
+	exit 2
 [[ -s $work/wasm-list ]] || {
-	echo 'test-char: no tracked Wasm files' >&2
+	echo 'test-char: no Wasm files' >&2
 	exit 2
 }
 lifts=0

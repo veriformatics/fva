@@ -1,12 +1,12 @@
 # The full gate (scripts/gate) as a CI fan-out (D32): one build, then one job per gate group
 # (`scripts/gate --groups`); together the groups cover every step, which a full local run checks.
 # Mathlib oleans come from its cache, never a rebuild. `ci/**` pushes = an agent's full gate, except
-# `ci/fuzz-*` (a fuzz campaign, fuzz.yml).
+# `ci/fuzz-*` (a fuzz campaign, fuzz.yml) and `ci/mut-*` (mutation shards, mutation.yml).
 name: gate
 
 on:
   push:
-    branches: [main, "ci/**", "!ci/fuzz-**"]
+    branches: [main, "ci/**", "!ci/fuzz-**", "!ci/mut-**"]
   pull_request:
 
 permissions:

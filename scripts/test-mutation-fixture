@@ -102,6 +102,23 @@ clean_cases() {
 	done
 	for c in "${pids[@]}"; do wait "$c" || fail=1; done
 	cat "$tmp"/c-*.out
+	shard_case "$d/results.tsv"
+}
+
+# D84 / scripts/mutation-ci: two trees (hosts) each run an ad-hoc update over half the
+# declarations; one tree's execution cache merged into the other, a full update there executes
+# nothing and writes the table byte for byte as the one-host run did
+shard_case() { # one-host results.tsv
+	local a b got
+	a=$(variant shard-a clean) && b=$tmp/shard-b && cp -a "$a" "$b" || exit 1
+	rc_is 0 "shard a" "$a" "$a/s.log" update --decls Fix.inc Fix.dbl
+	rc_is 0 "shard b" "$b" "$b/s.log" update --decls Fix.mk Fix.width
+	[[ ! -e $a/results.tsv && ! -e $b/results.tsv ]] || bad "shards: an ad-hoc run wrote results.tsv"
+	cp "$b"/.cache/mutate/exec/* "$a/.cache/mutate/exec/" || bad "shards: no cache to merge"
+	got=$(ran "$a" "$a/f.log")
+	[[ -z $got && $(<"$a/f.log.rc") == 0 ]] ||
+		bad "shards: the merged update ran '$(tr '\n' ' ' <<<"$got")', rc $(<"$a/f.log.rc")"
+	cmp -s "$1" "$a/results.tsv" || bad "shards: merged table differs from the one-host table"
 }
 
 clean_case() { # name dir

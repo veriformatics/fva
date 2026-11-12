@@ -1,4 +1,0 @@
-.lake/
-verification/*.ndjson
-verification/*.log
-verification/__pycache__/

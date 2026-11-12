@@ -1,5 +1,0 @@
-.lake/
-verification/out/
-verification/negative/*.olean
-verification/negative/*.ilean
-verification/negative/*.c

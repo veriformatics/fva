@@ -4,6 +4,7 @@ set -euo pipefail
 [[ $# -ge 1 && $# -le 2 ]] || exit 2
 grade=$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")
 repo=$(realpath -e "$grade/../..")
+"$repo/bench/fetch-runs" || exit 2
 task=$1
 manifest=${2:-$grade/judgments/$task-m5.tsv}
 [[ -f $manifest ]] || {

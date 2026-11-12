@@ -236,6 +236,11 @@ for tool in lake jq wasmtime wasm-tools timeout nice date cmp; do
 		exit 2
 	}
 done
+# third-party + FVA-built subject binaries live outside git (CppEH eh.wasm: scripts/fetch-subjects)
+"$root/scripts/fetch-subjects" || {
+	echo "FAIL setup: scripts/fetch-subjects"
+	exit 2
+}
 run setup nice -n 10 lake build fvatest fva
 if ((last_rc)); then
 	echo "FAIL setup: lake build rc=$last_rc"

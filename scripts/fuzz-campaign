@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # fuzz-campaign TARGET SECONDS (D70, campaign tier): libFuzzer on one reader (lift | blob | codex)
 # for a time box. Seeds: lift = every binary module of the official test scripts
-# (.cache/corpus/testsuite, wasm-tools json-from-wast) + the committed .wasm files; blob = the
-# committed .wasm files; codex = recorded app-server lines (FVATest/Fuzz/seeds/codex/); all +
+# (.cache/corpus/testsuite, wasm-tools json-from-wast) + FVA's .wasm files (committed + the subjects
+# scripts/fetch-subjects places); blob = those .wasm files; codex = recorded app-server lines (FVATest/Fuzz/seeds/codex/); all +
 # the committed corpus. Crash inputs → FVATest/Fuzz/crashes/TARGET/ (rc 1; the gate's
 # fuzz-replay step then fails until the reader is fixed); FVATest/Fuzz/corpus/TARGET/ = the
 # inputs a merge keeps beyond the seeds (the seeds regenerate from pinned inputs; replay reads
@@ -21,6 +21,11 @@ corpus=FVATest/Fuzz/corpus/$target crashes=FVATest/Fuzz/crashes/$target
 mkdir -p "$corpus" "$crashes"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+wasm_files() { # NUL list: committed .wasm + the placed third-party subjects
+	git ls-files -z '*.wasm'
+	scripts/fetch-subjects --paths | grep -z '\.wasm$'
+}
+scripts/fetch-subjects || exit 2
 mkdir -p "$tmp/seeds" "$tmp/new" "$tmp/art"
 case $target in
 lift)
@@ -31,9 +36,9 @@ lift)
 		wasm-tools json-from-wast "$w" -o "$tmp/wast/$n/$n.json" --wasm-dir "$tmp/wast/$n/" 2>/dev/null || true
 	done
 	find "$tmp/wast" -name '*.wasm' -exec cp -t "$tmp/seeds" {} + 2>/dev/null
-	git ls-files -z '*.wasm' | xargs -0 cp -t "$tmp/seeds" --backup=numbered
+	wasm_files | xargs -0 cp -t "$tmp/seeds" --backup=numbered
 	;;
-blob) git ls-files -z '*.wasm' | xargs -0 cp -t "$tmp/seeds" --backup=numbered ;;
+blob) wasm_files | xargs -0 cp -t "$tmp/seeds" --backup=numbered ;;
 codex) cp FVATest/Fuzz/seeds/codex/* "$tmp/seeds/" ;;
 esac
 # inputs up to 8 KiB: larger modules cost a render each (≈ 380 executions/s with them, a planted
