@@ -111,6 +111,7 @@ lz4-c | lz4-rust)
 	;;
 pflog)
 	"$root/scripts/fetch-bench" runorm bhgp-2022 >/dev/null
+	"$root/scripts/fetch-subjects"
 	cp "$root/bench/subjects/wasm-pflog/runorm-pflog.wasm" "$root/bench/tasks/pflog/build.sh" \
 		"$root/bench/tasks/pflog/invariance-port.diff" "$out/"
 	mkdir -p "$out/shim/vendor"
@@ -144,6 +145,7 @@ tmm)
 	;;
 glm-iround)
 	"$root/scripts/fetch-bench" glm >/dev/null
+	"$root/scripts/fetch-subjects"
 	cp "$root/bench/subjects/wasm-glm/glm-iround.wasm" "$root/bench/subjects/glm-shim/iround.cpp" \
 		"$root/bench/tasks/glm-iround/build.sh" "$out/"
 	tar -xzf "$dl/glm/glm-1.0.3.tar.gz" -C "$out" glm-1.0.3/glm glm-1.0.3/copying.txt

@@ -1,6 +1,6 @@
 # Benchmark v2 results
 
-Rubric: `rubric.md` (fixed before any graded run, with its dated addenda). FVA was built with the subjects known: the U14 groundwork is listed below, and FVA's library is not frozen against the subjects.
+Rubric: `rubric.md` (fixed before any graded run, with its dated addenda). The run directories named here (`bench/runs/…`) are in the archived runs, not in git: `bench/fetch-runs` fetches and unpacks them. FVA was built with the subjects known: the U14 groundwork is listed below, and FVA's library is not frozen against the subjects.
 
 ## Summary across the six graded tasks
 

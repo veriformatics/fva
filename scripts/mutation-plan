@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# mutation-plan N [--local]: split the mutation scope into N shards for
+# .github/workflows/mutation.yml (user ruling: updates run sharded over GitHub-hosted runners).
+# Prints {"indices": [0..N-1], "total": t, "shards": [{"files", "decls", "mutants"}…], "local":
+# {"files", "decls", "mutants"}}; --local prints the local part's arguments alone (one per line:
+# --files F… --decls D…), for scripts/test-mutation update here. A declaration holding more than
+# 1.8 × the per-shard target runs locally: fvamut selects no finer than a declaration, and one
+# runner + one worker would exceed the 6 h job limit (Ref.instrStep: 318 mutants).
+# A shard runs `scripts/test-mutation update --files F… --decls D…`: an ad-hoc run writes its
+# executions to the content-keyed cache (.cache/mutate/exec), never results.tsv; a later full
+# `--update` over the merged caches writes the table (scripts/mutation-ci). Units = whole files
+# (one probe each per shard), a file above the per-shard target split by declaration; packing =
+# largest unit first into the least-loaded shard. Counts = every listed mutant (a landing re-keys
+# nearly every row; current rows cost a shard nothing). rc 0 ok, 2 usage or setup.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+[[ ${1:-} =~ ^[1-9][0-9]*$ && ${2:-} =~ ^(|--local)$ ]] || {
+	echo 'usage: scripts/mutation-plan N [--local]' >&2
+	exit 2
+}
+n=$1 mode=${2:-}
+list=$(mktemp) && trap 'rm -f "$list" "$list.json"' EXIT
+scripts/test-mutation list >"$list" 2>&1 || {
+	tail -5 "$list" >&2
+	exit 2
+}
+# id = file:decl:OP:k (Lean names hold no ':' in this scope)
+grep -P '\tline [0-9]+\t' "$list" | cut -f1 | awk -F: '
+	{ decl = $2; for (i = 3; i <= NF - 2; i++) decl = decl ":" $i; c[$1 "\t" decl]++ }
+	END { for (k in c) print c[k] "\t" k }' |
+	jq -R -s --argjson n "$n" '
+	[split("\n")[] | select(length > 0) | split("\t") | {count: (.[0] | tonumber), file: .[1], decl: .[2]}] as $rows |
+	($rows | map(.count) | add) as $total |
+	(($total + $n - 1) / $n | floor) as $target |
+	($rows | map(select(.count > 1.8 * $target))) as $big |
+	($rows | map(select(.count <= 1.8 * $target))) as $rows |
+	{files: ($big | map(.file) | unique), decls: ($big | map(.decl)), mutants: ($big | map(.count) | add // 0)} as $local |
+	[$rows | group_by(.file)[] |
+		(map(.count) | add) as $c |
+		if $c <= $target then {files: [.[0].file], decls: map(.decl), mutants: $c}
+		else
+			(sort_by(-.count) | reduce .[] as $d ([];
+				if length > 0 and (.[-1].mutants + $d.count) <= $target
+				then .[-1].decls += [$d.decl] | .[-1].mutants += $d.count
+				else . + [{files: [$d.file], decls: [$d.decl], mutants: $d.count}] end))[]
+		end] |
+	sort_by(-.mutants) |
+	reduce .[] as $u ([range($n)] | map({files: [], decls: [], mutants: 0});
+		(to_entries | min_by(.value.mutants) | .key) as $i |
+		.[$i].files = (.[$i].files + $u.files | unique) |
+		.[$i].decls += $u.decls | .[$i].mutants += $u.mutants) |
+	{indices: [range($n)], total: $total, shards: ., local: $local}' >"$list.json" || exit 2
+if [[ $mode == --local ]]; then
+	jq -r '.local | if .mutants > 0 then "--files", .files[], "--decls", .decls[] else empty end' "$list.json"
+else
+	cat "$list.json"
+fi

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Third-party subject files back at their paths (Decisions: Repository contents): every
+# `places` path of bench/subjects/manifest.json gets its entry's bytes from scripts/fetch-bench
+# (sha256-checked); the paths are gitignored, never committed. A copy goes through a temp file +
+# rename, so a concurrent reader never sees a partial file. --paths lists the paths alone
+# (NUL-separated). rc 0 ok, 2 setup or fetch failure.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+manifest=bench/subjects/manifest.json
+places=$(jq -r '(.subjects + (.builds // []))[] | select(.places) | .id as $id | .places[] |
+	[$id, .] | @tsv' "$manifest") || exit 2
+if [[ ${1:-} == --paths ]]; then
+	cut -f2 <<<"$places" | tr '\n' '\0'
+	exit 0
+fi
+while IFS=$'\t' read -r id dest; do
+	# the last line = this id (an extracted entry prints its parent first on a cold cache)
+	line=$(scripts/fetch-bench "$id" | tail -1) || exit 2
+	src=${line#*  }
+	cmp -s "$src" "$dest" && continue
+	mkdir -p "${dest%/*}" || exit 2
+	tmp=$(mktemp "$dest.XXXXXX") || exit 2
+	if ! { cp "$src" "$tmp" && chmod 644 "$tmp" && mv -f "$tmp" "$dest"; }; then
+		rm -f "$tmp"
+		exit 2
+	fi
+done <<<"$places"

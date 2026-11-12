@@ -65,10 +65,27 @@ if ! (cd "$d" && scripts/check-scope) >/dev/null; then
 	echo "test-checks: check-scope failed a clean scope"
 	fail=1
 fi
+# fetch-bench (U33: the sha256 pins of every fetched artifact): a pinned file fetches and its cached
+# copy verifies (rc 0); a corrupted cached copy and a download missing its pin each fail (rc 1)
+d=$tmp/fetch && mkdir -p "$d/src" "$d/cache" && printf 'pinned bytes\n' >"$d/src/x.bin"
+sha=$(sha256sum "$d/src/x.bin" | cut -d' ' -f1)
+fb_manifest() { # sha → a one-subject manifest on stdout
+	jq -n --arg sha "$1" --arg url "file://$d/src/x.bin" '{schema: 1, subjects: [{id: "t", name: "t",
+		version: "1", upstream: "u", url: $url, file: "x.bin", sha256: $sha, license: "MIT"}]}'
+}
+fb_manifest "$sha" >"$d/ok.json" && fb_manifest "${sha//[0-9]/0}" >"$d/bad.json"
+if ! scripts/fetch-bench --manifest "$d/ok.json" --cache "$d/cache" t >/dev/null 2>&1; then
+	echo "test-checks: fetch-bench failed a correctly pinned file"
+	fail=1
+fi
+printf 'x' >>"$d/cache/t/x.bin"
+expect_fail "fetch-bench: corrupted cached copy" . scripts/fetch-bench --manifest "$d/ok.json" --cache "$d/cache" t
+expect_fail "fetch-bench: download missing its pin" . scripts/fetch-bench --manifest "$d/bad.json" --cache "$d/cache2" t
 # check-notices (D57): a module embedding a manifest artifact's bytes needs a NOTICE naming its
 # sha256, license, upstream, version and corresponding source, here or in an ancestor directory
 d=$tmp/notices && mkdir -p "$d/scripts" "$d/bench/subjects" "$d/runs/r1/Proofs"
 cp scripts/check-notices "$d/scripts/" && cp bench/subjects/manifest.json "$d/bench/subjects/"
+scripts/fetch-subjects || exit 2
 hex=$(xxd -p FVATest/Subjects/Lz4Wasm/lz4-block-codec.wasm | tr -d '\n') && [[ -n $hex ]] || {
 	echo "test-checks: xxd cannot dump the lz4-wasm codec (check-notices case setup)"
 	exit 2

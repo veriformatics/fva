@@ -19,3 +19,5 @@ mv -Tf "$shim" "$FVA_GRADE_BIN/frama-c"
 # The repo's pinned tools (wasm-tools, wasmtime) when the bench root has none (CI, fresh hosts).
 export PATH=$FVA_GRADE_BIN:$FVA_BENCH_HOME/bin:$repo/.tools/bin:$PATH
 cd "$repo" || exit 2
+# the archived runs live outside git (Decisions: Repository contents)
+bench/fetch-runs || exit 2

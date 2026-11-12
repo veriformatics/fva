@@ -1,5 +1,0 @@
-.lake/
-.verification/
-verification/*.olean
-verification/*.ndjson
-verification/nanoda*.json

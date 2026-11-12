@@ -2,6 +2,7 @@
 # Fast structural/behavior controls; no benchmark cache or proof toolchain required.
 set -euo pipefail
 root=$(realpath -e "$(dirname "${BASH_SOURCE[0]}")/../..")
+"$root/bench/fetch-runs" || exit 2
 g=$root/bench/grade
 tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT

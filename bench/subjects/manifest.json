@@ -32,24 +32,31 @@
       "sha256": "4bda6947a0498618552cba53ab3780745fd34cc1a0d84696e83a0547dcd68acf",
       "license": "BSD-2-Clause",
       "scope": "Byte-identical to gorhill/lz4-wasm dist at 8995cdef7b3adc4a4d2fc4fc86b84a86789ff858",
-      "source": "https://raw.githubusercontent.com/gorhill/lz4-wasm/8995cdef7b3adc4a4d2fc4fc86b84a86789ff858/src/lz4-block-codec.wat (hand-written WebAssembly text)"
+      "source": "https://raw.githubusercontent.com/gorhill/lz4-wasm/8995cdef7b3adc4a4d2fc4fc86b84a86789ff858/src/lz4-block-codec.wat (hand-written WebAssembly text)",
+      "places": [
+        "FVATest/Subjects/Lz4Wasm/lz4-block-codec.wasm"
+      ]
     },
     {
       "id": "edger-emscripten",
       "name": "edgeR emscripten package",
       "version": "4.99.10",
       "upstream": "https://bioconductor.org/packages/edgeR",
-      "url": "https://r2.ropensci.org/4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/edger-4.99.10/edgeR_4.99.10.tgz",
       "file": "edgeR_4.99.10.tgz",
       "sha256": "4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93",
-      "license": "GPL-2.0-or-later"
+      "license": "GPL-2.0-or-later",
+      "formerly": "https://r2.ropensci.org/4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93",
+      "places": [
+        ".cache/corpus/edgeR_4.99.10.tgz"
+      ]
     },
     {
       "id": "edger-wasm",
       "name": "edgeR emscripten shared library",
       "version": "4.99.10",
       "upstream": "https://bioconductor.org/packages/edgeR",
-      "url": "https://r2.ropensci.org/4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/edger-4.99.10/edgeR_4.99.10.tgz",
       "file": "edgeR.so",
       "sha256": "e39434314a9eb0399edf943c6a0475d34ff9d0d7ec0bb4a1b8ba726b4a6a88fb",
       "license": "GPL-2.0-or-later",
@@ -57,7 +64,10 @@
         "from": "edger-emscripten",
         "member": "edgeR/libs/edgeR.so"
       },
-      "source": "https://bioc.r-universe.dev/src/contrib/edgeR_4.99.10.tar.gz (sha256 c33c3f85edf6a67abbcb3e899124d266adc039b32e811d11e69fc34cedba6218)"
+      "source": "https://github.com/veriformatics/fva-artifacts/releases/download/edger-4.99.10/edgeR_4.99.10.tar.gz (sha256 c33c3f85edf6a67abbcb3e899124d266adc039b32e811d11e69fc34cedba6218)",
+      "places": [
+        "FVATest/Subjects/EdgerCpm/edgeR.so"
+      ]
     },
     {
       "id": "rnanorm",
@@ -99,10 +109,11 @@
       "name": "edgeR source package",
       "version": "4.99.10",
       "upstream": "https://bioconductor.org/packages/edgeR",
-      "url": "https://bioc.r-universe.dev/src/contrib/edgeR_4.99.10.tar.gz",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/edger-4.99.10/edgeR_4.99.10.tar.gz",
       "file": "edgeR_4.99.10.tar.gz",
       "sha256": "c33c3f85edf6a67abbcb3e899124d266adc039b32e811d11e69fc34cedba6218",
-      "license": "GPL-2.0-or-later"
+      "license": "GPL-2.0-or-later",
+      "formerly": "https://bioc.r-universe.dev/src/contrib/edgeR_4.99.10.tar.gz"
     },
     {
       "id": "runorm",
@@ -146,7 +157,11 @@
       "license": "BSD-2-Clause",
       "upstream": "https://github.com/lz4/lz4",
       "version": "1.10.0",
-      "source": "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz (lib/lz4.c) + bench/subjects/build-lz4 + bench/subjects/c-memory.c"
+      "source": "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz (lib/lz4.c) + bench/subjects/build-lz4 + bench/subjects/c-memory.c",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v1/lz4-c.wasm",
+      "places": [
+        "FVATest/Subjects/Lz4C/lz4-c.wasm"
+      ]
     },
     {
       "id": "lz4-c-o1-wasm",
@@ -155,7 +170,11 @@
       "license": "BSD-2-Clause",
       "upstream": "https://github.com/lz4/lz4",
       "version": "1.10.0",
-      "source": "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz (lib/lz4.c) + bench/tasks/lz4-c/build.sh with -O1 + bench/subjects/c-memory.c"
+      "source": "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz (lib/lz4.c) + bench/tasks/lz4-c/build.sh with -O1 + bench/subjects/c-memory.c",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v1/lz4-c-O1.wasm",
+      "places": [
+        "FVATest/Subjects/Lz4C/O1/lz4-c-O1.wasm"
+      ]
     },
     {
       "id": "lz4-flex-wasm",
@@ -164,7 +183,8 @@
       "license": "MIT",
       "upstream": "https://github.com/PSeitz/lz4_flex",
       "version": "0.14.0",
-      "source": "https://static.crates.io/crates/lz4_flex/lz4_flex-0.14.0.crate + bench/subjects/lz4-flex-shim + bench/subjects/build-lz4"
+      "source": "https://static.crates.io/crates/lz4_flex/lz4_flex-0.14.0.crate + bench/subjects/lz4-flex-shim + bench/subjects/build-lz4",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v1/lz4-flex.wasm"
     },
     {
       "id": "glm-iround-wasm",
@@ -173,7 +193,12 @@
       "license": "MIT",
       "upstream": "https://github.com/g-truc/glm",
       "version": "1.0.3",
-      "source": "https://codeload.github.com/g-truc/glm/tar.gz/refs/tags/1.0.3 + bench/subjects/glm-shim + bench/subjects/build-glm"
+      "source": "https://codeload.github.com/g-truc/glm/tar.gz/refs/tags/1.0.3 + bench/subjects/glm-shim + bench/subjects/build-glm",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v1/glm-iround.wasm",
+      "places": [
+        "bench/subjects/wasm-glm/glm-iround.wasm",
+        "FVATest/Subjects/GlmIround/glm-iround.wasm"
+      ]
     },
     {
       "id": "runorm-pflog-wasm",
@@ -182,7 +207,33 @@
       "license": "BSD-2-Clause",
       "upstream": "https://github.com/cleartools/runorm",
       "version": "9429aa00784a972fdeae64e0ca050ea08f3c5bc9",
-      "source": "https://github.com/cleartools/runorm/archive/9429aa00784a972fdeae64e0ca050ea08f3c5bc9.tar.gz + bench/subjects/runorm-shim + bench/subjects/build-runorm"
+      "source": "https://github.com/cleartools/runorm/archive/9429aa00784a972fdeae64e0ca050ea08f3c5bc9.tar.gz + bench/subjects/runorm-shim + bench/subjects/build-runorm",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v1/runorm-pflog.wasm",
+      "places": [
+        "bench/subjects/wasm-pflog/runorm-pflog.wasm"
+      ]
+    },
+    {
+      "id": "cppeh-wasm",
+      "file": "FVATest/Subjects/CppEH/eh.wasm",
+      "sha256": "4e2fe131b94743ec16e11c868d5d1dc0903956c8edfe1c2d3626c1fec7155292",
+      "license": "Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND MIT",
+      "upstream": "https://github.com/veriformatics/fva (FVATest/Subjects/CppEH)",
+      "version": "wasi-sdk 34.0",
+      "source": "FVATest/Subjects/CppEH/eh.cpp + FVATest/Subjects/CppEH/build + https://github.com/WebAssembly/wasi-sdk/tree/wasi-sdk-34",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v1/eh.wasm",
+      "places": [
+        "FVATest/Subjects/CppEH/eh.wasm"
+      ]
+    }
+  ],
+  "archives": [
+    {
+      "id": "bench-runs-v2",
+      "file": "bench-runs.tar.xz",
+      "sha256": "30b019f7bd92f75be17739a89220df91d0a7e6d8dc1ee314f6e5ab1ad783abc8",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/bench-runs-v2/bench-runs.tar.xz",
+      "contents": "bench/runs/ (bench/fetch-runs unpacks it)"
     }
   ]
 }

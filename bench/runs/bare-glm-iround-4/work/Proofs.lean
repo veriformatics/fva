@@ -1,2 +1,0 @@
--- Library root: import your proof modules here.
-import Proofs.Counterexample

@@ -10,6 +10,7 @@ grade=$(dirname "$(realpath -e "${BASH_SOURCE[0]}")")
 repo=$(realpath -e "$grade/../..")
 judgments=${FVA_GRADE_JUDGMENTS:-$grade/judgments}
 cd "$repo"
+bench/fetch-runs || exit 2
 [[ $# == 1 && $1 =~ ^(lz4-c|lz4-rust|glm-iround)$ ]] || {
 	echo "usage: bench/grade/judged lz4-c|lz4-rust|glm-iround" >&2
 	exit 2
@@ -39,7 +40,7 @@ for m in "$grade/manifests/"{wp,verus}-cmds-"$task".tsv; do
 	[[ ! -f $m ]] || runs+=$'\n'$(cut -f1 "$m" | sort -u)
 done
 for r in $runs; do
-	n=$(git ls-files -z "bench/runs/$r/work" | grep -zE '\.(sh|py|mjs|js)$' | xargs -0 -r cat | grep -c . || true)
+	n=$(find "bench/runs/$r/work" -name .lake -prune -o -type f -print0 | grep -zE '\.(sh|py|mjs|js)$' | xargs -0 -r cat | grep -c . || true)
 	printf '%s\t%s\n' "$r" "$n"
 done >"$tmp/scripts"
 if [[ $task == glm-iround ]]; then

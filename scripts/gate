@@ -39,6 +39,18 @@ mode=full
 [[ -n $group ]] && mode=group:$group
 scripts/fetch-tools || exit 1
 export PATH="$PWD/.tools/bin:$PATH"
+# Inputs the lanes read, fetched once before they start: parallel fetch-corpus runs share its
+# .part files (two runs into an empty corpus: one fails the other's sha256 check).
+# fetch-subjects first: it also places the edgeR archive (veriformatics/fva-artifacts; R-universe
+# dropped 4.99.10) until fetch-corpus names it there (U33 M4, a mutation digest input: U28b).
+scripts/fetch-subjects || {
+	echo "gate: scripts/fetch-subjects failed" >&2
+	exit 1
+}
+scripts/fetch-corpus >/dev/null || {
+	echo "gate: scripts/fetch-corpus failed" >&2
+	exit 1
+}
 logs=$(mktemp -d)
 trap 'rm -rf "$logs"' EXIT
 
@@ -56,7 +68,7 @@ run() { # name cmd... -> logs/name.{out,rc,sec}, when the selected group has the
 # a fork per file costs ≈ 5 s over FVATest's ≈ 1,600 files
 # shellcheck disable=SC2016 # awk's own $0
 mapfile -t shells < <(
-	git ls-files -co --exclude-standard -z -- 'scripts/*' 'bench/*' 'FVATest/*' ':!:bench/runs/**' |
+	git ls-files -co --exclude-standard -z -- 'scripts/*' 'bench/*' 'FVATest/*' |
 		xargs -0 -r awk 'FNR == 1 { if ($0 == "#!/usr/bin/env bash") print FILENAME; nextfile }'
 )
 mapfile -t workflows < <(git ls-files -co --exclude-standard -- '.github/workflows/*.yml')
