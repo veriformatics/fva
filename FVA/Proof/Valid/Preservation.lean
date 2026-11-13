@@ -41,6 +41,7 @@ theorem fragment_preservation {H : HostSem} (hH : TypeSoundHost H) {c c' : Confi
         Preserved c.store C a b c' := by
   induction step <;> intro C a b hok hf ht
   case num hr => exact same hok hf (ht.numeric hr)
+  case refNull => exact same hok hf ht.refNull
   case refIsNull => exact same hok hf ht.refIsNull
   case refFunc ha => exact same hok hf (ht.refFunc hf ha)
   case drop => exact same hok hf ht.drop
@@ -116,18 +117,18 @@ theorem fragment_preservation {H : HostSem} (hH : TypeSoundHost H) {c c' : Confi
   case call ha => exact same hok hf (ht.call hf ha)
   case callIndirect htarget => exact same hok hf (ht.callIndirect hf htarget)
   case callIndirectTrap => exact same hok hf (.single .trap)
-  case invoke hfi hlen => exact same hok hf (ht.invoke hok hfi hlen)
+  case invoke hfi hft hlen => exact same hok hf (ht.invoke hok hfi hft hlen)
   case frameExit => exact same hok hf ht.frameExit
-  case invokeHost hfi hlen hh =>
-    obtain ⟨p, hp, hout, hargs⟩ := ht.invoke_inv hfi hlen
-    obtain ⟨he, hres⟩ := (hH.1 _ _ _ _ _ hfi hargs).2 _ hh
-    have hok' := hH.2 _ _ _ _ _ _ hok hfi hargs hh
+  case invokeHost hfi hft hlen hh =>
+    obtain ⟨p, hp, hout, hargs⟩ := ht.invoke_inv hfi hft hlen
+    obtain ⟨he, hres⟩ := (hH.1 _ _ _ _ _ _ hfi hft hargs).2 _ hh
+    have hok' := hH.2 _ _ _ _ _ _ _ hok hfi hft hargs hh
     obtain ⟨D, hf', hc⟩ := hf.extendStore he
     exact ⟨he, hok', D, hc, hf', .sub ((ASeqT.values hres p).input hp) hout⟩
-  case invokeHostTrap hfi hlen hh =>
-    obtain ⟨p, hp, hout, hargs⟩ := ht.invoke_inv hfi hlen
-    have he := (hH.1 _ _ _ _ _ hfi hargs).2 _ hh
-    have hok' := hH.2 _ _ _ _ _ _ hok hfi hargs hh
+  case invokeHostTrap hfi hft hlen hh =>
+    obtain ⟨p, hp, hout, hargs⟩ := ht.invoke_inv hfi hft hlen
+    have he := (hH.1 _ _ _ _ _ _ hfi hft hargs).2 _ hh
+    have hok' := hH.2 _ _ _ _ _ _ _ hok hfi hft hargs hh
     exact changed ⟨he, hok'⟩ hf (.single .trap)
   case invokeHostDiverge => exact same hok hf ht
   case seq step ih =>
@@ -165,6 +166,40 @@ theorem fragment_preservation {H : HostSem} (hH : TypeSoundHost H) {c c' : Confi
       exact ⟨p, x, _, _, hin, hout, hm, .frame hn hf'.frameT (hDD.symm ▸ hb')⟩
   case trap => exact same hok hf (.single .trap)
   case trapFrame => exact same hok hf (.single .trap)
+  -- the P′ forms have no 2.0 typing rule (U28c types them): their redexes are not well typed
+  case handler | handlerExit | throwRefHandlerEmpty | throwRefCatch | throwRefCatchRef
+    | throwRefCatchAll | throwRefCatchAllRef | throwRefHandlerNext =>
+    exact absurd ht (ASeqT.not_mem (List.mem_singleton_self _) fun _ _ _ h => by cases h)
+  case tryTable | throw =>
+    exact absurd ht (ASeqT.not_mem (List.mem_append_right _ (List.mem_singleton_self _))
+      (AInstrT.not_plain fun _ _ h => by cases h))
+  case returnCall =>
+    exact absurd ht (ASeqT.not_mem (List.mem_singleton_self _)
+      (AInstrT.not_plain fun _ _ h => by cases h))
+  case throwRefNull | returnCallRef | returnCallRefNull | returnCallIndirect
+    | returnCallIndirectTrap | callRef | callRefNull | refAsNonNull | refAsNonNullNull | brOnNull
+    | brOnNullValue | brOnNonNull | brOnNonNullNull =>
+    exact absurd ht (ASeqT.not_mem (List.mem_cons_of_mem _ (List.mem_singleton_self _))
+      (AInstrT.not_plain fun _ _ h => by cases h))
+  case throwRefInstrs =>
+    exact absurd ht (ASeqT.not_mem (e := .plain .throwRef) (by simp [throwing])
+      (AInstrT.not_plain fun _ _ h => by cases h))
+  case throwRefLabel =>
+    obtain ⟨p, x, y, z, -, -, -, hi⟩ := ASeqT.single_iff.mp ht
+    cases hi with | label hn hc hb =>
+      exact absurd hb (ASeqT.not_mem (e := .plain .throwRef) (by simp [throwing])
+        (AInstrT.not_plain fun _ _ h => by cases h))
+  case throwRefFrame =>
+    obtain ⟨p, x, y, z, -, -, -, hi⟩ := ASeqT.single_iff.mp ht
+    cases hi with | frame hn hf hb =>
+      exact absurd hb (ASeqT.not_mem (e := .plain .throwRef) (by simp [throwing])
+        (AInstrT.not_plain fun _ _ h => by cases h))
+  case returnInvoke L _ _ _ =>
+    obtain ⟨p, x, y, z, -, -, -, hi⟩ := ASeqT.single_iff.mp ht
+    cases hi with | frame hn hf hb =>
+      obtain ⟨C', x, y, hin⟩ := ASeqT.fill_inner L hb
+      exact absurd hin (ASeqT.not_mem (List.mem_append_right _ (List.mem_singleton_self _))
+        fun _ _ _ h => by cases h)
 
 theorem preservation : Preservation := by
   intro H c c' ts hH hok hs

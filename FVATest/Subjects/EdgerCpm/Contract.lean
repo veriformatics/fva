@@ -125,12 +125,12 @@ def Linked (s : Store) (inst : ModuleInst) (alloc free : Nat) : Prop :=
   ∃ a160 a207 a12 a13, inst.funcs[207]? = some a207 ∧
     inst.funcs[12]? = some a12 ∧ inst.funcs[13]? = some a13 ∧
     inst.exportFunc "calc_cpm_raw" = some a160 ∧
-    s.funcs[a160]? = some (.wasm (Lifted.module.typeList.getD Lifted.func86.type ⟨[], []⟩) inst
+    s.funcs[a160]? = some (.wasm (Lifted.module.defTypes.getD Lifted.func86.type ⟨[], 0⟩) inst
       Lifted.func86) ∧
-    s.funcs[a207]? = some (.wasm (Lifted.module.typeList.getD Lifted.func133.type ⟨[], []⟩) inst
+    s.funcs[a207]? = some (.wasm (Lifted.module.defTypes.getD Lifted.func133.type ⟨[], 0⟩) inst
       Lifted.func133) ∧
-    s.funcs[a12]? = some (.host ⟨[.num .i32, .num .i32], [.num .i32]⟩ alloc) ∧
-    s.funcs[a13]? = some (.host ⟨[.num .i32], []⟩ free)
+    s.funcs[a12]? = some (.host ⟨[⟨[.num .i32, .num .i32], [.num .i32]⟩], 0⟩ alloc) ∧
+    s.funcs[a13]? = some (.host ⟨[⟨[.num .i32], []⟩], 0⟩ free)
 
 /-- A loader-prepared call with the linked code, caller data, two guaranteed scratch allocations,
 protected input/output bytes and non-wrapping addresses. Caller buffers may be live heap

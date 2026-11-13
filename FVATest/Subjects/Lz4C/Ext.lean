@@ -29,16 +29,17 @@ abbrev vI (n : Nat) : Val := .i32 (BitVec.ofNat 32 n)
 
 /-- Frame `f'` = entry locals `ls` of instance `inst`, except locals 2, 4, 15, 17, which hold
 `l2`, `l4`, `l15`, `l17` (`none` = unchanged). -/
-def Locals (ls : List Val) (inst : ModuleInst) (f' : Frame) (l2 l4 : Nat)
+def Locals (ls : List (Option Val)) (inst : ModuleInst) (f' : Frame) (l2 l4 : Nat)
     (l15 l17 : Option Nat) : Prop :=
   f'.inst = inst ∧ f'.locals.length = ls.length ∧
   (∀ i, i ≠ 2 → i ≠ 4 → i ≠ 15 → i ≠ 17 → f'.locals[i]? = ls[i]?) ∧
-  f'.locals[2]? = some (vI l2) ∧ f'.locals[4]? = some (vI l4) ∧
-  f'.locals[15]? = (l15.map vI <|> ls[15]?) ∧ f'.locals[17]? = (l17.map vI <|> ls[17]?)
+  f'.locals[2]? = some (some (vI l2)) ∧ f'.locals[4]? = some (some (vI l4)) ∧
+  f'.locals[15]? = (l15.map (some ∘ vI) <|> ls[15]?) ∧
+  f'.locals[17]? = (l17.map (some ∘ vI) <|> ls[17]?)
 
 /-- The loop's exits. -/
-def ExtExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p lim acc : Nat)
-    (b : Nat → UInt8) (c : Config) : Prop :=
+def ExtExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val))
+    (p lim acc : Nat) (b : Nat → UInt8) (c : Config) : Prop :=
   (∃ k f', (∀ j < k, b j = 255) ∧ b k ≠ 255 ∧ p + k + 1 ≤ lim ∧ (∀ i ≤ k, psum acc b i < 2 ^ 31) ∧
     Locals ls inst f' (p + k + 1) (p + k + 1) (some (b k).toNat) (some (psum acc b k)) ∧
     c = (ctx8 C).fill ⟨s, f', (body8.drop 4).map .plain⟩) ∨
@@ -53,8 +54,8 @@ def ExtExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p lim
     c = C.fill ⟨s, f', (body2.drop 1).map .plain⟩)
 
 /-- `ExtL1`'s exits, the bound exit's position kept: the bound check fails at `p + k = lim`. -/
-def ExtExitB (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p lim acc : Nat)
-    (b : Nat → UInt8) (c : Config) : Prop :=
+def ExtExitB (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val))
+    (p lim acc : Nat) (b : Nat → UInt8) (c : Config) : Prop :=
   (∃ k f', (∀ j < k, b j = 255) ∧ b k ≠ 255 ∧ p + k + 1 ≤ lim ∧ (∀ i ≤ k, psum acc b i < 2 ^ 31) ∧
     Locals ls inst f' (p + k + 1) (p + k + 1) (some (b k).toNat) (some (psum acc b k)) ∧
     c = (ctx8 C).fill ⟨s, f', (body8.drop 4).map .plain⟩) ∨
@@ -70,9 +71,10 @@ def ExtExitB (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p li
 
 /-- Checkpoint 1's statement L1. -/
 def ExtL1 : Prop :=
-  ∀ (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
+  ∀ (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val)) (ma : Nat)
     (mem : MemInst) (p lim acc : Nat),
-    ls[2]? = some (vI p) → ls[14]? = some (vI lim) → ls[17]? = some (vI acc) →
+    ls[2]? = some (some (vI p)) → ls[14]? = some (some (vI lim)) →
+    ls[17]? = some (some (vI acc)) →
     inst.mems[0]? = some ma → s.mems[ma]? = some mem →
     p ≤ lim → lim + 1 < 2 ^ 32 → lim ≤ mem.size → acc < 2 ^ 31 →
     Until H (Within (fun m a => m = ma ∧ p ≤ a ∧ a < lim) (fun _ _ => False))
@@ -82,16 +84,17 @@ def ExtL1 : Prop :=
 /-- The literal length's extension loop (`ExtL1`'s statement with `ExtExitB`): the engine's
 obligation for `SegA`. -/
 def ExtL1B : Prop :=
-  ∀ (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
+  ∀ (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val)) (ma : Nat)
     (mem : MemInst) (p lim acc : Nat),
-    ls[2]? = some (vI p) → ls[14]? = some (vI lim) → ls[17]? = some (vI acc) →
+    ls[2]? = some (some (vI p)) → ls[14]? = some (some (vI lim)) →
+    ls[17]? = some (some (vI acc)) →
     inst.mems[0]? = some ma → s.mems[ma]? = some mem →
     p ≤ lim → lim + 1 < 2 ^ 32 → lim ≤ mem.size → acc < 2 ^ 31 →
     Until H (Within (fun m a => m = ma ∧ p ≤ a ∧ a < lim) (fun _ _ => False))
       (ExtExitB C s inst ls p lim acc fun j => mem.byte (p + j))
       ((ctx9 C).fill ⟨s, ⟨ls, inst⟩, [.plain extLoop]⟩)
 
-theorem ExtExitB.exit {C : Context} {s : Store} {inst : ModuleInst} {ls : List Val}
+theorem ExtExitB.exit {C : Context} {s : Store} {inst : ModuleInst} {ls : List (Option Val)}
     {p lim acc : Nat} {b : Nat → UInt8} {c : Config}
     (h : ExtExitB C s inst ls p lim acc b c) : ExtExit C s inst ls p lim acc b c := by
   rcases h with h | ⟨k, f, hff, hb, hs, hl, hc⟩ | h

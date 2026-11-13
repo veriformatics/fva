@@ -19,7 +19,6 @@ open FVA.Wasm
 inductive OpType where
   | val (t : ValType)
   | bot
-  deriving DecidableEq
 
 /-- `⊢ t ≤ t'` (§3.3): an operand type matches itself; bottom matches every operand type. -/
 def OpType.Matches : OpType → OpType → Prop

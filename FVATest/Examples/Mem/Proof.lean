@@ -12,19 +12,19 @@ open FVA.Wasm FVA.Wasm.Num FVA.Wasm.Exec FVA.Wasm.Exec.Ref
 
 theorem callScale_holds : callScale := by
   intro x
-  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl, ?_⟩
+  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl rfl, ?_⟩
   intro H s inst h
-  have ha := instance_alloc rfl rfl rfl rfl h
-  have hf1 : s.funcs[1]? = some (.wasm ⟨[.num .i32], [.num .i32]⟩ inst Lifted.func1) := by
+  have ha := instance_alloc rfl rfl rfl rfl rfl h
+  have hf1 : s.funcs[1]? = some (.wasm ⟨[⟨[.num .i32], [.num .i32]⟩], 0⟩ inst Lifted.func1) := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
-  have hf2 : s.funcs[2]? = some (.wasm ⟨[.num .i32], [.num .i32]⟩ inst Lifted.func2) := by
+  have hf2 : s.funcs[2]? = some (.wasm ⟨[⟨[.num .i32], [.num .i32]⟩], 0⟩ inst Lifted.func2) := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   have hi2 : inst.funcs[2]? = some 2 := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   have he : inst.exportFunc "call_scale" = some 1 := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   clear ha h
-  refine ⟨1, he, ⟨_, hf1, by simp [Val.HasType, FuncInst.type]⟩, ?_⟩
+  refine ⟨1, he, ⟨_, _, hf1, rfl, by simp [Val.HasType, FuncType.mapHeap, ValType.mapHeap]⟩, ?_⟩
   unfold invokeConfig
   wasm_run [hf1, hf2, hi2, Lifted.func1, Lifted.func2]
   refine Must.done (o := .returned s [.i32 _]) ⟨rfl, rfl⟩ ?_
@@ -34,15 +34,16 @@ theorem callScale_holds : callScale := by
 
 theorem classify_holds : classify := by
   intro x y
-  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl, ?_⟩
+  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl rfl, ?_⟩
   intro H s inst h
-  have ha := instance_alloc rfl rfl rfl rfl h
-  have hf : s.funcs[3]? = some (.wasm ⟨[.num .i32, .num .i32], [.num .i32]⟩ inst Lifted.func3) := by
+  have ha := instance_alloc rfl rfl rfl rfl rfl h
+  have hf : s.funcs[3]? = some (.wasm ⟨[⟨[.num .i32, .num .i32], [.num .i32]⟩],
+      0⟩ inst Lifted.func3) := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   have he : inst.exportFunc "classify" = some 3 := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   clear ha h
-  refine ⟨3, he, ⟨_, hf, by simp [Val.HasType, FuncInst.type]⟩, ?_⟩
+  refine ⟨3, he, ⟨_, _, hf, rfl, by simp [Val.HasType, FuncType.mapHeap, ValType.mapHeap]⟩, ?_⟩
   unfold invokeConfig
   -- the `br_table` index: one case per target
   obtain hx | hx | hx | hx | hx | hx : x.toNat = 0 ∨ x.toNat = 1 ∨ x.toNat = 2 ∨ x.toNat = 3 ∨
@@ -64,7 +65,7 @@ def sumBody : List Instr :=
 
 /-- The configuration at the head of `array_sum`'s loop with locals `a c acc`. -/
 def sumHead (s : Store) (inst : ModuleInst) (a c acc : BitVec 32) : Config :=
-  ⟨s, ⟨[], {}⟩, [.frame 1 ⟨[.i32 a, .i32 c, .i32 acc], inst⟩
+  ⟨s, ⟨[], {}⟩, [.frame 1 ⟨[some (.i32 a), some (.i32 c), some (.i32 acc)], inst⟩
     [.label 1 [] [.label 0 [] [.label 0 [.loop .empty sumBody] (sumBody.map .plain)],
       .plain (.localGet 2)]]]⟩
 
@@ -74,7 +75,7 @@ theorem sum_loop (H : HostSem) (s : Store) (inst : ModuleInst) (mem : MemInst) (
     (hmem : mem.size = 65536) :
     ∀ (k i : Nat) (a c acc : BitVec 32), i + k + 1 = xs.length → a.toNat = p + 4 * i →
       c.toNat = k + 1 → acc = (xs.take i).sum →
-      Must H (fun | .returned _ vs => vs = [.i32 xs.sum] | .trapped _ => False)
+      Must H (fun | .returned _ vs => vs = [.i32 xs.sum] | _ => False)
         (sumHead s inst a c acc) := by
   intro k
   induction k with
@@ -114,13 +115,14 @@ theorem arraySum_holds : arraySum := by
   intro p xs hp
   refine ⟨fun H => ?_, ?_⟩
   · -- the fresh instance has the array's room: one 64 KiB page
-    obtain ⟨s, inst, h⟩ := instantiable_alloc (m := Lifted.module) rfl rfl rfl rfl rfl H
+    obtain ⟨s, inst, h⟩ := instantiable_alloc (m := Lifted.module) rfl rfl rfl rfl rfl rfl H
     refine ⟨s, inst, h, ?_⟩
-    obtain ⟨rfl, rfl⟩ := Prod.mk.inj (instance_alloc rfl rfl rfl rfl h)
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj (instance_alloc rfl rfl rfl rfl rfl h)
     exact ⟨_, rfl, by rw [le32s_length]; simpa [MemInst.size] using hp⟩
   intro H s inst h hfit
-  have ha := instance_alloc rfl rfl rfl rfl h
-  have hf : s.funcs[0]? = some (.wasm ⟨[.num .i32, .num .i32], [.num .i32]⟩ inst Lifted.func0) := by
+  have ha := instance_alloc rfl rfl rfl rfl rfl h
+  have hf : s.funcs[0]? = some (.wasm ⟨[⟨[.num .i32, .num .i32], [.num .i32]⟩],
+      0⟩ inst Lifted.func0) := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   have he : inst.exportFunc "array_sum" = some 0 := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
@@ -130,8 +132,8 @@ theorem arraySum_holds : arraySum := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   clear ha h
   have hw := Store.withBytes_mem0 hs p.toNat (le32s xs)
-  refine ⟨0, he, ⟨_, by rw [Store.withBytes_funcs]; exact hf,
-    by simp [Val.HasType, FuncInst.type]⟩, ?_⟩
+  refine ⟨0, he, ⟨_, _, by rw [Store.withBytes_funcs]; exact hf, by exact rfl,
+    by simp [Val.HasType, FuncType.mapHeap, ValType.mapHeap]⟩, ?_⟩
   unfold invokeConfig
   by_cases hn : xs = []
   · subst hn

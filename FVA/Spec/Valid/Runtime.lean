@@ -22,21 +22,27 @@ def ExternValT (s : Store) : ExternVal → Prop
   | .table a => a < s.tables.length
   | .mem a => a < s.mems.length
   | .global a => a < s.globals.length
+  | .tag a => a < s.tags.length
 
 /-- `S ⊢ moduleinst : C` (appendix "Module Instances"): each address names an instance of the
 context's type (a table or memory by its current limits), the data segments exist, the exports
 name instances under distinct names; `C.refs` = every function index; no locals, labels or
 return type. -/
 structure ModuleInstT (s : Store) (inst : ModuleInst) (C : Context) : Prop where
-  types : C.types = inst.types
-  funcs : List.Forall₂ (fun a ft => ∃ fi, s.funcs[a]? = some fi ∧ fi.type = ft) inst.funcs C.funcs
+  /-- The context's function types = the instance's defined types expanded (2.0's context until
+  U28c). -/
+  types : List.Forall₂ (fun dt ft => dt.expand = some ft) inst.types C.types
+  funcs : List.Forall₂ (fun a ft => ∃ fi, s.funcs[a]? = some fi ∧ fi.type.expand = some ft)
+    inst.funcs C.funcs
   tables : List.Forall₂ (fun a tt => ∃ ti, s.tables[a]? = some ti ∧ ti.type = tt) inst.tables
     C.tables
   mems : List.Forall₂
     (fun a lim => ∃ mi, s.mems[a]? = some mi ∧ (⟨mi.pages, mi.max⟩ : Limits) = lim)
     inst.mems C.mems
-  globals : List.Forall₂ (fun a gt => ∃ gi, s.globals[a]? = some gi ∧ gi.type = gt) inst.globals
-    C.globals
+  /-- Globals by global type matching (3.0 external subtyping: an immutable global of a subtype
+  serves). -/
+  globals : List.Forall₂ (fun a gt => ∃ gi, s.globals[a]? = some gi ∧ gi.type.Sub gt)
+    inst.globals C.globals
   elems : List.Forall₂ (fun a rt => ∃ ei, s.elems[a]? = some ei ∧ ei.type = rt) inst.elems C.elems
   datas : C.datas = inst.datas.length ∧ ∀ a ∈ inst.datas, a < s.datas.length
   exports : ∀ ex ∈ inst.exports, ExternValT s ex.value
@@ -49,7 +55,7 @@ structure ModuleInstT (s : Store) (inst : ModuleInst) (C : Context) : Prop where
 /-- `S ⊢ funcinst : functype` (appendix "Function Instances"): module code is typed in its
 instance's context; a host function's behavior is constrained by `TypeSoundHost`. -/
 def FuncInstOK (s : Store) : FuncInst → Prop
-  | .wasm ft inst code => ∃ C, ModuleInstT s inst C ∧ FuncT C code ft
+  | .wasm dt inst code => ∃ C ft, dt.expand = some ft ∧ ModuleInstT s inst C ∧ FuncT C code ft
   | .host _ _ => True
 
 /-- `⊢ store ok` (appendix "Store Validity"). -/
@@ -65,9 +71,10 @@ structure StoreOK (s : Store) : Prop where
   elems : ∀ ei ∈ s.elems, ∀ r ∈ ei.elem, Val.HasType s (.ref r) (.ref ei.type)
 
 /-- `S ⊢ frame : C` (appendix "Frames"): the instance's context with the locals' types, one run
-per local. -/
+per local; every local set (2.0's locals all have defaults, until U28c). -/
 def FrameT (s : Store) (f : Frame) (C : Context) : Prop :=
-  ∃ C₀ ts, ModuleInstT s f.inst C₀ ∧ List.Forall₂ (Val.HasType s) f.locals ts ∧
+  ∃ C₀ ts, ModuleInstT s f.inst C₀ ∧
+    List.Forall₂ (fun ov t => ∃ v, ov = some v ∧ Val.HasType s v t) f.locals ts ∧
     C = { C₀ with locals := ts.map (1, ·) }
 
 mutual
@@ -81,9 +88,14 @@ inductive AInstrT (s : Store) : Context → AInstr → StackType → Prop where
       AInstrT s C (.refFuncAddr a) ⟨[], [.val (.ref .funcref)]⟩
   | refExternAddr {C : Context} {a : Nat} :
       AInstrT s C (.refExternAddr a) ⟨[], [.val (.ref .externref)]⟩
+  | refNullAddr {C : Context} {ht : HeapType} :
+      AInstrT s C .refNullAddr ⟨[], [.val (.ref ⟨true, ht⟩)]⟩
+  | refExnAddr {C : Context} {a : Nat} (h : a < s.exns.length) :
+      AInstrT s C (.refExnAddr a) ⟨[], [.val (.ref .exnref)]⟩
   | trap {C : Context} {t₁ t₂ : List OpType} : AInstrT s C .trap ⟨t₁, t₂⟩
-  | invoke {C : Context} {a : Nat} {fi : FuncInst} (h : s.funcs[a]? = some fi) :
-      AInstrT s C (.invoke a) ⟨ops fi.type.params, ops fi.type.results⟩
+  | invoke {C : Context} {a : Nat} {fi : FuncInst} {ft : FuncType} (h : s.funcs[a]? = some fi)
+      (hft : fi.type.expand = some ft) :
+      AInstrT s C (.invoke a) ⟨ops ft.params, ops ft.results⟩
   | label {C : Context} {n : Nat} {cont : List Instr} {body : List AInstr}
       {t₁ t₂ : List ValType} (hn : t₁.length = n) (hc : SeqT C cont ⟨ops t₁, ops t₂⟩)
       (hb : ASeqT s (C.withLabel t₁) body ⟨[], ops t₂⟩) :
@@ -113,8 +125,10 @@ def ConfigOK (c : Config) (ts : List ValType) : Prop :=
 /-- Every outcome of a well-typed host call from a valid store has a valid store; divergence
 needs nothing (appendix "Host Function Instances"). -/
 def HostPreservesStore (H : HostSem) : Prop :=
-  ∀ (s : Store) (a : Nat) (ft : FuncType) (id : Nat) (args : List Val) (o : HostOutcome),
-    StoreOK s → s.funcs[a]? = some (.host ft id) → List.Forall₂ (Val.HasType s) args ft.params →
+  ∀ (s : Store) (a : Nat) (dt : DefType) (ft : FuncType) (id : Nat) (args : List Val)
+    (o : HostOutcome),
+    StoreOK s → s.funcs[a]? = some (.host dt id) → dt.expand = some ft →
+      List.Forall₂ (Val.HasType s) args ft.params →
       H id s args o →
         match o with
         | .returned s' _ => StoreOK s'

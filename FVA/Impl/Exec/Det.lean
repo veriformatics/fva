@@ -3,12 +3,13 @@ import FVA.Impl.Exec.Ref
 /-!
 # Choice points of the reference stepper
 
-NaN results, growth and host calls may have several successors under `Step`; trap propagation
-has administrative choices that keep the store and end at the same trap. `uniqueStep fits`
-excludes these cases under growth policy `fits` (`StepP`: at `true` growth has one outcome),
-`runDet` runs while `uniqueStep false` holds (normalizing pending traps), and
-`FVA.Proof.Exec.Det` proves every other executable step unique and `runDet`'s final states
-outcomes of every execution (`runDet_must`).
+NaN results, growth and host calls may have several successors under `Step`; trap and exception
+propagation have administrative choices that keep the store and end at the same trap, or at the
+nearest handler (or the top) with the same exception. `uniqueStep fits` excludes these cases under
+growth policy `fits` (`StepP`: at `true` growth has one outcome), `runDet` runs while
+`uniqueStep false` holds (normalizing pending traps and throws), and `FVA.Proof.Exec.Det` proves
+every other executable step unique and `runDet`'s final states outcomes of every execution
+(`runDet_must`).
 -/
 
 namespace FVA.Wasm.Exec.Ref
@@ -38,14 +39,22 @@ def seqUnique (fits : Bool) (s : Store) (f : Frame) (vs : List Val) : List AInst
   | [] => true
   | e :: rest => match toVal e with
     | some v => seqUnique fits s f (v :: vs) rest
-    | none => atUnique fits s f vs e
+    | none => atUnique fits s f vs e rest
 
-/-- The redex at the non-value `e` (values `vs` before it, top first) is no choice point. -/
-def atUnique (fits : Bool) (s : Store) (f : Frame) (vs : List Val) : AInstr → Bool
+/-- The redex at the non-value `e` (values `vs` before it, top first, `rest` after it) is no
+choice point; a thrown exception with values or code around it is one (3.0
+`throw_ref-instrs`). -/
+def atUnique (fits : Bool) (s : Store) (f : Frame) (vs : List Val) (e : AInstr)
+    (rest : List AInstr) : Bool :=
+  match e with
   | .label _ _ body => seqUnique fits s f [] body
   | .frame _ fi body => seqUnique fits s fi [] body
+  | .handler _ _ body => seqUnique fits s f [] body
   | .invoke a => match s.funcs[a]? with
     | some (.host ..) => false
+    | _ => true
+  | .plain .throwRef => match vs with
+    | .ref (.exn _) :: vs' => vs'.isEmpty && rest.isEmpty
     | _ => true
   | .plain i => instrUnique fits i vs
   | .trap => false
@@ -53,33 +62,76 @@ def atUnique (fits : Bool) (s : Store) (f : Frame) (vs : List Val) : AInstr → 
 end
 
 mutual
-/-- A trap is the next redex, possibly inside labels and frames. -/
+/-- A trap is the next redex, possibly inside labels, frames and handlers. -/
 def seqTraps : List AInstr → Bool
   | [] => false
   | e :: rest => match toVal e with
     | some _ => seqTraps rest
     | none => atTrap e
 
-/-- A non-value instruction has a pending trap. -/
+/-- A non-value instruction has a pending trap (a trap passes every handler). -/
 def atTrap : AInstr → Bool
   | .trap => true
-  | .label _ _ body | .frame _ _ body => seqTraps body
+  | .label _ _ body | .frame _ _ body | .handler _ _ body => seqTraps body
   | _ => false
+end
+
+/-- `es` is exactly a thrown exception. -/
+def isThrowing : List AInstr → Bool
+  | [.refExnAddr _, .plain .throwRef] => true
+  | _ => false
+
+mutual
+/-- Where the pending throw of `es` (values `vs` before it, top first) lands under 3.0's
+`throw_ref-instrs`, `-label` and `-frame`: `.inl a` = the whole sequence becomes `throwing a`
+(no handler encloses the throw inside it); `.inr es'` = the throw reaches its nearest handler,
+`es'` = `es` with that handler's body `throwing a`; `none` = no throw is pending, or it already
+sits alone in its handler (clause selection is next). -/
+def seqThrow (vs : List Val) : List AInstr → Option (Nat ⊕ List AInstr)
+  | [] => none
+  | e :: rest => match toVal e with
+    | some v => seqThrow (v :: vs) rest
+    | none => atThrow vs e rest
+
+/-- `seqThrow` at the non-value `e`, with values `vs` (top first) before it and `rest` after. -/
+def atThrow (vs : List Val) (e : AInstr) (rest : List AInstr) : Option (Nat ⊕ List AInstr) :=
+  match e with
+  | .plain .throwRef => match vs with
+    | .ref (.exn a) :: _ => some (.inl a)
+    | _ => none
+  | .label n cont body => match seqThrow [] body with
+    | some (.inl a) => some (.inl a)
+    | some (.inr body') => some (.inr (vals vs.reverse ++ [.label n cont body'] ++ rest))
+    | none => none
+  | .frame n fi body => match seqThrow [] body with
+    | some (.inl a) => some (.inl a)
+    | some (.inr body') => some (.inr (vals vs.reverse ++ [.frame n fi body'] ++ rest))
+    | none => none
+  | .handler n cs body => match seqThrow [] body with
+    | some (.inl a) => bif isThrowing body then none
+      else some (.inr (vals vs.reverse ++ [.handler n cs (throwing a)] ++ rest))
+    | some (.inr body') => some (.inr (vals vs.reverse ++ [.handler n cs body'] ++ rest))
+    | none => none
+  | _ => none
 end
 
 /-- The next step of `c` is the spec's only one under growth policy `fits`. -/
 def uniqueStep (fits : Bool) (c : Config) : Bool := seqUnique fits c.store c.frame [] c.instrs
 
-/-- Run deterministic steps, normalize pending traps, and stop at other choice points. -/
+/-- Run deterministic steps, normalize pending traps and throws (a throw jumps to its nearest
+handler, or ends the run uncaught), and stop at other choice points. -/
 def runDet : Nat → Config → Option Config
   | 0, _ => none
   | n + 1, c =>
     bif seqTraps c.instrs then some ⟨c.store, c.frame, [.trap]⟩
-    else bif uniqueStep false c then
-      match seq c.store c.frame [] c.instrs with
-      | .step s f es => runDet n ⟨s, f, es⟩
-      | .final => some c
-      | _ => none
-    else none
+    else match seqThrow [] c.instrs with
+    | some (.inl a) => some ⟨c.store, c.frame, throwing a⟩
+    | some (.inr es) => runDet n ⟨c.store, c.frame, es⟩
+    | none => bif uniqueStep false c then
+        match seq c.store c.frame [] c.instrs with
+        | .step s f es => runDet n ⟨s, f, es⟩
+        | .final => some c
+        | _ => none
+      else none
 
 end FVA.Wasm.Exec.Ref

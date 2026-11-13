@@ -19,9 +19,18 @@ theorem ASeqT.refFunc {s : Store} {f : Frame} {C : Context} {x addr : Nat}
         subst addr'
         exact .single (.refFuncAddr (List.getElem?_eq_some_iff.mp hfi).1)
 
+theorem ASeqT.refNull {s : Store} {C : Context} {ht : HeapType} {a b : List OpType}
+    (h : ASeqT s C [.plain (.refNull ht)] ⟨a, b⟩) : ASeqT s C [.refNullAddr] ⟨a, b⟩ := by
+  apply h.replace_fixed (vs := [])
+  · intro x y hi
+    cases hi with | plain hi => cases hi; rfl
+  · intro x y hi _
+    cases hi with | plain hi =>
+      cases hi with | refNull => exact .single .refNullAddr
+
 theorem ASeqT.localGet {s : Store} {f : Frame} {C : Context} {x : Nat} {v : Val}
     {a b : List OpType} (hf : FrameCtx s f C)
-    (h : ASeqT s C [.plain (.localGet x)] ⟨a, b⟩) (hv : f.locals[x]? = some v) :
+    (h : ASeqT s C [.plain (.localGet x)] ⟨a, b⟩) (hv : f.locals[x]? = some (some v)) :
     ASeqT s C [v.instr] ⟨a, b⟩ := by
   apply h.replace_fixed (vs := [])
   · intro x y hi
@@ -30,7 +39,7 @@ theorem ASeqT.localGet {s : Store} {f : Frame} {C : Context} {x : Nat} {v : Val}
     cases hi with | plain hi =>
       cases hi with | localGet hx =>
         obtain ⟨v', hv', ht⟩ := hf.locals hx
-        have heq := Option.some.inj (hv'.symm.trans hv)
+        have heq := Option.some.inj (Option.some.inj (hv'.symm.trans hv))
         subst v'
         exact .single (.value ht)
 
@@ -75,7 +84,7 @@ theorem ASeqT.globalGet {s : Store} {f : Frame} {C : Context} {x addr : Nat}
         subst addr'
         have heqg := Option.some.inj (hgi.symm.trans hg)
         subst gi
-        exact .single (.value (ht ▸ hok.globals g (List.mem_of_getElem? hg)))
+        exact .single (.value ((hok.globals g (List.mem_of_getElem? hg)).globalSub ht))
 
 theorem ASeqT.globalSet {s : Store} {f : Frame} {C : Context} {x addr : Nat}
     {g : GlobalInst} {v : Val} {a b : List OpType} (hf : FrameCtx s f C)
@@ -93,7 +102,7 @@ theorem ASeqT.globalSet {s : Store} {f : Frame} {C : Context} {x addr : Nat}
         subst addr'
         have heqg := Option.some.inj (hgi.symm.trans hg)
         subst gi
-        exact ⟨congrArg GlobalType.mutability ht,
-          by simpa only [ht, HasOpType] using hv, hp.trans (by simpa using hout)⟩
+        have hval : g.type.val = _ := ht.2
+        exact ⟨ht.1, by simpa only [hval, HasOpType] using hv, hp.trans (by simpa using hout)⟩
 
 end FVA.Wasm.Valid

@@ -39,9 +39,11 @@ def vec {α : Type} (f : α → List UInt8) (xs : List α) : List UInt8 :=
 /-- `name`. -/
 def name (s : String) : List UInt8 := vec (fun b => [b]) s.toUTF8.toList
 
-/-- Heap types. -/
+/-- Heap types; a closed form has no binary spelling (`HeapTypeB`), so it encodes to no bytes,
+which no decoder accepts. -/
 def heapType : HeapType → List UInt8
   | .abs .func => [0x70] | .abs .extern => [0x6F] | .abs .exn => [0x69] | .idx x => sleb x
+  | .def_ _ | .rec_ _ => []
 
 /-- Reference types: the one-byte form for a nullable abstract heap type. -/
 def refType (t : RefType) : List UInt8 :=

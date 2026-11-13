@@ -97,13 +97,16 @@ theorem extends_append {α : Type} {R : α → α → Prop} (xs ys : List α)
   fun _ x hx => ⟨x, lookup_append hx, h x⟩
 
 theorem alloc_extends (s : Store) (m : Module) (imports : List ExternVal) (gvals : List Val)
-    (erefs : List (List Ref)) : s.Extends (allocModule s m imports gvals erefs).1 := by
+    (trefs : List Ref) (erefs : List (List Ref)) :
+    s.Extends (allocModule s m imports gvals trefs erefs).1 := by
   refine ⟨extends_append _ _ (fun _ => rfl),
     extends_append _ _ (fun _ => ⟨rfl, rfl, Nat.le_refl _⟩),
     extends_append _ _ (fun _ => ⟨rfl, Nat.le_refl _⟩),
     extends_append _ _ (fun _ => ⟨rfl, .inr rfl⟩),
     extends_append _ _ (fun _ => ⟨rfl, .inl rfl⟩),
-    extends_append _ _ (fun _ => .inl rfl)⟩
+    extends_append _ _ (fun _ => .inl rfl),
+    extends_append _ _ (fun _ => rfl),
+    fun _ x hx => ⟨x, hx, rfl⟩⟩
 
 theorem seq_member {C : Context} {es : List Instr} {st : StackType} (h : SeqT C es st) :
     ∀ i ∈ es, ∃ st, InstrT C i st := by

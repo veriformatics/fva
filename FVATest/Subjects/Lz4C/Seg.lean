@@ -31,19 +31,19 @@ noncomputable def ctx2 (F : Ref.Context) : Ref.Context :=
 
 /-- The constant locals of the main loop: 0 = `src`, 1 = `dst`, 5 … 14 = the end pointers and
 limits the entry code computed (19 locals). -/
-def ConstLocals (ls : List Val) (src dst n cap : Nat) : Prop :=
-  ls.length = 19 ∧ ls[0]? = some (vI src) ∧ ls[1]? = some (vI dst) ∧
-  ls[5]? = some (vI (dst + cap)) ∧ ls[6]? = some (vI (dst + cap - 32)) ∧
-  ls[7]? = some (vI (src + n)) ∧ ls[8]? = some (vI (src + n - 16)) ∧
-  ls[9]? = some (vI (dst + cap - 5)) ∧ ls[10]? = some (vI (dst + cap - 7)) ∧
-  ls[11]? = some (vI (src + n - 4)) ∧ ls[12]? = some (vI (src + n - 8)) ∧
-  ls[13]? = some (vI (dst + cap - 12)) ∧ ls[14]? = some (vI (src + n - 15))
+def ConstLocals (ls : List (Option Val)) (src dst n cap : Nat) : Prop :=
+  ls.length = 19 ∧ ls[0]? = some (some (vI src)) ∧ ls[1]? = some (some (vI dst)) ∧
+  ls[5]? = some (some (vI (dst + cap))) ∧ ls[6]? = some (some (vI (dst + cap - 32))) ∧
+  ls[7]? = some (some (vI (src + n))) ∧ ls[8]? = some (some (vI (src + n - 16))) ∧
+  ls[9]? = some (some (vI (dst + cap - 5))) ∧ ls[10]? = some (some (vI (dst + cap - 7))) ∧
+  ls[11]? = some (some (vI (src + n - 4))) ∧ ls[12]? = some (some (vI (src + n - 8))) ∧
+  ls[13]? = some (some (vI (dst + cap - 12))) ∧ ls[14]? = some (some (vI (src + n - 15)))
 
 /-- The error epilogue's entry with local 4 = `v` and every constant local kept (the epilogue
 returns `~v + src`). -/
 noncomputable def ErrExit (F : Ref.Context) (st : Store) (inst : ModuleInst) (src dst n cap : Nat)
     (v : Nat) (c : Config) : Prop :=
-  ∃ ls', ConstLocals ls' src dst n cap ∧ ls'[4]? = some (vI v) ∧
+  ∃ ls', ConstLocals ls' src dst n cap ∧ ls'[4]? = some (some (vI v)) ∧
     c = (ctx1 F).fill ⟨st, ⟨ls', inst⟩, (body1.drop 54).map .plain⟩
 
 /-- The configuration after func 2 returned `r` with store `st` to the caller. -/
@@ -59,7 +59,8 @@ def Returned (caller : Frame) (rest : List AInstr) (outer : Ref.Context) (st : S
   with local 2 = `cpy − off` (as `i32`), 4 = `q + len + 2`, 15 = `t % 16`, 17 = `cpy`, 18 = `off`
   (3 = `op + 8k`, dead). -/
 noncomputable def SegBExit (caller : Frame) (rest : List AInstr) (outer : Ref.Context) (st : Store)
-    (inst : ModuleInst) (ls : List Val) (ma : Nat) (mem : MemInst) (src dst n cap op q len t : Nat)
+    (inst : ModuleInst) (ls : List (Option Val)) (ma : Nat) (mem : MemInst)
+        (src dst n cap op q len t : Nat)
     (c : Config) : Prop :=
   let F := fnCtx caller rest outer
   let cpy := op + len
@@ -69,11 +70,12 @@ noncomputable def SegBExit (caller : Frame) (rest : List AInstr) (outer : Ref.Co
   (near ∧ ¬ (q + len = src + n ∧ cpy ≤ dst + cap) ∧ ErrExit F st inst src dst n cap q c) ∨
   (¬ near ∧ c = (ctx6 (ctx2 F)).fill
     ⟨st.setMem ma (fwdCopy mem op q (8 * chunks op cpy)),
-      ⟨(((((ls.set 17 (vI cpy)).set 3 (vI (op + 8 * chunks op cpy))).set 15 (vI (t % 16))).set 4
-        (vI (q + len + 2))).set 18
-          (vI ((mem.byte (q + len)).toNat + 256 * (mem.byte (q + len + 1)).toNat))).set 2
-        (.i32 (BitVec.ofNat 32 cpy - BitVec.ofNat 32
-          ((mem.byte (q + len)).toNat + 256 * (mem.byte (q + len + 1)).toNat))), inst⟩,
+      ⟨(((((ls.set 17 (some (vI cpy))).set 3 (some (vI (op + 8 * chunks op cpy)))).set 15
+          (some (vI (t % 16)))).set 4
+        (some (vI (q + len + 2)))).set 18
+          (some (vI ((mem.byte (q + len)).toNat + 256 * (mem.byte (q + len + 1)).toNat)))).set 2
+        (some (.i32 (BitVec.ofNat 32 cpy - BitVec.ofNat 32
+          ((mem.byte (q + len)).toNat + 256 * (mem.byte (q + len + 1)).toNat)))), inst⟩,
       (body6.drop 1).map .plain⟩)
 
 /-- SegB: from X2 (the general literal path) with locals 3 = `op`, 4 = `q` (the first literal),
@@ -81,10 +83,10 @@ noncomputable def SegBExit (caller : Frame) (rest : List AInstr) (outer : Ref.Co
 source and destination buffers and writing only the destination buffer before it. -/
 def SegB : Prop :=
   ∀ (H : HostSem) (caller : Frame) (rest : List AInstr) (outer : Ref.Context) (st : Store)
-    (inst : ModuleInst) (ls : List Val) (a a4 ma : Nat) (mem : MemInst)
+    (inst : ModuleInst) (ls : List (Option Val)) (a a4 ma : Nat) (mem : MemInst)
     (src dst n cap op q len t : Nat),
-    ConstLocals ls src dst n cap → ls[3]? = some (vI op) → ls[4]? = some (vI q) →
-    ls[2]? = some (vI len) → ls[16]? = some (vI t) →
+    ConstLocals ls src dst n cap → ls[3]? = some (some (vI op)) → ls[4]? = some (some (vI q)) →
+    ls[2]? = some (some (vI len)) → ls[16]? = some (some (vI t)) →
     inst.funcs[3]? = some a → st.funcs[a]? = some (.wasm copyType inst Lifted.func3) →
     inst.funcs[4]? = some a4 → st.funcs[a4]? = some (.wasm copyType inst Lifted.func4) →
     inst.mems[0]? = some ma → st.mems[ma]? = some mem →
@@ -119,8 +121,9 @@ noncomputable def Err (F : Ref.Context) (st : Store) (inst : ModuleInst) (src ds
 `t` in local 16 (the other non-constant locals dead). -/
 noncomputable def AtX2 (F : Ref.Context) (st : Store) (inst : ModuleInst)
     (src dst n cap op q len t : Nat) (c : Config) : Prop :=
-  ∃ ls', ConstLocals ls' src dst n cap ∧ ls'[3]? = some (vI op) ∧ ls'[4]? = some (vI q) ∧
-    ls'[2]? = some (vI len) ∧ ls'[16]? = some (vI t) ∧
+  ∃ ls', ConstLocals ls' src dst n cap ∧ ls'[3]? = some (some (vI op)) ∧ ls'[4]? =
+      some (some (vI q)) ∧
+    ls'[2]? = some (some (vI len)) ∧ ls'[16]? = some (some (vI t)) ∧
     c = (ctx7 (ctx2 F)).fill ⟨st, ⟨ls', inst⟩, (body7.drop 1).map .plain⟩
 
 /-- SegA: from X1 (the token's literal field is 15: locals 4 = `ip` the token's position,
@@ -129,10 +132,12 @@ noncomputable def AtX2 (F : Ref.Context) (st : Store) (inst : ModuleInst)
 2 MiB: otherwise the length's overflow guards (`len > ~op`, `len > ~ip`) can fire for an `acc`
 near `2^31`. -/
 def SegA : Prop :=
-  ∀ (H : HostSem) (F : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
+  ∀ (H : HostSem) (F : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List (Option Val))
+      (ma : Nat)
     (mem : MemInst) (src dst n cap op ip t : Nat),
-    ConstLocals ls src dst n cap → ls[3]? = some (vI op) → ls[4]? = some (vI ip) →
-    ls[15]? = some (vI (ip + 1)) → ls[2]? = some (vI 15) → ls[16]? = some (vI t) →
+    ConstLocals ls src dst n cap → ls[3]? = some (some (vI op)) → ls[4]? = some (some (vI ip)) →
+    ls[15]? = some (some (vI (ip + 1))) → ls[2]? = some (some (vI 15)) → ls[16]? =
+        some (some (vI t)) →
     inst.mems[0]? = some ma → st.mems[ma]? = some mem →
     131072 ≤ src → 131072 ≤ dst → src + n ≤ mem.size → dst + cap ≤ mem.size →
     mem.size ≤ 2097152 → src ≤ ip → ip < src + n → op < 2 ^ 31 →
@@ -147,9 +152,10 @@ def SegA : Prop :=
 offset `off` (18), match pointer `op' − off` as `i32` (2), position `j` (4). -/
 noncomputable def AtX4 (F : Ref.Context) (st : Store) (inst : ModuleInst)
     (src dst n cap o' off m j : Nat) (c : Config) : Prop :=
-  ∃ ls', ConstLocals ls' src dst n cap ∧ ls'[4]? = some (vI j) ∧ ls'[15]? = some (vI m) ∧
-    ls'[17]? = some (vI o') ∧ ls'[18]? = some (vI off) ∧
-    ls'[2]? = some (.i32 (BitVec.ofNat 32 o' - BitVec.ofNat 32 off)) ∧
+  ∃ ls', ConstLocals ls' src dst n cap ∧ ls'[4]? = some (some (vI j)) ∧ ls'[15]? =
+      some (some (vI m)) ∧
+    ls'[17]? = some (some (vI o')) ∧ ls'[18]? = some (some (vI off)) ∧
+    ls'[2]? = some (some (.i32 (BitVec.ofNat 32 o' - BitVec.ofNat 32 off))) ∧
     c = (ctx5 (ctx2 F)).fill ⟨st, ⟨ls', inst⟩, (body5.drop 5).map .plain⟩
 
 /-- SegC: from X3 (the match code: locals 4 = `j` after the offset, 15 = the field `ml0`,
@@ -157,11 +163,12 @@ noncomputable def AtX4 (F : Ref.Context) (st : Store) (inst : ModuleInst)
 `15 + acc` from the extension bytes at `j` (`extM` with limit `iend − 4`); X4, or an error exit
 when `extM` fails. -/
 def SegC : Prop :=
-  ∀ (H : HostSem) (F : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
+  ∀ (H : HostSem) (F : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List (Option Val))
+      (ma : Nat)
     (mem : MemInst) (src dst n cap o' off ml0 j : Nat),
-    ConstLocals ls src dst n cap → ls[4]? = some (vI j) → ls[15]? = some (vI ml0) →
-    ls[17]? = some (vI o') → ls[18]? = some (vI off) →
-    ls[2]? = some (.i32 (BitVec.ofNat 32 o' - BitVec.ofNat 32 off)) →
+    ConstLocals ls src dst n cap → ls[4]? = some (some (vI j)) → ls[15]? = some (some (vI ml0)) →
+    ls[17]? = some (some (vI o')) → ls[18]? = some (some (vI off)) →
+    ls[2]? = some (some (.i32 (BitVec.ofNat 32 o' - BitVec.ofNat 32 off))) →
     inst.mems[0]? = some ma → st.mems[ma]? = some mem →
     131072 ≤ src → 131072 ≤ dst → src + n ≤ mem.size → dst + cap ≤ mem.size →
     mem.size ≤ 2097152 → src ≤ j → j ≤ src + n → ml0 < 16 → o' < 2 ^ 31 →
@@ -224,11 +231,12 @@ def ReadSet (ma src n dst cap : Nat) (m x : Nat) : Prop :=
 head with `op = o' + m + 4`, `ip = j`; an error exit when the match starts before `dst` (nothing
 written) or ends past `oend − 5` (the first 8 bytes written). -/
 def SegD : Prop :=
-  ∀ (H : HostSem) (F : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List Val) (a ma : Nat)
+  ∀ (H : HostSem) (F : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List (Option Val))
+      (a ma : Nat)
     (mem : MemInst) (src dst n cap o' off m j : Nat),
-    ConstLocals ls src dst n cap → ls[4]? = some (vI j) → ls[15]? = some (vI m) →
-    ls[17]? = some (vI o') → ls[18]? = some (vI off) →
-    ls[2]? = some (.i32 (BitVec.ofNat 32 o' - BitVec.ofNat 32 off)) →
+    ConstLocals ls src dst n cap → ls[4]? = some (some (vI j)) → ls[15]? = some (some (vI m)) →
+    ls[17]? = some (some (vI o')) → ls[18]? = some (some (vI off)) →
+    ls[2]? = some (some (.i32 (BitVec.ofNat 32 o' - BitVec.ofNat 32 off))) →
     inst.funcs[3]? = some a → st.funcs[a]? = some (.wasm copyType inst Lifted.func3) →
     inst.mems[0]? = some ma → st.mems[ma]? = some mem →
     131072 ≤ src → 131072 ≤ dst → src + n ≤ mem.size → dst + cap ≤ mem.size →
@@ -248,8 +256,8 @@ def SegD : Prop :=
 over the embedder's empty frame. -/
 def F0 : Ref.Context := fnCtx ⟨[], {}⟩ [] .hole
 
-/-- func 2's type: four `i32` parameters, one `i32` result. -/
-def decType : FuncType := ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩
+/-- func 2's defined type: four `i32` parameters, one `i32` result, a one-member group. -/
+def decType : DefType := ⟨[⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩], 0⟩
 
 /-- `−1` as an `i32` value: the decoder's error result before the main loop. -/
 def vNeg1 : Val := .i32 (BitVec.ofNat 32 4294967295)

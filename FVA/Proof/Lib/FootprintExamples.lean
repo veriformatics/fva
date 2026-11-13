@@ -21,12 +21,12 @@ def loadBody : List Instr := [.iconst .w32 100, .loadPacked .w32 .p8 .u ⟨0, 0�
 
 /-- Function 0 (export `f`) calls function 1. -/
 def inst : ModuleInst :=
-  { types := [⟨[], []⟩], funcs := [0, 1], mems := [0], exports := [⟨"f", .func 0⟩] }
+  { types := [⟨[⟨[], []⟩], 0⟩], funcs := [0, 1], mems := [0], exports := [⟨"f", .func 0⟩] }
 
 /-- The store: the caller, the callee with body `body`, one zeroed page of memory. -/
 def store (body : List Instr) : Store :=
-  { funcs := [.wasm ⟨[], []⟩ inst { type := 0, locals := [], body := [.call 1] },
-      .wasm ⟨[], []⟩ inst { type := 0, locals := [], body := body }],
+  { funcs := [.wasm ⟨[⟨[], []⟩], 0⟩ inst { type := 0, locals := [], body := [.call 1] },
+      .wasm ⟨[⟨[], []⟩], 0⟩ inst { type := 0, locals := [], body := body }],
     mems := [{ pages := 1, max := none, byte := fun _ => 0 }] }
 
 /-- The configuration just before the callee's access, under both frames. -/
@@ -35,7 +35,7 @@ def atAccess (body : List Instr) : Config :=
     [.label 0 [] (body.map .plain)]]]]⟩
 
 theorem invokeOK (body : List Instr) : InvokeOK (store body) 0 [] :=
-  ⟨_, rfl, .nil⟩
+  ⟨_, _, rfl, rfl, .nil⟩
 
 theorem walk_atAccess (body : List Instr) :
     walk 3 (invokeConfig (store body) 0 []) = some (atAccess body) := by

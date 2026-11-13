@@ -55,7 +55,7 @@ theorem c_xor {x : Nat} (hx : x < 2 ^ 32) :
 
 /-- Exit the extension block and its overflow guard. -/
 theorem c_footer (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (ma : Nat)
-    (src dst n cap o' off acc j : Nat) (v3 v16 : Val)
+    (src dst n cap o' off acc j : Nat) (v3 v16 : Option Val)
     (hn : n ≤ 2097152) (ha : acc ≤ 255 * n) (ho : o' < 2 ^ 31) :
     Until H
       (Within (fun m x => m = ma ∧ (Span ma src n m x ∨ Span ma dst cap m x)) (Span ma dst cap))
@@ -72,7 +72,7 @@ theorem c_footer (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (m
       c_atX4 F st inst src dst n cap o' off v3 j (15 + acc) v16
 
 theorem c_finish (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (ma : Nat)
-    (src dst n cap o' off acc j : Nat) (v3 v16 : Val)
+    (src dst n cap o' off acc j : Nat) (v3 v16 : Option Val)
     (hn : n ≤ 2097152) (ha : acc ≤ 255 * n) (ho : o' < 2 ^ 31) :
     Until H
       (Within (fun m x => m = ma ∧ (Span ma src n m x ∨ Span ma dst cap m x)) (Span ma dst cap))
@@ -91,7 +91,7 @@ def cResult (F : Context) (st : Store) (inst : ModuleInst) (mem : MemInst)
 
 /-- Model fuel bounds remaining reads; each iteration is one evaluator rewrite. -/
 theorem c_loop (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (ma : Nat)
-    (mem : MemInst) (src dst n cap o' off fuel q acc : Nat) (v4 v16 : Val)
+    (mem : MemInst) (src dst n cap o' off fuel q acc : Nat) (v4 : Val) (v16 : Option Val)
     (hm : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some mem)
     (hs : src + n ≤ mem.size) (hsize : mem.size ≤ 2097152) (ho : o' < 2 ^ 31)
     (hlo : src ≤ q) (hhi : q ≤ src + n) (hbudget : src + n - 4 ≤ q + fuel)
@@ -99,7 +99,7 @@ theorem c_loop (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (ma 
     Until H
       (Within (fun m x => m = ma ∧ (Span ma src n m x ∨ Span ma dst cap m x)) (Span ma dst cap))
       (cResult F st inst mem src dst n cap o' off fuel q acc)
-      ((ctx1 F).fill ⟨st, ⟨cLocals src dst n cap o' off (vI q) v4 acc v16, inst⟩,
+      ((ctx1 F).fill ⟨st, ⟨cLocals src dst n cap o' off (some (vI q)) v4 acc v16, inst⟩,
         cWrap [.plain cLoop]⟩) := by
   have hn : n ≤ 2097152 := by omega
   induction fuel generalizing q acc v4 v16 with
@@ -111,7 +111,7 @@ theorem c_loop (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (ma 
       right
       refine ⟨rfl, ?_⟩
       simpa only [BContext.fill, cLocals] using
-        c_err F st inst src dst n cap o' off (vI q) (q + 1) acc v16 (by omega) (by omega)
+        c_err F st inst src dst n cap o' off (some (vI q)) (q + 1) acc v16 (by omega) (by omega)
   | succ fuel ih =>
     by_cases hq : q + 1 ≤ src + n - 4
     · have hb : (mem.byte q).toNat ≤ 255 := by have := (mem.byte q).toNat_lt; omega
@@ -152,7 +152,7 @@ theorem c_loop (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (ma 
         right
         refine ⟨by simp only [extM, hq, ite_false], ?_⟩
         simpa only [BContext.fill, cLocals] using
-          c_err F st inst src dst n cap o' off (vI q) (q + 1) acc v16 (by omega) (by omega)
+          c_err F st inst src dst n cap o' off (some (vI q)) (q + 1) acc v16 (by omega) (by omega)
 
 theorem segC : SegC := by
   intro H F st inst ls ma mem src dst n cap o' off ml0 j hcl h4 h15 h17 h18 h2 hm hmem

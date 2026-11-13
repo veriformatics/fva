@@ -92,7 +92,7 @@ theorem StoreOK.dropData {s : Store} (h : StoreOK s) {a : Nat} {d : DataInst}
   have hr := Store.Extends.refl s
   have hs : s.Extends { s with datas := s.datas.set a { data := [] } } :=
     ⟨hr.1, hr.2.1, hr.2.2.1, hr.2.2.2.1, hr.2.2.2.2.1,
-      listExtends_set data_extends_refl ha (Or.inr rfl)⟩
+      listExtends_set data_extends_refl ha (Or.inr rfl), hr.2.2.2.2.2.2⟩
   exact ⟨hs, reassemble hs h.funcs h.tables h.mems h.globals h.elems⟩
 
 theorem StoreOK.writeMem {s : Store} (h : StoreOK s) {a : Nat} {m : MemInst}
@@ -178,9 +178,9 @@ theorem forall₂_set_left {α β : Type} {R : α → β → Prop} {xs : List α
 
 theorem FrameCtx.setLocal {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
     {x : Nat} {t : ValType} {v : Val} (hx : localAt C.locals x = some t)
-    (hv : v.HasType s t) : FrameCtx s { f with locals := f.locals.set x v } C := by
+    (hv : v.HasType s t) : FrameCtx s { f with locals := f.locals.set x (some v) } C := by
   obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, hvs, rfl⟩, rfl⟩ := h
   refine ⟨_, ls, ret, ⟨C₁, ts, hi, ?_, rfl⟩, rfl⟩
-  exact forall₂_set_left hvs ((localAt_singletons ts x).symm.trans hx) hv
+  exact forall₂_set_left hvs ((localAt_singletons ts x).symm.trans hx) ⟨v, rfl, hv⟩
 
 end FVA.Wasm.Valid

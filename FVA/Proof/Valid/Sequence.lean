@@ -233,9 +233,10 @@ theorem value_inv {s : Store} {C : Context} {v : Val} {a b : List OpType}
   | f64 v => cases h with | plain h => cases h; exact ⟨_, rfl, rfl, trivial⟩
   | ref r =>
     cases r with
-    | null t => cases h with | plain h => cases h; exact ⟨_, rfl, rfl, rfl⟩
+    | null => cases h with | refNullAddr => exact ⟨_, rfl, rfl, rfl⟩
     | func a => cases h with | refFuncAddr h => exact ⟨_, rfl, rfl, h⟩
     | extern a => cases h; exact ⟨_, rfl, rfl, trivial⟩
+    | exn a => cases h with | refExnAddr h => exact ⟨_, rfl, rfl, h⟩
 
 theorem value {s : Store} {C : Context} {v : Val} {t : ValType} (h : v.HasType s t) :
     AInstrT s C v.instr ⟨[], [.val t]⟩ := by
@@ -258,20 +259,28 @@ theorem value {s : Store} {C : Context} {v : Val} {t : ValType} (h : v.HasType s
     | ref r => cases h
   | ref r =>
     cases r with
-    | null rt =>
+    | null =>
       cases t with
       | num n => cases h
-      | ref rt' => cases h; exact .plain .refNull
+      | ref rt =>
+        rcases rt with ⟨_ | _, ht⟩
+        · cases h
+        · exact .refNullAddr
     | func a =>
       cases t with
       | num n => cases h
       | ref rt =>
-        rcases rt with ⟨_ | _, (_ | _ | _) | _⟩ <;> first | exact .refFuncAddr h | cases h
+        rcases rt with ⟨_ | _, (_ | _ | _) | _ | _ | _⟩ <;> first | exact .refFuncAddr h | cases h
     | extern a =>
       cases t with
       | num n => cases h
       | ref rt =>
-        rcases rt with ⟨_ | _, (_ | _ | _) | _⟩ <;> first | exact .refExternAddr | cases h
+        rcases rt with ⟨_ | _, (_ | _ | _) | _ | _ | _⟩ <;> first | exact .refExternAddr | cases h
+    | exn a =>
+      cases t with
+      | num n => cases h
+      | ref rt =>
+        rcases rt with ⟨_ | _, (_ | _ | _) | _ | _ | _⟩ <;> first | exact .refExnAddr h | cases h
 
 end AInstrT
 

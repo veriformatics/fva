@@ -41,18 +41,19 @@ noncomputable def bOuter (es : List AInstr) : List AInstr :=
 noncomputable def bCtx (caller : Frame) (rest : List AInstr) (outer : Context) : Context :=
   .label 0 [] (bAfterRoom.map .plain) (ctx7 (ctx2 (fnCtx caller rest outer)))
 
-def bLs (src dst n cap op q len t : Nat) (v15 v17 v18 : Val) : List Val :=
-  [vI src, vI dst, vI len, vI op, vI q, vI (dst + cap), vI (dst + cap - 32),
-    vI (src + n), vI (src + n - 16), vI (dst + cap - 5), vI (dst + cap - 7),
-    vI (src + n - 4), vI (src + n - 8), vI (dst + cap - 12), vI (src + n - 15),
-    v15, vI t, v17, v18]
+def bLs (src dst n cap op q len t : Nat) (v15 v17 v18 : Option Val) : List (Option Val) :=
+  [some (vI src), some (vI dst), some (vI len), some (vI op), some (vI q), some (vI (dst + cap)),
+    some (vI (dst + cap - 32)), some (vI (src + n)), some (vI (src + n - 16)),
+    some (vI (dst + cap - 5)), some (vI (dst + cap - 7)), some (vI (src + n - 4)),
+    some (vI (src + n - 8)), some (vI (dst + cap - 12)), some (vI (src + n - 15)), v15, some (vI t),
+    v17, v18]
 
-theorem b_const (src dst n cap op q len t : Nat) (v15 v17 v18 : Val) :
+theorem b_const (src dst n cap op q len t : Nat) (v15 v17 v18 : Option Val) :
     ConstLocals (bLs src dst n cap op q len t v15 v17 v18) src dst n cap := by
   simp [ConstLocals, bLs]
 
 theorem b_err (F : Context) (st : Store) (inst : ModuleInst) (src dst n cap op q len t : Nat)
-    (v15 v17 v18 : Val) :
+    (v15 v17 v18 : Option Val) :
     ErrExit F st inst src dst n cap q
       ((ctx1 F).fill ⟨st, ⟨bLs src dst n cap op q len t v15 v17 v18, inst⟩,
         (body1.drop 54).map .plain⟩) :=
@@ -60,8 +61,8 @@ theorem b_err (F : Context) (st : Store) (inst : ModuleInst) (src dst n cap op q
 
 /-- A return crosses the function's own labels and restores its caller frame. -/
 theorem b_return {R W : Nat → Nat → Prop} (H : HostSem) (caller : Frame) (rest : List AInstr)
-    (outer : Context) (st : Store) (inst : ModuleInst) (ls : List Val) (rv cpy dst : Nat)
-    (h17 : ls[17]? = some (vI cpy)) (h1 : ls[1]? = some (vI dst))
+    (outer : Context) (st : Store) (inst : ModuleInst) (ls : List (Option Val)) (rv cpy dst : Nat)
+    (h17 : ls[17]? = some (some (vI cpy))) (h1 : ls[1]? = some (some (vI dst)))
     (hdst : dst < 2 ^ 32) (hle : dst ≤ cpy) :
     Until H (Within R W) (Returned caller rest outer st (cpy - dst))
       ((bCtx caller rest outer).fill ⟨st, ⟨ls, inst⟩, vals [vI rv] ++ bRet.map .plain⟩) := by
@@ -84,7 +85,7 @@ noncomputable def bNearResult (caller : Frame) (rest : List AInstr) (outer : Con
 /-- The near-end branch has no scratch writes before its memmove call. -/
 theorem b_near (H : HostSem) (caller : Frame) (rest : List AInstr) (outer : Context)
     (st : Store) (inst : ModuleInst) (mem : MemInst) (a4 ma src dst n cap op q len t : Nat)
-    (v15 v18 : Val)
+    (v15 v18 : Option Val)
     (hcall4 : inst.funcs[4]? = some a4)
     (hfun4 : st.funcs[a4]? = some (.wasm copyType inst Lifted.func4))
     (hm : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some mem)
@@ -95,7 +96,7 @@ theorem b_near (H : HostSem) (caller : Frame) (rest : List AInstr) (outer : Cont
       (Within (fun m x => m = ma ∧ (Span ma src n m x ∨ Span ma dst cap m x)) (Span ma dst cap))
       (bNearResult caller rest outer st inst mem ma src dst n cap op q len)
       ((ctx1 (fnCtx caller rest outer)).fill
-        ⟨st, ⟨bLs src dst n cap op q len t v15 (vI (op + len)) v18, inst⟩,
+        ⟨st, ⟨bLs src dst n cap op q len t v15 (some (vI (op + len))) v18, inst⟩,
           bOuter (.label 0 [] (bNear.map .plain) :: bAfterRoom.map .plain)⟩) := by
   by_cases he : q + len = src + n
   · wasm_eval 6 [block_simp, bOuter, cOuter, bNear, bLs, he]
@@ -106,10 +107,10 @@ theorem b_near (H : HostSem) (caller : Frame) (rest : List AInstr) (outer : Cont
         · wasm_eval 3 [block_simp, bLs]
           · simp [TraceOK, AccessOK]
           · change Until H _ _ ((bCtx caller rest outer).fill
-              ⟨st, ⟨bLs src dst n cap op q len t v15 (vI (op + len)) v18, inst⟩,
+              ⟨st, ⟨bLs src dst n cap op q len t v15 (some (vI (op + len))) v18, inst⟩,
                 vals [vI op, vI q, vI len] ++ [.plain (.call 4)] ++ bRet.map .plain⟩)
             have hmove := s2 H (bCtx caller rest outer) st
-              ⟨bLs src dst n cap op q len t v15 (vI (op + len)) v18, inst⟩ []
+              ⟨bLs src dst n cap op q len t v15 (some (vI (op + len))) v18, inst⟩ []
               (bRet.map .plain) a4 ma inst mem op q len hcall4 hfun4 hm hmem (by omega)
               (by omega) (by omega)
             refine Until.trans (hmove.mono (fun c hw => ?_) (fun _ hx => hx)) ?_
@@ -121,7 +122,7 @@ theorem b_near (H : HostSem) (caller : Frame) (rest : List AInstr) (outer : Cont
             · intro c hc'
               subst c
               apply (b_return H caller rest outer (st.setMem ma (move mem op q len)) inst
-                (bLs src dst n cap op q len t v15 (vI (op + len)) v18) op (op + len) dst
+                (bLs src dst n cap op q len t v15 (some (vI (op + len))) v18) op (op + len) dst
                 (by rfl) (by rfl) (by omega) (by omega)).mono (fun _ hx => hx)
               intro c hr
               exact .inl ⟨he, hc, hr⟩
@@ -131,14 +132,16 @@ theorem b_near (H : HostSem) (caller : Frame) (rest : List AInstr) (outer : Cont
           right
           refine ⟨fun h => hc h.2, ?_⟩
           simpa only [BContext.fill, bLs] using
-            b_err (fnCtx caller rest outer) st inst src dst n cap op q len t v15 (vI (op + len)) v18
+            b_err (fnCtx caller rest outer) st inst src dst n cap op q len t v15
+                (some (vI (op + len))) v18
   · wasm_eval 7 [block_simp, bOuter, cOuter, bNear, bLs, he]
     · simp [TraceOK, AccessOK]
     · apply Until.done
       right
       refine ⟨fun h => he h.1, ?_⟩
       simpa only [BContext.fill, bLs] using
-        b_err (fnCtx caller rest outer) st inst src dst n cap op q len t v15 (vI (op + len)) v18
+        b_err (fnCtx caller rest outer) st inst src dst n cap op q len t v15
+            (some (vI (op + len))) v18
 
 theorem segB : SegB := by
   intro H caller rest outer st inst ls a a4 ma mem src dst n cap op q len t hcl h3 h4 h2 h16
@@ -149,12 +152,12 @@ theorem segB : SegB := by
   subst u16
   let F := fnCtx caller rest outer
   let ls0 := bLs src dst n cap op q len t u15 u17 u18
-  have near_case (v18 : Val) (hn : dst + cap < op + len + 12 ∨ src + n < q + len + 8) :
+  have near_case (v18 : Option Val) (hn : dst + cap < op + len + 12 ∨ src + n < q + len + 8) :
       Until H
         (Within (fun m x => m = ma ∧ (Span ma src n m x ∨ Span ma dst cap m x)) (Span ma dst cap))
         (SegBExit caller rest outer st inst ls0 ma mem src dst n cap op q len t)
         ((ctx1 F).fill
-          ⟨st, ⟨bLs src dst n cap op q len t u15 (vI (op + len)) v18, inst⟩,
+          ⟨st, ⟨bLs src dst n cap op q len t u15 (some (vI (op + len))) v18, inst⟩,
             bOuter (.label 0 [] (bNear.map .plain) :: bAfterRoom.map .plain)⟩) := by
     apply (b_near H caller rest outer st inst mem a4 ma src dst n cap op q len t u15 v18
       hcall4 hfun4 hm hmem hs hd hsize hq0 hqn hop0 hopn hlen).mono (fun _ hx => hx)
@@ -174,7 +177,7 @@ theorem segB : SegB := by
     · wasm_eval 19 [block_simp, bOuter, cOuter, bRoom, bTest, bLs, ls0, igtU_ofNat, hO, hI]
       · simp [TraceOK, AccessOK]
       · simpa only [BContext.fill, bOuter, cOuter, bLs, List.singleton_append] using
-          near_case (vI (q + len)) (.inr hI)
+          near_case (some (vI (q + len))) (.inr hI)
     · wasm_eval 19 [block_simp, bOuter, cOuter, bRoom, bTest, bLs, ls0, igtU_ofNat, hO, hI]
       · simp [TraceOK, AccessOK]
       · have hk := chunks_spec (q := op) (e := op + len) (by omega)
@@ -185,10 +188,11 @@ theorem segB : SegB := by
         have hreadEnd : q + 8 * chunks op (op + len) ≤ src + n := by omega
         have hwriteEnd : op + 8 * chunks op (op + len) ≤ dst + cap := by omega
         change Until H _ _ ((ctx7 (ctx2 F)).fill
-          ⟨st, ⟨bLs src dst n cap op q len t u15 (vI (op + len)) (vI (q + len)), inst⟩,
+          ⟨st, ⟨bLs src dst n cap op q len t u15 (some (vI (op + len))) (some (vI (q + len))),
+              inst⟩,
             (body7.drop 2).map .plain⟩)
         have hw := s3 (ctx2 F) H st inst
-          (bLs src dst n cap op q len t u15 (vI (op + len)) (vI (q + len))) a ma mem
+          (bLs src dst n cap op q len t u15 (some (vI (op + len))) (some (vI (q + len)))) a ma mem
           op q (op + len) (by rfl) (by rfl) (by rfl) hcall hfun hm hmem (by omega)
           (by omega) (by omega) (by omega)
         refine Until.trans (hw.mono (fun c hw' => ?_) (fun _ hx => hx)) ?_

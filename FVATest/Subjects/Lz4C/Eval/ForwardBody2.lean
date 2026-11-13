@@ -16,7 +16,8 @@ theorem mp_tail_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleIn
     Until H (Within (Span ma (s + i) r) (Span ma (d + i) r))
       (CpPost C (st.setMem ma (fwdCopy mem (d + i) (s + i) r)) inst d s)
       ((BContext.label [] 0 [] [.plain (.localGet 0)] C).fill
-        ⟨st, ⟨[vI d, vI s, u2, u3, vI i, u5, vI r], inst⟩, mpTail.map .plain⟩) := by
+        ⟨st, ⟨[some (vI d), some (vI s), some u2, some u3, some (vI i), some u5, some (vI r)],
+            inst⟩, mpTail.map .plain⟩) := by
   wasm_eval 8 [block_simp, mpTail, hm, hmem]
   · simp [TraceOK, AccessOK]
   · apply (mp1_until H (BContext.label [] 0 [] [.plain (.localGet 0)] C) st inst ma mem
@@ -35,7 +36,9 @@ theorem mp_forward_until (H : HostSem) (C : BContext) (st : Store) (inst : Modul
     (hd : d + n ≤ mem.size) (hs : s + n ≤ mem.size) (hsize : mem.size < 2 ^ 32) :
     Until H (Within (Span ma s n) (Span ma d n))
       (CpPost C (st.setMem ma (fwdCopy mem d s n)) inst d s)
-      (C.fill ⟨st, ⟨[vI d, vI s, vI n, vI 0, vI 0, vI 0, vI 0], inst⟩,
+      (C.fill ⟨st,
+          ⟨[some (vI d), some (vI s), some (vI n), some (vI 0), some (vI 0), some (vI 0),
+          some (vI 0)], inst⟩,
         [.label 0 [] (mpForward.map .plain), .plain (.localGet 0)]⟩) := by
   by_cases hn : n = 0
   · subst n
@@ -49,7 +52,8 @@ theorem mp_forward_until (H : HostSem) (C : BContext) (st : Store) (inst : Modul
     · wasm_eval 12 [block_simp, mpForward, mpBlock, hm, hmem, hn, hn4]
       · simp [TraceOK, AccessOK]
       · change Until H _ _ ((BContext.label [] 0 [] [.plain (.localGet 0)] C).fill
-          ⟨st, ⟨[vI d, vI s, vI n, vI 0, vI 0, vI 0, vI (n % 4)], inst⟩,
+          ⟨st, ⟨[some (vI d), some (vI s), some (vI n), some (vI 0), some (vI 0), some (vI 0),
+              some (vI (n % 4))], inst⟩,
             mpTail.map .plain⟩)
         have hr : n % 4 = n := Nat.mod_eq_of_lt hn4
         simpa only [hr, Nat.add_zero] using
@@ -60,7 +64,8 @@ theorem mp_forward_until (H : HostSem) (C : BContext) (st : Store) (inst : Modul
       · let C1 := BContext.label [] 0 [] [.plain (.localGet 0)] C
         let C2 := BContext.label [] 0 [] (mpTail.map .plain) C1
         change Until H _ _ (C2.fill
-          ⟨st, ⟨[vI d, vI s, vI (4 * (n / 4)), vI 0, vI 0, vI 0, vI (n % 4)], inst⟩,
+          ⟨st, ⟨[some (vI d), some (vI s), some (vI (4 * (n / 4))), some (vI 0), some (vI 0),
+              some (vI 0), some (vI (n % 4))], inst⟩,
             [.plain (.loop .empty mp4)] ++ [.plain (.localGet 6), .plain (.itestEqz .w32),
               .plain (.brIf 1)]⟩)
         apply (mp4_until H C2 st inst ma mem d s 0 (4 * (n / 4)) (n % 4) (n / 4)

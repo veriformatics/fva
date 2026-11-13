@@ -16,8 +16,8 @@ end InvokeProof
 
 /-- Calling a typed address in a valid store starts with a typed argument stack. -/
 theorem invocationOK : InvocationOK := by
-  intro s a fi args hs ha hargs
+  intro s a fi ft args hs ha hft hargs
   refine ⟨hs, {}, InvokeProof.emptyFrame s, ?_⟩
-  exact ASeqT.snoc (t₀ := []) (ASeqT.values hargs) (Matches.refl _) (.invoke ha)
+  exact ASeqT.snoc (t₀ := []) (ASeqT.values hargs) (Matches.refl _) (.invoke ha hft)
 
 end FVA.Wasm.Valid

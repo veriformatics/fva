@@ -17,9 +17,11 @@ theorem mb1_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleInst) 
     (hbs : ∀ j, 0 < j → iadd bs (BitVec.ofNat 32 j) = BitVec.ofNat 32 (s + j - 1)) :
     Until H (Within (Span ma (s + i) r) (Span ma (d + i) r))
       (fun c => c = C.fill ⟨st.setMem ma (backCopy mem (d + i) (s + i) r),
-        ⟨[u0, u1, u2, vI i, vI 0, .i32 bs, .i32 bd], inst⟩, rest⟩)
+        ⟨[some u0, some u1, some u2, some (vI i), some (vI 0), some (.i32 bs), some (.i32 bd)],
+            inst⟩, rest⟩)
       (C.fill ⟨st,
-        ⟨[u0, u1, u2, vI (i + r), vI r, .i32 bs, .i32 bd], inst⟩,
+        ⟨[some u0, some u1, some u2, some (vI (i + r)), some (vI r), some (.i32 bs),
+            some (.i32 bd)], inst⟩,
         [.plain (.loop .empty mb1)] ++ rest⟩) := by
   induction r generalizing st mem with
   | zero => omega
@@ -61,10 +63,12 @@ theorem mb4_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleInst) 
     (hbs : ∀ j, 4 ≤ j → iadd bs (BitVec.ofNat 32 j) = BitVec.ofNat 32 (s + j - 4)) :
     Until H (Within (Span ma s (4 * k)) (Span ma d (4 * k)))
       (fun c => c = C.fill ⟨st.setMem ma (backCopy mem d s (4 * k)),
-        ⟨[vI d, .i32 bd, u2, vI 0, vI d, vI s, .i32 bs], inst⟩,
+        ⟨[some (vI d), some (.i32 bd), some u2, some (vI 0), some (vI d), some (vI s),
+            some (.i32 bs)], inst⟩,
         [.label 0 [.loop .empty mb4] [.plain (.br 2)]] ++ rest⟩)
       (C.fill ⟨st,
-        ⟨[vI d, .i32 bd, u2, vI (4 * k), u4, u5, .i32 bs], inst⟩,
+        ⟨[some (vI d), some (.i32 bd), some u2, some (vI (4 * k)), some u4, some u5,
+            some (.i32 bs)], inst⟩,
         [.plain (.loop .empty mb4)] ++ rest⟩) := by
   induction k generalizing st mem u4 u5 with
   | zero => omega

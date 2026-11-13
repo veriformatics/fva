@@ -23,12 +23,14 @@ def unitT : FuncType := ⟨[], []⟩
 def mainT : FuncType := ⟨[], [.num .i32]⟩
 
 /-- An instance of host function 0 (`unitT`) + module function 1 (`mainT`) + memory 0. -/
-def inst : ModuleInst := { types := [unitT, mainT], funcs := [0, 1, 2], mems := [0] }
+def inst : ModuleInst :=
+  { types := [⟨[unitT], 0⟩, ⟨[mainT], 0⟩], funcs := [0, 1, 2], mems := [0] }
 
 /-- The process's store: host functions 0 and 2 (host ids 0, 1), module function 1 running
 `body`, one page of memory, at most 2. -/
 def store (body : Expr) (ty : FuncType) : MStore :=
-  { base := { funcs := [.host unitT 0, .wasm ty inst ⟨1, [], body⟩, .host unitT 1] },
+  { base := { funcs := [.host ⟨[unitT], 0⟩ 0, .wasm ⟨[ty], 0⟩ inst ⟨1, [], body⟩,
+      .host ⟨[unitT], 0⟩ 1] },
     mems := [MMem.alloc 1 (some 2)] }
 
 theorem store_inv (body : Expr) (ty : FuncType) : (store body ty).Inv := by
@@ -108,8 +110,8 @@ theorem pokeGrow :
   refine machineSegment_sysMust (m' := m₁) (b := ((MState.ofInvoke (store pokeBody mainT) 1
     []).runU true 8).2) (store_inv _ _) rfl rfl ?_
   have hc : m₁.code = .invoke 0 :: (pokeBody.drop 1).map .plain := rfl
-  have hf : m₁.store.base.funcs[0]? = some (.host unitT 0) := rfl
-  obtain ⟨K, hq, hcont⟩ := abs_host hc hf (Nat.zero_le _)
+  have hf : m₁.store.base.funcs[0]? = some (.host ⟨[unitT], 0⟩ 0) := rfl
+  obtain ⟨K, hq, hcont⟩ := abs_host hc hf rfl (Nat.zero_le _)
   refine sysMust_host hq hf rfl ⟨1, .returned (poked m₁.store.abs 0) [], rfl, rfl, rfl, 0,
     by norm_num, rfl⟩ fun τ o hW => ?_
   obtain ⟨-, -, rfl, b, hb, rfl⟩ := hW
@@ -249,7 +251,7 @@ abbrev divergeWorld : World where
 theorem diverges (Q : SysOutcome Unit → Prop) (fits : Bool) :
     ¬ SysMust divergeWorld fits Q ((), invokeConfig (store [] unitT).abs 0 []) :=
   host_diverged_not_must (W := divergeWorld) (σ := ()) (τ := ()) (a := 0) (args := [])
-    (k := .seq [] .hole []) (ft := unitT) (id := 0) rfl rfl rfl ⟨rfl, rfl, rfl, rfl⟩
+    (k := .seq [] .hole []) (dt := ⟨[unitT], 0⟩) (id := 0) rfl rfl rfl ⟨rfl, rfl, rfl, rfl⟩
 
 -- contract U27 E1: the standard three axioms alone, through every layer each theorem uses
 #print axioms pokeGrow

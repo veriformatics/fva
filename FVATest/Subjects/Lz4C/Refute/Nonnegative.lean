@@ -69,7 +69,7 @@ theorem refuted : ¬ Mutant := by
   have ha2 : a = 2 := Option.some.inj (ha.symm.trans he)
   subst a
   have hs : Steps H malformed.config malformedFinal :=
-    steps_of_runDet (Option.some_get malformed_run).symm malformed_result
+    runDet_steps (Option.some_get malformed_run).symm
   obtain ⟨result, -, -, ss, last, content, hp, -⟩ :=
     hm.outcome hs (o := .returned malformedFinal.store [.i32 (-2)]) ⟨rfl, malformed_result⟩
   exact malformed_not_parses ss last hp

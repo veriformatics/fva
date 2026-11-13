@@ -88,7 +88,7 @@ theorem Good.setMem {st : Store} {inst : ModuleInst} {ma src dst n cap : Nat} {m
   disj := hg.disj
 
 /-- The main loop's head for `F0` (a top-level call). -/
-noncomputable def mainHead (st : Store) (inst : ModuleInst) (ls : List Val) : Config :=
+noncomputable def mainHead (st : Store) (inst : ModuleInst) (ls : List (Option Val)) : Config :=
   (ctx4 (ctx2 F0)).fill ⟨st, ⟨ls, inst⟩, [.plain mainLoop]⟩
 
 theorem prologue_size (mem : MemInst) (o' off : Nat) :
@@ -131,7 +131,8 @@ theorem matchRest_low (mem : MemInst) (o' m oend a : Nat) (mp : BitVec 32) (h : 
       · exact fwdCopy_outside _ _ _ _ _ (Or.inl h)
       · rfl
 
-theorem ConstLocals.set {ls : List Val} {src dst n cap i : Nat} (h : ConstLocals ls src dst n cap)
+theorem ConstLocals.set {ls : List (Option Val)} {src dst n cap i : Nat}
+    (h : ConstLocals ls src dst n cap)
     (hi : i = 2 ∨ i = 3 ∨ i = 4 ∨ 15 ≤ i) (v : Val) : ConstLocals (ls.set i v) src dst n cap := by
   obtain ⟨hl, h0, h1, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩ := h
   refine ⟨by simp [hl], ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -163,22 +164,24 @@ theorem extM_bound {mem : MemInst} {lim : Nat} :
 /-- X3 (the match code) with output `o'`, offset `off`, length field `ml0`, position `j`. -/
 noncomputable def AtX3 (F : Ref.Context) (st : Store) (inst : ModuleInst)
     (src dst n cap o' off ml0 j : Nat) (c : Config) : Prop :=
-  ∃ ls', ConstLocals ls' src dst n cap ∧ ls'[4]? = some (vI j) ∧ ls'[15]? = some (vI ml0) ∧
-    ls'[17]? = some (vI o') ∧ ls'[18]? = some (vI off) ∧
-    ls'[2]? = some (.i32 (BitVec.ofNat 32 o' - BitVec.ofNat 32 off)) ∧
+  ∃ ls', ConstLocals ls' src dst n cap ∧ ls'[4]? = some (some (vI j)) ∧ ls'[15]? =
+      some (some (vI ml0)) ∧
+    ls'[17]? = some (some (vI o')) ∧ ls'[18]? = some (some (vI off)) ∧
+    ls'[2]? = some (some (.i32 (BitVec.ofNat 32 o' - BitVec.ofNat 32 off))) ∧
     c = (ctx6 (ctx2 F)).fill ⟨st, ⟨ls', inst⟩, (body6.drop 1).map .plain⟩
 
 theorem off_lt (mem : MemInst) (p : Nat) :
     (mem.byte p).toNat + 256 * (mem.byte (p + 1)).toNat < 65536 := by
   have := (mem.byte p).toNat_lt; have := (mem.byte (p + 1)).toNat_lt; omega
 
-theorem HeadLocals.const {ls : List Val} {src dst n cap op ip : Nat}
+theorem HeadLocals.const {ls : List (Option Val)} {src dst n cap op ip : Nat}
     (h : HeadLocals ls src dst n cap op ip) : ConstLocals ls src dst n cap := by
   obtain ⟨hl, h0, h1, -, -, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩ := h
   exact ⟨hl, h0, h1, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩
 
-theorem HeadLocals.of_const {ls : List Val} {src dst n cap op ip : Nat}
-    (h : ConstLocals ls src dst n cap) (h3 : ls[3]? = some (vI op)) (h4 : ls[4]? = some (vI ip)) :
+theorem HeadLocals.of_const {ls : List (Option Val)} {src dst n cap op ip : Nat}
+    (h : ConstLocals ls src dst n cap) (h3 : ls[3]? = some (some (vI op)))
+        (h4 : ls[4]? = some (some (vI ip))) :
     HeadLocals ls src dst n cap op ip := by
   obtain ⟨hl, h0, h1, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩ := h
   exact ⟨hl, h0, h1, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩

@@ -106,11 +106,11 @@ def enter (m : MState) (n : Nat) (cont : List Instr) (k : Nat) (body : List Inst
 /-- Call function address `a` before `rest`. -/
 def invoke (m : MState) (a : Nat) (rest : List AInstr) : Option MState :=
   match m.store.base.funcs[a]? with
-  | some (.wasm ft inst code) =>
+  | some (.wasm dt inst code) => dt.expand.bind fun ft =>
     let k := ft.params.length
     bif Nat.blt m.stack.length k then none
     else some { m with
-      frame := ⟨(m.stack.take k).reverse ++ code.localDefaults, inst⟩, stack := [],
+      frame := ⟨(m.stack.take k).reverse.map some ++ code.localDefaults, inst⟩, stack := [],
       code := code.body.map .plain,
       ctl := .label ft.results.length [] [] [] ::
         .frame ft.results.length m.frame (m.stack.drop k) rest :: m.ctl }
@@ -236,7 +236,7 @@ def runU (fits : Bool) : Nat → MState → MState × Bool
 def hostCall (m : MState) : Option (Nat × Nat × List AInstr) :=
   match m.code with
   | .invoke a :: rest => match m.store.base.funcs[a]? with
-    | some (.host ft id) =>
+    | some (.host dt id) => dt.expand.bind fun ft =>
       bif Nat.blt m.stack.length ft.params.length then none
       else some (id, ft.params.length, rest)
     | _ => none
@@ -309,24 +309,26 @@ def MStore.ofStore (s : Store) : MStore := { base := s, mems := s.mems.map MMem.
 
 /-- `allocModule` with fresh memories as empty tries. -/
 def MStore.alloc (s : MStore) (m : Module) (imports : List ExternVal) (gvals : List Val)
-    (erefs : List (List Ref)) : MStore × ModuleInst :=
-  let (s', inst) := allocModule s.abs m imports gvals erefs
+    (trefs : List Ref) (erefs : List (List Ref)) : MStore × ModuleInst :=
+  let (s', inst) := allocModule s.abs m imports gvals trefs erefs
   ({ base := s', mems := s.mems ++ m.mems.map fun lim => MMem.alloc lim.min lim.max }, inst)
 
 /-- The initialization run of `m` (§4.5.4) after allocation with evaluated initializers, as in
 `Ref.instantiate`: the final state or `none` when an initializer fails or disagrees. -/
 def initRun (fuel : Nat) (s : MStore) (m : Module) (imports : List ExternVal) :
     Option (MState × Bool) := do
-  let (s₀, inst₀) := s.alloc m imports (m.globals.map fun g => g.type.val.default)
-    (m.elems.map fun _ => [])
+  let (s₀, inst₀) := s.alloc m imports (m.globals.map fun _ => .i32 0)
+    (m.tables.map fun _ => .null) (m.elems.map fun _ => [])
   let gvals ← m.globals.mapM fun g => Ref.evalConst fuel s₀.abs inst₀ g.init
+  let trefs ← m.tables.mapM fun t => Ref.evalConst fuel s₀.abs inst₀ t.init >>= Ref.asRef
   let erefs ← m.elems.mapM fun e =>
     e.init.mapM fun ex => Ref.evalConst fuel s₀.abs inst₀ ex >>= Ref.asRef
-  let (s₁, inst) := s.alloc m imports gvals erefs
+  let (s₁, inst) := s.alloc m imports gvals trefs erefs
   let gvals₁ ← m.globals.mapM fun g => Ref.evalConst fuel s₁.abs inst g.init
+  let trefs₁ ← m.tables.mapM fun t => Ref.evalConst fuel s₁.abs inst t.init >>= Ref.asRef
   let erefs₁ ← m.elems.mapM fun e =>
     e.init.mapM fun ex => Ref.evalConst fuel s₁.abs inst ex >>= Ref.asRef
-  guard (gvals₁ == gvals && erefs₁ == erefs)
+  guard (gvals₁ == gvals && trefs₁ == trefs && erefs₁ == erefs)
   some (MState.run fuel
     { store := s₁, frame := ⟨[], inst⟩, stack := [], code := (initCode m).map .plain, ctl := [] })
 

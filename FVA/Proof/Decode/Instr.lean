@@ -225,6 +225,7 @@ theorem heapType_parses : Parses heapType HeapTypeB := by
           absHeapExcluded_none (show b.toNat < 0x6A ∨ 0x74 < b.toNat by omega)]
         simp only [List.cons_append, List.length_cons] at hs
         rw [hs, Res.bind_ok, hx]; rfl
+    | def_ _ | rec_ _ => exact h.elim
 
 theorem refType_parses : Parses refType RefTypeB := by
   constructor

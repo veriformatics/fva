@@ -15,7 +15,7 @@ open FVA.Wasm FVA.Wasm.Exec
 /-- An administrative value or one of the constant-expression instructions. -/
 def ConstInstr : AInstr → Prop
   | .plain i => isConstInstr i = true
-  | .refFuncAddr _ | .refExternAddr _ => True
+  | .refFuncAddr _ | .refExternAddr _ | .refNullAddr | .refExnAddr _ => True
   | _ => False
 
 theorem constInstr_val (v : Val) : ConstInstr v.instr := by
@@ -35,7 +35,16 @@ theorem atInstr_const {s s' : Store} {f f' : Frame} {vs : List Val} {i : Instr}
   cases i <;> simp only [isConstInstr, Bool.false_eq_true] at hi
   case iconst w n => simp only [atInstr, instrStep, reduceCtorEq] at h
   case fconst w n => simp only [atInstr, instrStep, reduceCtorEq] at h
-  case refNull t => simp only [atInstr, instrStep, reduceCtorEq] at h
+  case refNull t =>
+    simp only [atInstr, instrStep, Out.step.injEq] at h
+    rcases h with ⟨rfl, rfl, rfl⟩
+    refine ⟨rfl, rfl, ?_⟩
+    intro e he
+    simp only [List.mem_append, List.mem_cons, List.not_mem_nil, or_false] at he
+    rcases he with (he | rfl) | he
+    · exact constInstr_vals _ _ he
+    · trivial
+    · exact hc e he
   case refFunc x =>
     simp only [atInstr, instrStep] at h
     cases hg : f.inst.funcs[x]? <;>
@@ -84,6 +93,8 @@ theorem seq_const {s s' : Store} {f f' : Frame} {vs : List Val}
       | plain i => exact atInstr_const he hrest h
       | refFuncAddr a => simp only [toVal, reduceCtorEq] at hv
       | refExternAddr a => simp only [toVal, reduceCtorEq] at hv
+      | refNullAddr => simp only [toVal, reduceCtorEq] at hv
+      | refExnAddr a => simp only [toVal, reduceCtorEq] at hv
       | _ => contradiction
 
 theorem run_const {fuel : Nat} {c c' : Config} (hc : ∀ a ∈ c.instrs, ConstInstr a)
@@ -96,6 +107,8 @@ theorem run_const {fuel : Nat} {c c' : Config} (hc : ∀ a ∈ c.instrs, ConstIn
     · rename_i s f es hs
       rcases seq_const hc hs with ⟨rfl, rfl, hc'⟩
       exact ih (c := ⟨c.store, c.frame, es⟩) hc' h
+    · cases h
+      exact ⟨rfl, rfl⟩
     · cases h
       exact ⟨rfl, rfl⟩
     · contradiction
@@ -150,22 +163,31 @@ theorem instantiate_sound {H : HostSem} {fuel : Nat} {s s' : Store} {m : Module}
     (h : instantiate fuel s m imports = some (s', inst)) :
     Instantiated H m s imports s' inst := by
   simp only [instantiate, bind, Option.bind_eq_some_iff] at h
-  rcases h with ⟨gvals, _, erefs, _, gvals₁, hg, erefs₁, he, u, hu, c, hr, hc⟩
+  rcases h with ⟨gvals, _, trefs, _, erefs, _, gvals₁, hg, trefs₁, ht, erefs₁, he, u, hu, c, hr,
+    hc⟩
   cases u
   simp only [guard] at hu
   split at hu
   · rename_i heq
     simp only [Bool.and_eq_true, beq_iff_eq] at heq
-    rcases heq with ⟨hgv, her⟩
-    subst gvals₁ erefs₁
+    rcases heq with ⟨⟨hgv, htr⟩, her⟩
+    subst gvals₁ trefs₁ erefs₁
     rcases c with ⟨sf, ff, es⟩
     cases es with
     | nil =>
       simp only [Option.some.injEq, Prod.mk.injEq] at hc
       rcases hc with ⟨rfl, rfl⟩
-      refine ⟨hm, gvals, erefs, (allocModule s m imports gvals erefs).1, rfl, ?_, ?_, ?_⟩
+      refine ⟨hm, gvals, trefs, erefs, (allocModule s m imports gvals trefs erefs).1, rfl, ?_, ?_,
+        ?_, ?_⟩
       · apply (forall₂_mapM hg).imp
         intro g v hv
+        exact evalConst_sound hv
+      · apply (forall₂_mapM ht).imp
+        intro t r hex
+        simp only [Option.bind_eq_some_iff] at hex
+        rcases hex with ⟨v, hv, hvr⟩
+        cases v <;> simp only [asRef, reduceCtorEq, Option.some.injEq] at hvr
+        subst r
         exact evalConst_sound hv
       · apply (forall₂_mapM he).imp
         intro e rs hers
@@ -179,7 +201,7 @@ theorem instantiate_sound {H : HostSem} {fuel : Nat} {s s' : Store} {m : Module}
       · have hs := (run_sound (H := H) hr).1
         rcases steps_frame_shape hs with ⟨hi, hl⟩
         have hloc : ff.locals = [] := by simpa using hl
-        have hf : ff = ⟨[], (allocModule s m imports gvals erefs).2⟩ := by
+        have hf : ff = ⟨[], (allocModule s m imports gvals trefs erefs).2⟩ := by
           cases ff
           simp_all
         simpa only [hf] using hs

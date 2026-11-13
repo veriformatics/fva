@@ -14,7 +14,7 @@ set_option maxRecDepth 100000
 
 /-- The allocation in the empty store, before initialization. -/
 noncomputable def alloc : Store × ModuleInst :=
-  allocModule {} Lifted.module [] [.i32 65536] []
+  allocModule {} Lifted.module [] [.i32 65536] [] []
 
 /-- The initialization run: the data segment's `memory.init` + `data.drop`. -/
 noncomputable def initConfig : Config :=
@@ -32,39 +32,14 @@ theorem init_instrs : ((runDet 1000 initConfig).get init_some).instrs = vals [] 
 theorem init_must (H : HostSem) :
     Must H (fun o => o = .returned store0 []) initConfig := by
   refine runDet_must (Option.some_get init_some).symm ?_
-  rintro (⟨s, vs⟩ | s) ⟨hs, hv⟩
+  rintro (⟨s, vs⟩ | s | ⟨s, a⟩) ⟨hs, hv⟩
   · rw [init_instrs] at hv
     obtain rfl := vals_inj.mp hv.symm
     rw [← hs]; rfl
   · rw [init_instrs] at hv
     exact absurd hv (vals_ne_trap [])
-
-/-- A deterministic run ending in values is an execution. -/
-theorem steps_of_runDet {H : HostSem} {n : Nat} {c c' : Config} {vs : List Val}
-    (hr : runDet n c = some c') (hv : c'.instrs = vals vs) : Steps H c c' := by
-  induction n generalizing c with
-  | zero => simp only [runDet, reduceCtorEq] at hr
-  | succ n ih =>
-    cases ht : seqTraps c.instrs with
-    | true =>
-      simp only [runDet, ht, Bool.cond_true] at hr
-      have hi := congrArg (fun x => x.instrs) (Option.some.inj hr)
-      exact False.elim ((vals_ne_trap vs) (hv.symm.trans hi.symm))
-    | false =>
-      simp only [runDet, ht, Bool.cond_false] at hr
-      cases hu : uniqueStep false c with
-      | false => simp only [hu, Bool.cond_false, reduceCtorEq] at hr
-      | true =>
-        simp only [hu, Bool.cond_true] at hr
-        cases hs : seq c.store c.frame [] c.instrs with
-        | step s f es =>
-          simp only [hs] at hr
-          exact Relation.ReflTransGen.head (step_sound (by simp only [step, hs])) (ih hr)
-        | final =>
-          simp only [hs] at hr
-          cases Option.some.inj hr
-          exact .refl
-        | _ => simp only [hs, reduceCtorEq] at hr
+  · rw [init_instrs] at hv
+    exact absurd hv (vals_ne_throwing [] a)
 
 attribute [local irreducible] alloc initConfig in
 theorem init_run : runDet 1000 initConfig = some ⟨store0, ⟨[], alloc.2⟩, []⟩ := by
@@ -75,16 +50,17 @@ theorem init_run : runDet 1000 initConfig = some ⟨store0, ⟨[], alloc.2⟩, [
 
 /-- `(store0, alloc.2)` is a fresh instance. -/
 theorem instance_store0 (H : HostSem) : Instance Lifted.module H store0 alloc.2 := by
-  refine ⟨?_, [.i32 65536], [], alloc.1, rfl, ?_, ?_, ?_⟩
+  refine ⟨?_, [.i32 65536], [], [], alloc.1, rfl, ?_, ?_, ?_, ?_⟩
   · exact .nil
   · exact .cons .refl .nil
   · exact .nil
-  · exact steps_of_runDet (vs := []) init_run rfl
+  · exact .nil
+  · exact runDet_steps init_run
 
 /-- Every fresh instance is `(store0, alloc.2)`. -/
 theorem instance_eq {H : HostSem} {s : Store} {inst : ModuleInst}
     (h : Instance Lifted.module H s inst) : s = store0 ∧ inst = alloc.2 := by
-  obtain ⟨-, gvals, erefs, s₁, halloc, hg, he, hinit⟩ := h
+  obtain ⟨-, gvals, trefs, erefs, s₁, halloc, hg, ht, he, hinit⟩ := h
   obtain ⟨v, rfl⟩ : ∃ v, gvals = [v] := by
     cases hg with
     | cons _ hn => cases hn; exact ⟨_, rfl⟩
@@ -94,6 +70,7 @@ theorem instance_eq {H : HostSem} {s : Store} {inst : ModuleInst}
       (show Steps H ⟨s₁, ⟨[], inst⟩, vals [.i32 65536]⟩ ⟨s₁, ⟨[], inst⟩, [v.instr]⟩ from hstep)
     exact Val.instr_inj.mp (List.singleton_inj.mp (congrArg Config.instrs hc))
   subst hv
+  obtain rfl : trefs = [] := by cases ht; rfl
   obtain rfl : erefs = [] := by cases he; rfl
   have hai : (s₁, inst) = alloc := halloc.symm
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj hai

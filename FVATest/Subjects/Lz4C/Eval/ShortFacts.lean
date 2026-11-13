@@ -7,12 +7,13 @@ open FVA.Wasm FVA.Wasm.Exec FVA.Wasm.Exec.Ref
 
 set_option linter.unusedSimpArgs false
 
-theorem head_decompose {ls : List Val} {src dst n cap op ip : Nat}
+theorem head_decompose {ls : List (Option Val)} {src dst n cap op ip : Nat}
     (h : HeadLocals ls src dst n cap op ip) :
-    ∃ u2 u15 u16 u17 u18 : Val,
-      ls = [vI src, vI dst, u2, vI op, vI ip, vI (dst + cap), vI (dst + cap - 32),
-        vI (src + n), vI (src + n - 16), vI (dst + cap - 5), vI (dst + cap - 7),
-        vI (src + n - 4), vI (src + n - 8), vI (dst + cap - 12), vI (src + n - 15),
+    ∃ u2 u15 u16 u17 u18 : Option Val,
+      ls = [some (vI src), some (vI dst), u2, some (vI op), some (vI ip), some (vI (dst + cap)),
+        some (vI (dst + cap - 32)), some (vI (src + n)), some (vI (src + n - 16)),
+        some (vI (dst + cap - 5)), some (vI (dst + cap - 7)), some (vI (src + n - 4)),
+        some (vI (src + n - 8)), some (vI (dst + cap - 12)), some (vI (src + n - 15)),
         u15, u16, u17, u18] := by
   rcases h with ⟨hlen, h0, h1, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩
   have get (i : Nat) (hi : i < 19) : ls[i]? = some (ls[i]'(by omega)) :=
@@ -27,17 +28,20 @@ theorem head_decompose {ls : List Val} {src dst n cap op ip : Nat}
     symm
     exact List.getElem?_eq_none (by simp; omega)
 
-def tokenLs (src dst n cap op ip t ll : Nat) (u17 u18 : Val) : List Val :=
-  [vI src, vI dst, vI ll, vI op, vI ip, vI (dst + cap), vI (dst + cap - 32),
-    vI (src + n), vI (src + n - 16), vI (dst + cap - 5), vI (dst + cap - 7),
-    vI (src + n - 4), vI (src + n - 8), vI (dst + cap - 12), vI (src + n - 15),
-    vI (ip + 1), vI t, u17, u18]
+def tokenLs (src dst n cap op ip t ll : Nat) (u17 u18 : Option Val) : List (Option Val) :=
+  [some (vI src), some (vI dst), some (vI ll), some (vI op), some (vI ip), some (vI (dst + cap)),
+    some (vI (dst + cap - 32)), some (vI (src + n)), some (vI (src + n - 16)),
+    some (vI (dst + cap - 5)), some (vI (dst + cap - 7)), some (vI (src + n - 4)),
+    some (vI (src + n - 8)), some (vI (dst + cap - 12)), some (vI (src + n - 15)),
+    some (vI (ip + 1)), some (vI t), u17, u18]
 
-def matchLs (src dst n cap op ip t off : Nat) : List Val :=
-  [vI src, vI dst, vI (op + t / 16 - off), vI (ip + 1 + t / 16), vI (ip + 3 + t / 16),
-    vI (dst + cap), vI (dst + cap - 32), vI (src + n), vI (src + n - 16),
-    vI (dst + cap - 5), vI (dst + cap - 7), vI (src + n - 4), vI (src + n - 8),
-    vI (dst + cap - 12), vI (src + n - 15), vI (t % 16), vI t, vI (op + t / 16), vI off]
+def matchLs (src dst n cap op ip t off : Nat) : List (Option Val) :=
+  [some (vI src), some (vI dst), some (vI (op + t / 16 - off)), some (vI (ip + 1 + t / 16)),
+    some (vI (ip + 3 + t / 16)), some (vI (dst + cap)), some (vI (dst + cap - 32)),
+    some (vI (src + n)), some (vI (src + n - 16)), some (vI (dst + cap - 5)),
+    some (vI (dst + cap - 7)), some (vI (src + n - 4)), some (vI (src + n - 8)),
+    some (vI (dst + cap - 12)), some (vI (src + n - 15)), some (vI (t % 16)), some (vI t),
+    some (vI (op + t / 16)), some (vI off)]
 
 noncomputable def shortCtx (C : Context) : Context :=
   .label 0 [] (shortRest8.map .plain) (ctx8 C)
@@ -59,7 +63,8 @@ theorem read_two (mem : MemInst) (p : Nat) :
     mem.read p 2 = (mem.byte p).toNat + 256 * (mem.byte (p + 1)).toNat := by
   simp [MemInst.read]
 
-theorem short_copy (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst) (ls : List Val)
+theorem short_copy (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst)
+    (ls : List (Option Val))
     (a ma : Nat) (mem : MemInst) (src dst n cap d s k : Nat) (rest : List AInstr)
     (hcall : inst.funcs[3]? = some a)
     (hfun : st.funcs[a]? = some (.wasm copyType inst Lifted.func3))

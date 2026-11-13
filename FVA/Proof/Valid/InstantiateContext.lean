@@ -31,63 +31,56 @@ theorem address_bound {β : Type} {R : Nat → β → Prop} {addrs : List Nat} {
   simpa [ha] using hb a _ ht
 
 theorem alloc_exports {s : Store} {m : Module} {imports : List ExternVal}
-    (hv : ModuleValid m) (hm : ImportsMatch s m imports) (gvals : List Val)
-    (erefs : List (List Ref)) (hg : m.globals.length = gvals.length) :
-    ∀ ex ∈ (allocModule s m imports gvals erefs).2.exports,
-      ExternValT (allocModule s m imports gvals erefs).1 ex.value := by
+    (hv : ModuleValid m) (hm : ImportsMatch s m imports) (gvals : List Val) (trefs : List Ref)
+    (erefs : List (List Ref)) (hg : m.globals.length = gvals.length)
+    (ht : m.tables.length = trefs.length) :
+    ∀ ex ∈ (allocModule s m imports gvals trefs erefs).2.exports,
+      ExternValT (allocModule s m imports gvals trefs erefs).1 ex.value := by
   intro ex hex
-  obtain ⟨e, he, hmap⟩ := List.mem_filterMap.mp hex
+  obtain ⟨e, he, rfl⟩ := List.mem_map.mp hex
   have hv' := hv.exports e he
   cases hd : e.desc with
   | func x =>
-    have hb := address_bound (alloc_funcs hv hm gvals erefs)
+    have hb := address_bound (alloc_funcs hv hm gvals trefs erefs)
       (fun _ _ ⟨fi, hfi, _⟩ => lookup_lt hfi) (by simpa [hd, ExportDesc.Ok] using hv')
-    simp only [hd, Option.map_some, Option.some.injEq] at hmap
-    subst hmap
-    simpa only [allocModule, ExternValT] using hb
+    simpa only [allocModule, ExternValT, hd] using hb
   | table x =>
-    have hb := address_bound (alloc_tables hm gvals erefs)
+    have hb := address_bound (alloc_tables hv hm gvals trefs erefs ht)
       (fun _ _ ⟨ti, hti, _⟩ => lookup_lt hti) (by simpa [hd, ExportDesc.Ok] using hv')
-    simp only [hd, Option.map_some, Option.some.injEq] at hmap
-    subst hmap
-    simpa only [allocModule, ExternValT] using hb
+    simpa only [allocModule, ExternValT, hd] using hb
   | mem x =>
-    have hb := address_bound (alloc_mems hm gvals erefs)
+    have hb := address_bound (alloc_mems hm gvals trefs erefs)
       (fun _ _ ⟨mi, hmi⟩ => lookup_lt hmi) (by simpa [hd, ExportDesc.Ok] using hv')
-    simp only [hd, Option.map_some, Option.some.injEq] at hmap
-    subst hmap
-    simpa only [allocModule, ExternValT] using hb
+    simpa only [allocModule, ExternValT, hd] using hb
   | global x =>
-    have hb := address_bound (alloc_globals hm gvals erefs hg)
+    have hb := address_bound (alloc_globals hv hm gvals trefs erefs hg)
       (fun _ _ ⟨gi, hgi, _⟩ => lookup_lt hgi) (by simpa [hd, ExportDesc.Ok] using hv')
-    simp only [hd, Option.map_some, Option.some.injEq] at hmap
-    subst hmap
-    simpa only [allocModule, ExternValT] using hb
+    simpa only [allocModule, ExternValT, hd] using hb
   | tag x => simp [hd, ExportDesc.Ok] at hv'
 
 /-- Allocation metadata supplies an instance context before initializer values are proved
 well typed; imported table and memory minima use their actual current sizes. -/
 theorem alloc_instance {s : Store} {m : Module} {imports : List ExternVal}
-    (hv : ModuleValid m) (hm : ImportsMatch s m imports) (gvals : List Val)
+    (hv : ModuleValid m) (hm : ImportsMatch s m imports) (gvals : List Val) (trefs : List Ref)
     (erefs : List (List Ref)) (hg : m.globals.length = gvals.length)
-    (he : m.elems.length = erefs.length) :
-    ∃ C, ModuleInstT (allocModule s m imports gvals erefs).1
-      (allocModule s m imports gvals erefs).2 C ∧ (moduleContext m).Entails C := by
-  let s₁ := (allocModule s m imports gvals erefs).1
-  let inst := (allocModule s m imports gvals erefs).2
-  have hfuncs := alloc_funcs hv hm gvals erefs
-  have hglobals := alloc_globals hm gvals erefs hg
-  have helems := alloc_elems s m imports gvals erefs he
+    (htl : m.tables.length = trefs.length) (he : m.elems.length = erefs.length) :
+    ∃ C, ModuleInstT (allocModule s m imports gvals trefs erefs).1
+      (allocModule s m imports gvals trefs erefs).2 C ∧ (moduleContext m).Entails C := by
+  let s₁ := (allocModule s m imports gvals trefs erefs).1
+  let inst := (allocModule s m imports gvals trefs erefs).2
+  have hfuncs := alloc_funcs hv hm gvals trefs erefs
+  have hglobals := alloc_globals hv hm gvals trefs erefs hg
+  have helems := alloc_elems (s := s) (imports := imports) hv gvals trefs erefs he
   obtain ⟨tables, ht, hshape⟩ := forall₂_exists_right
     (S := fun a tt => ∃ ti, s₁.tables[a]? = some ti ∧ ti.type = tt)
     (T := fun tt tt' : TableType => tt'.elem = tt.elem)
-    (alloc_tables hm gvals erefs) (by
+    (alloc_tables hv hm gvals trefs erefs htl) (by
       rintro a tt ⟨ti, hti, he⟩
       exact ⟨ti.type, ⟨ti, hti, rfl⟩, he⟩)
   obtain ⟨mems, hm', _⟩ := forall₂_exists_right
     (S := fun a lim => ∃ mi, s₁.mems[a]? = some mi ∧ (⟨mi.pages, mi.max⟩ : Limits) = lim)
     (T := fun _ _ : Limits => True)
-    (alloc_mems hm gvals erefs) (by
+    (alloc_mems hm gvals trefs erefs) (by
       rintro a lim ⟨mi, hmi⟩
       exact ⟨⟨mi.pages, mi.max⟩, ⟨mi, hmi, rfl⟩, trivial⟩)
   let C : Context := { moduleContext m with
@@ -95,9 +88,10 @@ theorem alloc_instance {s : Store} {m : Module} {imports : List ExternVal}
     mems := mems
     refs := List.range inst.funcs.length }
   have hmem_len : (moduleContext m).mems.length = mems.length :=
-    (alloc_mems hm gvals erefs).length_eq.symm.trans hm'.length_eq
+    (alloc_mems hm gvals trefs erefs).length_eq.symm.trans hm'.length_eq
   refine ⟨C, ?_, ?_⟩
-  · refine ⟨rfl, hfuncs, ht, hm', hglobals, helems, ?_, ?_, ?_, rfl, rfl, rfl, rfl⟩
+  · refine ⟨forall₂_defTypes (Module.inP2_spec hv.profile).types, hfuncs, ht, hm', hglobals,
+      helems, ?_, ?_, ?_, rfl, rfl, rfl, rfl⟩
     · constructor
       · simp [C, allocModule, moduleContext]
       · intro a ha
@@ -107,10 +101,8 @@ theorem alloc_instance {s : Store} {m : Module} {imports : List ExternVal}
         change s.datas.length + i < (s.datas ++ m.datas.map (fun d => (⟨d.init⟩ : DataInst))).length
         simp only [List.length_append, List.length_map]
         omega
-    · exact alloc_exports hv hm gvals erefs hg
-    · simp only [allocModule]
-      exact nodup_filterMap_map (k := Export.name) (fun e v hv => by
-        obtain ⟨w, -, rfl⟩ := Option.map_eq_some_iff.mp hv; rfl) hv.exportNames
+    · exact alloc_exports hv hm gvals trefs erefs hg htl
+    · simpa only [allocModule, List.map_map, Function.comp_def] using hv.exportNames
   · refine ⟨rfl, rfl, ?_, ?_, rfl, rfl, Nat.le_refl _, fun _ => rfl,
       rfl, rfl, ?_⟩
     · intro x tt hx

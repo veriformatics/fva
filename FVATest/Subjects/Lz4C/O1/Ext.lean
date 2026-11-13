@@ -47,15 +47,16 @@ noncomputable def ctx (C : Context) : Context :=
   .label 0 [] ((b12.drop 19).map .plain) <| .label 0 [] ((b11.drop 2).map .plain) C
 
 /-- `f'` = entry locals `ls`, except the listed ones (`none` = unchanged). -/
-def LocalsAt (ls : List Val) (inst : ModuleInst) (f' : Frame) (u : List (Nat × Option Nat)) :
+def LocalsAt (ls : List (Option Val)) (inst : ModuleInst) (f' : Frame)
+    (u : List (Nat × Option Nat)) :
     Prop :=
   f'.inst = inst ∧ f'.locals.length = ls.length ∧
   ∀ i, f'.locals[i]? = match u.lookup i with
-    | some v => v.map vI <|> ls[i]?
+    | some v => v.map (some ∘ vI) <|> ls[i]?
     | none => ls[i]?
 
 /-- The loop's exits. -/
-def ExtExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p lim acc : Nat)
+def ExtExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val)) (p lim acc : Nat)
     (b : Nat → UInt8) (c : Config) : Prop :=
   (∃ k f', (∀ j < k, b j = 255) ∧ b k ≠ 255 ∧ p + k + 1 ≤ lim ∧ (∀ i ≤ k, psum acc b i < 2 ^ 31) ∧
     LocalsAt ls inst f' [(18, some (p + k + 2)), (19, some (psum acc b k)),
@@ -81,9 +82,10 @@ def ExtExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p lim
 
 /-- `ExtL1` for the `-O1` loop. -/
 def ExtL1O1 : Prop :=
-  ∀ (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
+  ∀ (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val)) (ma : Nat)
     (mem : MemInst) (p lim acc : Nat),
-    ls[18]? = some (vI (p + 1)) → ls[14]? = some (vI lim) → ls[19]? = some (vI acc) →
+    ls[18]? = some (some (vI (p + 1))) → ls[14]? = some (some (vI lim)) → ls[19]? =
+        some (some (vI acc)) →
     20 < ls.length → inst.mems[0]? = some ma → s.mems[ma]? = some mem →
     p ≤ lim → lim + 1 < 2 ^ 32 → lim ≤ mem.size → acc < 2 ^ 31 →
     Until H (Within (fun m a => m = ma ∧ p ≤ a ∧ a < lim) (fun _ _ => False))

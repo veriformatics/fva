@@ -1,4 +1,5 @@
 import FVA.Spec.Valid.Module
+import FVA.Impl.TypeEq
 
 /-!
 # WebAssembly validator
@@ -11,6 +12,8 @@ bottom, but explicit operands still undergo every type check. Local declarations
 namespace FVA.Wasm.Valid
 
 open FVA.Wasm
+
+deriving instance DecidableEq for OpType
 
 namespace Check
 

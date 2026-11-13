@@ -42,12 +42,14 @@ def DataInst.Extends (d₁ d₂ : DataInst) : Prop :=
 def ListExtends {α : Type} (R : α → α → Prop) (xs₁ xs₂ : List α) : Prop :=
   ∀ (i : Nat) (x : α), xs₁[i]? = some x → ∃ y, xs₂[i]? = some y ∧ R x y
 
-/-- Store extension `S₁ ⪯ S₂` (appendix "Soundness"). -/
+/-- Store extension `S₁ ⪯ S₂` (appendix "Soundness"; 3.0 `7.1` `Extend_store`: tags and
+exceptions unchanged, new ones after them). -/
 def Store.Extends (s₁ s₂ : Store) : Prop :=
   ListExtends (· = ·) s₁.funcs s₂.funcs ∧ ListExtends TableInst.Extends s₁.tables s₂.tables ∧
   ListExtends MemInst.Extends s₁.mems s₂.mems ∧
   ListExtends GlobalInst.Extends s₁.globals s₂.globals ∧
-  ListExtends ElemInst.Extends s₁.elems s₂.elems ∧ ListExtends DataInst.Extends s₁.datas s₂.datas
+  ListExtends ElemInst.Extends s₁.elems s₂.elems ∧ ListExtends DataInst.Extends s₁.datas s₂.datas ∧
+  ListExtends (· = ·) s₁.tags s₂.tags ∧ ListExtends (· = ·) s₁.exns s₂.exns
 
 /-- A host outcome allowed for a call with result types `ts` from store `s`. -/
 def HostOutcome.Allowed (s : Store) (ts : List ValType) : HostOutcome → Prop
@@ -58,8 +60,8 @@ def HostOutcome.Allowed (s : Store) (ts : List ValType) : HostOutcome → Prop
 /-- Every host function, called with arguments of its parameter types, has an outcome, and only
 allowed ones. -/
 def ValidHost (H : HostSem) : Prop :=
-  ∀ (s : Store) (a : Nat) (ft : FuncType) (id : Nat) (args : List Val),
-    s.funcs[a]? = some (FuncInst.host ft id) →
+  ∀ (s : Store) (a : Nat) (dt : DefType) (ft : FuncType) (id : Nat) (args : List Val),
+    s.funcs[a]? = some (FuncInst.host dt id) → dt.expand = some ft →
     List.Forall₂ (Val.HasType s) args ft.params →
       (∃ o, H id s args o) ∧ ∀ o, H id s args o → o.Allowed s ft.results
 

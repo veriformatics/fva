@@ -38,7 +38,11 @@ theorem step_simU {fits : Bool} {m m' : MState} (hi : m.Inv) (hu : m.uniq fits =
         Ref.seqUnique, hv]
       simp only [MState.uniq, hv] at hu
       cases e with
-      | plain i => simpa [Ref.atUnique] using hu
+      | plain i =>
+        by_cases ht : i = .throwRef
+        · subst ht
+          simp [MState.step, hv, MState.stepPlain, Ref.instrStep] at h
+        · simpa [Ref.atUnique_plain ht] using hu
       | invoke a =>
         simp only [Ref.atUnique, MStore.abs]
         cases hf : st.base.funcs[a]? with
@@ -192,19 +196,19 @@ theorem seq_wrap_host {S : Store} {f : Frame} {es : List AInstr} {a : Nat} {args
 
 /-- At a host call the stepper's focus is that call in the machine's contexts, and each
 outcome's continuation is the resumed machine's abstraction (contract U27 T5). -/
-theorem abs_host {m : MState} {a : Nat} {rest : List AInstr} {ft : FuncType} {id : Nat}
-    (hc : m.code = .invoke a :: rest) (hf : m.store.base.funcs[a]? = some (.host ft id))
-    (hk : ft.params.length ≤ m.stack.length) :
+theorem abs_host {m : MState} {a : Nat} {rest : List AInstr} {dt : DefType} {ft : FuncType}
+    {id : Nat} (hc : m.code = .invoke a :: rest) (hf : m.store.base.funcs[a]? = some (.host dt id))
+    (hft : dt.expand = some ft) (hk : ft.params.length ≤ m.stack.length) :
     ∃ K, Ref.seq m.abs.store m.abs.frame [] m.abs.instrs =
         .host a (m.stack.take ft.params.length).reverse K ∧
       ∀ (ms : MStore) (out : List AInstr),
         (m.hostResume ms out rest ft.params.length).abs = ⟨ms.abs, m.abs.frame, K.fill out⟩ := by
-  have hS : m.store.abs.funcs[a]? = some (.host ft id) := hf
+  have hS : m.store.abs.funcs[a]? = some (.host dt id) := hf
   have hin : Ref.seq m.store.abs m.frame [] (vals m.stack.reverse ++ m.code) =
       .host a (m.stack.take ft.params.length).reverse
         (.seq (m.stack.drop ft.params.length).reverse .hole rest) := by
     rw [hc, seq_focus _ _ _ _ rfl]
-    simp only [Ref.atInstr, hS, MMem.blt_false hk, Bool.cond_false]
+    simp only [Ref.atInstr, hS, hft, MMem.blt_false hk, Bool.cond_false]
   refine ⟨wrapK m.ctl m.frame (.seq (m.stack.drop ft.params.length).reverse .hole rest), ?_,
     fun ms out => ?_⟩
   · rw [abs_eq_wrapC]
@@ -215,18 +219,22 @@ theorem abs_host {m : MState} {a : Nat} {rest : List AInstr} {ft : FuncType} {id
 
 theorem hostCall_some {m : MState} {id k : Nat} {rest : List AInstr}
     (h : m.hostCall = some (id, k, rest)) :
-    ∃ a ft, m.code = .invoke a :: rest ∧ m.store.base.funcs[a]? = some (.host ft id) ∧
-      k = ft.params.length ∧ k ≤ m.stack.length := by
+    ∃ a dt ft, m.code = .invoke a :: rest ∧ m.store.base.funcs[a]? = some (.host dt id) ∧
+      dt.expand = some ft ∧ k = ft.params.length ∧ k ≤ m.stack.length := by
   unfold MState.hostCall at h
   split at h
   · next a rest' hc =>
     split at h
-    · next ft id' hf =>
-      cases hb : Nat.blt m.stack.length ft.params.length
-      · simp only [hb, Bool.cond_false, Option.some.injEq, Prod.mk.injEq] at h
-        obtain ⟨rfl, rfl, rfl⟩ := h
-        exact ⟨a, ft, hc, hf, rfl, le_of_blt_false hb⟩
-      · simp [hb] at h
+    · next dt id' hf =>
+      cases hft : dt.expand with
+      | none => simp [hft] at h
+      | some ft =>
+        simp only [hft, Option.bind_some] at h
+        cases hb : Nat.blt m.stack.length ft.params.length
+        · simp only [hb, Bool.cond_false, Option.some.injEq, Prod.mk.injEq] at h
+          obtain ⟨rfl, rfl, rfl⟩ := h
+          exact ⟨a, dt, ft, hc, hf, hft, rfl, le_of_blt_false hb⟩
+        · simp [hb] at h
     · simp at h
   · simp at h
 
@@ -268,10 +276,10 @@ theorem machineRun_sysMust {W : World} {Q : SysOutcome W.St → Prop}
         | some r =>
           obtain ⟨τ, ms, out⟩ := r
           simp only [sysRun, he, hh, hx] at h
-          obtain ⟨a, ft, hc, hfn, rfl, hk⟩ := hostCall_some hh
+          obtain ⟨a, dt, ft, hc, hfn, hft, rfl, hk⟩ := hostCall_some hh
           obtain ⟨hinv, hok, hsingle⟩ := hX σ id m.store _ τ ms out hx hi
-          obtain ⟨K, hq', hcont⟩ := abs_host hc hfn hk
-          have hfa : m.abs.store.funcs[a]? = some (.host ft id) := hfn
+          obtain ⟨K, hq', hcont⟩ := abs_host hc hfn hft hk
+          have hfa : m.abs.store.funcs[a]? = some (.host dt id) := hfn
           refine sysMust_host hq' hfa he ⟨τ, out.spec ms, hok⟩ fun τ' o' hW => ?_
           obtain ⟨rfl, rfl⟩ := hsingle τ' o' hW
           have heq : (⟨Ref.hostStore m.abs.store (out.spec ms), m.abs.frame,

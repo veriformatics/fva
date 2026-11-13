@@ -439,8 +439,8 @@ theorem iterSim (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC) (hD : Seg
       ⟨hll, hsc1, hsc2, hml, hoff8, hlt, rfl⟩ | ⟨hll, hsc1, hsc2, hml, hoff8, hle, rfl⟩)
     · -- X1: the literal length's extension bytes, then the general literal path
       rw [ite_eq_left hll]
-      have hA' := hA H F0 st inst (((ls.set 15 (vI (src + i + 1))).set 16
-        (vI (mem.byte (src + i)).toNat)).set 2 (vI 15)) ma mem src dst inp.length cap
+      have hA' := hA H F0 st inst (((ls.set 15 (some (vI (src + i + 1)))).set 16
+        (some (vI (mem.byte (src + i)).toNat))).set 2 (some (vI 15))) ma mem src dst inp.length cap
         (dst + out.length) (src + i) (mem.byte (src + i)).toNat
         (((hcl.set (by omega) _).set (by omega) _).set (by omega) _)
         (by rw [List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega),
@@ -465,9 +465,11 @@ theorem iterSim (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC) (hD : Seg
           exact contErrSim (ma := ma) hR (by omega) (by omega) (fun c h => h) herr
     · -- X2: no room for the shortcut, the general literal path
       rw [ite_eq_right (by omega), ite_eq_right (by omega)]
-      have h3' : ((((ls.set 15 (vI (src + i + 1))).set 16 (vI (mem.byte (src + i)).toNat)).set 2
-          (vI ((mem.byte (src + i)).toNat / 16))).set 4 (vI (src + i + 1)))[3]? =
-          some (vI (dst + out.length)) := by
+      have h3' :
+          ((((ls.set 15 (some (vI (src + i + 1)))).set 16
+          (some (vI (mem.byte (src + i)).toNat))).set 2
+          (some (vI ((mem.byte (src + i)).toNat / 16)))).set 4 (some (vI (src + i + 1))))[3]? =
+          some (some (vI (dst + out.length))) := by
         rw [List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega),
           List.getElem?_set_ne (by omega), List.getElem?_set_ne (by omega)]
         exact hl.2.2.2.1

@@ -13,7 +13,9 @@ theorem mp_body_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleIn
     (hd : d + n ≤ mem.size) (hs : s + n ≤ mem.size) (hsize : mem.size < 2 ^ 32) :
     Until H (Within (Span ma s n) (Span ma d n))
       (MvPost C (st.setMem ma (move mem d s n)) inst d)
-      (C.fill ⟨st, ⟨[vI d, vI s, vI n, vI 0, vI 0, vI 0, vI 0], inst⟩,
+      (C.fill ⟨st,
+          ⟨[some (vI d), some (vI s), some (vI n), some (vI 0), some (vI 0), some (vI 0),
+          some (vI 0)], inst⟩,
         mpBody.map .plain⟩) := by
   by_cases hds : d < s
   · wasm_eval 7 [block_simp, mpBody, mpOuter, mbInner, hds]
@@ -36,12 +38,14 @@ theorem s2 : MemmoveS2 := by
   · simp [TraceOK, AccessOK]
   · let B := BContext.label [] 1 [] [] (BContext.frame vs 1 f rest (.base C))
     change Until H _ _ (B.fill ⟨st,
-      ⟨[vI d, vI s, vI n, vI 0, vI 0, vI 0, vI 0], inst⟩, mpBody.map .plain⟩)
+      ⟨[some (vI d), some (vI s), some (vI n), some (vI 0), some (vI 0), some (vI 0), some (vI 0)],
+          inst⟩, mpBody.map .plain⟩)
     apply (mp_body_until H B st inst ma mem d s n hm hmem hd hs hsize).trans
     intro c hc
     obtain ⟨u1, u2, u3, u4, u5, u6, rfl⟩ := hc
     change Until H _ _ (C.fill ⟨_, f, vals vs ++
-      (.frame 1 ⟨[vI d, u1, u2, u3, u4, u5, u6], inst⟩ [.label 1 [] (vals [vI d])] :: rest)⟩)
+      (.frame 1 ⟨[some (vI d), some u1, some u2, some u3, some u4, some u5, some u6],
+          inst⟩ [.label 1 [] (vals [vI d])] :: rest)⟩)
     wasm_eval 2 [block_simp]
     · simp [TraceOK, AccessOK]
     · apply Until.done

@@ -11,6 +11,26 @@ theorem ASeqT.fragment {s : Store} {C : Context} {pre es post : List AInstr}
   obtain ⟨x, _, he⟩ := hpre.split (xs := pre) (ys := es)
   exact ⟨x, y, he⟩
 
+/-- A sequence holding an administrative instruction without a typing rule is not well typed (the
+P′ forms, typed from U28c). -/
+theorem ASeqT.not_mem {s : Store} {C : Context} {es : List AInstr} {e : AInstr}
+    {a b : List OpType} (hmem : e ∈ es) (he : ∀ C x y, ¬ AInstrT s C e ⟨x, y⟩) :
+    ¬ ASeqT s C es ⟨a, b⟩ := by
+  intro h
+  obtain ⟨pre, post, rfl⟩ := List.append_of_mem hmem
+  have h' : ASeqT s C (pre ++ [e] ++ post) ⟨a, b⟩ := by
+    simpa only [List.append_assoc, List.singleton_append] using h
+  obtain ⟨x, y, hx⟩ := h'.fragment
+  obtain ⟨p, x', y', z, -, -, -, hi⟩ :=
+    ASeqT.snoc_iff.mp (show ASeqT s C ([] ++ [e]) ⟨x, y⟩ from hx)
+  exact he _ _ _ hi
+
+/-- A plain instruction without a 2.0 typing rule. -/
+theorem AInstrT.not_plain {s : Store} {i : Instr} (hi : ∀ C st, ¬ InstrT C i st) :
+    ∀ C x y, ¬ AInstrT s C (.plain i) ⟨x, y⟩ := by
+  intro C x y h
+  cases h with | plain h => exact hi _ _ h
+
 theorem ASeqT.br_args {s : Store} {C : Context} {vs : List Val} {l : Nat}
     {a b : List OpType} {ts : List ValType}
     (h : ASeqT s C (vals vs ++ [.plain (.br l)]) ⟨a, b⟩)
@@ -67,6 +87,10 @@ theorem block_br_args {s : Store} {C : Context} {vs : List Val} {k j : Nat}
       have heq : k + 1 + j = k + (j + 1) := by omega
       rw [heq] at hb
       exact ih hb ht
+  | handler preValues n cs inner rest ih =>
+    obtain ⟨x, y, he⟩ := h.fragment
+    obtain ⟨p, x, y, z, hin, hout, hm, hi⟩ := ASeqT.single_iff.mp he
+    cases hi
 
 theorem block_return_args {s : Store} {C : Context} {vs : List Val} {k : Nat}
     (L : BlockCtx k) {a b : List OpType} {ts : List ValType}
@@ -81,6 +105,26 @@ theorem block_return_args {s : Store} {C : Context} {vs : List Val} {k : Nat}
     obtain ⟨x, y, he⟩ := h.fragment
     obtain ⟨p, x, y, z, hin, hout, hm, hi⟩ := ASeqT.single_iff.mp he
     cases hi with | label hn hc hb => exact ih hb ht
+  | handler preValues n cs inner rest ih =>
+    obtain ⟨x, y, he⟩ := h.fragment
+    obtain ⟨p, x, y, z, hin, hout, hm, hi⟩ := ASeqT.single_iff.mp he
+    cases hi
+
+/-- The hole of a block context holds a sequence typed in some context. -/
+theorem ASeqT.fill_inner {s : Store} {C : Context} {k : Nat} (L : BlockCtx k) {es : List AInstr}
+    {a b : List OpType} (h : ASeqT s C (L.fill es) ⟨a, b⟩) : ∃ C' x y, ASeqT s C' es ⟨x, y⟩ := by
+  induction L generalizing C a b with
+  | base preValues rest =>
+    obtain ⟨x, y, he⟩ := h.fragment
+    exact ⟨C, x, y, he⟩
+  | label preValues n cont inner rest ih =>
+    obtain ⟨x, y, he⟩ := h.fragment
+    obtain ⟨p, x, y, z, hin, hout, hm, hi⟩ := ASeqT.single_iff.mp he
+    cases hi with | label hn hc hb => exact ih hb
+  | handler preValues n cs inner rest ih =>
+    obtain ⟨x, y, he⟩ := h.fragment
+    obtain ⟨p, x, y, z, hin, hout, hm, hi⟩ := ASeqT.single_iff.mp he
+    cases hi
 
 theorem ASeqT.labelExit {s : Store} {C : Context} {n : Nat} {cont : List Instr}
     {vs : List Val} {a b : List OpType}

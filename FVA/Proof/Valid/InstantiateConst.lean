@@ -109,11 +109,14 @@ theorem constant_value {H : HostSem} {s : Store} {inst : ModuleInst} {C : Contex
       have hv := congrArg Config.instrs (Ref.steps_values (vs := [w]) steps)
       have heq : v = w := value_inj (List.singleton_inj.mp hv)
       simpa [heq, w, Val.HasType]
-  case refNull rt =>
+  case refNull ht =>
     cases hi
-    have hv := congrArg Config.instrs (Ref.steps_values (vs := [.ref (.null rt)]) steps)
-    have heq : v = .ref (.null rt) := value_inj (List.singleton_inj.mp hv)
-    simp [heq, Val.HasType]
+    have hs : Ref.step ⟨s, ⟨[], inst⟩, [.plain (.refNull ht)]⟩ =
+        some ⟨s, ⟨[], inst⟩, [(Val.ref .null).instr]⟩ := by
+      simp [Ref.step, Ref.seq, Ref.toVal, Ref.atInstr, Ref.instrStep, Val.instr]
+    have hu : Ref.uniqueStep false ⟨s, ⟨[], inst⟩, [.plain (.refNull ht)]⟩ = true := by
+      simp [Ref.uniqueStep, Ref.seqUnique, Ref.toVal, Ref.atUnique, Ref.instrUnique]
+    simp [value_of_step hs hu steps, Val.HasType]
   case refFunc x =>
     cases hi
     rename_i ft hf hr

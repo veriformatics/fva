@@ -1,0 +1,166 @@
+script	line	type	outcome
+contexts.wast	2	module	pass
+contexts.wast	52	assert_return	fail: line 52: {"args":[],"field":"body-zero","module":"contexts","type":"invoke"}: expected assert_return [{"type":"i32","value":"17"}], actual stuck
+contexts.wast	53	assert_return	fail: line 53: {"args":[],"field":"outer-branch","module":"contexts","type":"invoke"}: expected assert_return [{"type":"i32","value":"31"}], actual stuck
+contexts.wast	54	assert_return	fail: line 54: {"args":[],"field":"return","module":"contexts","type":"invoke"}: expected assert_return [{"type":"i32","value":"43"}], actual stuck
+contexts.wast	55	assert_trap	fail: line 55: {"args":[],"field":"trap-all","module":"contexts","type":"invoke"}: expected assert_trap null, actual stuck
+contexts.wast	56	assert_trap	fail: line 56: {"args":[],"field":"trap-all-ref","module":"contexts","type":"invoke"}: expected assert_trap null, actual stuck
+contexts.wast	57	assert_return	fail: line 57: {"args":[{"type":"i32","value":"11"},{"type":"i64","value":"29"}],"field":"normal","module":"contexts","type":"invoke"}: expected assert_return [{"type":"i32","value":"14"},{"type":"i64","value":"24"}], actual stuck
+contexts.wast	58	assert_return	fail: line 58: {"args":[{"type":"i32","value":"-3"},{"type":"i64","value":"5"}],"field":"normal","module":"contexts","type":"invoke"}: expected assert_return [{"type":"i32","value":"0"},{"type":"i64","value":"0"}], actual stuck
+exceptions.wast	2	module	pass
+exceptions.wast	200	assert_return	fail: line 200: {"args":[{"type":"i32","value":"-17"},{"type":"i64","value":"81985529216486895"},{"type":"f32","value":"2147483648"},{"type":"f64","value":"4609434218613702656"}],"field":"mixed","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"-17"},{"type":"i64","value":"81985529216486895"},{"type":"f32","value":"2147483648"},{"type":"f64","value":"4609434218613702656"}], actual stuck
+exceptions.wast	201	assert_return	fail: line 201: {"args":[{"type":"i32","value":"0"},{"type":"i32","value":"-1"}],"field":"pair","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"0"},{"type":"i32","value":"-1"}], actual stuck
+exceptions.wast	202	assert_return	fail: line 202: {"args":[{"type":"i32","value":"-2147483648"},{"type":"i32","value":"2147483647"}],"field":"pair","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"-2147483648"},{"type":"i32","value":"2147483647"}], actual stuck
+exceptions.wast	203	assert_return	fail: line 203: {"args":[{"type":"i32","value":"11"},{"type":"i32","value":"29"}],"field":"catch-ref","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"11"},{"type":"i32","value":"29"},{"type":"i32","value":"11"},{"type":"i32","value":"29"}], actual stuck
+exceptions.wast	204	assert_return	fail: line 204: {"args":[{"type":"i32","value":"-2147483648"},{"type":"i32","value":"0"}],"field":"catch-ref","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"-2147483648"},{"type":"i32","value":"0"},{"type":"i32","value":"-2147483648"},{"type":"i32","value":"0"}], actual stuck
+exceptions.wast	205	assert_return	fail: line 205: {"args":[{"type":"i32","value":"1"}],"field":"nested","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"17"},{"type":"i32","value":"29"}], actual stuck
+exceptions.wast	206	assert_return	fail: line 206: {"args":[{"type":"i32","value":"0"}],"field":"nested","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"31"},{"type":"i32","value":"47"}], actual stuck
+exceptions.wast	207	assert_return	fail: line 207: {"args":[],"field":"frames","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"53"},{"type":"i32","value":"71"}], actual stuck
+exceptions.wast	208	assert_return	fail: line 208: {"args":[],"field":"no-match","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"79"},{"type":"i32","value":"83"}], actual stuck
+exceptions.wast	209	assert_return	fail: line 209: {"args":[],"field":"all","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"19"}], actual stuck
+exceptions.wast	210	assert_return	fail: line 210: {"args":[],"field":"all-ref","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"89"},{"type":"i32","value":"97"}], actual stuck
+exceptions.wast	211	assert_return	fail: line 211: {"args":[],"field":"order-tag-first","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"-1"}], actual stuck
+exceptions.wast	212	assert_return	fail: line 212: {"args":[],"field":"order-all-first","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"23"}], actual stuck
+exceptions.wast	213	assert_return	fail: line 213: {"args":[],"field":"distinct-tags","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"101"},{"type":"i32","value":"103"}], actual stuck
+exceptions.wast	214	assert_trap	fail: line 214: {"args":[],"field":"null","module":"exceptions","type":"invoke"}: expected assert_trap null, actual stuck
+exceptions.wast	215	assert_exception	fail: line 215: {"args":[],"field":"uncaught","module":"exceptions","type":"invoke"}: expected assert_exception null, actual stuck
+exceptions.wast	216	assert_exception	fail: line 216: {"args":[],"field":"uncaught-deep","module":"exceptions","type":"invoke"}: expected assert_exception null, actual stuck
+exceptions.wast	217	assert_return	pass
+exceptions.wast	218	assert_trap	pass
+exceptions.wast	219	assert_return	fail: line 219: {"args":[],"field":"store","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"127"},{"type":"i32","value":"131"},{"type":"i32","value":"276"}], actual stuck
+exceptions.wast	220	assert_return	fail: line 220: {"args":[{"type":"i32","value":"149"},{"type":"i32","value":"151"}],"field":"save","module":"exceptions","type":"invoke"}: expected assert_return [], actual stuck
+exceptions.wast	221	assert_exception	fail: line 221: {"args":[],"field":"uncaught","module":"exceptions","type":"invoke"}: expected assert_exception null, actual stuck
+exceptions.wast	222	assert_return	fail: line 222: {"args":[],"field":"saved","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"149"},{"type":"i32","value":"151"}], actual stuck
+exceptions.wast	225	module	pass
+exceptions.wast	228	assert_exception	fail: line 228: {"args":[],"field":"throw","module":"later","type":"invoke"}: expected assert_exception null, actual stuck
+exceptions.wast	229	assert_return	fail: line 229: {"args":[],"field":"saved","module":"exceptions","type":"invoke"}: expected assert_return [{"type":"i32","value":"149"},{"type":"i32","value":"151"}], actual stuck
+initializers.wast	2	module	pass
+initializers.wast	28	register	pass
+initializers.wast	30	assert_return	pass
+initializers.wast	31	assert_return	pass
+initializers.wast	32	assert_return	pass
+initializers.wast	33	assert_return	pass
+initializers.wast	34	assert_trap	pass
+initializers.wast	35	assert_return	pass
+initializers.wast	36	assert_return	pass
+initializers.wast	37	assert_return	pass
+initializers.wast	38	assert_return	fail: line 38: {"args":[{"type":"i32","value":"349"}],"field":"global-call","module":"initializers","type":"invoke"}: expected assert_return [{"type":"i32","value":"378"}], actual stuck
+initializers.wast	40	module	pass
+initializers.wast	46	assert_return	pass
+initializers.wast	49	assert_unlinkable	pass
+initializers.wast	53	assert_unlinkable	pass
+initializers.wast	57	assert_unlinkable	pass
+payload-refs.wast	2	module	pass
+payload-refs.wast	56	assert_return	fail: line 56: {"args":[{"type":"i32","value":"359"},{"type":"i64","value":"-367"},{"type":"i32","value":"1"}],"field":"fields","module":"payload-refs","type":"invoke"}: expected assert_return [{"type":"i32","value":"390"},{"type":"i64","value":"-367"}], actual stuck
+payload-refs.wast	57	assert_return	fail: line 57: {"args":[{"type":"i32","value":"359"},{"type":"i64","value":"-367"},{"type":"i32","value":"0"}],"field":"fields","module":"payload-refs","type":"invoke"}: expected assert_return [{"type":"i32","value":"322"},{"type":"i64","value":"-367"}], actual stuck
+payload-refs.wast	58	assert_return	fail: line 58: {"args":[{"type":"i32","value":"373"}],"field":"boxed","module":"payload-refs","type":"invoke"}: expected assert_return [{"type":"i32","value":"373"}], actual stuck
+payload-refs.wast	59	assert_return	fail: line 59: {"args":[],"field":"empty","module":"payload-refs","type":"invoke"}: expected assert_return [{"type":"i32","value":"853"}], actual stuck
+payload-refs.wast	60	assert_exception	fail: line 60: {"args":[],"field":"uncaught-empty","module":"payload-refs","type":"invoke"}: expected assert_exception null, actual stuck
+properties.wast	3	module	pass
+properties.wast	33	assert_return	fail: line 33: {"args":[{"type":"i32","value":"0"},{"type":"i64","value":"0"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"0"},{"type":"i64","value":"0"}], actual stuck
+properties.wast	34	assert_return	fail: line 34: {"args":[{"type":"i32","value":"-1"},{"type":"i64","value":"-1"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-1"},{"type":"i64","value":"-1"}], actual stuck
+properties.wast	35	assert_return	fail: line 35: {"args":[{"type":"i32","value":"-2147483648"},{"type":"i64","value":"-9223372036854775808"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-2147483648"},{"type":"i64","value":"-9223372036854775808"}], actual stuck
+properties.wast	36	assert_return	fail: line 36: {"args":[{"type":"i32","value":"2147483647"},{"type":"i64","value":"9223372036854775807"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"2147483647"},{"type":"i64","value":"9223372036854775807"}], actual stuck
+properties.wast	37	assert_return	fail: line 37: {"args":[{"type":"i32","value":"0"},{"type":"i64","value":"-9223372036854775808"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"0"},{"type":"i64","value":"-9223372036854775808"}], actual stuck
+properties.wast	38	assert_return	fail: line 38: {"args":[{"type":"i32","value":"-2147483648"},{"type":"i64","value":"0"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-2147483648"},{"type":"i64","value":"0"}], actual stuck
+properties.wast	39	assert_return	fail: line 39: {"args":[{"type":"i32","value":"2147483647"},{"type":"i64","value":"-1"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"2147483647"},{"type":"i64","value":"-1"}], actual stuck
+properties.wast	40	assert_return	fail: line 40: {"args":[{"type":"i32","value":"-1"},{"type":"i64","value":"9223372036854775807"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-1"},{"type":"i64","value":"9223372036854775807"}], actual stuck
+properties.wast	41	assert_return	fail: line 41: {"args":[{"type":"i32","value":"802353641"},{"type":"i64","value":"6217520777298286595"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"802353641"},{"type":"i64","value":"6217520777298286595"}], actual stuck
+properties.wast	42	assert_return	fail: line 42: {"args":[{"type":"i32","value":"662166918"},{"type":"i64","value":"-6782817765345620312"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"662166918"},{"type":"i64","value":"-6782817765345620312"}], actual stuck
+properties.wast	43	assert_return	fail: line 43: {"args":[{"type":"i32","value":"1047405031"},{"type":"i64","value":"-7415258037621125455"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"1047405031"},{"type":"i64","value":"-7415258037621125455"}], actual stuck
+properties.wast	44	assert_return	fail: line 44: {"args":[{"type":"i32","value":"152615004"},{"type":"i64","value":"-8277343385706893842"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"152615004"},{"type":"i64","value":"-8277343385706893842"}], actual stuck
+properties.wast	45	assert_return	fail: line 45: {"args":[{"type":"i32","value":"-1969234827"},{"type":"i64","value":"9210075990542958191"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-1969234827"},{"type":"i64","value":"9210075990542958191"}], actual stuck
+properties.wast	46	assert_return	fail: line 46: {"args":[{"type":"i32","value":"-1747855102"},{"type":"i64","value":"-4629765865506266236"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-1747855102"},{"type":"i64","value":"-4629765865506266236"}], actual stuck
+properties.wast	47	assert_return	fail: line 47: {"args":[{"type":"i32","value":"-1594074861"},{"type":"i64","value":"-6370329207057036611"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-1594074861"},{"type":"i64","value":"-6370329207057036611"}], actual stuck
+properties.wast	48	assert_return	fail: line 48: {"args":[{"type":"i32","value":"-1013805832"},{"type":"i64","value":"5999617100438067434"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-1013805832"},{"type":"i64","value":"5999617100438067434"}], actual stuck
+properties.wast	49	assert_return	fail: line 49: {"args":[{"type":"i32","value":"441627457"},{"type":"i64","value":"533381527787789083"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"441627457"},{"type":"i64","value":"533381527787789083"}], actual stuck
+properties.wast	50	assert_return	fail: line 50: {"args":[{"type":"i32","value":"-344402498"},{"type":"i64","value":"3911800713536441248"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-344402498"},{"type":"i64","value":"3911800713536441248"}], actual stuck
+properties.wast	51	assert_return	fail: line 51: {"args":[{"type":"i32","value":"1823001215"},{"type":"i64","value":"-4028797717100922103"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"1823001215"},{"type":"i64","value":"-4028797717100922103"}], actual stuck
+properties.wast	52	assert_return	fail: line 52: {"args":[{"type":"i32","value":"925550804"},{"type":"i64","value":"-5596956038510482138"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"925550804"},{"type":"i64","value":"-5596956038510482138"}], actual stuck
+properties.wast	53	assert_return	fail: line 53: {"args":[{"type":"i32","value":"-905960883"},{"type":"i64","value":"-1900414279479035385"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-905960883"},{"type":"i64","value":"-1900414279479035385"}], actual stuck
+properties.wast	54	assert_return	fail: line 54: {"args":[{"type":"i32","value":"-802361414"},{"type":"i64","value":"2262280156688237308"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-802361414"},{"type":"i64","value":"2262280156688237308"}], actual stuck
+properties.wast	55	assert_return	fail: line 55: {"args":[{"type":"i32","value":"1062978091"},{"type":"i64","value":"-457131243170772075"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"1062978091"},{"type":"i64","value":"-457131243170772075"}], actual stuck
+properties.wast	56	assert_return	fail: line 56: {"args":[{"type":"i32","value":"185444336"},{"type":"i64","value":"-6666987093527476574"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"185444336"},{"type":"i64","value":"-6666987093527476574"}], actual stuck
+properties.wast	57	assert_return	fail: line 57: {"args":[{"type":"i32","value":"-1128327783"},{"type":"i64","value":"1202181979268736819"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-1128327783"},{"type":"i64","value":"1202181979268736819"}], actual stuck
+properties.wast	58	assert_return	fail: line 58: {"args":[{"type":"i32","value":"-478313738"},{"type":"i64","value":"-7637368444210641512"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-478313738"},{"type":"i64","value":"-7637368444210641512"}], actual stuck
+properties.wast	59	assert_return	fail: line 59: {"args":[{"type":"i32","value":"-1558328297"},{"type":"i64","value":"5945449192839981153"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-1558328297"},{"type":"i64","value":"5945449192839981153"}], actual stuck
+properties.wast	60	assert_return	fail: line 60: {"args":[{"type":"i32","value":"-676551092"},{"type":"i64","value":"4026690014664278366"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-676551092"},{"type":"i64","value":"4026690014664278366"}], actual stuck
+properties.wast	61	assert_return	fail: line 61: {"args":[{"type":"i32","value":"2004138277"},{"type":"i64","value":"-2036163314458841441"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"2004138277"},{"type":"i64","value":"-2036163314458841441"}], actual stuck
+properties.wast	62	assert_return	fail: line 62: {"args":[{"type":"i32","value":"-24827022"},{"type":"i64","value":"8548839425382469492"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"-24827022"},{"type":"i64","value":"8548839425382469492"}], actual stuck
+properties.wast	63	assert_return	fail: line 63: {"args":[{"type":"i32","value":"2055451715"},{"type":"i64","value":"-8539725638587499155"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"2055451715"},{"type":"i64","value":"-8539725638587499155"}], actual stuck
+properties.wast	64	assert_return	fail: line 64: {"args":[{"type":"i32","value":"2040168424"},{"type":"i64","value":"8495444933111839066"}],"field":"roundtrip","module":"properties","type":"invoke"}: expected assert_return [{"type":"i32","value":"2040168424"},{"type":"i64","value":"8495444933111839066"}], actual stuck
+references.wast	2	module	pass
+references.wast	69	assert_return	fail: line 69: {"args":[{"type":"i32","value":"1"},{"type":"i32","value":"223"}],"field":"call","module":"references","type":"invoke"}: expected assert_return [{"type":"i32","value":"230"}], actual stuck
+references.wast	70	assert_trap	fail: line 70: {"args":[{"type":"i32","value":"0"},{"type":"i32","value":"223"}],"field":"call","module":"references","type":"invoke"}: expected assert_trap null, actual stuck
+references.wast	71	assert_return	fail: line 71: {"args":[{"type":"i32","value":"1"},{"type":"i32","value":"227"}],"field":"non-null","module":"references","type":"invoke"}: expected assert_return [{"type":"i32","value":"234"}], actual stuck
+references.wast	72	assert_trap	fail: line 72: {"args":[{"type":"i32","value":"0"},{"type":"i32","value":"227"}],"field":"non-null","module":"references","type":"invoke"}: expected assert_trap null, actual stuck
+references.wast	73	assert_return	fail: line 73: {"args":[{"type":"i32","value":"0"}],"field":"branch-null","module":"references","type":"invoke"}: expected assert_return [{"type":"i32","value":"212"}], actual stuck
+references.wast	74	assert_return	fail: line 74: {"args":[{"type":"i32","value":"1"}],"field":"branch-null","module":"references","type":"invoke"}: expected assert_return [{"type":"i32","value":"219"}], actual stuck
+references.wast	75	assert_return	fail: line 75: {"args":[{"type":"i32","value":"0"}],"field":"branch-non-null","module":"references","type":"invoke"}: expected assert_return [{"type":"i32","value":"224"}], actual stuck
+references.wast	76	assert_return	fail: line 76: {"args":[{"type":"i32","value":"1"}],"field":"branch-non-null","module":"references","type":"invoke"}: expected assert_return [{"type":"i32","value":"218"}], actual stuck
+references.wast	77	assert_return	fail: line 77: {"args":[{"type":"i32","value":"229"}],"field":"local","module":"references","type":"invoke"}: expected assert_return [{"type":"i32","value":"242"}], actual stuck
+references.wast	78	assert_return	pass
+references.wast	79	assert_return	pass
+references.wast	80	assert_return	pass
+references.wast	81	assert_return	pass
+references.wast	82	assert_return	pass
+references.wast	83	assert_return	pass
+references.wast	84	assert_return	pass
+references.wast	85	assert_return	pass
+references.wast	86	assert_return	pass
+references.wast	87	assert_return	pass
+tags.wast	2	module	pass
+tags.wast	10	register	pass
+tags.wast	12	module	pass
+tags.wast	47	register	pass
+tags.wast	49	assert_return	fail: line 49: {"args":[{"type":"i32","value":"239"}],"field":"shared","module":"catcher","type":"invoke"}: expected assert_return [{"type":"i32","value":"239"}], actual stuck
+tags.wast	50	assert_return	fail: line 50: {"args":[{"type":"i32","value":"241"}],"field":"alias","module":"catcher","type":"invoke"}: expected assert_return [{"type":"i32","value":"241"}], actual stuck
+tags.wast	51	assert_return	fail: line 51: {"args":[{"type":"i32","value":"251"}],"field":"noise","module":"catcher","type":"invoke"}: expected assert_return [{"type":"i32","value":"251"}], actual stuck
+tags.wast	52	assert_return	fail: line 52: {"args":[{"type":"i32","value":"257"}],"field":"own","module":"catcher","type":"invoke"}: expected assert_return [{"type":"i32","value":"257"}], actual stuck
+tags.wast	54	module	pass
+tags.wast	75	assert_return	fail: line 75: {"args":[{"type":"i32","value":"263"}],"field":"own","module":"later","type":"invoke"}: expected assert_return [{"type":"i32","value":"263"}], actual stuck
+tags.wast	76	assert_return	fail: line 76: {"args":[{"type":"i32","value":"269"}],"field":"fresh","module":"later","type":"invoke"}: expected assert_return [{"type":"i32","value":"269"}], actual stuck
+tags.wast	77	assert_return	fail: line 77: {"args":[{"type":"i32","value":"271"}],"field":"shared","module":"catcher","type":"invoke"}: expected assert_return [{"type":"i32","value":"271"}], actual stuck
+tags.wast	78	assert_return	fail: line 78: {"args":[{"type":"i32","value":"277"}],"field":"alias","module":"catcher","type":"invoke"}: expected assert_return [{"type":"i32","value":"277"}], actual stuck
+tail.wast	2	module	pass
+tail.wast	90	assert_return	fail: line 90: {"args":[{"type":"i32","value":"11"},{"type":"i64","value":"37"}],"field":"direct","module":"tail","type":"invoke"}: expected assert_return [{"type":"i64","value":"30"},{"type":"i32","value":"16"}], actual stuck
+tail.wast	91	assert_return	fail: line 91: {"args":[{"type":"i32","value":"-5"},{"type":"i64","value":"7"}],"field":"direct","module":"tail","type":"invoke"}: expected assert_return [{"type":"i64","value":"0"},{"type":"i32","value":"0"}], actual stuck
+tail.wast	92	assert_return	pass
+tail.wast	93	assert_return	fail: line 93: {"args":[{"type":"i32","value":"12000"},{"type":"i32","value":"17"}],"field":"recur","module":"tail","type":"invoke"}: expected assert_return [{"type":"i32","value":"36017"}], actual stuck
+tail.wast	94	assert_return	fail: line 94: {"args":[{"type":"i32","value":"13"},{"type":"i64","value":"41"}],"field":"ref","module":"tail","type":"invoke"}: expected assert_return [{"type":"i64","value":"34"},{"type":"i32","value":"18"}], actual stuck
+tail.wast	95	assert_trap	fail: line 95: {"args":[{"type":"i32","value":"13"},{"type":"i64","value":"41"}],"field":"null-ref","module":"tail","type":"invoke"}: expected assert_trap null, actual stuck
+tail.wast	96	assert_return	fail: line 96: {"args":[{"type":"i32","value":"17"},{"type":"i64","value":"43"},{"type":"i32","value":"0"}],"field":"indirect","module":"tail","type":"invoke"}: expected assert_return [{"type":"i64","value":"36"},{"type":"i32","value":"22"}], actual stuck
+tail.wast	97	assert_trap	fail: line 97: {"args":[{"type":"i32","value":"17"},{"type":"i64","value":"43"},{"type":"i32","value":"1"}],"field":"indirect","module":"tail","type":"invoke"}: expected assert_trap null, actual stuck
+tail.wast	98	assert_trap	fail: line 98: {"args":[{"type":"i32","value":"17"},{"type":"i64","value":"43"},{"type":"i32","value":"4"}],"field":"indirect","module":"tail","type":"invoke"}: expected assert_trap null, actual stuck
+tail.wast	99	assert_trap	fail: line 99: {"args":[{"type":"i32","value":"17"},{"type":"i64","value":"43"},{"type":"i32","value":"5"}],"field":"indirect","module":"tail","type":"invoke"}: expected assert_trap null, actual stuck
+tail.wast	100	assert_trap	fail: line 100: {"args":[{"type":"i32","value":"17"},{"type":"i64","value":"43"},{"type":"i32","value":"-1"}],"field":"indirect","module":"tail","type":"invoke"}: expected assert_trap null, actual stuck
+tail.wast	101	assert_exception	fail: line 101: {"args":[],"field":"drop-direct","module":"tail","type":"invoke"}: expected assert_exception null, actual stuck
+tail.wast	102	assert_exception	fail: line 102: {"args":[],"field":"drop-ref","module":"tail","type":"invoke"}: expected assert_exception null, actual stuck
+tail.wast	103	assert_exception	fail: line 103: {"args":[],"field":"drop-indirect","module":"tail","type":"invoke"}: expected assert_exception null, actual stuck
+tail.wast	104	assert_return	fail: line 104: {"args":[],"field":"keep-ordinary","module":"tail","type":"invoke"}: expected assert_return [{"type":"i32","value":"181"}], actual stuck
+tail.wast	105	assert_return	fail: line 105: {"args":[],"field":"outer-caller","module":"tail","type":"invoke"}: expected assert_return [{"type":"i32","value":"181"}], actual stuck
+tail.wast	106	assert_return	fail: line 106: {"args":[{"type":"i32","value":"191"}],"field":"host-direct","module":"tail","type":"invoke"}: expected assert_return [], actual stuck
+tail.wast	107	assert_return	fail: line 107: {"args":[{"type":"i32","value":"193"}],"field":"host-ref","module":"tail","type":"invoke"}: expected assert_return [], actual stuck
+tail.wast	108	assert_return	fail: line 108: {"args":[{"type":"i32","value":"197"}],"field":"host-indirect","module":"tail","type":"invoke"}: expected assert_return [], actual stuck
+types.wast	2	module	pass
+types.wast	69	assert_return	pass
+types.wast	70	assert_return	pass
+types.wast	71	assert_trap	pass
+types.wast	72	assert_trap	pass
+types.wast	73	assert_trap	pass
+types.wast	74	assert_return	pass
+types.wast	75	assert_return	pass
+types.wast	76	assert_trap	pass
+types.wast	77	assert_return	pass
+types.wast	78	assert_return	pass
+types.wast	79	assert_return	pass
+types.wast	80	assert_return	pass
+types.wast	81	assert_return	pass
+types.wast	83	module	pass
+types.wast	93	register	pass
+types.wast	95	module	pass
+types.wast	107	assert_return	pass
+types.wast	110	assert_unlinkable	pass
+types.wast	115	assert_unlinkable	pass
+types.wast	122	assert_unlinkable	pass
+types.wast	127	assert_unlinkable	pass

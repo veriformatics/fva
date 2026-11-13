@@ -259,7 +259,8 @@ lane_planted() {
 		f=1
 	fi
 	# D49: the build rewrites a vendored base module's compiled file with its source untouched
-	# (`CallReturns`, which `Returns` claims mean, admitting a trap): the module stays base by its
+	# (`CallReturns`, which `Returns` claims mean, admitting a trap or an uncaught exception: its
+	# first `| _ => False` arm): the module stays base by its
 	# source, so its compiled bytes must fail the pins; the cache's Real.sqrt comes back first
 	for x in "" .server .private; do
 		ln -f "$PWD/.lake/packages/mathlib/.lake/build/lib/lean/$m.olean$x" "$olean$x" || exit 2
@@ -267,7 +268,7 @@ lane_planted() {
 	b=FVA/Spec/Claims
 	bsrc=$tmp/planted-base/$b.lean
 	mkdir -p "$(dirname "$bsrc")"
-	sed 's/^    | \.trapped _ => False$/    | .trapped _ => True/' "$q/fva/$b.lean" >"$bsrc"
+	sed '0,/^    | _ => False$/s//    | _ => True/' "$q/fva/$b.lean" >"$bsrc"
 	cmp -s "$bsrc" "$q/fva/$b.lean" && exit 2
 	bolean=$q/fva/.lake/build/lib/lean/$b.olean
 	lake env lean -R "$tmp/planted-base" -o "$bolean" "$bsrc" >"$tmp/planted-base.log" 2>&1 || exit 2

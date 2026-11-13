@@ -1,4 +1,4 @@
-import FVA.Spec.Syntax
+import FVA.Impl.TypeEq
 import FVA.Profile
 
 /-!

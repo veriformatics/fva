@@ -9,14 +9,14 @@ set_option maxRecDepth 6000
 set_option linter.unusedSimpArgs false
 
 noncomputable def dProloguePost (F : Context) (st : Store) (inst : ModuleInst) (mem : MemInst)
-    (ma src dst n cap cpy j m o' off : Nat) (v16 : Val) (c : Config) : Prop :=
+    (ma src dst n cap cpy j m o' off : Nat) (v16 : Option Val) (c : Config) : Prop :=
   ∃ v18, c = (ctx5 (ctx2 F)).fill
     ⟨st.setMem ma (prologue mem o' off).1,
       ⟨dLs src dst n cap cpy j m o' (prologue mem o' off).2 v16 v18, inst⟩,
       dAfterPrologue.map .plain⟩
 
 theorem d_prologue (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (a ma : Nat)
-    (mem : MemInst) (src dst n cap cpy j m o' off : Nat) (v16 : Val)
+    (mem : MemInst) (src dst n cap cpy j m o' off : Nat) (v16 : Option Val)
     (hcall : inst.funcs[3]? = some a)
     (hfun : st.funcs[a]? = some (.wasm copyType inst Lifted.func3))
     (hm : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some mem)

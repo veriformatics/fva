@@ -50,26 +50,33 @@ theorem body4_eq : body4 = [mainLoop] := by kernel_rfl
 attribute [local irreducible] body1 body2 body3 body4 mainLoop
 
 /-- Block `@1`'s code `es` running with locals `ls` (func 2 invoked from outside). -/
-noncomputable abbrev at1 (st : Store) (inst : ModuleInst) (ls : List Val) (es : List Instr) :
+noncomputable abbrev at1 (st : Store) (inst : ModuleInst) (ls : List (Option Val))
+    (es : List Instr) :
     Config :=
   (ctx1 F0).fill ⟨st, ⟨ls, inst⟩, es.map .plain⟩
 
 /-- The locals once `local 4 ← −1` ran: the arguments, then zeros. -/
-def ls0 (src dst n cap : Nat) : List Val :=
-  [vI src, vI dst, vI n, vI cap, .i32 4294967295#32, .i32 0, .i32 0, .i32 0, .i32 0, .i32 0,
-    .i32 0, .i32 0, .i32 0, .i32 0, .i32 0, .i32 0, .i32 0, .i32 0, .i32 0]
+def ls0 (src dst n cap : Nat) : List (Option Val) :=
+  [some (vI src), some (vI dst), some (vI n), some (vI cap), some (.i32 4294967295#32),
+    some (.i32 0), some (.i32 0), some (.i32 0), some (.i32 0), some (.i32 0), some (.i32 0),
+    some (.i32 0), some (.i32 0), some (.i32 0), some (.i32 0), some (.i32 0), some (.i32 0),
+    some (.i32 0), some (.i32 0)]
 
 /-- After `codeC1`. -/
-def ls1 (src dst n cap : Nat) : List Val :=
-  [vI src, vI dst, vI n, vI cap, .i32 4294967295#32, vI (dst + cap), vI (dst + cap - 32),
-    vI (src + n), vI (src + n - 16), vI (dst + cap - 5), vI (dst + cap - 7), .i32 0, .i32 0,
-    .i32 0, .i32 0, .i32 0, .i32 0, .i32 0, .i32 0]
+def ls1 (src dst n cap : Nat) : List (Option Val) :=
+  [some (vI src), some (vI dst), some (vI n), some (vI cap), some (.i32 4294967295#32),
+    some (vI (dst + cap)), some (vI (dst + cap - 32)), some (vI (src + n)),
+    some (vI (src + n - 16)), some (vI (dst + cap - 5)), some (vI (dst + cap - 7)), some (.i32 0),
+    some (.i32 0), some (.i32 0), some (.i32 0), some (.i32 0), some (.i32 0), some (.i32 0),
+    some (.i32 0)]
 
 /-- After `codeC2`: the main loop's locals. -/
-def ls2 (src dst n cap : Nat) : List Val :=
-  [vI src, vI dst, vI n, vI dst, vI src, vI (dst + cap), vI (dst + cap - 32), vI (src + n),
-    vI (src + n - 16), vI (dst + cap - 5), vI (dst + cap - 7), vI (src + n - 4), vI (src + n - 8),
-    vI (dst + cap - 12), vI (src + n - 15), .i32 0, .i32 0, .i32 0, .i32 0]
+def ls2 (src dst n cap : Nat) : List (Option Val) :=
+  [some (vI src), some (vI dst), some (vI n), some (vI dst), some (vI src), some (vI (dst + cap)),
+    some (vI (dst + cap - 32)), some (vI (src + n)), some (vI (src + n - 16)),
+    some (vI (dst + cap - 5)), some (vI (dst + cap - 7)), some (vI (src + n - 4)),
+    some (vI (src + n - 8)), some (vI (dst + cap - 12)), some (vI (src + n - 15)), some (.i32 0),
+    some (.i32 0), some (.i32 0), some (.i32 0)]
 
 /-- `Entry`'s exits. -/
 def EntryQ (st : Store) (inst : ModuleInst) (mem : MemInst) (src dst n cap : Nat) (c : Config) :
@@ -85,8 +92,8 @@ variable {H : HostSem} {st : Store} {inst : ModuleInst} {ma : Nat} {mem : MemIns
   {src dst n cap : Nat}
 
 /-- From block `@1`'s end, func 2 returns local 4. -/
-theorem ret_local4 {R W : Nat → Nat → Prop} {Q : Config → Prop} {ls : List Val} {v : Val}
-    (h4 : ls[4]? = some v) (hq : Q ⟨st, ⟨[], {}⟩, vals [v]⟩) :
+theorem ret_local4 {R W : Nat → Nat → Prop} {Q : Config → Prop} {ls : List (Option Val)} {v : Val}
+    (h4 : ls[4]? = some (some v)) (hq : Q ⟨st, ⟨[], {}⟩, vals [v]⟩) :
     Until H (Within R W) Q (F0.fill ⟨st, ⟨ls, inst⟩, (Lifted.func2.body.drop 3).map .plain⟩) := by
   rw [fn_tail]
   wasm_cstepu [h4]
@@ -150,8 +157,8 @@ theorem entry_zero (hm0 : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some m
       (fun c => EntryQ st inst mem src dst n cap c ∨ (cap ≠ 0 ∧
         c = at1 st inst (ls0 src dst n cap) (codeB ++ codeC1 ++ codeC2 ++
           .block .empty body2 :: epi)))
-      (at1 st inst (ls0 src dst n cap) (.block .empty zeroCap :: codeB ++ codeC1 ++ codeC2 ++
-          .block .empty body2 :: epi)) := by
+      (at1 st inst (ls0 src dst n cap)
+          (.block .empty zeroCap :: codeB ++ codeC1 ++ codeC2 ++ .block .empty body2 :: epi)) := by
   show Until H _ _ ((ctx1 F0).fill ⟨st, ⟨_, inst⟩, _⟩)
   iterate 2 (wasm_cstepu [zeroCap, ls0]; · wasm_within [zeroCap])
   by_cases hc0 : cap = 0

@@ -25,7 +25,7 @@ def sumBody : List Instr :=
 def sumFunc : Func := { type := 0, locals := [(1, .num .i32)], body := sumBody }
 
 /-- A store holding the function at address 0. -/
-def store0 : Store := { funcs := [.wasm ⟨[.num .i32], [.num .i32]⟩ {} sumFunc] }
+def store0 : Store := { funcs := [.wasm ⟨[⟨[.num .i32], [.num .i32]⟩], 0⟩ {} sumFunc] }
 
 private theorem nvFrame (n f es) : toVal (.frame n f es) = none := rfl
 private theorem nvLabel (n cont es) : toVal (.label n cont es) = none := rfl
@@ -40,7 +40,7 @@ private theorem nvBranch (l) : toVal (.plain (.br l)) = none := rfl
 private theorem nvBranchIf (l) : toVal (.plain (.brIf l)) = none := rfl
 
 private theorem lookup_func :
-    store0.funcs[0]? = some (.wasm ⟨[.num .i32], [.num .i32]⟩ {} sumFunc) := rfl
+    store0.funcs[0]? = some (.wasm ⟨[⟨[.num .i32], [.num .i32]⟩], 0⟩ {} sumFunc) := rfl
 
 private theorem toVal_one :
     toVal (.plain (.iconst .w32 1)) = some (.i32 1) := rfl
@@ -82,7 +82,7 @@ private def loopInstr : Instr :=
 
 /-- Configuration immediately before entering or re-entering the loop. -/
 private def loopEntry (n acc : BitVec 32) : Config :=
-  ⟨store0, ⟨[], {}⟩, [.frame 1 ⟨[.i32 n, .i32 acc], {}⟩
+  ⟨store0, ⟨[], {}⟩, [.frame 1 ⟨[some (.i32 n), some (.i32 acc)], {}⟩
     [.label 1 [] (.label 0 [] [.plain loopInstr] :: (sumBody.drop 1).map .plain)]]⟩
 
 /-- The caller configuration after the function returns. -/
@@ -93,7 +93,8 @@ private theorem start_walk (n : BitVec 32) :
     walk 2 (invokeConfig store0 0 [.i32 n]) = some (loopEntry n 0) := by
   simp [walk, loopEntry, loopInstr, lookup_func, sumFunc, sumBody, invokeConfig,
     uniqueStep, seqUnique, atUnique, instrUnique, step, seq, atInstr, instrStep,
-    BlockType.expand, Func.localDefaults, ValType.default]
+    BlockType.expand, Func.localDefaults, ValType.default, DefType.expand, FuncType.mapHeap,
+    ValType.mapHeap]
 
 private theorem zero_walk (acc : BitVec 32) :
     walk 8 (loopEntry 0 acc) = some (returned acc) := by

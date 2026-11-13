@@ -4,18 +4,18 @@
    "text":
    "clamp(x, lo, hi) returns lo when x < lo, hi when x > hi, and x otherwise (for lo <= hi).",
    "reason":
-   "The claim guarantees that clamp returns x for every input, including when x is below lo or above hi. For example, clamp(7, 2, 5) is required to return 5 but the claim guarantees 7.",
+   "The claim guarantees that clamp always returns x, including when x is below lo or above hi. For example, it says clamp(7, 2, 5) returns 7, but the requirement says it returns hi (5); it also covers lo > hi, which the requirement does not specify.",
    "id": "R1",
    "claims": ["Examples.Mislabeled.clamp"]}],
  "model": "gpt-6-luna",
  "inputsSha":
- "3b8c0a318d35f0177676d1d55903ec53db8d73512300d24bc60a938a227397b8",
- "generated": "2026-11-07 04:16 UTC",
+ "585aa98a10f9605005a139d2c61ae27047625fb11dd97f0f67ca5af4edf1c19b",
+ "generated": "2026-11-07 07:48 UTC",
  "effort": "medium",
  "claims":
  [{"verdict": "",
    "summary":
-   "For every choice of three 32-bit inputs, the exported function named “clamp” returns the first input unchanged.",
+   "The module’s clamp export always returns its first 32-bit input, for every choice of its three 32-bit inputs.",
    "statement":
    "∀ (x lo hi : BitVec 32),\n  FVA.Wasm.Exec.Returns Examples.Mislabeled.Lifted.module \"clamp\"\n    [FVA.Wasm.Exec.Val.i32 x, FVA.Wasm.Exec.Val.i32 lo, FVA.Wasm.Exec.Val.i32 hi] [FVA.Wasm.Exec.Val.i32 x]",
    "serves": ["R1"],
@@ -42,25 +42,24 @@
      "binary": [7],
      "args": [7, 2, 5]},
     {"status": "confirmed",
-     "spec": [3],
-     "holds": null,
-     "binary": [3],
-     "args": [3, 4, 9]},
-    {"status": "confirmed",
      "spec": [4294967295],
      "holds": null,
      "binary": [4294967295],
-     "args": [4294967295, 0, 4294967295]},
+     "args": [4294967295, 0, 10]},
+    {"status": "confirmed",
+     "spec": [5],
+     "holds": null,
+     "binary": [5],
+     "args": [5, 8, 2]},
     {"status": "confirmed",
      "spec": [1],
      "holds": null,
      "binary": [1],
      "args": [1, 1, 1]}],
    "details":
-   ["Covers every combination of three 32-bit bit-vectors: the value, lower bound, and upper bound.",
-    "All are passed as Wasm 32-bit integer values; the claim does not interpret them as signed or unsigned numbers.",
-    "The returned 32-bit value must equal the first input bit-for-bit. No arithmetic or wraparound condition is involved.",
-    "Returns additionally requires the module to be instantiable and every call from every fresh instance, under every host behavior, to terminate without trapping and return exactly that value."],
+   ["Covers every three-argument combination of 32-bit bit-vector values; all three arguments and the returned value are passed as i32 bit patterns, not interpreted as signed or unsigned integers.",
+    "There is no arithmetic or wraparound condition stated; the specified result is the first argument unchanged.",
+    "Returns additionally requires that the module can be instantiated, and that every call in every fresh instance under every host behavior terminates, does not trap or throw, and returns exactly the specified value."],
    "caveats":
-   ["Despite the export name “clamp,” the elaborated claim says the result is exactly the first input for every input; it does not assert clamping or any relationship to the lower and upper bounds.",
-    "It says nothing about memory effects or behavior of exports other than this call."]}]}
+   ["Despite the export name, the claim does not specify clamping: its result is exactly the first input, regardless of the other inputs.",
+    "The statement is conditional on the module being instantiable; if it is not, the claim is false rather than vacuously true. It also makes no claim about memory changes."]}]}

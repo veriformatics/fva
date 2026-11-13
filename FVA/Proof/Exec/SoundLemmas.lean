@@ -138,7 +138,7 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
         (v₁ := v₁) (v₂ := v₂) (c := c))
   case case13 =>
     rcases h with ⟨v, hv, rfl, rfl, rfl, rfl⟩
-    exact ⟨[], rfl, StepP.localGet hv⟩
+    exact ⟨[], rfl, StepP.localGet (Option.join_eq_some_iff.mp hv)⟩
   case case14 x v stk hx =>
     rcases h with ⟨rfl, rfl, rfl, rfl⟩
     exact ⟨[_], rfl, StepP.localSet (by simpa only [Nat.blt_eq, decide_eq_true_eq] using hx)⟩
@@ -204,6 +204,9 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
       intro a ha
       have := callTarget_eq_some.mpr ha
       simp only [ht, reduceCtorEq] at this
+  case case60 =>
+    rcases h with ⟨rfl, rfl, rfl, rfl⟩
+    exact ⟨[], rfl, StepP.refNull⟩
   case case21 x i stk =>
     rcases h with ⟨⟨a, t⟩, ht, h⟩
     rcases tableAt_eq_some.mp ht with ⟨ha, ht⟩
@@ -464,5 +467,69 @@ theorem instrStep_sound {H : HostSem} {s s' : Store} {f f' : Frame} {i : Instr}
       refine ⟨(stk.take ft.params.length).reverse, ?_, StepP.loop hft ?_⟩
       · simp
       · simp [Nat.min_eq_left (nblt_false.mp hb)]
+  case case61 bt cs body =>
+    rcases h with ⟨ft, hft, h⟩
+    simp only [cond] at h
+    split at h
+    · contradiction
+    · rename_i hb
+      cases h
+      refine ⟨(stk.take ft.params.length).reverse, ?_, StepP.tryTable hft ?_⟩
+      · simp
+      · simp [Nat.min_eq_left (nblt_false.mp hb)]
+  case case62 x ta hta ti hti =>
+    rcases h with ⟨ft, hft, h⟩
+    simp only [cond] at h
+    split at h
+    · contradiction
+    · rename_i hb
+      cases h
+      simp only [Bool.or_eq_false_iff, Bool.not_eq_false', List.isEmpty_iff] at hb
+      refine ⟨(stk.take ft.params.length).reverse, ?_, StepP.throw hta hti hft hb.1 ?_⟩
+      · simp
+      · simp [Nat.min_eq_left (nblt_false.mp hb.2)]
+  case case65 =>
+    rcases h with ⟨a, ha, rfl, rfl, rfl, rfl⟩
+    exact ⟨[], rfl, StepP.returnCall ha⟩
+  case case66 =>
+    rcases h with ⟨rfl, rfl, rfl, rfl⟩
+    exact ⟨[.ref (.func _)], rfl, StepP.returnCallRef⟩
+  case case67 =>
+    rcases h with ⟨rfl, rfl, rfl, rfl⟩
+    exact ⟨[.ref .null], rfl, StepP.returnCallRefNull⟩
+  case case68 x y i stk =>
+    rcases h with ⟨rfl, rfl, rfl, rfl⟩
+    refine ⟨[.i32 i], rfl, ?_⟩
+    cases ht : callTarget s f x y i with
+    | some a => exact StepP.returnCallIndirect (callTarget_eq_some.mp ht)
+    | none =>
+      apply StepP.returnCallIndirectTrap
+      intro a ha
+      have := callTarget_eq_some.mpr ha
+      simp only [ht, reduceCtorEq] at this
+  case case69 =>
+    rcases h with ⟨rfl, rfl, rfl, rfl⟩
+    exact ⟨[.ref (.func _)], rfl, StepP.callRef⟩
+  case case70 =>
+    rcases h with ⟨rfl, rfl, rfl, rfl⟩
+    exact ⟨[.ref .null], rfl, StepP.callRefNull⟩
+  case case71 r stk =>
+    rcases h with ⟨rfl, rfl, rfl, rfl⟩
+    refine ⟨[.ref r], rfl, ?_⟩
+    cases r with
+    | null => exact StepP.refAsNonNullNull
+    | _ => exact StepP.refAsNonNull nofun
+  case case72 l r stk =>
+    rcases h with ⟨rfl, rfl, rfl, rfl⟩
+    refine ⟨[.ref r], rfl, ?_⟩
+    cases r with
+    | null => exact StepP.brOnNull
+    | _ => exact StepP.brOnNullValue nofun
+  case case73 l r stk =>
+    rcases h with ⟨rfl, rfl, rfl, rfl⟩
+    refine ⟨[.ref r], rfl, ?_⟩
+    cases r with
+    | null => exact StepP.brOnNonNullNull
+    | _ => exact StepP.brOnNonNull nofun
 
 end FVA.Wasm.Exec.Ref

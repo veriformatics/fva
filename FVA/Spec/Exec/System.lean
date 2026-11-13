@@ -39,7 +39,7 @@ def SysStep (W : World) (fits : Bool) : W.St × Config → W.St × Config → Pr
     ((StepP NoHost fits c d ∧ τ = σ) ∨ (StepP (W.host σ τ) fits c d ∧ ¬ Step NoHost c d))
 
 /-- How a process finished, with its final world and store: values returned, an explicit exit,
-or abnormally (a trap). -/
+or abnormally (a trap or an uncaught exception). -/
 inductive SysOutcome (St : Type) where
   | returned (σ : St) (s : Store) (vs : List Val)
   | exited (σ : St) (s : Store) (code : Nat)
@@ -50,7 +50,8 @@ A command's `returned` from `_start` = exit 0. -/
 def SysFinal (W : World) : W.St × Config → SysOutcome W.St → Prop
   | (σ, c), .returned σ' s vs => σ' = σ ∧ W.exited σ = none ∧ Final c (.returned s vs)
   | (σ, c), .exited σ' s k => σ' = σ ∧ W.exited σ = some k ∧ c.store = s
-  | (σ, c), .abnormal σ' s => σ' = σ ∧ W.exited σ = none ∧ Final c (.trapped s)
+  | (σ, c), .abnormal σ' s =>
+    σ' = σ ∧ W.exited σ = none ∧ (Final c (.trapped s) ∨ ∃ a, Final c (.thrown s a))
 
 /-- Total correctness of a process: every execution finishes, with an outcome satisfying `Q`. -/
 inductive SysMust (W : World) (fits : Bool) (Q : SysOutcome W.St → Prop) :

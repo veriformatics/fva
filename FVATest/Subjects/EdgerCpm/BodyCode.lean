@@ -16,23 +16,25 @@ noncomputable def cellCode : List Instr := elseCode (columnCode.getD 3 .nop)
 noncomputable def freeLoop : Instr := (thenCode (rowCode.getD 3 .nop)).getD 0 .nop
 
 noncomputable def prefixFrame (x : Input) (l : Layout) (inst : ModuleInst) : Frame :=
-  ⟨[.i32 0, .i32 (.ofNat 32 l.lib), .i32 (.ofNat 32 l.c), .i32 (.ofNat 32 x.m),
-    .i32 0, .i32 0, .i32 (.ofNat 32 x.n), .i32 0, .i32 1, .i32 0, .i32 0, .i32 0], inst⟩
+  ⟨[some (.i32 0), some (.i32 (.ofNat 32 l.lib)), some (.i32 (.ofNat 32 l.c)),
+    some (.i32 (.ofNat 32 x.m)), some (.i32 0), some (.i32 0), some (.i32 (.ofNat 32 x.n)),
+    some (.i32 0), some (.i32 1), some (.i32 0), some (.i32 0), some (.i32 0)], inst⟩
 
 noncomputable def tableFrame (x : Input) (l : Layout) (inst : ModuleInst) (t : BitVec 32) :
     Frame :=
-  ⟨(prefixFrame x l inst).locals.set 4 (.i32 t), inst⟩
+  ⟨(prefixFrame x l inst).locals.set 4 (some (.i32 t)), inst⟩
 
 noncomputable def allocatedHead (x : Input) (l : Layout) (inst : ModuleInst)
     (t : BitVec 32) : List AInstr :=
-  [.frame 0 ⟨(tableFrame x l inst t).locals.set 0 (.i32 1), inst⟩
+  [.frame 0 ⟨(tableFrame x l inst t).locals.set 0 (some (.i32 1)), inst⟩
     [.label 0 [] ((Lifted.func86.body.drop 14).map .plain)]]
 
 noncomputable def mainFrame (x : Input) (l : Layout) (inst : ModuleInst)
     (t : BitVec 32) (r j : Nat) (p b : BitVec 32) : Frame :=
-  ⟨[.i32 (.ofNat 32 j), .i32 (.ofNat 32 l.lib), .i32 (.ofNat 32 l.c),
-    .i32 (.ofNat 32 r), .i32 t, .i32 p, .i32 (.ofNat 32 x.n), .i32 0, .i32 1,
-    .i32 (.ofNat 32 x.n), .i32 (.ofNat 32 x.m), .i32 b], inst⟩
+  ⟨[some (.i32 (.ofNat 32 j)), some (.i32 (.ofNat 32 l.lib)), some (.i32 (.ofNat 32 l.c)),
+    some (.i32 (.ofNat 32 r)), some (.i32 t), some (.i32 p), some (.i32 (.ofNat 32 x.n)),
+    some (.i32 0), some (.i32 1), some (.i32 (.ofNat 32 x.n)), some (.i32 (.ofNat 32 x.m)),
+    some (.i32 b)], inst⟩
 
 noncomputable def columnHead (tail : List AInstr) : List AInstr :=
   .label 0 [rowLoop] (.plain columnLoop :: (rowCode.drop 19).map .plain) :: tail

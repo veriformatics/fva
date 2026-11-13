@@ -3,13 +3,13 @@ import FVATest.Subjects.GlmIround.Proof
 answer, but not what the shipped code returns) must not prove — the module returns 1. -/
 open FVA.Wasm.Exec FVA.Wasm.Exec.Ref FVA.Wasm.Num Subjects.GlmIround
 example : Returns Lifted.module "iround" [.f64 belowHalf] [.i32 0] := by
-  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl, ?_⟩
+  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl rfl, ?_⟩
   rintro H s inst hinst
-  obtain ⟨h1, h2⟩ := Prod.mk.inj (instance_alloc rfl rfl rfl rfl hinst)
+  obtain ⟨h1, h2⟩ := Prod.mk.inj (instance_alloc rfl rfl rfl rfl rfl hinst)
   subst h1; subst h2
-  refine ⟨0, by decide +kernel, ⟨_, rfl, .cons ⟨⟩ .nil⟩, ?_⟩
+  refine ⟨0, by decide +kernel, ⟨_, _, rfl, rfl, .cons ⟨⟩ .nil⟩, ?_⟩
   refine (must_returned_of_runDet_get (P := fun _ _ => True) (vs := [.i32 0]) (n := 50)
     runSome (by kernel_rfl) trivial).mono ?_
-  rintro (⟨s', vs⟩ | s') h
+  rintro (⟨s', vs⟩ | s' | ⟨s', a⟩) h
   · exact h.1
-  · exact h
+  all_goals exact h

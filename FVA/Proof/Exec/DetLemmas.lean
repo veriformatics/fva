@@ -43,6 +43,9 @@ theorem stack_drop (vs ws : List Val) :
     seq s f stk (vals vs) = .final := by
   simpa only [List.append_nil, seq] using seq_vals s f stk vs []
 
+@[simp] theorem seq_throwing (s : Store) (f : Frame) (a : Nat) :
+    seq s f [] (throwing a) = .thrown a := rfl
+
 theorem seq_block_br (s : Store) (f : Frame) (args : List Val) {l : Nat} (L : BlockCtx l) :
     ∀ (k : Nat) (stk : List Val) (rest : List AInstr),
       ∃ extra, seq s f stk (L.fill (vals args ++ [.plain (.br (l + k))]) ++ rest) =
@@ -61,6 +64,13 @@ theorem seq_block_br (s : Store) (f : Frame) (args : List Val) {l : Nat} (L : Bl
     simp only [List.append_nil] at hx
     simp only [BlockCtx.fill, he, List.append_assoc, seq_vals,
       List.cons_append, seq, toVal, atInstr, hx]
+  | @handler l vs n cs inner tail ih =>
+    intro k stk rest
+    obtain ⟨extra, hx⟩ := ih k [] []
+    refine ⟨extra, ?_⟩
+    simp only [List.append_nil] at hx
+    simp only [BlockCtx.fill, List.append_assoc, seq_vals,
+      List.cons_append, seq, toVal, atInstr, hx]
 
 theorem seq_block_ret (s : Store) (f : Frame) (args : List Val) {l : Nat} (L : BlockCtx l) :
     ∀ (stk : List Val) (rest : List AInstr),
@@ -73,6 +83,13 @@ theorem seq_block_ret (s : Store) (f : Frame) (args : List Val) {l : Nat} (L : B
     simp only [BlockCtx.fill, List.append_assoc, seq_vals,
       List.cons_append, seq, toVal, atInstr]
   | label vs n cont inner tail ih =>
+    intro stk rest
+    obtain ⟨extra, hx⟩ := ih [] []
+    refine ⟨extra, ?_⟩
+    simp only [List.append_nil] at hx
+    simp only [BlockCtx.fill, List.append_assoc, seq_vals,
+      List.cons_append, seq, toVal, atInstr, hx]
+  | handler vs n cs inner tail ih =>
     intro stk rest
     obtain ⟨extra, hx⟩ := ih [] []
     refine ⟨extra, ?_⟩

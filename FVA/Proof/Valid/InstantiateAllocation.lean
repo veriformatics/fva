@@ -5,56 +5,65 @@ namespace FVA.Wasm.Valid.InitProof
 
 open FVA.Wasm FVA.Wasm.Exec
 
-/-- Tables of the 2.0 profile hold nullable references (`ModuleValid.profile`). -/
-theorem table_nullable {m : Module} (hv : ModuleValid m) {t : Table} (ht : t ∈ m.tables) :
-    t.type.elem = ⟨true, t.type.elem.heap⟩ := by
-  have h := hv.profile
-  simp only [Module.inP2, Bool.and_eq_true, List.all_eq_true] at h
-  obtain ⟨⟨⟨⟨⟨⟨⟨⟨-, -⟩, -⟩, htab⟩, -⟩, -⟩, -⟩, -⟩, -⟩ := h
-  have hr := (htab t ht).1
-  simp only [ValType.inP2, Bool.or_eq_true, beq_iff_eq] at hr
-  rcases hr with hr | hr <;> rw [hr]
+/-- The initializer of a 2.0-profile table is a typed constant `ref.null` of its element
+type. -/
+theorem table_init {m : Module} (hv : ModuleValid m) {t : Table} (ht : t ∈ m.tables)
+    (C : Context) : ExprT C t.init [.ref t.type.elem] ∧ ConstExpr C t.init := by
+  obtain ⟨a, he, -, hi⟩ := (Module.inP2_spec hv.profile).tables t ht
+  rw [hi, he]
+  exact ⟨⟨_, SeqT.single .refNull, Matches.refl _⟩, by simp [ConstExpr, ConstInstr]⟩
 
 theorem alloc_values {H : HostSem} {s : Store} {m : Module} {imports : List ExternVal}
     (hv : ModuleValid m) (hm : ImportsMatch s m imports) (hs : StoreOK s)
-    (gvals : List Val) (erefs : List (List Ref))
+    (gvals : List Val) (trefs : List Ref) (erefs : List (List Ref))
     (hg : List.Forall₂ (fun g v => Steps H
-      ⟨(allocModule s m imports gvals erefs).1,
-        ⟨[], (allocModule s m imports gvals erefs).2⟩, g.init.map .plain⟩
-      ⟨(allocModule s m imports gvals erefs).1,
-        ⟨[], (allocModule s m imports gvals erefs).2⟩, [v.instr]⟩) m.globals gvals)
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, g.init.map .plain⟩
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, [v.instr]⟩) m.globals gvals)
+    (ht : List.Forall₂ (fun t r => Steps H
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, t.init.map .plain⟩
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, [(Val.ref r).instr]⟩) m.tables trefs)
     (he : List.Forall₂ (fun e rs => List.Forall₂ (fun ex r => Steps H
-      ⟨(allocModule s m imports gvals erefs).1,
-        ⟨[], (allocModule s m imports gvals erefs).2⟩, ex.map .plain⟩
-      ⟨(allocModule s m imports gvals erefs).1,
-        ⟨[], (allocModule s m imports gvals erefs).2⟩, [(Val.ref r).instr]⟩) e.init rs)
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, ex.map .plain⟩
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, [(Val.ref r).instr]⟩) e.init rs)
       m.elems erefs) :
-    List.Forall₂ (fun g v => Val.HasType (allocModule s m imports gvals erefs).1 v g.type.val)
+    List.Forall₂ (fun g v => Val.HasType (allocModule s m imports gvals trefs erefs).1 v g.type.val)
       m.globals gvals ∧
+    List.Forall₂ (fun t r =>
+      Val.HasType (allocModule s m imports gvals trefs erefs).1 (.ref r) (.ref t.type.elem))
+      m.tables trefs ∧
     List.Forall₂ (fun e rs => ∀ r ∈ rs,
-      Val.HasType (allocModule s m imports gvals erefs).1 (.ref r) (.ref e.type.nullable))
+      Val.HasType (allocModule s m imports gvals trefs erefs).1 (.ref r) (.ref e.type.nullable))
       m.elems erefs := by
-  let s₁ := (allocModule s m imports gvals erefs).1
-  let inst := (allocModule s m imports gvals erefs).2
+  let s₁ := (allocModule s m imports gvals trefs erefs).1
+  let inst := (allocModule s m imports gvals trefs erefs).2
   let C : Context := { moduleContext m with globals := importGlobals m.imports }
   have hfuncs : ∀ (x : Nat) (ft : FuncType), C.funcs[x]? = some ft →
       ∃ a, inst.funcs[x]? = some a ∧ a < s₁.funcs.length := by
     intro x ft hx
-    obtain ⟨a, ha, fi, hfi, _⟩ := forall₂_lookup_right (alloc_funcs hv hm gvals erefs) hx
+    obtain ⟨a, ha, fi, hfi, _⟩ := forall₂_lookup_right (alloc_funcs hv hm gvals trefs erefs) hx
     exact ⟨a, ha, lookup_lt hfi⟩
   have hglobals : ∀ (x : Nat) (gt : GlobalType), C.globals[x]? = some gt →
       ∃ (a : Nat) (gi : GlobalInst), inst.globals[x]? = some a ∧ s₁.globals[a]? = some gi ∧
         gi.value.HasType s₁ gt.val := by
     intro x gt hx
-    obtain ⟨a, ha, gi, hgi, htype⟩ := forall₂_lookup_right (import_globals hm) hx
+    obtain ⟨a, ha, gi, hgi, htype⟩ := forall₂_lookup_right (import_globals hv hm) hx
     refine ⟨a, gi, lookup_append ha, lookup_append hgi, ?_⟩
-    have ht := (alloc_extends s m imports gvals erefs).value
-      (hs.globals gi (List.mem_of_getElem? hgi))
-    simpa [htype] using ht
-  constructor
+    exact ((alloc_extends s m imports gvals trefs erefs).value
+      (hs.globals gi (List.mem_of_getElem? hgi))).globalSub htype
+  refine ⟨?_, ?_, ?_⟩
   · apply rel_imp_mem hg
     intro g hgin v _ hsteps
     exact constant_value hfuncs hglobals (hv.globals g hgin).1 (hv.globals g hgin).2 hsteps
+  · apply rel_imp_mem ht
+    intro t htin r _ hsteps
+    obtain ⟨hte, htc⟩ := table_init hv htin C
+    exact constant_value hfuncs hglobals hte htc hsteps
   · apply rel_imp_mem he
     intro e hein rs _ hsteps r hr
     have htyped :
@@ -71,17 +80,22 @@ theorem alloc_values {H : HostSem} {s : Store} {m : Module} {imports : List Exte
 through the proven extension; function typing uses allocation metadata, not recursive StoreOK. -/
 theorem alloc_store {s : Store} {m : Module} {imports : List ExternVal}
     (hv : ModuleValid m) (hm : ImportsMatch s m imports) (hs : StoreOK s)
-    (gvals : List Val) (erefs : List (List Ref))
+    (gvals : List Val) (trefs : List Ref) (erefs : List (List Ref))
     (hg : List.Forall₂ (fun g v =>
-      Val.HasType (allocModule s m imports gvals erefs).1 v g.type.val) m.globals gvals)
+      Val.HasType (allocModule s m imports gvals trefs erefs).1 v g.type.val) m.globals gvals)
+    (ht : List.Forall₂ (fun t r =>
+      Val.HasType (allocModule s m imports gvals trefs erefs).1 (.ref r) (.ref t.type.elem))
+      m.tables trefs)
     (he : List.Forall₂ (fun e rs => ∀ r ∈ rs,
-      Val.HasType (allocModule s m imports gvals erefs).1 (.ref r) (.ref e.type.nullable))
+      Val.HasType (allocModule s m imports gvals trefs erefs).1 (.ref r) (.ref e.type.nullable))
       m.elems erefs) :
-    StoreOK (allocModule s m imports gvals erefs).1 := by
-  let s₁ := (allocModule s m imports gvals erefs).1
-  let inst := (allocModule s m imports gvals erefs).2
-  have hext := alloc_extends s m imports gvals erefs
-  obtain ⟨C, hinst, hctx⟩ := alloc_instance hv hm gvals erefs hg.length_eq he.length_eq
+    StoreOK (allocModule s m imports gvals trefs erefs).1 := by
+  let s₁ := (allocModule s m imports gvals trefs erefs).1
+  let inst := (allocModule s m imports gvals trefs erefs).2
+  have hP := Module.inP2_spec hv.profile
+  have hext := alloc_extends s m imports gvals trefs erefs
+  obtain ⟨C, hinst, hctx⟩ :=
+    alloc_instance hv hm gvals trefs erefs hg.length_eq ht.length_eq he.length_eq
   constructor
   · intro fi hfi
     change fi ∈ s.funcs ++ m.funcs.map _ at hfi
@@ -90,20 +104,23 @@ theorem alloc_store {s : Store} {m : Module} {imports : List ExternVal}
     · obtain ⟨fn, hfn, rfl⟩ := List.mem_map.mp hfi
       obtain ⟨ft, hft, hdef, hbody⟩ := hv.funcs fn hfn
       have hcode := FuncT.transport (C := moduleContext m) ⟨hft, hdef, hbody⟩ hctx
-      have htype : m.typeList[fn.type]? = some ft := hft
-      refine ⟨C, hinst, ?_⟩
-      simpa [htype] using hcode
+      obtain ⟨dt, hdt, hexp⟩ := forall₂_lookup_right (forall₂_defTypes hP.types) hft
+      refine ⟨C, ft, ?_, hinst, hcode⟩
+      simpa only [FuncInst.type, hdt, Option.getD_some] using hexp
   · intro ti hti
-    change ti ∈ s.tables ++ m.tables.map _ at hti
+    change ti ∈ s.tables ++ (m.tables.zip trefs).map _ at hti
     rcases List.mem_append.mp hti with hti | hti
-    · obtain ⟨ht, hlen, hvals⟩ := hs.tables ti hti
-      exact ⟨ht, hlen, fun r hr => hext.value (hvals r hr)⟩
-    · obtain ⟨tt, htt, rfl⟩ := List.mem_map.mp hti
+    · obtain ⟨htt, hlen, hvals⟩ := hs.tables ti hti
+      exact ⟨htt, hlen, fun r hr => hext.value (hvals r hr)⟩
+    · obtain ⟨⟨tt, r₀⟩, hpair, rfl⟩ := List.mem_map.mp hti
+      have htt := (List.of_mem_zip hpair).1
+      obtain ⟨a, hea, -, -⟩ := hP.tables tt htt
       refine ⟨hv.tables tt htt, List.length_replicate, ?_⟩
       intro r hr
-      have hr' : r = Ref.null tt.type.elem.heap := (List.mem_replicate.mp hr).2
-      simp only [hr', Val.HasType]
-      exact table_nullable hv htt
+      rw [(List.mem_replicate.mp hr).2]
+      have h₀ := List.forall₂_zip ht hpair
+      simp only [hea] at h₀ ⊢
+      exact h₀
   · intro mi hmi
     change mi ∈ s.mems ++ m.mems.map _ at hmi
     rcases List.mem_append.mp hmi with hmi | hmi
@@ -115,12 +132,19 @@ theorem alloc_store {s : Store} {m : Module} {imports : List ExternVal}
     rcases List.mem_append.mp hgi with hgi | hgi
     · exact hext.value (hs.globals gi hgi)
     · obtain ⟨⟨g, v⟩, hpair, rfl⟩ := List.mem_map.mp hgi
-      exact List.forall₂_zip hg hpair
+      have hval := List.forall₂_zip hg hpair
+      dsimp only
+      rw [ValType.mapHeap_of_inP2 (σ := closeHeap m.defTypes) (fun _ => rfl)
+        (hP.globals g (List.of_mem_zip hpair).1)]
+      exact hval
   · intro ei hei r hr
     change ei ∈ s.elems ++ (m.elems.zip erefs).map _ at hei
     rcases List.mem_append.mp hei with hei | hei
     · exact hext.value (hs.elems ei hei r hr)
     · obtain ⟨⟨e, rs⟩, hpair, rfl⟩ := List.mem_map.mp hei
-      exact List.forall₂_zip he hpair r hr
+      obtain ⟨a, hb⟩ := HeapType.eq_abs_of_inP2 (hP.elems e (List.of_mem_zip hpair).1)
+      have hval := List.forall₂_zip he hpair r hr
+      simp only [RefType.nullable, hb, closeHeap_abs] at hval ⊢
+      exact hval
 
 end FVA.Wasm.Valid.InitProof

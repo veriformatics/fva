@@ -14,8 +14,10 @@ theorem mp1_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleInst) 
     (hd : d + r ≤ mem.size) (hs : s + r ≤ mem.size) (hsize : mem.size < 2 ^ 32) (hr : 0 < r) :
     Until H (Within (Span ma s r) (Span ma d r))
       (fun c => c = C.fill ⟨st.setMem ma (fwdCopy mem d s r),
-        ⟨[u0, u1, u2, vI (s + r), vI (d + r), u5, vI 0], inst⟩, rest⟩)
-      (C.fill ⟨st, ⟨[u0, u1, u2, vI s, vI d, u5, vI r], inst⟩,
+        ⟨[some u0, some u1, some u2, some (vI (s + r)), some (vI (d + r)), some u5, some (vI 0)],
+            inst⟩, rest⟩)
+      (C.fill ⟨st,
+          ⟨[some u0, some u1, some u2, some (vI s), some (vI d), some u5, some (vI r)], inst⟩,
         [.plain (.loop .empty mp1)] ++ rest⟩) := by
   induction r generalizing st mem d s with
   | zero => omega
@@ -53,8 +55,11 @@ theorem mp4_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleInst) 
     (he : e = i + 4 * k) (hk : 0 < k) :
     Until H (Within (Span ma (s + i) (4 * k)) (Span ma (d + i) (4 * k)))
       (fun c => c = C.fill ⟨st.setMem ma (fwdCopy mem (d + i) (s + i) (4 * k)),
-        ⟨[vI d, vI s, vI e, vI (d + e - 4), vI e, vI (s + e - 4), vI r], inst⟩, rest⟩)
-      (C.fill ⟨st, ⟨[vI d, vI s, vI e, u3, vI i, u5, vI r], inst⟩,
+        ⟨[some (vI d), some (vI s), some (vI e), some (vI (d + e - 4)), some (vI e),
+            some (vI (s + e - 4)), some (vI r)], inst⟩, rest⟩)
+      (C.fill ⟨st,
+          ⟨[some (vI d), some (vI s), some (vI e), some u3, some (vI i), some u5, some (vI r)],
+          inst⟩,
         [.plain (.loop .empty mp4)] ++ rest⟩) := by
   induction k generalizing st mem i u3 u5 with
   | zero => omega

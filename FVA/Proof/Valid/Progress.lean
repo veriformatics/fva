@@ -22,18 +22,20 @@ theorem ainstr_progress {H : HostSem} (hH : ValidHost H) {s : Store} {C : Contex
   case plain hi => exact instr_progress hi hf hargs
   case refFuncAddr ha => cases hargs; exact .values [.ref (.func _)]
   case refExternAddr => cases hargs; exact .values [.ref (.extern _)]
+  case refNullAddr => cases hargs; exact .values [.ref .null]
+  case refExnAddr => cases hargs; exact .values [.ref (.exn _)]
   case trap => exact FragmentProgress.trap.prepend args
-  case invoke C addr fi hfi =>
+  case invoke C addr fi ft hfi hft =>
     have hvs := hasOp_ops_iff.mp hargs
     have hlen := hvs.length_eq
     cases fi with
-    | wasm ft inst code => exact .step (.invoke hfi hlen)
-    | host ft id =>
-      obtain ⟨out, hout⟩ := (hH _ _ _ _ _ hfi hvs).1
+    | wasm dt inst code => exact .step (.invoke hfi hft hlen)
+    | host dt id =>
+      obtain ⟨out, hout⟩ := (hH _ _ _ _ _ _ hfi hft hvs).1
       cases out with
-      | returned s' res => exact .step (.invokeHost hfi hlen hout)
-      | trapped s' => exact .step (.invokeHostTrap hfi hlen hout)
-      | diverged => exact .step (.invokeHostDiverge hfi hlen hout)
+      | returned s' res => exact .step (.invokeHost hfi hft hlen hout)
+      | trapped s' => exact .step (.invokeHostTrap hfi hft hlen hout)
+      | diverged => exact .step (.invokeHostDiverge hfi hft hlen hout)
   case label C n cont body t₁ t₂ hn hc hb ih =>
     cases hargs
     have hp := ih f [] (hf.withLabel t₁) .nil

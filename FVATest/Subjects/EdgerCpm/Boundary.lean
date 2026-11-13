@@ -91,6 +91,6 @@ theorem boundary (x : Input) (H : HostSem) (l : Layout) (s : Store) (inst : Modu
     rw [hc, hl] at hcpm
     rw [cpmElem_10_18 hcpm] at hh
     exact ⟨hh, fun q hq c hcm => rCutoff_10_18 hq hcm ▸ below_cutoff⟩
-  | trapped _ => exact ho
+  | trapped _ | thrown _ _ => exact ho
 
 end Subjects.EdgerCpm

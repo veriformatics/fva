@@ -31,6 +31,16 @@ theorem forall₂_exists_right {α β γ : Type} {R : α → β → Prop} {S : �
     obtain ⟨zs, hss, hts⟩ := ih
     exact ⟨z :: zs, .cons hs' hss, .cons ht' hts⟩
 
+/-- A context's function types against an instance's defined types (`ModuleInstT.types`). -/
+theorem forall₂_expand_getElem? {dts : List DefType} {fts : List FuncType}
+    (h : List.Forall₂ (fun dt ft => dt.expand = some ft) dts fts) (x : Nat) :
+    fts[x]? = dts[x]?.bind DefType.expand := by
+  induction h generalizing x with
+  | nil => simp
+  | cons hd _ ih => cases x with
+    | zero => simp [hd]
+    | succ x => simpa using ih x
+
 theorem listExtends_length {α : Type} {R : α → α → Prop} {xs ys : List α}
     (h : ListExtends R xs ys) : xs.length ≤ ys.length := by
   by_contra hn
@@ -46,6 +56,7 @@ theorem ExternValT.extends {s s' : Store} (h : s.Extends s') {v : ExternVal}
   | table a => exact Nat.lt_of_lt_of_le hv (listExtends_length h.2.1)
   | mem a => exact Nat.lt_of_lt_of_le hv (listExtends_length h.2.2.1)
   | global a => exact Nat.lt_of_lt_of_le hv (listExtends_length h.2.2.2.1)
+  | tag a => exact Nat.lt_of_lt_of_le hv (listExtends_length h.2.2.2.2.2.2.1)
 
 theorem ModuleInstT.extends {s s' : Store} {inst : ModuleInst} {C : Context}
     (hi : ModuleInstT s inst C) (h : s.Extends s') :
@@ -67,19 +78,19 @@ theorem ModuleInstT.extends {s s' : Store} {inst : ModuleInst} {C : Context}
   · refine ⟨hi.types, ?_, htts, hmls, ?_, ?_, ?_, ?_, hi.exportNames,
       hi.refs, hi.noLocals, hi.noLabels, hi.noReturn⟩
     · apply List.Forall₂.imp _ hi.funcs
-      rintro a ft ⟨fi, hfi, rfl⟩
+      rintro a ft ⟨fi, hfi, hft⟩
       obtain ⟨fi', hfi', rfl⟩ := h.1 _ _ hfi
-      exact ⟨_, hfi', rfl⟩
+      exact ⟨_, hfi', hft⟩
     · apply List.Forall₂.imp _ hi.globals
-      rintro a gt ⟨gi, hgi, rfl⟩
+      rintro a gt ⟨gi, hgi, hsub⟩
       obtain ⟨gi', hgi', he⟩ := h.2.2.2.1 _ _ hgi
-      exact ⟨gi', hgi', he.1⟩
+      exact ⟨gi', hgi', he.1 ▸ hsub⟩
     · apply List.Forall₂.imp _ hi.elems
       rintro a rt ⟨ei, hei, rfl⟩
       obtain ⟨ei', hei', he⟩ := h.2.2.2.2.1 _ _ hei
       exact ⟨ei', hei', he.1⟩
     · exact ⟨hi.datas.1, fun a ha =>
-        Nat.lt_of_lt_of_le (hi.datas.2 a ha) (listExtends_length h.2.2.2.2.2)⟩
+        Nat.lt_of_lt_of_le (hi.datas.2 a ha) (listExtends_length h.2.2.2.2.2.1)⟩
     · exact fun ex hex => ExternValT.extends h (hi.exports ex hex)
   · refine ⟨rfl, rfl, ?_, ?_, rfl, rfl, Nat.le_refl _, fun _ => rfl,
       rfl, rfl, fun _ hx => hx⟩
@@ -94,7 +105,7 @@ theorem FrameT.extends {s s' : Store} {f : Frame} {C : Context}
   obtain ⟨C₀, ts, hi, hvs, rfl⟩ := hf
   obtain ⟨D₀, hi', he⟩ := hi.extends h
   exact ⟨{ D₀ with locals := ts.map (1, ·) },
-    ⟨D₀, ts, hi', h.values hvs, rfl⟩, he.withLocals _⟩
+    ⟨D₀, ts, hi', hvs.imp fun _ _ ⟨v, hv, ht⟩ => ⟨v, hv, h.value ht⟩, rfl⟩, he.withLocals _⟩
 
 theorem FuncT.transport {C D : Context} {f : Func} {ft : FuncType}
     (hf : FuncT C f ft) (h : C.Entails D) : FuncT D f ft := by
@@ -106,11 +117,11 @@ theorem FuncT.transport {C D : Context} {f : Func} {ft : FuncType}
 theorem FuncInstOK.extends {s s' : Store} {fi : FuncInst}
     (hf : FuncInstOK s fi) (h : s.Extends s') : FuncInstOK s' fi := by
   cases fi with
-  | host ft id => trivial
-  | wasm ft inst code =>
-    obtain ⟨C, hi, hc⟩ := hf
+  | host dt id => trivial
+  | wasm dt inst code =>
+    obtain ⟨C, ft, hft, hi, hc⟩ := hf
     obtain ⟨D, hi', he⟩ := hi.extends h
-    exact ⟨D, hi', hc.transport he⟩
+    exact ⟨D, ft, hft, hi', hc.transport he⟩
 
 theorem AInstrT.transport {s s' : Store} {C D : Context} {i : AInstr} {st : StackType}
     (hi : AInstrT s C i st) (he : s.Extends s') (hc : C.Entails D) : AInstrT s' D i st := by
@@ -120,10 +131,12 @@ theorem AInstrT.transport {s s' : Store} {C D : Context} {i : AInstr} {st : Stac
   | plain hi => exact .plain (hi.transport hc)
   | refFuncAddr ha => exact .refFuncAddr (Nat.lt_of_lt_of_le ha he.funcs_length)
   | refExternAddr => exact .refExternAddr
+  | refNullAddr => exact .refNullAddr
+  | refExnAddr ha => exact .refExnAddr (Nat.lt_of_lt_of_le ha he.exns_length)
   | trap => exact .trap
-  | invoke hi =>
+  | invoke hi hft =>
     obtain ⟨fi', hi', rfl⟩ := he.1 _ _ hi
-    exact .invoke hi'
+    exact .invoke hi' hft
   | label hn hcont hb ih => exact .label hn (hcont.transport hc) (ih he (hc.withLabel _))
   | frame hn hf hb ih =>
     obtain ⟨D', hf', hc'⟩ := hf.extends he

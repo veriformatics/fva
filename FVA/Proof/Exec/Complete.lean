@@ -13,10 +13,12 @@ namespace FVA.Wasm.Exec.Ref
 open FVA.Wasm FVA.Wasm.Exec
 
 theorem seq_of_final {c : Config} {o : Outcome} (hf : Final c o) :
-    seq c.store c.frame [] c.instrs = .final := by
+    seq c.store c.frame [] c.instrs = .final ∨
+      ∃ a, seq c.store c.frame [] c.instrs = .thrown a := by
   cases o with
-  | returned s vs => rw [hf.2]; exact seq_values _ _ _ _
-  | trapped s => rw [hf.2]; rfl
+  | returned s vs => rw [hf.2]; exact .inl (seq_values _ _ _ _)
+  | trapped s => rw [hf.2]; exact .inl rfl
+  | thrown s a => rw [hf.2]; exact .inr ⟨a, rfl⟩
 
 theorem seq_of_step {H : HostSem} {c c' : Config} (hs : Step H c c')
     (hu : uniqueStep false c = true) (hp : seq c.store c.frame [] c.instrs ≠ .stuck) :
@@ -36,7 +38,7 @@ theorem run_complete {H : HostSem} {c c' : Config} {o : Outcome}
   induction hs using Relation.ReflTransGen.head_induction_on with
   | refl =>
     intro hu hp
-    exact ⟨1, by simp only [run, seq_of_final hf]⟩
+    rcases seq_of_final hf with h | ⟨a, h⟩ <;> exact ⟨1, by simp only [run, h]⟩
   | @head c d hstep hrest ih =>
     intro hu hp
     obtain ⟨n, hn⟩ := ih
@@ -70,7 +72,7 @@ theorem run_must {H : HostSem} {Q : Outcome → Prop} {n : Nat} {c c' : Config}
       · intro d e hd he
         exact hu d e (.head hsem hd) he
       · simpa only [run, hs] using hr
-    | final =>
+    | final | thrown _ =>
       have he : c = c' := Option.some.inj (by simpa only [run, hs] using hr)
       subst c'
       obtain ⟨_, hf⟩ := (run_sound (H := H) hr).2

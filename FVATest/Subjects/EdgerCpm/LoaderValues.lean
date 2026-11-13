@@ -10,7 +10,8 @@ set_option maxHeartbeats 0
 set_option Elab.async false
 
 noncomputable def placeholder : Store × ModuleInst :=
-  allocModule env Lifted.module imports (Lifted.module.globals.map (·.type.val.default))
+  allocModule env Lifted.module imports
+    (Lifted.module.globals.map fun g => g.type.val.default.getD (.i32 0)) []
     (Lifted.module.elems.map fun _ => [])
 
 noncomputable def globalValues? : Option (List Val) :=
@@ -27,7 +28,7 @@ theorem elementValues_some : elementValues?.isSome := by decide +kernel
 noncomputable def elementValues : List (List Ref) := elementValues?.get elementValues_some
 
 noncomputable def allocation : Store × ModuleInst :=
-  allocModule env Lifted.module imports globalValues elementValues
+  allocModule env Lifted.module imports globalValues [] elementValues
 
 theorem globals_eq :
     (Lifted.module.globals.mapM fun g => evalConst 100 allocation.1 allocation.2 g.init) =

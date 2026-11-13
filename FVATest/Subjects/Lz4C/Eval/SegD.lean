@@ -9,7 +9,7 @@ set_option maxRecDepth 6000
 set_option linter.unusedSimpArgs false
 
 theorem d_err (F : Context) (st : Store) (inst : ModuleInst) (src dst n cap cpy j m o' : Nat)
-    (mp : BitVec 32) (v16 v18 : Val) (hlo : src ≤ j) (hhi : j ≤ src + n) :
+    (mp : BitVec 32) (v16 : Option Val) (v18 : Val) (hlo : src ≤ j) (hhi : j ≤ src + n) :
     Err F st inst src dst n cap
       ((ctx1 F).fill ⟨st, ⟨dLs src dst n cap cpy j m o' mp v16 v18, inst⟩,
         (body1.drop 54).map .plain⟩) :=
@@ -23,7 +23,7 @@ noncomputable def dRestPost (F : Context) (st : Store) (inst : ModuleInst) (mem 
       inst src dst n cap (o' + m + 4) j c)
 
 theorem d_rest (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (a ma : Nat)
-    (mem : MemInst) (src dst n cap o' m j p : Nat) (v16 v18 : Val)
+    (mem : MemInst) (src dst n cap o' m j p : Nat) (v16 : Option Val) (v18 : Val)
     (hcall : inst.funcs[3]? = some a)
     (hfun : st.funcs[a]? = some (.wasm copyType inst Lifted.func3))
     (hm : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some mem)

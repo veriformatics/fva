@@ -9,16 +9,18 @@ set_option maxRecDepth 6000
 set_option linter.unusedSimpArgs false
 
 /-- The near-end byte loop leaves its final branch to its caller's label context. -/
-theorem d_bytes (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst) (ls : List Val)
+theorem d_bytes (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst)
+    (ls : List (Option Val))
     (ma : Nat) (mem : MemInst) (src dst n cap p q e k : Nat)
-    (h2 : ls[2]? = some (vI p)) (h18 : ls[18]? = some (vI q)) (h3 : ls[3]? = some (vI e))
+    (h2 : ls[2]? = some (some (vI p))) (h18 : ls[18]? = some (some (vI q)))
+        (h3 : ls[3]? = some (some (vI e)))
     (hm : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some mem)
     (hp0 : dst ≤ p) (hq0 : dst ≤ q) (hp1 : p + k ≤ dst + cap) (hq1 : q + k ≤ dst + cap)
     (hend : dst + cap ≤ mem.size) (hsize : mem.size < 2 ^ 32) (he : e = q + k) (hk : 0 < k) :
     Until H (Within (ReadSet ma src n dst cap) (Span ma dst cap))
       (fun c => c = C.fill
         ⟨st.setMem ma (fwdCopy mem q p k),
-          ⟨(ls.set 18 (vI (q + k))).set 2 (vI (p + k)), inst⟩,
+          ⟨(ls.set 18 (some (vI (q + k)))).set 2 (some (vI (p + k))), inst⟩,
           [.label 0 [dByteLoop] [.plain (.br 2)]]⟩)
       (C.fill ⟨st, ⟨ls, inst⟩, [.plain dByteLoop]⟩) := by
   have hl2 : 2 < ls.length := (List.getElem?_eq_some_iff.mp h2).1
@@ -37,7 +39,7 @@ theorem d_bytes (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst) (ls
         · intro x hx0 hx1
           constructor <;> omega
       · apply Until.done
-        rw [List.set_comm (vI (p + 1)) (vI (q + 1)) (by decide : (2 : Nat) ≠ 18)]
+        rw [List.set_comm (some (vI (p + 1))) (some (vI (q + 1))) (by decide : (2 : Nat) ≠ 18)]
         rfl
     · wasm_eval 16 [block_simp, dByteLoop, dByteBody, h2, h18, h3, hm, hmem]
       · simp [TraceOK, AccessOK, ReadSet, Span]
@@ -47,13 +49,13 @@ theorem d_bytes (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst) (ls
           constructor <;> omega
         · intro x hx0 hx1
           constructor <;> omega
-      · let ls' := (ls.set 2 (vI (p + 1))).set 18 (vI (q + 1))
-        have h2' : ls'[2]? = some (vI (p + 1)) := by
+      · let ls' := (ls.set 2 (some (vI (p + 1)))).set 18 (some (vI (q + 1)))
+        have h2' : ls'[2]? = some (some (vI (p + 1))) := by
           simp only [ls', List.getElem?_set_ne (by decide : (18 : Nat) ≠ 2),
             List.getElem?_set_self hl2]
-        have h18' : ls'[18]? = some (vI (q + 1)) :=
+        have h18' : ls'[18]? = some (some (vI (q + 1))) :=
           List.getElem?_set_self (by simpa only [List.length_set] using hl18)
-        have h3' : ls'[3]? = some (vI e) := by
+        have h3' : ls'[3]? = some (some (vI e)) := by
           simpa only [ls', List.getElem?_set_ne (by decide : (18 : Nat) ≠ 3),
             List.getElem?_set_ne (by decide : (2 : Nat) ≠ 3)] using h3
         have hi := ih (st.setMem ma (mem.write q 1 (mem.byte p).toNat))
@@ -74,9 +76,10 @@ noncomputable def dHeadPost (F : Context) (st : Store) (inst : ModuleInst)
     c = (ctx4 (ctx2 F)).fill ⟨st, ⟨ls, inst⟩, [.plain mainLoop]⟩
 
 theorem d_finish_near (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst)
-    (ls : List Val) (ma : Nat) (mem : MemInst) (src dst n cap cpy j p q : Nat)
-    (hcl : ConstLocals ls src dst n cap) (h2 : ls[2]? = some (vI p))
-    (h18 : ls[18]? = some (vI q)) (h3 : ls[3]? = some (vI cpy)) (h4 : ls[4]? = some (vI j))
+    (ls : List (Option Val)) (ma : Nat) (mem : MemInst) (src dst n cap cpy j p q : Nat)
+    (hcl : ConstLocals ls src dst n cap) (h2 : ls[2]? = some (some (vI p)))
+    (h18 : ls[18]? = some (some (vI q))) (h3 : ls[3]? = some (some (vI cpy)))
+        (h4 : ls[4]? = some (some (vI j)))
     (hm : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some mem)
     (hp0 : dst ≤ p) (hpq : p ≤ q) (hq1 : q ≤ dst + cap) (hc1 : cpy ≤ dst + cap)
     (hend : dst + cap ≤ mem.size) (hsize : mem.size < 2 ^ 32) :
@@ -103,7 +106,7 @@ theorem d_finish_near (H : HostSem) (F : Context) (st : Store) (inst : ModuleIns
       wasm_eval 1 [block_simp]
       · simp [TraceOK, AccessOK]
       · apply Until.done
-        refine ⟨(ls.set 18 (vI (q + (cpy - q)))).set 2 (vI (p + (cpy - q))), ?_, ?_⟩
+        refine ⟨(ls.set 18 (some (vI (q + (cpy - q))))).set 2 (some (vI (p + (cpy - q)))), ?_, ?_⟩
         · apply HeadLocals.of_const
           · exact (hcl.set (by omega) _).set (by omega) _
           · simpa only [List.getElem?_set_ne (by decide : (2 : Nat) ≠ 3),

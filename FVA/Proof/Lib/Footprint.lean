@@ -59,6 +59,7 @@ theorem access_final {c : Config} {o : Outcome} (hf : Final c o) : access c = no
   cases o with
   | returned s' vs => obtain ⟨-, rfl⟩ := hf; exact access_vals s f vs
   | trapped s' => obtain ⟨-, rfl⟩ := hf; exact access_trap s f
+  | thrown s' a => obtain ⟨-, rfl⟩ := hf; rfl
 
 /-- The access of `C.fill c` is the access of `c`: labels and frames are entered, not executed. -/
 theorem Context.access_fill (C : Context) (c : Config) : access (C.fill c) = access c := by

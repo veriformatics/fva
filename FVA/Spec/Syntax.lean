@@ -23,11 +23,15 @@ inductive AbsHeapType where
   | func | extern | exn
   deriving DecidableEq, Repr
 
-/-- Heap types (`heaptype`): abstract, or the defined type with this type index. -/
+mutual
+/-- Heap types (`heaptype`): abstract; a type index (source syntax); a closed defined type
+(`def_`: what closure puts in place of a type index for runtime and validation); the `i`-th type
+of the enclosing recursive group (`rec_`: only inside a rolled group, A2). -/
 inductive HeapType where
   | abs (a : AbsHeapType)
   | idx (x : Nat)
-  deriving DecidableEq, Repr
+  | def_ (d : DefType)
+  | rec_ (i : Nat)
 
 /-- Reference types (`reftype`): `ref null? ht`. -/
 structure RefType where
@@ -35,7 +39,28 @@ structure RefType where
   null : Bool
   /-- The referenced heap type. -/
   heap : HeapType
-  deriving DecidableEq, Repr
+
+/-- Value types. -/
+inductive ValType where
+  | num (t : NumType)
+  | ref (t : RefType)
+
+/-- Function types: parameter and result value types. -/
+structure FuncType where
+  /-- Parameter types. -/
+  params : List ValType
+  /-- Result types. -/
+  results : List ValType
+
+/-- Defined types (3.0 `deftype` = `_DEF rectype n`): type `idx` of the rolled recursive group
+`group`, whose members refer to each other by `rec_` and to earlier types by `def_`. Two defined
+types are the same type exactly when they are equal terms (canonical group + projection). -/
+structure DefType where
+  /-- The rolled recursive group. -/
+  group : List FuncType
+  /-- The projection. -/
+  idx : Nat
+end
 
 /-- `funcref` = `ref null func`. -/
 @[match_pattern] abbrev RefType.funcref : RefType := ⟨true, .abs .func⟩
@@ -46,20 +71,6 @@ structure RefType where
 
 /-- The nullable reference type of the same heap type. -/
 def RefType.nullable (t : RefType) : RefType := { t with null := true }
-
-/-- Value types. -/
-inductive ValType where
-  | num (t : NumType)
-  | ref (t : RefType)
-  deriving DecidableEq, Repr
-
-/-- Function types: parameter and result value types. -/
-structure FuncType where
-  /-- Parameter types. -/
-  params : List ValType
-  /-- Result types. -/
-  results : List ValType
-  deriving DecidableEq, Repr
 
 /-- Recursive types (`rectype`), in P′: function types defined together, each the final subtype of
 no declared supertype (`sub final ε (func ft)`); they refer to each other and to earlier types by
@@ -80,7 +91,6 @@ structure TableType where
   limits : Limits
   /-- Element reference type. -/
   elem : RefType
-  deriving DecidableEq, Repr
 
 /-- Global mutability. -/
 inductive Mut where
@@ -93,14 +103,12 @@ structure GlobalType where
   mutability : Mut
   /-- Value type. -/
   val : ValType
-  deriving DecidableEq, Repr
 
 /-- Block types: no result, one value type, or a function type index. -/
 inductive BlockType where
   | empty
   | val (t : ValType)
   | idx (x : Nat)
-  deriving DecidableEq, Repr
 
 /-- Memory operand immediates: alignment exponent and byte offset. -/
 structure MemArg where
@@ -380,7 +388,6 @@ inductive ImportDesc where
   | global (t : GlobalType)
   /-- A tag of the function type with this index. -/
   | tag (x : Nat)
-  deriving DecidableEq, Repr
 
 /-- Imports. -/
 structure Import where
@@ -390,7 +397,6 @@ structure Import where
   name : String
   /-- Description. -/
   desc : ImportDesc
-  deriving DecidableEq, Repr
 
 /-- Export descriptions. -/
 inductive ExportDesc where

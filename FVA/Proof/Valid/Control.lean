@@ -159,8 +159,7 @@ theorem ASeqT.call {s : Store} {f : Frame} {C : Context} {x addr : Nat}
       have heq := Option.some.inj (ha'.symm.trans ha)
       subst addr'
       apply ASeqT.single_iff.mpr
-      refine ⟨p, x, _, _, hin, hout, hm, ?_⟩
-      simpa only [ht] using AInstrT.invoke (C := C) hfi
+      exact ⟨p, x, _, _, hin, hout, hm, AInstrT.invoke (C := C) hfi ht⟩
 
 theorem ASeqT.callIndirect {s : Store} {f : Frame} {C : Context} {x y addr : Nat}
     {v : BitVec 32} {a b : List OpType} (hf : FrameCtx s f C)
@@ -170,11 +169,9 @@ theorem ASeqT.callIndirect {s : Store} {f : Frame} {C : Context} {x y addr : Nat
   intro ins out hi
   cases hi with | plain hi =>
     cases hi with | callIndirect _ _ hy =>
-      obtain ⟨ta, ti, fi, ft, _, _, _, hfi, hft, he⟩ := htarget
-      have hct : C.types[y]? = some ft := (hf.blockType (.idx y)).trans hft
-      have heq := Option.some.inj (hy.symm.trans hct)
-      have hfiType := he.trans heq.symm
-      refine ⟨_, rfl, .single ?_⟩
-      simpa only [hfiType] using AInstrT.invoke (C := C) hfi
+      obtain ⟨ta, ti, fi, dt, _, _, _, hfi, hdt, he⟩ := htarget
+      have hb := hf.blockType (.idx y)
+      simp only [Context.blockType, BlockType.expand, hdt, Option.bind_some] at hb
+      exact ⟨_, rfl, .single (AInstrT.invoke (C := C) hfi (by rw [he]; exact hb.symm.trans hy))⟩
 
 end FVA.Wasm.Valid

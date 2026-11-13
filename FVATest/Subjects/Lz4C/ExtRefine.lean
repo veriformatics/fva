@@ -26,16 +26,17 @@ def extModel (b : Nat → UInt8) (p lim : Nat) (j a : Nat) : Exit :=
 termination_by lim - (p + j)
 
 /-- The frame at the head of iteration `j` holds the model's state `(p + j, a)`. -/
-structure Sim (ls : List Val) (inst : ModuleInst) (p : Nat) (j a : Nat) (f : Frame) : Prop where
+structure Sim (ls : List (Option Val)) (inst : ModuleInst) (p : Nat) (j a : Nat)
+    (f : Frame) : Prop where
   inst : f.inst = inst
   len : f.locals.length = ls.length
   others : ∀ i, i ≠ 2 → i ≠ 4 → i ≠ 15 → i ≠ 17 → f.locals[i]? = ls[i]?
-  l2 : f.locals[2]? = some (vI (p + j))
-  l15 : f.locals[15]? = if j = 0 then ls[15]? else some (vI 255)
-  l17 : f.locals[17]? = some (vI a)
+  l2 : f.locals[2]? = some (some (vI (p + j)))
+  l15 : f.locals[15]? = if j = 0 then ls[15]? else some (some (vI 255))
+  l17 : f.locals[17]? = some (some (vI a))
 
 /-- The wasm configuration of each model exit. -/
-def SimExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p : Nat) :
+def SimExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val)) (p : Nat) :
     Exit → Config → Prop
   | .normal k a byte, c => ∃ f', Locals ls inst f' (p + k + 1) (p + k + 1) (some byte) (some a) ∧
       c = (ctx8 C).fill ⟨s, f', (body8.drop 4).map .plain⟩
@@ -46,9 +47,9 @@ def SimExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p : N
       c = C.fill ⟨s, f', (body2.drop 1).map .plain⟩
 
 /-- One iteration simulates one model step. -/
-theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val))
     (ma : Nat) (mem : MemInst) (p lim j a : Nat) (f : Frame)
-    (h14 : ls[14]? = some (vI lim)) (hm : inst.mems[0]? = some ma)
+    (h14 : ls[14]? = some (some (vI lim))) (hm : inst.mems[0]? = some ma)
     (hmem : s.mems[ma]? = some mem) (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size)
     (hlen17 : 17 < ls.length) (hj : p + j ≤ lim) (ha : a < 2 ^ 31) (hi : Sim ls inst p j a f)
     (hk : p + j + 1 ≤ lim → a + (mem.byte (p + j)).toNat < 2 ^ 31 → ∀ f',
@@ -58,7 +59,7 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
           (a + (mem.byte (p + j)).toNat))) (head C s f')) :
     Until H (Within (fun m x => m = ma ∧ p ≤ x ∧ x < lim) (fun _ _ => False))
       (SimExit C s inst ls p (extModel (fun i => mem.byte (p + i)) p lim j a)) (head C s f) := by
-  have hf14 : f.locals[14]? = some (vI lim) := by
+  have hf14 : f.locals[14]? = some (some (vI lim)) := by
     rw [hi.others 14 (by decide) (by decide) (by decide) (by decide), h14]
   have hlenf : f.locals.length = ls.length := hi.len
   have hadd := add32 (p + j) 1
@@ -85,7 +86,7 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
     wasm_cstepu [extBody]
     · wasm_within [extBody]
     simp only [hb, ite_true]
-    refine Until.done ⟨⟨f.locals.set 4 (vI (p + j + 1)), f.inst⟩,
+    refine Until.done ⟨⟨f.locals.set 4 (some (vI (p + j + 1))), f.inst⟩,
       ⟨hi.inst, by simp [hlenf], fun i h₂ h₄ h₁₅ h₁₇ => ?_, ?_, ?_, ?_, ?_⟩, rfl⟩
     · rw [getElem?_set_of_ne (Ne.symm h₄)]; exact hi.others i h₂ h₄ h₁₅ h₁₇
     · rw [getElem?_set_of_ne (by decide)]; exact hi.l2
@@ -125,8 +126,9 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
       wasm_cstepu [extBody]
       · wasm_within [extBody]
       simp only [ho, ite_true]
-      refine Until.done ⟨⟨((f.locals.set 4 (vI (p + j + 1))).set 15
-        (vI (mem.byte (p + j)).toNat)).set 17 (vI (a + (mem.byte (p + j)).toNat)), f.inst⟩,
+      refine Until.done ⟨⟨((f.locals.set 4 (some (vI (p + j + 1)))).set 15
+        (some (vI (mem.byte (p + j)).toNat))).set 17 (some (vI (a + (mem.byte (p + j)).toNat))),
+            f.inst⟩,
         ⟨hi.inst, by simp [hlenf], fun i h₂ h₄ h₁₅ h₁₇ => ?_, ?_, ?_, ?_, ?_⟩, rfl⟩
       · rw [getElem?_set_of_ne (Ne.symm h₁₇), getElem?_set_of_ne (Ne.symm h₁₅),
           getElem?_set_of_ne (Ne.symm h₄)]; exact hi.others i h₂ h₄ h₁₅ h₁₇
@@ -170,8 +172,9 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
         · wasm_within [extBody]
         simp only [hff, ite_true]
         have hsim : Sim ls inst p (j + 1) (a + (mem.byte (p + j)).toNat)
-            ⟨(((f.locals.set 4 (vI (p + j + 1))).set 15 (vI (mem.byte (p + j)).toNat)).set 17
-              (vI (a + (mem.byte (p + j)).toNat))).set 2 (vI (p + j + 1)), f.inst⟩ :=
+            ⟨(((f.locals.set 4 (some (vI (p + j + 1)))).set 15
+                (some (vI (mem.byte (p + j)).toNat))).set 17
+              (some (vI (a + (mem.byte (p + j)).toNat)))).set 2 (some (vI (p + j + 1))), f.inst⟩ :=
           { inst := hi.inst
             len := by simp [hlenf]
             others := fun i h₂ h₄ h₁₅ h₁₇ => by
@@ -204,9 +207,11 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
         wasm_cstepu [extBody]
         · wasm_within [extBody]
         simp only [hff, ite_false]
-        refine Until.done ⟨⟨(((f.locals.set 4 (vI (p + j + 1))).set 15
-          (vI (mem.byte (p + j)).toNat)).set 17 (vI (a + (mem.byte (p + j)).toNat))).set 2
-          (vI (p + j + 1)), f.inst⟩, ⟨hi.inst, by simp [hlenf], fun i h₂ h₄ h₁₅ h₁₇ => ?_, ?_, ?_,
+        refine Until.done ⟨⟨(((f.locals.set 4 (some (vI (p + j + 1)))).set 15
+          (some (vI (mem.byte (p + j)).toNat))).set 17
+              (some (vI (a + (mem.byte (p + j)).toNat)))).set 2
+          (some (vI (p + j + 1))), f.inst⟩,
+              ⟨hi.inst, by simp [hlenf], fun i h₂ h₄ h₁₅ h₁₇ => ?_, ?_, ?_,
           ?_, ?_⟩, by simp only [ctx8, Context.fill]⟩
         · simp only
           rw [getElem?_set_of_ne (Ne.symm h₂), getElem?_set_of_ne (Ne.symm h₁₇),
@@ -223,9 +228,9 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
           rw [getElem?_set_of_ne (by decide), List.getElem?_set_self (by simp; omega)]; rfl
 
 /-- The loop simulates the model from every head. -/
-theorem sim (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+theorem sim (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val))
     (ma : Nat) (mem : MemInst) (p lim : Nat)
-    (h14 : ls[14]? = some (vI lim)) (hm : inst.mems[0]? = some ma)
+    (h14 : ls[14]? = some (some (vI lim))) (hm : inst.mems[0]? = some ma)
     (hmem : s.mems[ma]? = some mem) (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size)
     (hlen17 : 17 < ls.length) :
     ∀ n j a f, lim - (p + j) = n → p + j ≤ lim → a < 2 ^ 31 → Sim ls inst p j a f →

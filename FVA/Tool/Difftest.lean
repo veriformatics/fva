@@ -176,14 +176,16 @@ def Eng.invoke (e : Eng) (fuel a : Nat) (args : List Val) : Eng × Run × Outcom
 def Eng.instantiate (e : Eng) (fuel : Nat) (m : Module) (imports : List ExternVal) :
     Except String (Eng × ModuleInst) := do
   let s := e.store
-  let (s₀, inst₀) := allocModule s m imports (m.globals.map fun g => g.type.val.default)
-    (m.elems.map fun _ => [])
+  let (s₀, inst₀) := allocModule s m imports (m.globals.map fun _ => .i32 0)
+    (m.tables.map fun _ => .null) (m.elems.map fun _ => [])
   let consts (s : Store) (inst : ModuleInst) :=
     (m.globals.mapM fun g => Ref.evalConst fuel s inst g.init,
+     m.tables.mapM fun t => Ref.evalConst fuel s inst t.init >>= Ref.asRef,
      m.elems.mapM fun el => el.init.mapM fun ex => Ref.evalConst fuel s inst ex >>= Ref.asRef)
-  let (some gvals, some erefs) := consts s₀ inst₀ | throw "an initializer is not constant"
-  let (s₁, inst) := allocModule s m imports gvals erefs
-  unless consts s₁ inst == (some gvals, some erefs) do throw "initializers disagree"
+  let (some gvals, some trefs, some erefs) := consts s₀ inst₀
+    | throw "an initializer is not constant"
+  let (s₁, inst) := allocModule s m imports gvals trefs erefs
+  unless consts s₁ inst == (some gvals, some trefs, some erefs) do throw "initializers disagree"
   let e₁ := ({ e with store := s₁ } : Eng).mirrorFrom s.mems.length
   let (r, o) := Run.go fuel
     { c := ⟨e₁.store, ⟨[], inst⟩, (initCode m).map .plain⟩, mirrors := e₁.mirrors }
@@ -300,28 +302,34 @@ def wastString (bs : ByteArray) : String := Id.run do
 /-- A WAST name string. -/
 def nameLit (s : String) : String := wastString s.toUTF8
 
-/-- A value as a WAST constant; a function reference prints as the non-null pattern. -/
-def valLit : Val → String
+/-- A value of type `t` as a WAST constant; a function reference prints as the non-null
+pattern, a null (which carries no type) by `t`'s heap type (a defined type is a function type). -/
+def valLit (t : ValType) : Val → String
   | .i32 v => s!"(i32.const {v.toNat})"
   | .i64 v => s!"(i64.const {v.toNat})"
   | .f32 v => s!"(f32.const {lit f32fmt v.toNat})"
   | .f64 v => s!"(f64.const {lit f64fmt v.toNat})"
-  | .ref (.null (.abs .func)) => "(ref.null func)"
-  | .ref (.null (.abs .extern)) => "(ref.null extern)"
-  | .ref (.null (.abs .exn)) => "(ref.null exn)"
-  | .ref (.null (.idx x)) => s!"(ref.null {x})"
+  | .ref .null => match t with
+    | .ref ⟨_, .abs .extern⟩ => "(ref.null extern)"
+    | .ref ⟨_, .abs .exn⟩ => "(ref.null exn)"
+    | _ => "(ref.null func)"
   | .ref (.func _) => "(ref.func)"
   | .ref (.extern a) => s!"(ref.extern {a})"
+  | .ref (.exn _) => "(ref.exn)"
 
-/-- An expected result after a choice point: a quiet NaN may be any arithmetic NaN. -/
-def choiceLit : Val → String
+/-- An expected result of type `t` after a choice point: a quiet NaN may be any arithmetic NaN. -/
+def choiceLit (t : ValType) : Val → String
   | .f32 v => match payload f32fmt v.toNat with
-    | some p => if p ≥ f32fmt.canon then "(f32.const nan:arithmetic)" else valLit (.f32 v)
-    | none => valLit (.f32 v)
+    | some p => if p ≥ f32fmt.canon then "(f32.const nan:arithmetic)" else valLit t (.f32 v)
+    | none => valLit t (.f32 v)
   | .f64 v => match payload f64fmt v.toNat with
-    | some p => if p ≥ f64fmt.canon then "(f64.const nan:arithmetic)" else valLit (.f64 v)
-    | none => valLit (.f64 v)
-  | v => valLit v
+    | some p => if p ≥ f64fmt.canon then "(f64.const nan:arithmetic)" else valLit t (.f64 v)
+    | none => valLit t (.f64 v)
+  | v => valLit t v
+
+/-- Values of types `ts`, each as ` <constant>` (a value past `ts` prints untyped). -/
+def typedLits (lit : ValType → Val → String) (ts : List ValType) (vs : List Val) : String :=
+  String.join (vs.zipIdx.map fun (v, i) => " " ++ lit (ts[i]?.getD (.num .i32)) v)
 
 /-! ## Scripts -/
 
@@ -465,7 +473,7 @@ def genArg (memSize : Nat) (sh : Shape) (structured : Bool) (t : ValType) : Gen 
   | .num .i64 => return .i64 (BitVec.ofNat 64 (← int 64))
   | .num .f32 => return .f32 (BitVec.ofNat 32 (← operand f32fmt none))
   | .num .f64 => return .f64 (BitVec.ofNat 64 (← operand f64fmt none))
-  | .ref t => return .ref (.null t.heap)
+  | .ref _ => return .ref .null
 
 /-- A case's shape, input fill seed (if the memory is observable and the case fills) and
 arguments. -/
@@ -530,7 +538,7 @@ def script (sub : Subject) (cfg : Config) (name : String) (ft : FuncType) (ep₀
       let (eng, _, o) := ep.eng.invoke cfg.fuel fa fargs
       let .returned [] := o | return fail "probe fill failed"
       ep := { ep with eng }
-      let call := s!"(invoke {pname} \"fill\" {" ".intercalate (fargs.map valLit)})"
+      let call := s!"(invoke {pname} \"fill\" {" ".intercalate (fargs.map (valLit (.num .i32)))})"
       lines := lines.push ⟨s!"(assert_return {call})", s!"case {st.cases}: fill [{p}, {p + len})"⟩
       st := { st with assertions := st.assertions + 1 }
       if let some m := eng.store.mems[ma]? then
@@ -539,7 +547,7 @@ def script (sub : Subject) (cfg : Config) (name : String) (ft : FuncType) (ep₀
         st := { st with assertions := st.assertions + 1 }
     let (eng, run, o) := ep.eng.invoke cfg.fuel a args
     let call :=
-      s!"(invoke {ep.subjectName} {nameLit name}{String.join (args.map (" " ++ valLit ·))})"
+      s!"(invoke {ep.subjectName} {nameLit name}{typedLits valLit ft.params args})"
     let what := s!"case {st.cases}: {call}"
     match o with
     | .exhausted => st := { st with exhausted := st.exhausted + 1 }; continue
@@ -548,7 +556,7 @@ def script (sub : Subject) (cfg : Config) (name : String) (ft : FuncType) (ep₀
     | .trapped =>
       lines := lines.push ⟨s!"(assert_trap {call} \"\")", what ++ " → trap"⟩
     | .returned vs =>
-      let shown := String.join (vs.map fun v => " " ++ (if run.nan then choiceLit v else valLit v))
+      let shown := typedLits (if run.nan then choiceLit else valLit) ft.results vs
       lines := lines.push ⟨s!"(assert_return {call}{shown})", what ++ " →" ++ shown⟩
     st := { st with cases := st.cases + 1, assertions := st.assertions + 1,
                     grows := st.grows + (if run.grow then 1 else 0) }
@@ -567,7 +575,8 @@ def script (sub : Subject) (cfg : Config) (name : String) (ft : FuncType) (ep₀
           st := { st with assertions := st.assertions + 1 }
     for (wname, gname, ga) in ep.globals do
       if let some gi := eng.store.globals[ga]? then
-        lines := lines.push ⟨s!"(assert_return (get {wname} {nameLit gname}) {valLit gi.value})",
+        lines := lines.push
+          ⟨s!"(assert_return (get {wname} {nameLit gname}) {valLit gi.type.val gi.value})",
           s!"{what}: global {gname}"⟩
         st := { st with assertions := st.assertions + 1 }
   return { name, lines, stats := st }
@@ -597,7 +606,7 @@ def scripts (cfg : Config) (bs : ByteArray) : Except String (Array Script) := do
   let ep ← sub.epoch cfg 0 {}
   let fns := ep.subject.exports.filterMap fun ex => match ex.value with
     | .func a => if cfg.exports.isEmpty || cfg.exports.contains ex.name then
-        (ep.eng.store.funcs[a]?).map fun fi => (ex.name, fi.type) else none
+        (ep.eng.store.funcs[a]?).bind fun fi => fi.type.expand.map (ex.name, ·) else none
     | _ => none
   let tasks := fns.map fun (name, ft) => Task.spawn fun _ => script sub cfg name ft ep
   return (tasks.map Task.get).toArray
