@@ -48,6 +48,6 @@ theorem importsMatchList_iff (s : Store) (types : List FuncType) :
 
 theorem importsMatch_iff (s : Store) (m : Module) (imports : List ExternVal) :
     importsMatch s m imports = true ↔ ImportsMatch s m imports :=
-  importsMatchList_iff s m.types imports m.imports
+  importsMatchList_iff s m.typeList imports m.imports
 
 end FVA.Wasm.Exec.Ref

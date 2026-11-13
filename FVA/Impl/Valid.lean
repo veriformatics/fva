@@ -98,7 +98,7 @@ def fixed (C : Context) : Instr → Option StackType
   | .fbinop w _ => some ⟨[flt w, flt w], [flt w]⟩
   | .frelop w _ => some ⟨[flt w, flt w], [i32]⟩
   | .cvtop op => some ⟨[.val (.num op.types.1)], [.val (.num op.types.2)]⟩
-  | .refNull rt => some ⟨[], [.val (.ref rt)]⟩
+  | .refNull ht => some ⟨[], [.val (.ref ⟨true, ht⟩)]⟩
   | .refFunc x => match C.funcs[x]? with
     | none => none
     | some _ => bif C.refs.any (Nat.beq x) then some ⟨[], [.val (.ref .funcref)]⟩ else none
@@ -253,13 +253,14 @@ def importDesc (C : Context) : ImportDesc → Bool
   | .table tt => limits (2 ^ 32 - 1) tt.limits
   | .mem lim => limits (2 ^ 16) lim
   | .global _ => true
+  | .tag _ => false
 
 /-- Function body validation; local declarations stay in compressed runs. -/
 def func (C : Context) (f : Func) : Bool :=
   match C.types[f.type]? with
   | none => false
   | some ft =>
-    expr { C with
+    f.locals.all (fun l => l.2.defaultable) && expr { C with
       locals := ft.params.map (1, ·) ++ f.locals
       labels := [ft.results]
       return_ := some ft.results } f.body ft.results
@@ -284,6 +285,7 @@ def exportDesc (C : Context) : ExportDesc → Bool
   | .table x => Nat.blt x C.tables.length
   | .mem x => Nat.blt x C.mems.length
   | .global x => Nat.blt x C.globals.length
+  | .tag _ => false
 
 /-- Distinct names, without a hash-table trusted implementation. -/
 def distinct : List String → Bool
@@ -296,15 +298,15 @@ end Check
 def validate (m : Module) : Bool :=
   let C := moduleContext m
   let C' := { C with globals := importGlobals m.imports }
-  Nat.ble C.mems.length 1 &&
-  m.funcs.all (fun f => Nat.blt f.type m.types.length) &&
+  m.inP2 && Nat.ble C.mems.length 1 &&
+  m.funcs.all (fun f => Nat.blt f.type m.typeList.length) &&
   m.imports.all (fun im => Check.importDesc C im.desc) &&
   m.funcs.all (Check.func C) &&
-  m.tables.all (fun tt => Check.limits (2 ^ 32 - 1) tt.limits) &&
+  m.tables.all (fun t => Check.limits (2 ^ 32 - 1) t.type.limits) &&
   m.mems.all (Check.limits (2 ^ 16)) &&
   m.globals.all (fun g => Check.constExpr C' g.init [g.type.val]) &&
-  m.elems.all (fun e => e.init.all (fun ex => Check.constExpr C' ex [.ref e.type]) &&
-    Check.elemMode C' e.type e.mode) &&
+  m.elems.all (fun e => e.init.all (fun ex => Check.constExpr C' ex [.ref e.type.nullable]) &&
+    Check.elemMode C' e.type.nullable e.mode) &&
   m.datas.all (fun d => Check.dataMode C' d.mode) &&
   m.elems.all (fun e => Nat.blt e.init.length (2 ^ 32)) &&
   m.datas.all (fun d => Nat.blt d.init.length (2 ^ 32)) &&

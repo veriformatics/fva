@@ -1,19 +1,34 @@
 #!/usr/bin/env bash
-# Decoder evidence on the pinned corpus (scripts/fetch-corpus):
-# E1 = the official test scripts in the corpus (binary-format + numeric): every assert_malformed
-#      binary module is rejected as malformed, every valid binary module decodes (counts pinned,
-#      so an empty run fails);
+# Decoder evidence on the pinned corpus (scripts/fetch-corpus); U2 + U28a (docs/contracts/U28a-profile.md):
+# E1 = official binary scripts: every binary assert_malformed of the decoder scripts (binary format +
+#      numerics) and of the P′ scripts is rejected as malformed; every binary module of the decoder
+#      scripts decodes (counts pinned, so an empty run fails);
 # E2 = whole-module differential: `wasm-tools print` of the original (custom sections stripped)
-#      equals that of the decode → re-encode round trip (FVATest/Encode.lean), for every valid
-#      testsuite module plus lz4-wasm's lz4 codec and R-universe edgeR.so.
-# E2 normalizes the two element-segment spellings the syntax does not record: `(table 0)` and
-# `funcref (ref.func N)…` vs `func N…`.
-# E5 = `fva lift` is deterministic and its `decode_eq` kernel-checks (lz4-wasm codec); the same file
-#      with `len` + 1 or one byte changed must fail the kernel check (the link binds both).
+#      equals that of the decode → re-encode round trip (FVA/Tool/Encode.lean) for every valid
+#      decoder-script module, lz4-wasm's lz4 codec, R-universe edgeR.so and the C++ EH example, up
+#      to `norm`'s five AST-identical spellings (element types exact);
+# E5 = `fva lift` is deterministic (lz4-wasm codec, the C++ EH example) and `decode_eq`
+#      kernel-checks (the codec, the P′ exception probe); the codec's file with `len` + 1 or one
+#      byte changed must fail the kernel check (the link binds both);
+# E6 = the profile boundary: the classifier (`fvatest classify`, FVATest/Profile.lean, independent of
+#      the decoder) and FVA's decoder agree (P′ → decodes, else `unsupported` naming one of the classes
+#      shown) on the WAT probes (FVATest/Profile/probes/expected.tsv; static-profile memory counts
+#      where pinned) and on every well-formed binary module (module, module_definition,
+#      assert_invalid, assert_unlinkable, assert_uninstantiable) of every pinned script, the P′ ones
+#      round-tripping as in E2; binary encoding probes (probes/binary.tsv) decode as pinned; the
+#      command manifest FVATest/Profile/commands.tsv = one row per module command of every pinned
+#      script (script, ordinal, line, kind, format, syntax class, decoder verdict), regenerated +
+#      compared (`--regen` rewrites it);
+# E7 = scripts/check-profile: the probe tables name exactly the support manifest's classes
+#      (`fvatest profile`, FVA/Profile.lean).
 # Exit status (U12 K4): 0 pass, 1 assertion failure, 2 setup/infrastructure, 3 the program
 # under test crashed (signal).
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
+# glob + sort order = bytes: the command manifest is compared row by row on every host
+export LC_ALL=C
+regen=0
+[[ ${1:-} == --regen ]] && regen=1
 export PATH="$PWD/.tools/bin:$PATH"
 scripts/fetch-corpus || exit 2
 lake build fva fvatest >/dev/null || exit 2
@@ -21,24 +36,25 @@ fva=.lake/build/bin/fva enc=.lake/build/bin/fvatest corpus=.cache/corpus
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-# the decoder's own scripts (binary format + numerics); the execution scripts belong to test-spec
+# every pinned script as JSON + binary modules, one wasm-tools per script in parallel
+jobs=$(nproc)
+# shellcheck disable=SC2016 # the bash -c script expands its own arguments
+for w in "$corpus"/testsuite/*.wast; do printf '%s\0' "$w"; done |
+	xargs -0 -P "$jobs" -I{} bash -c 'n=$(basename "$1" .wast); mkdir -p "$2/$n" &&
+		wasm-tools json-from-wast "$1" -o "$2/$n/$n.json" --wasm-dir "$2/$n/" 2>/dev/null ||
+		echo "test-decoder: json-from-wast failed on $n"' _ {} "$work" >"$work/json.err"
+if [[ -s $work/json.err ]]; then
+	cat "$work/json.err"
+	exit 2
+fi
+# the decoder's own scripts (binary format + numerics) and the P′ scripts; the execution scripts
+# belong to test-spec
 decoder_scripts="binary binary-leb128 custom utf8-custom-section-id utf8-import-field utf8-import-module
 utf8-invalid-encoding i32 i64 int_exprs int_literals f32 f64 f32_cmp f64_cmp f32_bitwise f64_bitwise
 float_exprs float_misc float_literals conversions"
-for n in $decoder_scripts; do
-	w=$corpus/testsuite/$n.wast
-	mkdir -p "$work/$n"
-	wasm-tools json-from-wast "$w" -o "$work/$n/$n.json" --wasm-dir "$work/$n/" 2>/dev/null || {
-		echo "test-decoder: json-from-wast failed on $n"
-		exit 2
-	}
-done
+pprime_scripts="tag throw throw_ref try_table return_call return_call_indirect return_call_ref call_ref
+br_on_null br_on_non_null ref_as_non_null local_init type-equivalence type-rec type-canon"
 
-# type<TAB>file for every binary module command
-jq -r --arg d "$work" 'input_filename as $f | .commands[]
-	| select((.type == "assert_malformed" or .type == "module") and (.module_type // "binary") == "binary")
-	| [.type, ($f | sub("/[^/]*$"; "")) + "/" + .filename] | @tsv' "$work"/*/*.json >"$work/cases.tsv"
-mapfile -t files < <(cut -f2 "$work/cases.tsv")
 # A program under test killed by a signal makes no verdict.
 sut() {
 	"$@"
@@ -46,11 +62,30 @@ sut() {
 	((rc < 128)) || exit 3
 	return "$rc"
 }
+# decoder verdicts of every binary module command, keyed by file
+binary_files() {
+	jq -r --arg d "$work/$1" '.commands[] | select(.filename and (.module_type // "binary") == "binary")
+		| $d + "/" + .filename' "$work/$1/$1.json"
+}
+for w in "$corpus"/testsuite/*.wast; do binary_files "$(basename "$w" .wast)"; done >"$work/all.txt"
+mapfile -t files <"$work/all.txt"
 sut "$fva" decode "${files[@]}" /dev/null >"$work/decoded.txt" 2>&1
-
-bad=0 malformed=0 valid=0
 declare -A result
 while IFS= read -r line; do result[${line%%: *}]=${line#*: }; done <"$work/decoded.txt"
+
+# type<TAB>file for every binary module command of the E1 scripts (P′ scripts: malformed alone)
+for n in $decoder_scripts; do
+	jq -r --arg d "$work/$n" '.commands[]
+		| select((.type == "assert_malformed" or .type == "module") and (.module_type // "binary") == "binary")
+		| [.type, $d + "/" + .filename] | @tsv' "$work/$n/$n.json"
+done >"$work/cases.tsv"
+for n in $pprime_scripts; do
+	jq -r --arg d "$work/$n" '.commands[]
+		| select(.type == "assert_malformed" and (.module_type // "binary") == "binary")
+		| [.type, $d + "/" + .filename] | @tsv' "$work/$n/$n.json"
+done >>"$work/cases.tsv"
+
+bad=0 malformed=0 valid=0
 valid_files=()
 while IFS=$'\t' read -r type file; do
 	r=${result[$file]:-missing}
@@ -70,48 +105,270 @@ done <"$work/cases.tsv"
 echo "E1 malformed rejected: $malformed (pinned 702); valid decoded: $valid (pinned 186)"
 ((malformed == 702 && valid == 186)) || bad=1
 
+# norm: spellings the syntax does not record, each decoding to the same AST — an explicit
+# `(table 0)`, an empty `else`, a one-type `rec` group, a table's explicit `ref.null` of its own
+# heap type, a `(ref func)` segment of `ref.func`s in expression form; element types stay exact
+# shellcheck disable=SC2329 # run by rt in xargs' bash -c (export -f)
 norm() {
-	sed -E '/^  \(elem/{ s/ \(table 0\)//; :a; s/funcref(( [0-9]+)*) \(ref\.func ([0-9]+)\)/funcref\1 \3/; ta; s/funcref(( [0-9]+)*)\)$/func\1)/ }'
+	sed -E -e '/^  \(elem/{ s/ \(table 0\)//; :a; s/\(ref func\)(( [0-9]+)*) \(ref\.func ([0-9]+)\)/(ref func)\1 \3/; ta; s/\(ref func\)(( [0-9]+)*)\)$/func\1)/ }' \
+		-e 's/^(  \(table .*funcref) ref\.null func\)$/\1)/' \
+		-e 's/^(  \(table .*externref) ref\.null extern\)$/\1)/' \
+		-e 's/^(  \(table .*exnref) ref\.null exn\)$/\1)/' \
+		-e 's/^(  \(table .*\(ref (null )?([a-z0-9]+)\)) ref\.null \3\)$/\1)/' |
+		awk '{ l[NR] = $0 } END {
+			for (i = 1; i <= NR; i++) {
+				if (l[i] == "  (rec" && l[i + 2] == "  )" && l[i + 1] ~ /^    \(type /) {
+					print substr(l[i + 1], 3); i += 2; continue
+				}
+				if (l[i] ~ /^ *else$/) { e = l[i]; sub(/else$/, "end", e); if (l[i + 1] == e) continue }
+				print l[i]
+			}
+		}'
 }
-same=0
-for f in "${valid_files[@]}" "$corpus/lz4-wasm-block-codec.wasm" "$corpus/edgeR.so"; do
-	wasm-tools strip --all "$f" -o "$work/a.wasm" && wasm-tools print "$work/a.wasm" | norm >"$work/a.wat" ||
+# rt FILE…: per file `ok FILE`, `fail FILE` + its first diff lines, `crash FILE` (the re-encoder
+# killed by a signal) or `setup FILE`; one write per file, so parallel jobs never interleave
+# shellcheck disable=SC2329 # run by xargs' bash -c (export -f)
+rt() {
+	local f d out rc
+	for f; do
+		d=$(mktemp -d -p "$work") || return 2
+		if ! wasm-tools strip --all "$f" -o "$d/a.wasm" || ! wasm-tools print "$d/a.wasm" | norm >"$d/a.wat"; then
+			out="setup $f"
+		else
+			"$enc" reencode "$f" "$d/b.wasm" 2>/dev/null
+			rc=$?
+			if ((rc >= 128)); then
+				out="crash $f"
+			elif ((rc == 0)) && wasm-tools print "$d/b.wasm" | norm >"$d/b.wat" && cmp -s "$d/a.wat" "$d/b.wat"; then
+				out="ok $f"
+			else
+				out="fail $f"$'\n'"$(diff "$d/a.wat" "$d/b.wat" 2>/dev/null | head -6)"
+			fi
+		fi
+		rm -rf "$d"
+		printf '%s\n' "$out"
+	done
+}
+export -f rt norm
+export work enc
+# roundtrips LABEL FILE…: every file's round trip in parallel; prints the failures, sets `same`
+roundtrips() {
+	local label=$1
+	shift
+	printf '%s\0' "$@" | xargs -0 -P "$jobs" -n 32 bash -c 'rt "$@"' _ >"$work/rt.out"
+	if grep -q '^crash ' "$work/rt.out"; then
+		grep '^crash ' "$work/rt.out"
+		exit 3
+	fi
+	if grep -q '^setup ' "$work/rt.out"; then
+		grep '^setup ' "$work/rt.out"
 		exit 2
-	if sut "$enc" reencode "$f" "$work/b.wasm" &&
-		wasm-tools print "$work/b.wasm" | norm >"$work/b.wat" && cmp -s "$work/a.wat" "$work/b.wat"; then
-		same=$((same + 1))
-	else
-		echo "E2 FAIL $f"
-		diff "$work/a.wat" "$work/b.wat" 2>/dev/null | head -6
+	fi
+	same=$(grep -c '^ok ' "$work/rt.out")
+	if grep -q '^fail ' "$work/rt.out"; then
+		grep -v '^ok ' "$work/rt.out" | sed "s/^fail /$label FAIL round trip /"
 		bad=1
 	fi
-done
-echo "E2 round trips equal: $same (pinned 188)"
-((same == 188)) || bad=1
+}
+cpp=.cache/corpus/eh.wasm
+roundtrips E2 "${valid_files[@]}" "$corpus/lz4-wasm-block-codec.wasm" "$corpus/edgeR.so" "$cpp"
+echo "E2 round trips equal: $same (pinned 189)"
+((same == 189)) || bad=1
 
+# lifted DIR FILE NS OUT: `fva lift` run in DIR (it takes the artifact path relative to the project
+# root); a failed lift prints its first lines
+lifted() {
+	local rc
+	(cd "$1" && "$OLDPWD/$fva" lift "$2" "$4" --ns "$3") >"$work/$3.log" 2>&1
+	rc=$?
+	((rc < 128)) || exit 3
+	((rc == 0)) && return
+	echo "E5 FAIL lift failed on $2"
+	head -5 "$work/$3.log"
+	return 1
+}
+# lift2 FILE NS: two lifts into $work/<NS>1.lean + <NS>2.lean, byte-equal
+lift2() {
+	lifted . "$1" "$2" "$work/${2}1.lean" && lifted . "$1" "$2" "$work/${2}2.lean" || return 1
+	cmp -s "$work/${2}1.lean" "$work/${2}2.lean" && return
+	echo "E5 FAIL lift not deterministic on $1"
+	return 1
+}
+e5=0 checks=()
 codec=$corpus/lz4-wasm-block-codec.wasm
-sut "$fva" lift "$codec" "$work/L1.lean" --ns L && sut "$fva" lift "$codec" "$work/L2.lean" --ns L || bad=1
-cmp -s "$work/L1.lean" "$work/L2.lean" || {
-	echo "E5 FAIL lift not deterministic"
-	bad=1
-}
-check() { sut lake env lean "$1" >"$work/check.out" 2>&1; }
-check "$work/L1.lean" || {
-	echo "E5 FAIL decode_eq rejected"
-	head -5 "$work/check.out"
-	bad=1
-}
-len=$(sed -n 's/^def len : Nat := //p' "$work/L1.lean")
-sed "s/^def len : Nat := $len\$/def len : Nat := $((len + 1))/" "$work/L1.lean" >"$work/L3.lean"
-sed -E 's/^(def bytes : Nat := wasm_bytes% "0061736d01000000[0-9a-f]{40})(.)/\1f/' "$work/L1.lean" >"$work/L4.lean"
-for t in L3 L4; do
-	if cmp -s "$work/L1.lean" "$work/$t.lean"; then
-		echo "E5 FAIL tamper $t did not apply"
-		bad=1
-	elif check "$work/$t.lean"; then
+if lift2 "$codec" L; then
+	len=$(sed -n 's/^def len : Nat := //p' "$work/L1.lean")
+	sed "s/^def len : Nat := $len\$/def len : Nat := $((len + 1))/" "$work/L1.lean" >"$work/L3.lean"
+	sed -E 's/^(def bytes : Nat := wasm_bytes% "0061736d01000000[0-9a-f]{40})(.)/\1f/' "$work/L1.lean" >"$work/L4.lean"
+	checks+=(L1)
+	for t in L3 L4; do
+		if cmp -s "$work/L1.lean" "$work/$t.lean"; then
+			echo "E5 FAIL tamper $t did not apply"
+			e5=1
+		else checks+=("$t"); fi
+	done
+else e5=1; fi
+lift2 "$cpp" C || e5=1
+probes=FVATest/Profile/probes
+wasm-tools parse "$probes/p-eh.wat" -o "$work/p-eh.wasm" || exit 2
+if lifted "$work" p-eh.wasm E E.lean; then checks+=(E); else e5=1; fi
+# the kernel checks side by side; each file's rc lands in <file>.rc
+for t in "${checks[@]}"; do
+	(
+		lake env lean "$work/$t.lean" >"$work/$t.out" 2>&1
+		echo $? >"$work/$t.rc"
+	) &
+done
+wait
+for t in "${checks[@]}"; do
+	rc=$(cat "$work/$t.rc")
+	((rc < 128)) || exit 3
+	case $t:$rc in
+	L1:0 | E:0 | L3:[1-9]* | L4:[1-9]*) ;;
+	L1:* | E:*)
+		echo "E5 FAIL decode_eq rejected ($t)"
+		head -5 "$work/$t.out"
+		e5=1
+		;;
+	*)
 		echo "E5 FAIL tampered $t accepted"
+		e5=1
+		;;
+	esac
+done
+if ((e5)); then bad=1; else
+	echo "E5 lift deterministic (codec, C++ EH) + kernel-checked (codec, P′ probe); len + 1 and a changed byte rejected"
+fi
+
+# verdict RESULT: V = the class of a decode result, ok | malformed | unsupported:<class> | missing
+verdict() {
+	case $1 in
+	ok*) V=ok ;;
+	malformed*) V=malformed ;;
+	"unsupported at byte "*)
+		local c=${1#unsupported at byte *: }
+		V=unsupported:${c%%: *}
+		;;
+	*) V=missing ;;
+	esac
+}
+# agree FILE CLASSES: FVA's decoder verdict on FILE matches the classifier's verdict — decodes
+# for p-prime, else `unsupported` of one of the listed classes (the decoder stops at the first)
+agree() {
+	local c
+	verdict "${result[$1]:-missing}"
+	if [[ $2 == p-prime ]]; then
+		[[ $V == ok ]]
+		return
+	fi
+	for c in ${2//,/ }; do [[ $V == "unsupported:$c" ]] && return 0; done
+	return 1
+}
+: >"$work/probes.tsv"
+while IFS=$'\t' read -r name want mems; do
+	wasm-tools parse "$probes/$name.wat" -o "$work/probe-$name.wasm" || exit 2
+	printf '%s\t%s\t%s\n' "$work/probe-$name.wasm" "$want" "$mems" >>"$work/probes.tsv"
+done <"$probes/expected.tsv"
+mapfile -t pfiles < <(cut -f1 "$work/probes.tsv")
+sut "$enc" classify "${pfiles[@]}" >"$work/probes.class" || exit 2
+sut "$fva" decode "${pfiles[@]}" /dev/null >"$work/probes.decoded" 2>&1
+while IFS= read -r line; do result[${line%%: *}]=${line#*: }; done <"$work/probes.decoded"
+probe_ok=0
+while IFS=$'\t' read -r file want mems got gotmems; do
+	if [[ $got != "$want" ]]; then
+		echo "E6 FAIL classifier $file: $got, pinned $want"
+		bad=1
+	elif [[ $mems != - && $gotmems != "$mems" ]]; then
+		echo "E6 FAIL classifier $file: $gotmems memories, pinned $mems"
+		bad=1
+	elif ! agree "$file" "$got"; then
+		echo "E6 FAIL decoder $file: ${result[$file]:-missing}, classifier $got"
+		bad=1
+	else
+		probe_ok=$((probe_ok + 1))
+	fi
+done < <(paste "$work/probes.tsv" <(cut -f2,3 "$work/probes.class"))
+nwat=$(wc -l <"$probes/expected.tsv")
+# binary encoding probes: hex → bytes, the decoder verdict as pinned
+bfiles=()
+while IFS=$'\t' read -r name _ _; do
+	xxd -r -p "$probes/$name.hex" >"$work/$name.wasm" || exit 2
+	bfiles+=("$work/$name.wasm")
+done <"$probes/binary.tsv"
+sut "$fva" decode "${bfiles[@]}" /dev/null >"$work/bin.decoded" 2>&1
+while IFS= read -r line; do result[${line%%: *}]=${line#*: }; done <"$work/bin.decoded"
+bin_ok=0
+while IFS=$'\t' read -r name want _; do
+	key=$work/$name.wasm
+	verdict "${result[$key]:-missing}"
+	got=$V
+	if [[ $got == "$want" ]]; then bin_ok=$((bin_ok + 1)); else
+		echo "E6 FAIL binary probe $name: $got (${result[$key]:-missing}), pinned $want"
 		bad=1
 	fi
-done
-echo "E5 lift deterministic + kernel-checked; len + 1 and a changed byte rejected"
+done <"$probes/binary.tsv"
+nbin=$(wc -l <"$probes/binary.tsv")
+echo "E6 probes agreeing: WAT $probe_ok (pinned $nwat), binary $bin_ok (pinned $nbin)"
+((probe_ok == nwat && bin_ok == nbin)) || bad=1
+# E7: the probe tables name exactly the support manifest's classes
+if scripts/check-profile; then echo "E7 probe tables agree with the support manifest"; else bad=1; fi
+
+# every module command of every pinned script: script ordinal line kind format file
+for w in "$corpus"/testsuite/*.wast; do
+	n=$(basename "$w" .wast)
+	jq -r --arg n "$n" --arg d "$work/$n" '.commands | to_entries[] | select(.value.filename)
+		| [$n, .key, .value.line, .value.type, (.value.module_type // "binary"), $d + "/" + .value.filename]
+		| @tsv' "$work/$n/$n.json"
+done >"$work/mods.tsv"
+awk -F'\t' '$5 == "binary" { print $6 }' "$work/mods.tsv" >"$work/bin.txt"
+mapfile -t bmods <"$work/bin.txt"
+mkdir "$work/cls"
+# shellcheck disable=SC2016 # the bash -c script expands its own arguments
+printf '%s\0' "${bmods[@]}" | xargs -0 -P "$jobs" -n 64 bash -c \
+	'"$1" classify "${@:3}" >"$(mktemp -p "$2" c.XXXXXX)" || echo "classify failed (rc $?)"' _ "$enc" "$work/cls" \
+	>"$work/cls.err"
+if [[ -s $work/cls.err ]]; then
+	cat "$work/cls.err"
+	exit 2
+fi
+cat "$work"/cls/c.* >"$work/mods.class"
+declare -A class
+while IFS=$'\t' read -r file c _; do class[$file]=$c; done <"$work/mods.class"
+declare -A tally
+pprime=()
+: >"$work/commands.tsv"
+while IFS=$'\t' read -r n k l kind fmt file; do
+	c=- v=-
+	if [[ $fmt == binary ]]; then
+		c=${class[$file]:-missing}
+		verdict "${result[$file]:-missing}"
+		v=$V
+		case $kind in module | module_definition | assert_invalid | assert_unlinkable | assert_uninstantiable)
+			if [[ $c == print-failed ]] || agree "$file" "$c"; then
+				tally[$c]=$((${tally[$c]:-0} + 1))
+				if [[ $c == p-prime ]]; then pprime+=("$file"); fi
+			else
+				echo "E6 FAIL $n:$l $kind: decoder ${result[$file]:-missing}, classifier $c"
+				bad=1
+			fi
+			;;
+		esac
+	fi
+	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$n" "$k" "$l" "$kind" "$fmt" "$c" "$v" >>"$work/commands.tsv"
+done <"$work/mods.tsv"
+manifest=FVATest/Profile/commands.tsv
+if ((regen)); then
+	cp "$work/commands.tsv" "$manifest"
+	echo "E6 command manifest regenerated: $(wc -l <"$manifest") rows"
+elif ! cmp -s "$work/commands.tsv" "$manifest"; then
+	echo "E6 FAIL command manifest differs from $manifest (--regen rewrites it):"
+	diff "$manifest" "$work/commands.tsv" | head -10
+	bad=1
+fi
+roundtrips E6 "${pprime[@]}"
+same7=$same
+line="E6 boundary:"
+for k in $(printf '%s\n' "${!tally[@]}" | LC_ALL=C sort); do line+=" $k=${tally[$k]}"; done
+echo "$line; P′ round trips equal: $same7 (pinned 2878)"
+((same7 == 2878)) || bad=1
 exit "$bad"

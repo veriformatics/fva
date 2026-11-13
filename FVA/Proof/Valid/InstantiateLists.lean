@@ -27,6 +27,23 @@ theorem rel_filterMap {α β γ δ : Type} {R : α → β → Prop} {S : γ → 
     · simpa [List.filterMap_cons, ha, hb] using ih
     · simpa [List.filterMap_cons, ha, hb] using List.Forall₂.cons hh ih
 
+/-- Keys stay distinct through a `filterMap` that keeps each kept element's key. -/
+theorem nodup_filterMap_map {α β γ : Type} {l : List α} {f : α → Option β} {g : β → γ}
+    {k : α → γ} (hf : ∀ a b, f a = some b → g b = k a) (hn : (l.map k).Nodup) :
+    ((l.filterMap f).map g).Nodup := by
+  induction l with
+  | nil => simp
+  | cons a l ih =>
+    simp only [List.map_cons, List.nodup_cons] at hn
+    cases hfa : f a with
+    | none => simpa [List.filterMap_cons, hfa] using ih hn.2
+    | some b =>
+      simp only [List.filterMap_cons, hfa, List.map_cons, List.nodup_cons]
+      refine ⟨fun hmem => ?_, ih hn.2⟩
+      obtain ⟨b', hb', hgb⟩ := List.mem_map.mp hmem
+      obtain ⟨a', ha', hfa'⟩ := List.mem_filterMap.mp hb'
+      exact hn.1 (List.mem_map.mpr ⟨a', ha', by rw [← hf a' b' hfa', hgb, hf a b hfa]⟩)
+
 theorem filterMap_getD {α β : Type} (f : α → Option β) (d : β) (xs : List α)
     (h : ∀ x ∈ xs, ∃ y, f x = some y) :
     xs.filterMap f = xs.map (fun x => (f x).getD d) := by

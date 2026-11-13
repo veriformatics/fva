@@ -30,6 +30,8 @@ structure Kernel where
   declineOn : List String := []
   /-- An absolute binary path in place of the toolchain's (planted kernels in checks). -/
   binPath : Option String := none
+  /-- Run with the main thread's stack unlimited (`ulimit -s unlimited`). -/
+  bigStack : Bool := false
 
 /-- Every bundled kernel (Lake `Check.lean` `bundledKernels` + `leanchecker`). -/
 def kernels : List Kernel :=
@@ -43,7 +45,10 @@ def kernels : List Kernel :=
    -- introduces them (`Char.ofNat` under a string literal, `Decidable.intro` under `Nat.mod`)
    { name := "lean4lean", lineage := "lean", bin := "lean4lean", args := ["--import", "EXPORT"],
      declineOn := ["deep recursion detected", "deterministic timeout", "unknown constant"] },
-   { name := "nanoda", lineage := "nanoda", bin := "nanoda_bin", args := ["CONFIG"] },
+   -- nanoda checks on its main thread (`num_threads` 1, `nanodaConfig`): its worker threads get
+   -- a fixed stack, which FVA's own export overflows (the decoder proofs' term depth)
+   { name := "nanoda", lineage := "nanoda", bin := "nanoda_bin", args := ["CONFIG"],
+     bigStack := true },
    { name := "con-leche", lineage := "con", bin := "con-leche", args := ["EXPORT"] },
    { name := "con-ron", lineage := "con", bin := "con-ron", args := ["EXPORT"] }]
 
@@ -90,12 +95,12 @@ the arena's `011_nonTypeAxiom` canary; Lake's bundled setup leaves it off. -/
 def nanodaConfig (exportPath : String) : Lean.Json := Lean.Json.mkObj
   [("use_stdin", false), ("export_file_path", exportPath),
    ("permitted_axioms", Lean.toJson standardAxioms), ("unpermitted_axiom_hard_error", true),
-   ("num_threads", 4), ("nat_extension", true), ("string_extension", true)]
+   ("num_threads", 1), ("nat_extension", true), ("string_extension", true)]
 
 /-- Everything about invoking `k` besides its binary and input (keys cached canary results). -/
 def Kernel.configId (k : Kernel) : String :=
   " ".intercalate k.args ++ (if k.args.contains "CONFIG" then (nanodaConfig "EXPORT").compress
-    else "") ++ "|" ++ "|".intercalate k.declineOn
+    else "") ++ "|" ++ "|".intercalate k.declineOn ++ (if k.bigStack then "|bigStack" else "")
 
 /-- The toolchain's binary of `k`. -/
 def Kernel.path (k : Kernel) : IO System.FilePath := do
@@ -113,8 +118,9 @@ def runKernel (k : Kernel) (bin exportPath config : System.FilePath) (limit : Na
     if a == "EXPORT" then exportPath.toString else if a == "CONFIG" then config.toString else a
   let t0 ← IO.monoMsNow
   let out := config.withExtension "out"
+  let stack := if k.bigStack then "ulimit -s unlimited; " else ""
   let child ← IO.Process.spawn
-    { cmd := "bash", args := #["-c", "out=$1; shift; exec \"$@\" >\"$out\" 2>&1", "_",
+    { cmd := "bash", args := #["-c", stack ++ "out=$1; shift; exec \"$@\" >\"$out\" 2>&1", "_",
         out.toString, "timeout", "-k", "10", toString limit, bin.toString] ++ args.toArray,
       stdout := .null, stderr := .null, stdin := .null }
   let rc ← child.wait

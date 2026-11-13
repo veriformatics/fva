@@ -1,4 +1,4 @@
-1	module	skip:outside-profile	unsupported
+1	module	skip:outside-profile	invalid
 48	assert_trap	skip:missing/rejected module	-
 49	assert_trap	skip:missing/rejected module	-
 50	assert_trap	skip:missing/rejected module	-
@@ -10,4 +10,4 @@
 58	assert_trap	skip:missing/rejected module	-
 63	module	pass	valid
 77	assert_trap	pass	-
-82	module	skip:outside-profile	malformed
+82	module	skip:outside-profile	invalid

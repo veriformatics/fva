@@ -265,15 +265,13 @@ theorem value {s : Store} {C : Context} {v : Val} {t : ValType} (h : v.HasType s
     | func a =>
       cases t with
       | num n => cases h
-      | ref rt => cases rt with
-        | funcref => exact .refFuncAddr h
-        | externref => cases h
+      | ref rt =>
+        rcases rt with ⟨_ | _, (_ | _ | _) | _⟩ <;> first | exact .refFuncAddr h | cases h
     | extern a =>
       cases t with
       | num n => cases h
-      | ref rt => cases rt with
-        | funcref => cases h
-        | externref => exact .refExternAddr
+      | ref rt =>
+        rcases rt with ⟨_ | _, (_ | _ | _) | _⟩ <;> first | exact .refExternAddr | cases h
 
 end AInstrT
 

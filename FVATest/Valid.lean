@@ -7,7 +7,7 @@ open FVA.Wasm FVA.Wasm.Valid
 /-- A function fixture keeps its local runs compressed. -/
 def one (body : Expr) (params results : List ValType := [])
     (locals : List (Nat × ValType) := []) : Module :=
-  { types := [⟨params, results⟩], funcs := [⟨0, locals, body⟩] }
+  { types := [[⟨params, results⟩]], funcs := [⟨0, locals, body⟩] }
 
 #guard validate {}
 #guard validate (one [.iconst .w32 7] [] [.num .i32])
@@ -36,10 +36,10 @@ def one (body : Expr) (params results : List ValType := [])
 #guard validate (one [.loop (.val (.num .i32)) [.br 0]] [] [.num .i32])
 #guard !validate (one [.loop (.val (.num .i32)) []] [] [.num .i32])
 #guard validate {
-  types := [⟨[], []⟩, ⟨[.num .i32], []⟩]
+  types := [[⟨[], []⟩], [⟨[.num .i32], []⟩]]
   funcs := [⟨0, [], [.iconst .w32 0, .loop (.idx 1) [.br 0]]⟩] }
 #guard !validate {
-  types := [⟨[], []⟩, ⟨[.num .i32], []⟩]
+  types := [[⟨[], []⟩], [⟨[.num .i32], []⟩]]
   funcs := [⟨0, [], [.iconst .w32 0, .loop (.idx 1) [.drop, .br 0]]⟩] }
 
 #guard !validate (one [.refFunc 0, .drop])
@@ -60,8 +60,29 @@ def one (body : Expr) (params results : List ValType := [])
 #guard !validate { imports := [⟨"m", "memory", .mem ⟨0, none⟩⟩], mems := [⟨0, none⟩] }
 #guard !validate { mems := [⟨0, none⟩, ⟨0, none⟩] }
 #guard !validate { mems := [⟨2 ^ 16 + 1, none⟩] }
-#guard !validate { tables := [⟨⟨2 ^ 32, none⟩, .funcref⟩] }
-#guard !validate { tables := [⟨⟨2, some 1⟩, .funcref⟩] }
+#guard !validate { tables := [⟨⟨⟨2 ^ 32, none⟩, .funcref⟩, [.refNull (.abs .func)]⟩] }
+#guard !validate { tables := [⟨⟨⟨2, some 1⟩, .funcref⟩, [.refNull (.abs .func)]⟩] }
+#guard validate { tables := [⟨⟨⟨1, none⟩, .funcref⟩, [.refNull (.abs .func)]⟩] }
+
+-- Until U28c the validator accepts the 2.0 profile alone (`Module.inP2`): one function type per
+-- recursion group, no tags, nullable function or external references, tables starting null,
+-- non-null element segments of `ref.func` initializers.
+#guard !validate { types := [[⟨[], []⟩, ⟨[], []⟩]] }
+#guard !validate { types := [[⟨[], []⟩]], tags := [⟨0⟩] }
+-- Tag imports + exports sit outside the profile itself (`test-spec` skips such `assert_invalid`
+-- modules on `inP2` alone), beyond the import/export typing that also rejects them.
+#guard !Module.inP2 { types := [[⟨[], []⟩]], imports := [⟨"m", "t", .tag 0⟩] }
+#guard !Module.inP2 { exports := [⟨"t", .tag 0⟩] }
+#guard Module.inP2
+  { types := [[⟨[], []⟩]], imports := [⟨"m", "f", .func 0⟩], exports := [⟨"f", .func 0⟩] }
+#guard !validate (one [] [.ref .exnref])
+#guard !validate (one [] [] [] [(1, .ref ⟨false, .abs .func⟩)])
+#guard !validate (one [.refNull (.idx 0), .drop])
+#guard !validate { one [] with
+  tables := [⟨⟨⟨1, none⟩, .funcref⟩, [.refFunc 0]⟩], exports := [⟨"f", .func 0⟩] }
+#guard validate { one [] with elems := [⟨⟨false, .abs .func⟩, [[.refFunc 0]], .declarative⟩] }
+#guard !validate { one [] with
+  elems := [⟨⟨false, .abs .func⟩, [[.refNull (.abs .func)]], .declarative⟩] }
 
 #guard !validate (one [.iconst .w32 (2 ^ 32)] [] [.num .i32])
 #guard !validate (one [.fconst .w64 (2 ^ 64)] [] [.num .f64])

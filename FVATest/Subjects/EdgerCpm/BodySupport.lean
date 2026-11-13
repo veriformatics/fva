@@ -50,10 +50,10 @@ theorem read64 {s : Store} {mem : MemInst} {p : Nat} {v : BitVec 64}
       Nat.pow_zero, Nat.div_one] <;> apply UInt8.toNat_inj.mp <;> simp)
   simpa only [show 256 ^ 8 = 2 ^ 64 by decide, Nat.mod_eq_of_lt v.isLt] using hr
 
-theorem cpm_type : Lifted.module.types.getD Lifted.func86.type ⟨[], []⟩ =
+theorem cpm_type : Lifted.module.typeList.getD Lifted.func86.type ⟨[], []⟩ =
     ⟨[.num .i32, .num .i32, .num .i32, .num .i32], []⟩ := rfl
 
-theorem row_type : Lifted.module.types.getD Lifted.func133.type ⟨[], []⟩ =
+theorem row_type : Lifted.module.typeList.getD Lifted.func133.type ⟨[], []⟩ =
     ⟨[.num .i32, .num .i32, .num .i32], []⟩ := rfl
 
 structure Allocated (heap : Nat → Prop) (blocks : Store → List (Nat × Nat))

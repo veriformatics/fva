@@ -1,0 +1,18 @@
+(module
+  (tag $e (param i32))
+  (tag $f)
+  (func $thrower (param i32) (throw $e (local.get 0)))
+  (func (export "catches") (param i32) (result i32)
+    (block $none
+      (block $h (result i32 exnref)
+        (try_table (catch_ref $e $h) (catch_all $none)
+          (call $thrower (local.get 0)))
+        (return (i32.const 0)))
+      (drop)
+      (return))
+    (i32.const 2))
+  (func (export "rethrows") (param exnref) (throw_ref (local.get 0)))
+  (func (export "all") (result exnref)
+    (block $h (result exnref)
+      (try_table (catch_all_ref $h) (throw $f))
+      (ref.null exn))))

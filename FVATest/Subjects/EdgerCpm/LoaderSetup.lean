@@ -18,7 +18,7 @@ def stub (ft : FuncType) : FuncInst :=
     | .num .i64 => .iconst .w64 0
     | .num .f32 => .fconst .w32 0
     | .num .f64 => .fconst .w64 0
-    | .ref t => .refNull t⟩
+    | .ref t => .refNull t.heap⟩
 
 def environment (m : Module) : Store × List ExternVal := Id.run do
   let mut s : Store := {}
@@ -26,7 +26,7 @@ def environment (m : Module) : Store × List ExternVal := Id.run do
   for im in m.imports do
     match im.desc with
     | .func x =>
-      let ft := m.types.getD x ⟨[], []⟩
+      let ft := m.typeList.getD x ⟨[], []⟩
       let a := s.funcs.length
       let fi := if a = 12 ∨ a = 13 then .host ft a else stub ft
       evs := evs ++ [.func a]
@@ -37,11 +37,12 @@ def environment (m : Module) : Store × List ExternVal := Id.run do
     | .table tt =>
       evs := evs ++ [.table s.tables.length]
       s := { s with tables := s.tables ++
-        [{ type := tt, elem := List.replicate tt.limits.min (.null tt.elem) }] }
+        [{ type := tt, elem := List.replicate tt.limits.min (.null tt.elem.heap) }] }
     | .global gt =>
       let v := if im.name == "__stack_pointer" then Val.i32 65536 else gt.val.default
       evs := evs ++ [.global s.globals.length]
       s := { s with globals := s.globals ++ [{ type := gt, value := v }] }
+    | .tag _ => pure ()
   return (s, evs)
 
 noncomputable def env : Store := (environment Lifted.module).1
@@ -92,7 +93,7 @@ theorem externCheck_sound {s : Store} {ts : List FuncType} {ev : ExternVal} {im 
 
 def importsCheck (s : Store) (m : Module) (xs : List ExternVal) : Bool :=
   xs.length == m.imports.length &&
-    (xs.zip m.imports).all fun (ev, im) => externCheck s m.types ev im.desc
+    (xs.zip m.imports).all fun (ev, im) => externCheck s m.typeList ev im.desc
 
 theorem importsCheck_sound {s : Store} {m : Module} {xs : List ExternVal}
     (h : importsCheck s m xs = true) : ImportsMatch s m xs := by

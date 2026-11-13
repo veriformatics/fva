@@ -15,9 +15,10 @@ namespace FVA.Wasm.Exec
 
 open FVA.Wasm
 
-/-- Reference values (§4.2.1): null of a type, a function address, an external address. -/
+/-- Reference values (§4.2.1): null of a heap type (the `ref.null ht` constant), a function
+address, an external address. -/
 inductive Ref where
-  | null (t : RefType)
+  | null (ht : HeapType)
   | func (a : Nat)
   | extern (a : Nat)
   deriving DecidableEq
@@ -37,7 +38,7 @@ def _root_.FVA.Wasm.ValType.default : ValType → Val
   | .num .i64 => .i64 0
   | .num .f32 => .f32 0
   | .num .f64 => .f64 0
-  | .ref t => .ref (.null t)
+  | .ref t => .ref (.null t.heap)
 
 /-- External values (§4.2.11). -/
 inductive ExternVal where

@@ -311,8 +311,8 @@ attribute [wasm_step] eq_self List.flatMap_cons List.flatMap_nil List.replicate_
     toVal (.plain (.fconst .w64 n)) = some (.f64 (BitVec.ofNat 64 n)) := by
   have : n < 18446744073709551616 := h
   simp [toVal, Nat.blt_eq, this]
-@[wasm_step] theorem toVal_refNull (t : RefType) :
-    toVal (.plain (.refNull t)) = some (.ref (.null t)) := id rfl
+@[wasm_step] theorem toVal_refNull (ht : HeapType) :
+    toVal (.plain (.refNull ht)) = some (.ref (.null ht)) := id rfl
 
 -- `isTrapOnly` by cases, never unfolded (its catch-all match would block a symbolic value)
 @[wasm_step] theorem isTrapOnly_nil : isTrapOnly [] = false := id rfl

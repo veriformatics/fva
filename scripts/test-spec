@@ -2,7 +2,8 @@
 # Official validation + execution scripts; exact counts prevent shrinking runs.
 # Four workers; --fast omits bulk + memory_fill.
 # Validation columns: module unlinkable uninstantiable invalid malformed outside undecodable.
-# Differential columns: valid invalid undecoded (binary candidates; wasm2,-simd oracle).
+# Differential columns: valid invalid undecoded respelled (binary candidates; wasm2,-simd oracle on
+# the module's AST: respelled = valid under the P′ features alone, judged on FVA's re-encoding).
 # FVA_SPEC_COUNTS=<file> records actual rows without bypassing comparison; names select scripts.
 # Exit status (U12 K4): 0 pass, 1 assertion failure, 2 setup/infrastructure, 3 the program
 # under test crashed (signal).
@@ -15,6 +16,8 @@ lake build fvatest >/dev/null || exit 2
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 root=$PWD
+pfeatures=$(.lake/build/bin/fvatest profile | jq -r .wasmToolsFeatures) || exit 2
+[[ -n $pfeatures && $pfeatures != null ]] || exit 2
 if [[ ${1-} == --kernel ]]; then
 	(($# == 1)) || exit 2
 	lake build fva >/dev/null || exit 2
@@ -53,8 +56,8 @@ fi
 pinned="memory_copy 4450 0 0
 memory_fill 100 0 0
 bulk 117 0 0
-address 259 0 1
-align 115 0 50
+address 260 0 0
+align 119 0 46
 annotations 10 0 64
 binary 128 0 1
 binary-leb128 91 0 0
@@ -102,7 +105,7 @@ local_get 36 0 0
 local_set 53 0 0
 local_tee 97 0 1
 loop 106 0 15
-memory 80 0 10
+memory 86 0 4
 memory_init 250 0 0
 memory_redundancy 8 0 0
 memory_size 42 0 0
@@ -117,7 +120,7 @@ stack 7 0 0
 start 19 0 1
 store 61 0 7
 switch 28 0 0
-table 17 0 29
+table 20 0 26
 table_copy 1728 0 0
 table_fill 45 0 0
 table_get 16 0 0
@@ -132,169 +135,169 @@ unreachable 64 0 0
 unreached-valid 2 0 11
 unwind 50 0 0
 utf8-invalid-encoding 3 0 180"
-coverage="differential address 4 0 0
-validation address 4 0 0 0 0 0 1
-differential align 25 42 2
-validation align 25 0 0 42 48 0 2
-differential annotations 4 0 0
+coverage="differential address 4 0 0 0
+validation address 4 0 0 1 0 0 0
+differential align 25 44 0 0
+validation align 25 0 0 44 48 0 0
+differential annotations 4 0 0 0
 validation annotations 10 0 0 0 64 0 0
-differential binary 20 0 1
-validation binary 20 0 0 0 108 0 1
-differential binary-leb128 33 0 0
+differential binary 20 1 0 0
+validation binary 20 0 0 0 108 1 0
+differential binary-leb128 33 0 0 0
 validation binary-leb128 33 0 0 0 58 0 0
-differential block 1 155 0
+differential block 1 155 0 0
 validation block 1 0 0 155 15 0 0
-differential br 1 20 0
+differential br 1 20 0 0
 validation br 1 0 0 20 0 0 0
-differential br_if 1 29 1
-validation br_if 1 0 0 29 0 0 1
-differential bulk 13 0 0
+differential br_if 1 30 0 0
+validation br_if 1 0 0 29 0 1 0
+differential bulk 13 0 0 0
 validation bulk 13 0 0 0 0 0 0
-differential call 1 18 0
+differential call 1 18 0 0
 validation call 1 0 0 18 0 0 0
-differential call_indirect 3 24 0
+differential call_indirect 3 24 0 0
 validation call_indirect 3 0 0 24 11 0 0
-differential comments 4 0 0
+differential comments 4 0 0 0
 validation comments 5 0 0 0 0 0 0
-differential const 402 0 0
+differential const 402 0 0 0
 validation const 402 0 0 0 76 0 0
-differential conversions 1 25 0
+differential conversions 1 25 0 0
 validation conversions 1 0 0 25 0 0 0
-differential custom 3 0 0
+differential custom 3 0 0 0
 validation custom 3 0 0 0 8 0 0
-differential data 40 26 0
+differential data 40 26 0 2
 validation data 26 0 14 20 0 6 0
-differential elem 67 30 18
-validation elem 55 0 12 24 0 22 2
-differential endianness 1 0 0
+differential elem 68 47 0 18
+validation elem 55 0 12 24 0 24 0
+differential endianness 1 0 0 0
 validation endianness 1 0 0 0 0 0 0
-differential exports 56 31 1
+differential exports 56 32 0 0
 validation exports 56 0 0 31 0 1 0
-differential f32 1 11 0
+differential f32 1 11 0 0
 validation f32 1 0 0 11 2 0 0
-differential f32_bitwise 1 3 0
+differential f32_bitwise 1 3 0 0
 validation f32_bitwise 1 0 0 3 0 0 0
-differential f32_cmp 1 6 0
+differential f32_cmp 1 6 0 0
 validation f32_cmp 1 0 0 6 0 0 0
-differential f64 1 11 0
+differential f64 1 11 0 0
 validation f64 1 0 0 11 2 0 0
-differential f64_bitwise 1 3 0
+differential f64_bitwise 1 3 0 0
 validation f64_bitwise 1 0 0 3 0 0 0
-differential f64_cmp 1 6 0
+differential f64_cmp 1 6 0 0
 validation f64_cmp 1 0 0 6 0 0 0
-differential fac 1 0 0
+differential fac 1 0 0 0
 validation fac 1 0 0 0 0 0 0
-differential float_exprs 98 0 0
+differential float_exprs 98 0 0 0
 validation float_exprs 98 0 0 0 0 0 0
-differential float_literals 2 0 0
+differential float_literals 2 0 0 0
 validation float_literals 2 0 0 0 78 0 0
-differential float_memory 6 0 0
+differential float_memory 6 0 0 0
 validation float_memory 6 0 0 0 0 0 0
-differential float_misc 1 0 0
+differential float_misc 1 0 0 0
 validation float_misc 1 0 0 0 0 0 0
-differential forward 1 0 0
+differential forward 1 0 0 0
 validation forward 1 0 0 0 0 0 0
-differential func 4 51 1
-validation func 4 0 0 51 23 0 1
-differential func_ptrs 3 7 0
+differential func 4 52 0 0
+validation func 4 0 0 51 23 1 0
+differential func_ptrs 3 7 0 0
 validation func_ptrs 3 0 0 7 0 0 0
-differential global 5 42 2
-validation global 5 0 0 39 7 4 1
-differential i32 1 83 0
+differential global 5 44 0 3
+validation global 5 0 0 39 7 5 0
+differential i32 1 83 0 0
 validation i32 1 0 0 83 2 0 0
-differential i64 1 29 0
+differential i64 1 29 0 0
 validation i64 1 0 0 29 2 0 0
-differential id 1 0 0
+differential id 1 0 0 0
 validation id 1 0 0 0 6 0 0
-differential if 1 92 0
+differential if 1 92 0 0
 validation if 1 0 0 92 24 0 0
-differential imports 154 1 7
+differential imports 154 8 0 7
 validation imports 66 88 0 1 16 7 0
-differential inline-module 1 0 0
+differential inline-module 1 0 0 0
 validation inline-module 1 0 0 0 0 0 0
-differential int_exprs 19 0 0
+differential int_exprs 19 0 0 0
 validation int_exprs 19 0 0 0 0 0 0
-differential int_literals 1 0 0
+differential int_literals 1 0 0 0
 validation int_literals 1 0 0 0 20 0 0
-differential labels 1 3 0
+differential labels 1 3 0 0
 validation labels 1 0 0 3 0 0 0
-differential left-to-right 1 0 0
+differential left-to-right 1 0 0 0
 validation left-to-right 1 0 0 0 0 0 0
-differential linking 43 0 28
+differential linking 43 28 0 28
 validation linking 17 19 7 0 0 28 0
-differential load 1 46 0
+differential load 1 46 0 0
 validation load 1 0 0 46 13 0 0
-differential local_get 1 16 0
+differential local_get 1 16 0 0
 validation local_get 1 0 0 16 0 0 0
-differential local_set 1 33 0
+differential local_set 1 33 0 0
 validation local_set 1 0 0 33 0 0 0
-differential local_tee 1 41 1
-validation local_tee 1 0 0 41 0 0 1
-differential loop 1 27 0
+differential local_tee 1 42 0 0
+validation local_tee 1 0 0 41 0 1 0
+differential loop 1 27 0 0
 validation loop 1 0 0 27 15 0 0
-differential memory 11 16 6
-validation memory 11 0 0 16 3 0 6
-differential memory_copy 33 64 0
+differential memory 11 22 0 0
+validation memory 11 0 0 22 3 0 0
+differential memory_copy 33 64 0 0
 validation memory_copy 33 0 0 64 0 0 0
-differential memory_fill 11 64 0
+differential memory_fill 11 64 0 0
 validation memory_fill 11 0 0 64 0 0 0
-differential memory_init 29 67 0
+differential memory_init 29 67 0 0
 validation memory_init 29 0 0 67 0 0 0
-differential memory_redundancy 1 0 0
+differential memory_redundancy 1 0 0 0
 validation memory_redundancy 1 0 0 0 0 0 0
-differential memory_size 4 2 0
+differential memory_size 4 2 0 0
 validation memory_size 4 0 0 2 0 0 0
-differential memory_trap 2 0 0
+differential memory_trap 2 0 0 0
 validation memory_trap 2 0 0 0 0 0 0
-differential names 4 0 0
+differential names 4 0 0 0
 validation names 4 0 0 0 0 0 0
-differential nop 1 4 0
+differential nop 1 4 0 0
 validation nop 1 0 0 4 0 0 0
-differential ref_func 3 3 0
+differential ref_func 3 3 0 0
 validation ref_func 3 0 0 3 0 0 0
-differential return 1 20 0
+differential return 1 20 0 0
 validation return 1 0 0 20 0 0 0
-differential select 3 29 1
-validation select 3 0 0 29 0 0 1
-differential skip-stack-guard-page 1 0 0
+differential select 3 30 0 0
+validation select 3 0 0 29 0 1 0
+differential skip-stack-guard-page 1 0 0 0
 validation skip-stack-guard-page 1 0 0 0 0 0 0
-differential stack 2 0 0
+differential stack 2 0 0 0
 validation stack 2 0 0 0 0 0 0
-differential start 6 3 0
+differential start 6 3 0 0
 validation start 5 0 1 3 1 0 0
-differential store 1 51 0
+differential store 1 51 0 0
 validation store 1 0 0 51 7 0 0
-differential switch 1 1 0
+differential switch 1 1 0 0
 validation switch 1 0 0 1 0 0 0
-differential table 11 6 16
-validation table 11 0 0 6 3 6 13
-differential table_copy 52 0 0
+differential table 14 19 0 6
+validation table 11 0 0 9 3 16 0
+differential table_copy 52 0 0 0
 validation table_copy 52 0 0 0 0 0 0
-differential table_fill 1 9 0
+differential table_fill 1 9 0 0
 validation table_fill 1 0 0 9 0 0 0
-differential table_get 1 5 0
+differential table_get 1 5 0 0
 validation table_get 1 0 0 5 0 0 0
-differential table_grow 9 7 0
+differential table_grow 9 7 0 0
 validation table_grow 9 0 0 7 0 0 0
-differential table_init 40 67 1
+differential table_init 40 67 1 0
 validation table_init 40 0 0 67 0 1 0
-differential table_set 1 7 0
+differential table_set 1 7 0 0
 validation table_set 1 0 0 7 0 0 0
-differential table_size 1 2 0
+differential table_size 1 2 0 0
 validation table_size 1 0 0 2 0 0 0
-differential token 35 0 0
+differential token 35 0 0 0
 validation token 35 0 0 0 26 0 0
-differential traps 4 0 0
+differential traps 4 0 0 0
 validation traps 4 0 0 0 0 0 0
-differential type 1 0 0
+differential type 1 0 0 0
 validation type 1 0 0 0 2 0 0
-differential unreachable 1 0 0
+differential unreachable 1 0 0 0
 validation unreachable 1 0 0 0 0 0 0
-differential unreached-valid 1 0 2
+differential unreached-valid 1 2 0 2
 validation unreached-valid 1 0 0 0 0 2 0
-differential unwind 1 0 0
+differential unwind 1 0 0 0
 validation unwind 1 0 0 0 0 0 0
-differential utf8-invalid-encoding 0 0 0
+differential utf8-invalid-encoding 0 0 0 0
 validation utf8-invalid-encoding 3 0 0 0 180 0 0"
 fast=false
 if [[ ${1-} == --fast ]]; then
@@ -331,10 +334,41 @@ if [[ $(printf '%s\n' "${names[@]}" | sort -u | wc -l) != "${#names[@]}" ]]; the
 	exit 2
 fi
 
+# oracle FILE: O = wasm-tools' verdict on FILE's AST in the 2.0 profile. 3.0 spells some 2.0 ASTs
+# with encodings wasm2 lacks (an explicit table initializer, a `(ref func)` expression segment;
+# FVA decodes both to the 2.0 AST): a FILE invalid under wasm2 but valid under the P′ features is
+# judged on FVA's re-encoding (2.0 spellings wherever the AST has one), R = 1. rc 2 = setup,
+# 3 = the re-encoder crashed.
+# shellcheck disable=SC2329
+oracle() {
+	local rc
+	R=0 O=invalid
+	wasm-tools validate --features=wasm2,-simd "$1" >/dev/null 2>&1
+	rc=$?
+	((rc < 2)) || return 2
+	if ((rc == 0)); then
+		O=valid
+		return 0
+	fi
+	wasm-tools validate --features="$pfeatures" "$1" >/dev/null 2>&1
+	rc=$?
+	((rc < 2)) || return 2
+	((rc == 0)) || return 0
+	"$root/.lake/build/bin/fvatest" reencode "$1" "$1.2.wasm" >/dev/null 2>&1
+	rc=$?
+	((rc < 128)) || return 3
+	((rc == 0)) || return 2
+	R=1
+	wasm-tools validate --features=wasm2,-simd "$1.2.wasm" >/dev/null 2>&1
+	rc=$?
+	((rc < 2)) || return 2
+	((rc == 0)) && O=valid
+	return 0
+}
 # Compare every decoded binary candidate, including negative cases; decoder exclusions count.
 # shellcheck disable=SC2329
 diff_script() {
-	local name=$1 file verdict oracle rc bad=0 positive=0 negative=0 excluded=0
+	local name=$1 file verdict rc bad=0 positive=0 negative=0 excluded=0 respelled=0
 	local -a files
 	if ! jq -r --arg dir "$work/$name" '.commands[]
 		| select(.type == "module" or .type == "assert_invalid" or
@@ -363,16 +397,20 @@ diff_script() {
 		while IFS=$'\t' read -r file verdict; do
 			case $verdict in
 			valid | invalid)
-				wasm-tools validate --features=wasm2,-simd "$file" >"$work/$name.oracle" 2>&1
+				oracle "$file"
 				rc=$?
-				if ((rc > 1)); then
+				if ((rc == 3)); then
+					: >"$work/$name.crash"
+					return 3
+				fi
+				if ((rc)); then
 					: >"$work/$name.infra"
 					return 2
 				fi
-				oracle=invalid
-				if ((rc == 0)); then oracle=valid; fi
-				if [[ $oracle != "$verdict" ]]; then
-					echo "  FAIL $name: differential $file FVA=$verdict wasm-tools=$oracle" >>"$work/$name.out"
+				respelled=$((respelled + R))
+				if [[ $O != "$verdict" ]]; then
+					((R)) && O+=' (re-encoded)'
+					echo "  FAIL $name: differential $file FVA=$verdict wasm-tools=$O" >>"$work/$name.out"
 					bad=1
 				fi
 				if [[ $verdict == valid ]]; then positive=$((positive + 1)); else negative=$((negative + 1)); fi
@@ -385,7 +423,8 @@ diff_script() {
 			esac
 		done <"$work/$name.valid"
 	fi
-	printf 'differential %s %s %s %s\n' "$name" "$positive" "$negative" "$excluded" >>"$work/$name.out"
+	printf 'differential %s %s %s %s %s\n' "$name" "$positive" "$negative" "$excluded" "$respelled" \
+		>>"$work/$name.out"
 	return "$bad"
 }
 
@@ -416,8 +455,8 @@ run_script() {
 	printf '%s %s\n' "$((SECONDS - start))" "$name" >"$work/$name.time"
 	return "$rc"
 }
-export -f run_script diff_script
-export work root
+export -f run_script diff_script oracle
+export work root pfeatures
 # The child shell expands $1.
 # shellcheck disable=SC2016
 printf '%s\n' "${names[@]}" | xargs -r -P 4 -n 1 bash -c 'run_script "$1"' _
@@ -431,7 +470,7 @@ for name in "${names[@]}"; do
 	if [[ -s $work/$name.err ]]; then tail -5 "$work/$name.err"; fi
 done
 corpus=(.cache/corpus/lz4-wasm-block-codec.wasm .cache/corpus/edgeR.so
-	bench/subjects/wasm/*.wasm FVATest/Examples/*/*.wasm)
+	.cache/corpus/lz4-c.wasm .cache/corpus/lz4-flex.wasm FVATest/Examples/*/*.wasm)
 "$root/.lake/build/bin/fvatest" validate "${corpus[@]}" >"$work/corpus.valid"
 corpus_rc=$?
 if ((corpus_rc == 2 || corpus_rc == 126 || corpus_rc == 127)); then : >"$work/corpus.infra"; fi

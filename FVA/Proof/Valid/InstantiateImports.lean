@@ -7,7 +7,7 @@ open FVA.Wasm FVA.Wasm.Exec
 theorem import_funcs {s : Store} {m : Module} {imports : List ExternVal}
     (h : ImportsMatch s m imports) :
     List.Forall₂ (fun a ft => ∃ fi, s.funcs[a]? = some fi ∧ fi.type = ft)
-      (ExternVal.funcs imports) (importFuncs { types := m.types } m.imports) := by
+      (ExternVal.funcs imports) (importFuncs { types := m.typeList } m.imports) := by
   unfold ExternVal.funcs importFuncs
   apply rel_filterMap h
   intro ev im hm
@@ -53,8 +53,8 @@ theorem import_globals {s : Store} {m : Module} {imports : List ExternVal}
   cases ev <;> cases desc <;> simp only [ExternVal.Matches] at hm <;> try trivial
 
 theorem funcTypes_map {m : Module} (h : ModuleValid m) :
-    m.funcs.filterMap (fun f => m.types[f.type]?) =
-      m.funcs.map (fun f => (m.types[f.type]?).getD ⟨[], []⟩) := by
+    m.funcs.filterMap (fun f => m.typeList[f.type]?) =
+      m.funcs.map (fun f => (m.typeList[f.type]?).getD ⟨[], []⟩) := by
   apply filterMap_getD
   intro f hf
   exact ⟨_, List.getElem?_eq_getElem (h.funcTypes f hf)⟩
@@ -66,7 +66,7 @@ theorem alloc_funcs {s : Store} {m : Module} {imports : List ExternVal}
       (allocModule s m imports gvals erefs).1.funcs[a]? = some fi ∧ fi.type = ft)
       (allocModule s m imports gvals erefs).2.funcs (moduleContext m).funcs := by
   let inst := (allocModule s m imports gvals erefs).2
-  let build (fn : Func) := FuncInst.wasm (m.types[fn.type]?.getD ⟨[], []⟩) inst fn
+  let build (fn : Func) := FuncInst.wasm (m.typeList[fn.type]?.getD ⟨[], []⟩) inst fn
   have hi := binding_append (tail := m.funcs.map build) (import_funcs hm)
   have hf := fresh_binding s.funcs m.funcs build FuncInst.type
   have both := List.rel_append hi hf
@@ -78,14 +78,18 @@ theorem alloc_tables {s : Store} {m : Module} {imports : List ExternVal}
     List.Forall₂ (fun a tt => ∃ ti,
       (allocModule s m imports gvals erefs).1.tables[a]? = some ti ∧ ti.type.elem = tt.elem)
       (allocModule s m imports gvals erefs).2.tables (moduleContext m).tables := by
-  let build (tt : TableType) : TableInst :=
-    ⟨tt, List.replicate tt.limits.min (.null tt.elem)⟩
+  let build (t : Table) : TableInst :=
+    ⟨t.type, List.replicate t.type.limits.min (.null t.type.elem.heap)⟩
   have hi := binding_append (tail := m.tables.map build) (import_tables hm)
-  have hf : List.Forall₂ (fun a tt => ∃ ti,
-      (s.tables ++ m.tables.map build)[a]? = some ti ∧ ti.type.elem = tt.elem)
+  have hf : List.Forall₂ (fun a (t : Table) => ∃ ti,
+      (s.tables ++ m.tables.map build)[a]? = some ti ∧ ti.type.elem = t.type.elem)
       (fresh s.tables.length m.tables.length) m.tables :=
-    (fresh_lookup s.tables m.tables build).imp (fun a tt h => ⟨build tt, h, rfl⟩)
-  have both := List.rel_append hi hf
+    (fresh_lookup s.tables m.tables build).imp (fun a t h => ⟨build t, h, rfl⟩)
+  have hf' : List.Forall₂ (fun a tt => ∃ ti,
+      (s.tables ++ m.tables.map build)[a]? = some ti ∧ ti.type.elem = TableType.elem tt)
+      (fresh s.tables.length m.tables.length) (m.tables.map (·.type)) :=
+    List.forall₂_map_right_iff.2 hf
+  have both := List.rel_append hi hf'
   simpa only [allocModule, moduleContext, fresh, build] using both
 
 theorem alloc_mems {s : Store} {m : Module} {imports : List ExternVal}
@@ -131,11 +135,11 @@ theorem alloc_elems (s : Store) (m : Module) (imports : List ExternVal)
     List.Forall₂ (fun a rt => ∃ ei,
       (allocModule s m imports gvals erefs).1.elems[a]? = some ei ∧ ei.type = rt)
       (allocModule s m imports gvals erefs).2.elems (moduleContext m).elems := by
-  let build (p : Elem × List Ref) : ElemInst := ⟨p.1.type, p.2⟩
+  let build (p : Elem × List Ref) : ElemInst := ⟨p.1.type.nullable, p.2⟩
   have hf := fresh_binding s.elems (m.elems.zip erefs) build ElemInst.type
   have hlen : (m.elems.zip erefs).length = m.elems.length := by simp [he]
   have hmap : (m.elems.zip erefs).map (fun p => (build p).type) =
-      m.elems.map (·.type) := map_zip_left (fun e : Elem => e.type) _ _ he
+      m.elems.map (·.type.nullable) := map_zip_left (fun e : Elem => e.type.nullable) _ _ he
   rw [hlen, hmap] at hf
   simpa only [allocModule, moduleContext, fresh, build] using hf
 

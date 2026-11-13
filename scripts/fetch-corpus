@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Fetch the pinned Wasm corpus into .cache/corpus; every download is sha256-checked.
-# Third-party binaries are fetched, never committed: edgeR (GPL >= 2); the lz4-wasm codec = the
-# BSD-2-Clause dist of gorhill/lz4-wasm (byte-identical at 8995cdef), committable with its notice.
+# Third-party binaries are fetched, never committed (Decisions: Repository contents): edgeR (GPL >= 2,
+# veriformatics/fva-artifacts since R-universe dropped 4.99.10), the lz4-wasm codec (BSD-2-Clause dist of
+# gorhill/lz4-wasm at 8995cdef), the lz4 C/Rust builds + CppEH's eh.wasm (fva-artifacts subject-builds-v1):
+# the mutation workers see .cache/corpus (shared), never a gitignored placed copy.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 dir=.cache/corpus
 mkdir -p "$dir/testsuite"
 ts=https://raw.githubusercontent.com/WebAssembly/testsuite/44f1503f98409fa3737437bf9449a37a5def4210
 lz4wasm=https://raw.githubusercontent.com/gorhill/lz4-wasm/8995cdef7b3adc4a4d2fc4fc86b84a86789ff858
+art=https://github.com/veriformatics/fva-artifacts/releases/download
 
 # destination url sha256
 files=(
@@ -96,8 +99,27 @@ files=(
 	"testsuite/unreachable.wast $ts/unreachable.wast 5ec91fd3df1ab694c77eb8d3e693d4e137fb96026d1c7f1b5bfd391cdaf6c89f"
 	"testsuite/unreached-valid.wast $ts/unreached-valid.wast dff9172d39abecb5f922c90aab9e6cda712d0943c1319564c25850b4c7e1a250"
 	"testsuite/unwind.wast $ts/unwind.wast 55da9a7d4d2dc19feb04fca3ab47eb842aa10202f2f9136fb3ca756c0b2bb931"
+	# P′ (U28a): exception handling, tail calls, function references, rec groups
+	"testsuite/tag.wast $ts/tag.wast 15a8c36165de51b8d006f5d2afb3a6e9b69ea4d9915451c86a1a62b74843957f"
+	"testsuite/throw.wast $ts/throw.wast a0deb9073850b6b3fe2b6e8928fdf32a83a2d00b3e77744c9a81b10aa30f3bf8"
+	"testsuite/throw_ref.wast $ts/throw_ref.wast 577a4bdc3fb22331f4a2b50d025316f6a445dd261e12fe043eda8be4b822b42d"
+	"testsuite/try_table.wast $ts/try_table.wast 3e23f9755ad5ed1319394f496de31e5c3ec564a265afb6be68f963efb398fc1d"
+	"testsuite/return_call.wast $ts/return_call.wast f3473155d523116912b9bf2a96902062043e1e66c3fe195248211c4bd203096e"
+	"testsuite/return_call_indirect.wast $ts/return_call_indirect.wast 23b17ea497e92342d33bf725e3a63f9414026f1d2b7b02614e42d1275afbf4ab"
+	"testsuite/return_call_ref.wast $ts/return_call_ref.wast 8a27d9c0899125be14bffaa7674ee96bddf50408fe7c246eed20dd970380f24c"
+	"testsuite/call_ref.wast $ts/call_ref.wast 742dae3d3abb20d42312bb74c778c503ce17171475420dafb529e4fe35008369"
+	"testsuite/br_on_null.wast $ts/br_on_null.wast 56904bb13112422b37dcf8f47a72c3d8025e9eebc660d2cad123d7f06de50a2a"
+	"testsuite/br_on_non_null.wast $ts/br_on_non_null.wast 94881465822bd6b7f186be21c0759b6342a04a4af5c1308118e74d09fb16a067"
+	"testsuite/ref_as_non_null.wast $ts/ref_as_non_null.wast 0dac757a473d996c692863a45bbdd04d9ce2300e736a0d148b2db72b1a61cd2c"
+	"testsuite/local_init.wast $ts/local_init.wast 4a496f820a6863d429c772f4ac85018944fa96e1f1cec6df9fc9231c9795890d"
+	"testsuite/type-equivalence.wast $ts/type-equivalence.wast b2dfe2e2c165b23e82092129be1f3141f3f11680f30bd0c4923aed06919f5cff"
+	"testsuite/type-rec.wast $ts/type-rec.wast 490fcb220f3dea47f5c41bd1971bd5f89a849071f34aeeb32c0a1bc7c85779a4"
+	"testsuite/type-canon.wast $ts/type-canon.wast 51506c9b325f4943c627b5bf42fbafcf30db33fe20922360ed4641932cbbbaf4"
 	"lz4-wasm-block-codec.wasm $lz4wasm/dist/lz4-block-codec.wasm 4bda6947a0498618552cba53ab3780745fd34cc1a0d84696e83a0547dcd68acf"
-	"edgeR_4.99.10.tgz https://r2.ropensci.org/4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93 4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93"
+	"edgeR_4.99.10.tgz $art/edger-4.99.10/edgeR_4.99.10.tgz 4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93"
+	"lz4-c.wasm $art/subject-builds-v1/lz4-c.wasm 8b73efb63f0467d9999d867007969b75826140dce9e5677bd0439dc6af384ac6"
+	"lz4-flex.wasm $art/subject-builds-v1/lz4-flex.wasm 1f115e3a5ddee865621f406e2abf545854218cb8dc632d759e998553031aa775"
+	"eh.wasm $art/subject-builds-v1/eh.wasm 4e2fe131b94743ec16e11c868d5d1dc0903956c8edfe1c2d3626c1fec7155292"
 )
 
 for f in "${files[@]}"; do

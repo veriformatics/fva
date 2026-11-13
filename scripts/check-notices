@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Third-party bytes carry their notice (D57): every committed file whose `wasm_bytes% "<hex>"`
-# literal is a third-party artifact of bench/subjects/manifest.json (`subjects` + `builds`, matched
-# by sha256 of the bytes) needs a NOTICE in its directory or an ancestor naming that artifact's
-# sha256, license, upstream, version and its corresponding source (the words "corresponding
-# source"): BSD-2-Clause binary redistribution reproduces the notice, GPL-2.0 the source offer.
-# rc 0 clean, 1 findings, 2 setup.
+# Nothing third-party committed (Decisions: Repository contents; U33, was D57's notice rule): no
+# committed file whose sha256 is an artifact of bench/subjects/manifest.json (`subjects`,
+# `builds`, `archives`), and no committed `wasm_bytes% "<hex>"` literal whose bytes are one — a
+# lifted third-party module stays generated (scripts/test-subjects), its binary fetched
+# (scripts/fetch-subjects, fetch-corpus); a NOTICE no longer admits either. rc 0 clean,
+# 1 findings, 2 setup.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 manifest=bench/subjects/manifest.json
@@ -14,23 +14,20 @@ command -v xxd >/dev/null || {
 	echo "check-notices: xxd not found" >&2
 	exit 2
 }
-declare -A fields
-while IFS=$'\t' read -r sha license upstream version; do
-	fields[$sha]=$license$'\t'$upstream$'\t'$version
-done < <(jq -r '(.subjects + (.builds // []))[] | [.sha256, .license, .upstream, .version] | @tsv' \
+declare -A ids
+while IFS=$'\t' read -r sha id; do
+	ids[$sha]=$id
+done < <(jq -r '(.subjects + (.builds // []) + (.archives // []))[] | [.sha256, .id] | @tsv' \
 	"$manifest") || exit 2
-((${#fields[@]})) || exit 2
-# the nearest-first NOTICE files of a path's directory and its ancestors
-notices() {
-	local d=${1%/*}
-	[[ $d == "$1" ]] && d=.
-	while :; do
-		[[ -f $d/NOTICE ]] && printf '%s\n' "$d/NOTICE"
-		[[ $d == . ]] && break
-		[[ $d == */* ]] && d=${d%/*} || d=.
-	done
-}
+((${#ids[@]})) || exit 2
 fail=0
+while IFS= read -r line; do
+	sha=${line%% *} f=${line#*  }
+	if [[ -n ${ids[$sha]+x} ]]; then
+		echo "check-notices: $f is the third-party artifact ${ids[$sha]} ($sha): fetch it, never commit it"
+		fail=1
+	fi
+done < <(git ls-files -z | xargs -0 -r sha256sum --) || exit 2
 while IFS= read -r -d '' f; do
 	while IFS= read -r hex; do
 		[[ -n $hex ]] || continue
@@ -38,19 +35,9 @@ while IFS= read -r -d '' f; do
 			echo "check-notices: $f: cannot decode a wasm_bytes% literal" >&2
 			exit 2
 		}
-		[[ -n ${fields[$sha]+x} ]] || continue
-		IFS=$'\t' read -r license upstream version <<<"${fields[$sha]}"
-		ok=0
-		while IFS= read -r n; do
-			if grep -qF -- "$sha" "$n" && grep -qF -- "$license" "$n" && grep -qF -- "$upstream" "$n" &&
-				grep -qF -- "$version" "$n" && grep -qi -- 'corresponding source' "$n"; then
-				ok=1
-				break
-			fi
-		done < <(notices "$f")
-		if ((! ok)); then
-			echo "check-notices: $f embeds $sha ($license, $upstream $version): no NOTICE here or above" \
-				"names its sha256, license, upstream, version and corresponding source"
+		if [[ -n ${ids[$sha]+x} ]]; then
+			echo "check-notices: $f embeds the third-party artifact ${ids[$sha]} ($sha): a lifted" \
+				"third-party module stays generated, never committed"
 			fail=1
 		fi
 	done < <(grep -oE 'wasm_bytes% "[0-9a-f]+"' "$f" | sed 's/^wasm_bytes% "//; s/"$//')

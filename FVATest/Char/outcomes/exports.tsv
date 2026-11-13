@@ -27,7 +27,7 @@
 59	assert_invalid	pass	invalid
 63	assert_invalid	pass	invalid
 67	assert_invalid	pass	invalid
-71	assert_invalid	skip:decode-error	unsupported
+71	assert_invalid	skip:outside the 2.0 validation profile	invalid
 78	module	pass	valid
 79	module	pass	valid
 80	module	pass	valid

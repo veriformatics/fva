@@ -30,8 +30,16 @@ def sx : Sx → String | .s => "Sx.s" | .u => "Sx.u"
 /-- Number types. -/
 def numType : NumType → String
   | .i32 => "NumType.i32" | .i64 => "NumType.i64" | .f32 => "NumType.f32" | .f64 => "NumType.f64"
-/-- Reference types. -/
-def refType : RefType → String | .funcref => "RefType.funcref" | .externref => "RefType.externref"
+/-- Abstract heap types. -/
+def absHeapType : AbsHeapType → String
+  | .func => "AbsHeapType.func" | .extern => "AbsHeapType.extern" | .exn => "AbsHeapType.exn"
+/-- Heap types. -/
+def heapType : HeapType → String
+  | .abs a => app "HeapType.abs" [absHeapType a] | .idx x => app "HeapType.idx" [toString x]
+/-- Reference types (the 2.0 abbreviations where one applies). -/
+def refType : RefType → String
+  | .funcref => "RefType.funcref" | .externref => "RefType.externref"
+  | .exnref => "RefType.exnref" | t => app "RefType.mk" [toString t.null, heapType t.heap]
 /-- Value types. -/
 def valType : ValType → String
   | .num t => app "ValType.num" [numType t] | .ref t => app "ValType.ref" [refType t]
@@ -82,6 +90,12 @@ def cvtop : CvtOp → String
   | .demote => "CvtOp.demote" | .promote => "CvtOp.promote"
   | .reinterpret w b => app "CvtOp.reinterpret" [width w, toString b]
 
+/-- Handler clauses. -/
+def catch_ : Catch → String
+  | .tag x l => app "Catch.tag" [toString x, toString l]
+  | .tagRef x l => app "Catch.tagRef" [toString x, toString l]
+  | .all l => app "Catch.all" [toString l] | .allRef l => app "Catch.allRef" [toString l]
+
 /-- `Instr.c` applied to rendered arguments. -/
 def ins (c : String) (args : List String) : String := app ("Instr." ++ c) args
 
@@ -98,9 +112,10 @@ def instr : Instr → String
   | .fbinop w op => ins "fbinop" [width w, fbinop op]
   | .frelop w op => ins "frelop" [width w, frelop op]
   | .cvtop op => ins "cvtop" [cvtop op]
-  | .refNull t => ins "refNull" [refType t]
+  | .refNull t => ins "refNull" [heapType t]
   | .refIsNull => ins "refIsNull" []
   | .refFunc x => ins "refFunc" [toString x]
+  | .refAsNonNull => ins "refAsNonNull" []
   | .drop => ins "drop" []
   | .select none => ins "select" ["none"]
   | .select (some ts) => ins "select" [app "some" [list (ts.map valType)]]
@@ -128,6 +143,12 @@ def instr : Instr → String
   | .return_ => ins "return_" []
   | .call x => ins "call" [toString x]
   | .callIndirect x y => ins "callIndirect" [toString x, toString y]
+  | .callRef x => ins "callRef" [toString x] | .returnCall x => ins "returnCall" [toString x]
+  | .returnCallIndirect x y => ins "returnCallIndirect" [toString x, toString y]
+  | .returnCallRef x => ins "returnCallRef" [toString x]
+  | .brOnNull l => ins "brOnNull" [toString l] | .brOnNonNull l => ins "brOnNonNull" [toString l]
+  | .throw x => ins "throw" [toString x] | .throwRef => ins "throwRef" []
+  | .tryTable bt cs b => ins "tryTable" [blockType bt, list (cs.map catch_), list (instrList b)]
 /-- Rendered instructions of a sequence. -/
 def instrList : List Instr → List String
   | [] => []
@@ -156,10 +177,12 @@ def importDesc : ImportDesc → String
   | .table t => app "ImportDesc.table" [tableType t]
   | .mem l => app "ImportDesc.mem" [limits l]
   | .global g => app "ImportDesc.global" [globalType g]
+  | .tag x => app "ImportDesc.tag" [toString x]
 /-- Export descriptions. -/
 def exportDesc : ExportDesc → String
   | .func x => app "ExportDesc.func" [toString x] | .table x => app "ExportDesc.table" [toString x]
   | .mem x => app "ExportDesc.mem" [toString x] | .global x => app "ExportDesc.global" [toString x]
+  | .tag x => app "ExportDesc.tag" [toString x]
 /-- Element modes. -/
 def elemMode : ElemMode → String
   | .passive => "ElemMode.passive" | .declarative => "ElemMode.declarative"
@@ -194,10 +217,12 @@ def file (ns : String) (bytes : ByteArray) (m : Module) (source : String := "") 
       s!"    body := {instrs f.body} }\n\n"
   let funcs := list ((List.range m.funcs.length).map fun i => s!"func{i}")
   out := out ++ "/-- The decoded module. -/\nnoncomputable def module : Module :=\n" ++
-    s!"  \{ types := {list (m.types.map funcType)},\n" ++
+    s!"  \{ types := {list (m.types.map fun g => list (g.map funcType))},\n" ++
     s!"    funcs := {funcs},\n" ++
-    s!"    tables := {list (m.tables.map tableType)},\n" ++
+    s!"    tables := {list (m.tables.map fun t =>
+      app "Table.mk" [tableType t.type, instrs t.init])},\n" ++
     s!"    mems := {list (m.mems.map limits)},\n" ++
+    s!"    tags := {list (m.tags.map fun t => app "Tag.mk" [toString t.type])},\n" ++
     s!"    globals := {list (m.globals.map fun g =>
       app "Global.mk" [globalType g.type, instrs g.init])},\n" ++
     s!"    elems := {list (m.elems.map fun e =>

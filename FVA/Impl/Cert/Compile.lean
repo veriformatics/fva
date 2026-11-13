@@ -95,9 +95,9 @@ def symRun : List Instr → List Arith → Option (List Arith)
 def toyBody (m : Module) : Option (List Instr) :=
   match m.funcs with
   | [f] =>
-    bif decide (m.types = [⟨[.num .i32], [.num .i32]⟩]) && Nat.beq f.type 0 && f.locals.isEmpty &&
-        m.tables.isEmpty && m.mems.isEmpty && m.globals.isEmpty && m.elems.isEmpty &&
-        m.datas.isEmpty && m.start.isNone && m.imports.isEmpty &&
+    bif decide (m.types = [[⟨[.num .i32], [.num .i32]⟩]]) && Nat.beq f.type 0 && f.locals.isEmpty &&
+        m.tables.isEmpty && m.mems.isEmpty && m.tags.isEmpty && m.globals.isEmpty &&
+        m.elems.isEmpty && m.datas.isEmpty && m.start.isNone && m.imports.isEmpty &&
         decide (m.exports = [⟨"f", .func 0⟩]) then some f.body
     else none
   | _ => none

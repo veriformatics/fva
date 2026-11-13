@@ -31,22 +31,30 @@ theorem localAt_normalize (ls : List (Nat × ValType)) (x : Nat) :
     localAt ls x = localAt ((localTypes ls).map (1, ·)) x :=
   (localAt_runs ls x).trans (localAt_singletons (localTypes ls) x).symm
 
-theorem default_typed (s : Store) (t : ValType) : t.default.HasType s t := by
+theorem default_typed (s : Store) (t : ValType) (h : t.defaultable = true) :
+    t.default.HasType s t := by
   cases t with
   | num n => cases n <;> trivial
-  | ref r => rfl
+  | ref r =>
+    obtain ⟨null, heap⟩ := r
+    simp only [ValType.defaultable] at h
+    subst h; rfl
 
-theorem localDefaults_typed (s : Store) (code : Func) :
+theorem localDefaults_typed (s : Store) (code : Func)
+    (hd : ∀ l ∈ code.locals, l.2.defaultable = true) :
     List.Forall₂ (Val.HasType s) code.localDefaults (localTypes code.locals) := by
   unfold Func.localDefaults localTypes
-  induction code.locals with
+  generalize code.locals = ls at hd ⊢
+  induction ls with
   | nil => exact .nil
   | cons nt rest ih =>
     obtain ⟨n, t⟩ := nt
-    apply List.rel_append _ ih
+    apply List.rel_append _ (ih fun l hl => hd l (by simp [hl]))
+    have ht : t.defaultable = true := hd (n, t) (by simp)
+    clear hd ih
     induction n with
     | zero => exact .nil
-    | succ n ih => exact .cons (default_typed s t) ih
+    | succ n ih => exact .cons (default_typed s t ht) ih
 
 theorem ASeqT.invoke_inv {s : Store} {C : Context} {addr : Nat} {fi : FuncInst}
     {vs : List Val} {a b : List OpType}
@@ -74,7 +82,7 @@ theorem wasm_frame_typed {s : Store} {C D : Context} {inst : ModuleInst} {code :
   let FC : Context := { C with locals := ts.map (1, ·) }
   have hlocals : List.Forall₂ (Val.HasType s) (vs ++ code.localDefaults) ts := by
     simpa only [ts, localTypes_append, localTypes_singletons] using
-      List.rel_append hvs (localDefaults_typed s code)
+      List.rel_append hvs (localDefaults_typed s code hc.2.1)
   have hf : FrameT s ⟨vs ++ code.localDefaults, inst⟩ FC := ⟨C, ts, hi, hlocals, rfl⟩
   have he : Context.Entails
       { C with
@@ -86,7 +94,7 @@ theorem wasm_frame_typed {s : Store} {C D : Context} {inst : ModuleInst} {code :
       rfl, rfl, Nat.le_refl _, ?_, ?_, rfl, fun _ hx => hx⟩
     · exact localAt_normalize _
     · exact congrArg (ft.results :: ·) hi.noLabels.symm
-  obtain ⟨out, hbody, hm⟩ := hc.2
+  obtain ⟨out, hbody, hm⟩ := hc.2.2
   exact .frame rfl hf (.single (.label rfl .nil (ASeqT.plain (.sub (hbody.transport he) hm))))
 
 theorem ASeqT.invoke {s : Store} {C : Context} {addr : Nat} {ft : FuncType}

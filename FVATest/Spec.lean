@@ -36,7 +36,7 @@ def spectestStore : Store :=
   { funcs := printTypes.map fun (_, ps) => .wasm ⟨ps, []⟩ {} ⟨0, [], []⟩,
     globals := [⟨⟨.const, .num .i32⟩, .i32 666⟩, ⟨⟨.const, .num .i64⟩, .i64 666⟩,
       ⟨⟨.const, .num .f32⟩, .f32 0x4426a666⟩, ⟨⟨.const, .num .f64⟩, .f64 0x4084d4cccccccccd⟩],
-    tables := [⟨⟨⟨10, some 20⟩, .funcref⟩, List.replicate 10 (.null .funcref)⟩],
+    tables := [⟨⟨⟨10, some 20⟩, .funcref⟩, List.replicate 10 (.null (.abs .func))⟩],
     mems := [⟨1, some 2, fun _ => 0⟩] }
 
 /-- Exports of the fixture module; its store addresses are independent of tested modules. -/
@@ -103,17 +103,19 @@ def parseValue (inst : ModuleInst) (j : Json) : Except String (Option Val) := do
   let ty ← j.getObjValAs? String "type"
   let v ← j.getObjValAs? String "value"
   match ty, v with
-  | "funcref", "null" => return some (.ref (.null .funcref))
-  | "externref", "null" => return some (.ref (.null .externref))
+  | "funcref", "null" => return some (.ref (.null (.abs .func)))
+  | "externref", "null" => return some (.ref (.null (.abs .extern)))
+  | "exnref", "null" => return some (.ref (.null (.abs .exn)))
   | "funcref", n => return (n.toNat? >>= fun i => inst.funcs[i]?).map (.ref ∘ .func)
   | "externref", n => return n.toNat?.map (.ref ∘ .extern)
   | _, _ => return (← Numeric.parseValue j).map fromNumeric
 
-/-- The JSON value type, including reference types. -/
+/-- The JSON value type, including reference types (P′'s defined types are function types). -/
 def valueType : Val → String
   | .i32 _ => "i32" | .i64 _ => "i64" | .f32 _ => "f32" | .f64 _ => "f64"
-  | .ref (.null .funcref) | .ref (.func _) => "funcref"
-  | .ref (.null .externref) | .ref (.extern _) => "externref"
+  | .ref (.null (.abs .func)) | .ref (.null (.idx _)) | .ref (.func _) => "funcref"
+  | .ref (.null (.abs .extern)) | .ref (.extern _) => "externref"
+  | .ref (.null (.abs .exn)) => "exnref"
 
 /-- Equality of exact expected values, including reference identity. -/
 def sameValue : Val → Val → Bool
@@ -127,8 +129,8 @@ def sameValue : Val → Val → Bool
 def meets (inst : ModuleInst) (v : Val) (j : Json) : Except String Bool := do
   let ty ← j.getObjValAs? String "type"
   if ty == "refnull" then return match v with | .ref (.null _) => true | _ => false
-  if ty == "nullfuncref" then return sameValue v (.ref (.null .funcref))
-  if ty == "nullexternref" then return sameValue v (.ref (.null .externref))
+  if ty == "nullfuncref" then return sameValue v (.ref (.null (.abs .func)))
+  if ty == "nullexternref" then return sameValue v (.ref (.null (.abs .extern)))
   if ty != valueType v then return false
   if let some n := toNumeric v then
     let some e ← Numeric.parseExpect j | throw s!"unsupported expectation {j.compress}"
@@ -143,7 +145,8 @@ def meets (inst : ModuleInst) (v : Val) (j : Json) : Except String Bool := do
 def showValue : Val → String
   | .i32 b => s!"i32:{b.toNat}" | .i64 b => s!"i64:{b.toNat}"
   | .f32 b => s!"f32:{b.toNat}" | .f64 b => s!"f64:{b.toNat}"
-  | .ref (.null .funcref) => "funcref:null" | .ref (.null .externref) => "externref:null"
+  | .ref (.null (.abs .func)) => "funcref:null" | .ref (.null (.abs .extern)) => "externref:null"
+  | .ref (.null (.abs .exn)) => "exnref:null" | .ref (.null (.idx x)) => s!"ref {x}:null"
   | .ref (.func a) => s!"funcref:@{a}" | .ref (.extern a) => s!"externref:{a}"
 
 /-- The action outcome; a missing/rejected module is explicitly outside this runner's reach. -/
@@ -316,6 +319,12 @@ def validatePayload (dir : System.FilePath) (c : Json) (kind : String) (line : N
       else .error s!"{kind}: positive module is undecodable: {why}"
     return (tally t line result, none)
   | .ok m =>
+    -- P′ decodes, validation keeps the 2.0 profile until U28c: rejecting a P′ module there
+    -- never reaches the typing rule the assertion is about
+    if kind == "assert_invalid" && !m.inP2 then
+      let t := { t with validation.outside := t.validation.outside + 1 }
+      return (tally t line (.ok (some "outside the 2.0 validation profile: P′ typing = U28c")),
+        none)
     let t := { t with validation := t.validation.checked kind }
     let accepted := FVA.Wasm.Valid.validate m
     if kind == "assert_invalid" then
@@ -324,9 +333,9 @@ def validatePayload (dir : System.FilePath) (c : Json) (kind : String) (line : N
     if !accepted then return (tally t line (.error s!"{kind}: validator rejected"), none)
     return (t, some m)
 
-/-- A binary malformed payload must fail FVA's decoder. `unsupported` = outside the profile;
-decoded but invalid = "rejected only by validation" (Wasm 3.0 calls memarg flags ≥ 0x80
-malformed, Wasm 2.0 invalid). Text payloads test wasm-tools' parser and are skipped. -/
+/-- A binary malformed payload must fail FVA's decoder: FVA's grammar is Wasm 3.0's restricted
+to P′ (U28a), so a payload that decodes is a decoder fault; `unsupported` = outside the profile.
+Text payloads test wasm-tools' parser and are skipped. -/
 def checkMalformed (dir : System.FilePath) (c : Json) : IO (Except String (Option String)) := do
   if ((c.getObjValAs? String "module_type").toOption.getD "binary") != "binary" then
     return .ok (some "text format")
@@ -335,9 +344,7 @@ def checkMalformed (dir : System.FilePath) (c : Json) : IO (Except String (Optio
   return match FVA.Wasm.Decode.decode (FVA.Tool.packBytes bs) bs.size with
     | .error (.malformed _ _) => .ok none
     | .error (.unsupported pos why) => .ok (some s!"outside: decoder offset {pos}: {why}")
-    | .ok m =>
-      if FVA.Wasm.Valid.validate m then .error "assert_malformed: module decodes + validates"
-      else .ok (some "rejected only by validation")
+    | .ok _ => .error "assert_malformed: module decodes"
 
 /-- The outcome one command added to the tally: `pass`, `fail: why`, `skip: why`. -/
 def outcome (before after : Tally) : String :=

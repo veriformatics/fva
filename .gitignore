@@ -4,7 +4,6 @@ __pycache__/
 *.pyc
 .venv/
 *.wasm
-!bench/subjects/wasm/*.wasm
 !FVATest/Cheats/*.wasm
 !FVATest/Examples/**/*.wasm
 !FVATest/Subjects/**/*.wasm
@@ -30,6 +29,8 @@ FVATest/Subjects/Lz4C/O1/Lifted.lean
 FVATest/Subjects/GlmIround/glm-iround.wasm
 FVATest/Subjects/GlmIround/Lifted.lean
 FVATest/Subjects/CppEH/eh.wasm
+bench/subjects/wasm/lz4-c.wasm
+bench/subjects/wasm/lz4-flex.wasm
 bench/subjects/wasm-glm/glm-iround.wasm
 bench/subjects/wasm-pflog/runorm-pflog.wasm
 # archived benchmark runs (bench/fetch-runs unpacks fva-artifacts' bench-runs archive)

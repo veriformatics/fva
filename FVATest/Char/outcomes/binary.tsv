@@ -125,5 +125,5 @@
 1195	assert_malformed	pass	not-run:malformed
 1205	assert_malformed	pass	not-run:malformed
 1219	assert_malformed	pass	not-run:malformed
-1238	assert_invalid	skip:decode-error	malformed
+1238	assert_invalid	skip:outside the 2.0 validation profile	invalid
 1247	assert_malformed	pass	not-run:malformed

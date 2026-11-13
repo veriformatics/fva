@@ -89,7 +89,7 @@
 599	assert_invalid	pass	invalid
 603	assert_invalid	pass	invalid
 607	assert_invalid	pass	invalid
-613	assert_invalid	skip:decode-error	malformed
+613	assert_invalid	skip:outside the 2.0 validation profile	invalid
 630	assert_invalid	pass	invalid
 634	assert_invalid	pass	invalid
 639	assert_invalid	pass	invalid

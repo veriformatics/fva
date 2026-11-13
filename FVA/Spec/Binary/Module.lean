@@ -3,20 +3,21 @@ import FVA.Spec.Binary.Instr
 /-!
 # Modules in the binary format (reviewed spec)
 
-Spec §5.5. `ModuleB m bs` reads: the complete file `bs` encodes the module `m`. Custom sections
-may appear between any sections and carry no meaning; absent and empty sections decode alike.
+Wasm 3.0 `5.4-binary.modules` (SpecTec `859d3232`) restricted to P′. `ModuleB m bs` reads: the
+complete file `bs` encodes the module `m`. Custom sections may appear between any sections and
+carry no meaning; absent and empty sections decode alike.
 -/
 
 namespace FVA.Wasm.Binary
 
 open FVA.Wasm
 
-/-- `section_N(B)`: id byte, `u32` content size, content (spec §5.5.2). -/
+/-- `section_N(B)`: id byte, `u32` content size, content (`Bsection_`). -/
 def SectionB {α : Type} (id : UInt8) (R : α → List UInt8 → Prop) (a : α) (bs : List UInt8) :
     Prop :=
   ∃ sb cont, R a cont ∧ ULeb 32 cont.length sb ∧ bs = id :: sb ++ cont
 
-/-- A custom section: id 0, a name, then any bytes (spec §5.5.3). -/
+/-- A custom section: id 0, a name, then any bytes (`Bcustomsec`). -/
 def CustomB (bs : List UInt8) : Prop :=
   ∃ (nm : String) (nb rest : List UInt8), SectionB 0 (fun _ cont => Name nm nb ∧ cont = nb ++ rest)
     () bs
@@ -41,44 +42,57 @@ def OptSecB {α : Type} (id : UInt8) (R : α → List UInt8 → Prop) (x : Optio
 /-- Index into a vector, encoded as `u32`. -/
 def IdxB (x : Nat) (bs : List UInt8) : Prop := ULeb 32 x bs
 
-/-- Import descriptions (spec §5.5.5). -/
+/-- Import descriptions (`Bexterntype`). -/
 def ImportDescB : ImportDesc → List UInt8 → Prop
   | .func x, bs => ∃ b, IdxB x b ∧ bs = 0x00 :: b
   | .table t, bs => ∃ b, TableTypeB t b ∧ bs = 0x01 :: b
   | .mem t, bs => ∃ b, LimitsB t b ∧ bs = 0x02 :: b
   | .global t, bs => ∃ b, GlobalTypeB t b ∧ bs = 0x03 :: b
+  | .tag x, bs => ∃ b, TagTypeB x b ∧ bs = 0x04 :: b
 
-/-- Imports: module name, field name, description (spec §5.5.5). -/
+/-- Imports: module name, field name, description (`Bimport`). -/
 def ImportB (im : Import) (bs : List UInt8) : Prop :=
   ∃ b₁ b₂ b₃, Name im.module b₁ ∧ Name im.name b₂ ∧ ImportDescB im.desc b₃ ∧
     bs = b₁ ++ b₂ ++ b₃
 
-/-- Globals: type and initializer (spec §5.5.9). -/
+/-- Tables (`Btable`): a table type, its elements initialized to the null of its heap type, or
+`0x40 0x00`, the table type and an initializer expression. -/
+def TableB (t : Table) (bs : List UInt8) : Prop :=
+  (t.init = [.refNull t.type.elem.heap] ∧ TableTypeB t.type bs) ∨
+  (∃ b₁ b₂, TableTypeB t.type b₁ ∧ ExprB t.init b₂ ∧ bs = [0x40, 0x00] ++ b₁ ++ b₂)
+
+/-- Tags (`Btag`). -/
+def TagB (t : Tag) (bs : List UInt8) : Prop := TagTypeB t.type bs
+
+/-- Globals: type and initializer (`Bglobal`). -/
 def GlobalB (g : Global) (bs : List UInt8) : Prop :=
   ∃ b₁ b₂, GlobalTypeB g.type b₁ ∧ ExprB g.init b₂ ∧ bs = b₁ ++ b₂
 
-/-- Export descriptions (spec §5.5.10). -/
+/-- Export descriptions (`Bexternidx`). -/
 def ExportDescB : ExportDesc → List UInt8 → Prop
   | .func x, bs => ∃ b, IdxB x b ∧ bs = 0x00 :: b
   | .table x, bs => ∃ b, IdxB x b ∧ bs = 0x01 :: b
   | .mem x, bs => ∃ b, IdxB x b ∧ bs = 0x02 :: b
   | .global x, bs => ∃ b, IdxB x b ∧ bs = 0x03 :: b
+  | .tag x, bs => ∃ b, IdxB x b ∧ bs = 0x04 :: b
 
-/-- Exports: name and description (spec §5.5.10). -/
+/-- Exports: name and description (`Bexport`). -/
 def ExportB (ex : Export) (bs : List UInt8) : Prop :=
   ∃ b₁ b₂, Name ex.name b₁ ∧ ExportDescB ex.desc b₂ ∧ bs = b₁ ++ b₂
 
-/-- Element kind `0x00` = `funcref` (spec §5.5.12). -/
-def ElemKindB (t : RefType) (bs : List UInt8) : Prop := t = .funcref ∧ bs = [0x00]
+/-- Element kind `0x00` = `(ref func)` (`Belemkind`). -/
+def ElemKindB (t : RefType) (bs : List UInt8) : Prop := t = ⟨false, .abs .func⟩ ∧ bs = [0x00]
 
 /-- Function indices as `(ref.func y) end` initializers. -/
 def funcInits (ys : List Nat) : List Expr := ys.map fun y => [Instr.refFunc y]
 
-/-- Element segments: the eight encodings selected by a `u32` flag (spec §5.5.12). -/
+/-- Element segments: the eight encodings selected by a `u32` flag (`Belem`); the function-index
+forms have type `(ref func)`, flag 4's expressions `(ref null func)`. -/
 inductive ElemB : Elem → List UInt8 → Prop where
   | e0 {off : Expr} {ys : List Nat} {bf be bv : List UInt8} (hf : ULeb 32 0 bf) (he : ExprB off be)
       (hv : Vec IdxB ys bv) :
-      ElemB { type := .funcref, init := funcInits ys, mode := .active 0 off } (bf ++ be ++ bv)
+      ElemB { type := ⟨false, .abs .func⟩, init := funcInits ys, mode := .active 0 off }
+        (bf ++ be ++ bv)
   | e1 {t : RefType} {ys : List Nat} {bf bk bv : List UInt8} (hf : ULeb 32 1 bf)
       (hk : ElemKindB t bk) (hv : Vec IdxB ys bv) :
       ElemB { type := t, init := funcInits ys, mode := .passive } (bf ++ bk ++ bv)
@@ -103,7 +117,7 @@ inductive ElemB : Elem → List UInt8 → Prop where
       (ht : RefTypeB t bt) (hv : Vec ExprB els bv) :
       ElemB { type := t, init := els, mode := .declarative } (bf ++ bt ++ bv)
 
-/-- Data segments: three encodings selected by a `u32` flag (spec §5.5.14). -/
+/-- Data segments: three encodings selected by a `u32` flag (`Bdata`). -/
 inductive DataB : Data → List UInt8 → Prop where
   | d0 {off : Expr} {init : List UInt8} {bf be bv : List UInt8} (hf : ULeb 32 0 bf)
       (he : ExprB off be) (hv : Vec Byte init bv) :
@@ -114,12 +128,12 @@ inductive DataB : Data → List UInt8 → Prop where
       (hf : ULeb 32 2 bf) (hx : IdxB x bx) (he : ExprB off be) (hv : Vec Byte init bv) :
       DataB { init := init, mode := .active x off } (bf ++ bx ++ be ++ bv)
 
-/-- A run of locals: `n:u32 t:valtype` (spec §5.5.13). -/
+/-- A run of locals: `n:u32 t:valtype` (`Blocals`). -/
 def LocalsB (g : Nat × ValType) (bs : List UInt8) : Prop :=
   ∃ b₁ b₂, ULeb 32 g.1 b₁ ∧ ValTypeB g.2 b₂ ∧ bs = b₁ ++ b₂
 
 /-- A code entry: `size:u32` then local runs and the body; at most 2^32 − 1 locals in total
-(spec §5.5.13). The runs stay as encoded (`Func.locals`). -/
+(`Bcode`, `Bfunc`). The runs stay as encoded (`Func.locals`). -/
 def CodeB (c : List (Nat × ValType) × Expr) (bs : List UInt8) : Prop :=
   ∃ (bsz bl be : List UInt8),
     Vec LocalsB c.1 bl ∧ ExprB c.2 be ∧ (c.1.map Prod.fst).sum < 2 ^ 32 ∧
@@ -134,27 +148,30 @@ inductive UsesData : Instr → Prop where
   | loop {bt : BlockType} {body : List Instr} (h : UsesDataS body) : UsesData (.loop bt body)
   | thn {bt : BlockType} {thn els : List Instr} (h : UsesDataS thn) : UsesData (.if_ bt thn els)
   | els {bt : BlockType} {thn els : List Instr} (h : UsesDataS els) : UsesData (.if_ bt thn els)
+  | tryTable {bt : BlockType} {cs : List Catch} {body : List Instr} (h : UsesDataS body) :
+      UsesData (.tryTable bt cs body)
 /-- Some instruction of the sequence uses a data index. -/
 inductive UsesDataS : List Instr → Prop where
   | head {i : Instr} {is : List Instr} (h : UsesData i) : UsesDataS (i :: is)
   | tail {i : Instr} {is : List Instr} (h : UsesDataS is) : UsesDataS (i :: is)
 end
 
-/-- The magic number `\0asm` and version 1 (spec §5.5.16). -/
+/-- The magic number `\0asm` and version 1 (`Bmagic`, `Bversion`). -/
 def preamble : List UInt8 := [0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00]
 
-/-- `ModuleB m bs`: the file `bs` encodes the module `m` (spec §5.5.16). The function and code
+/-- `ModuleB m bs`: the file `bs` encodes the module `m` (`Bmodule`). The function and code
 sections have equal length; a data count, when present, equals the number of data segments;
 code may use data indices only when the data count section is present. -/
 def ModuleB (m : Module) (bs : List UInt8) : Prop :=
   ∃ (typeIdxs : List Nat) (codes : List (List (Nat × ValType) × Expr)) (dataCount : Option Nat)
-    (c₀ s₁ c₁ s₂ c₂ s₃ c₃ s₄ c₄ s₅ c₅ s₆ c₆ s₇ c₇ s₈ c₈ s₉ c₉ s₁₂ c₁₂ s₁₀ c₁₀ s₁₁ c₁₁ :
+    (c₀ s₁ c₁ s₂ c₂ s₃ c₃ s₄ c₄ s₅ c₅ s₁₃ c₁₃ s₆ c₆ s₇ c₇ s₈ c₈ s₉ c₉ s₁₂ c₁₂ s₁₀ c₁₀ s₁₁ c₁₁ :
       List UInt8),
-    CustomsB c₀ ∧ VecSecB 1 FuncTypeB m.types s₁ ∧ CustomsB c₁ ∧
+    CustomsB c₀ ∧ VecSecB 1 RecTypeB m.types s₁ ∧ CustomsB c₁ ∧
     VecSecB 2 ImportB m.imports s₂ ∧ CustomsB c₂ ∧
     VecSecB 3 IdxB typeIdxs s₃ ∧ CustomsB c₃ ∧
-    VecSecB 4 TableTypeB m.tables s₄ ∧ CustomsB c₄ ∧
+    VecSecB 4 TableB m.tables s₄ ∧ CustomsB c₄ ∧
     VecSecB 5 LimitsB m.mems s₅ ∧ CustomsB c₅ ∧
+    VecSecB 13 TagB m.tags s₁₃ ∧ CustomsB c₁₃ ∧
     VecSecB 6 GlobalB m.globals s₆ ∧ CustomsB c₆ ∧
     VecSecB 7 ExportB m.exports s₇ ∧ CustomsB c₇ ∧
     OptSecB 8 IdxB m.start s₈ ∧ CustomsB c₈ ∧
@@ -166,7 +183,7 @@ def ModuleB (m : Module) (bs : List UInt8) : Prop :=
     m.funcs = List.zipWith (fun t c => { type := t, locals := c.1, body := c.2 }) typeIdxs codes ∧
     (∀ n, dataCount = some n → n = m.datas.length) ∧
     (dataCount = none → ∀ c ∈ codes, ¬ UsesDataS c.2) ∧
-    bs = preamble ++ c₀ ++ s₁ ++ c₁ ++ s₂ ++ c₂ ++ s₃ ++ c₃ ++ s₄ ++ c₄ ++ s₅ ++ c₅ ++ s₆ ++ c₆ ++
-      s₇ ++ c₇ ++ s₈ ++ c₈ ++ s₉ ++ c₉ ++ s₁₂ ++ c₁₂ ++ s₁₀ ++ c₁₀ ++ s₁₁ ++ c₁₁
+    bs = preamble ++ c₀ ++ s₁ ++ c₁ ++ s₂ ++ c₂ ++ s₃ ++ c₃ ++ s₄ ++ c₄ ++ s₅ ++ c₅ ++ s₁₃ ++ c₁₃ ++
+      s₆ ++ c₆ ++ s₇ ++ c₇ ++ s₈ ++ c₈ ++ s₉ ++ c₉ ++ s₁₂ ++ c₁₂ ++ s₁₀ ++ c₁₀ ++ s₁₁ ++ c₁₁
 
 end FVA.Wasm.Binary

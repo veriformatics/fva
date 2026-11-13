@@ -36,25 +36,34 @@ theorem alloc_exports {s : Store} {m : Module} {imports : List ExternVal}
     ∀ ex ∈ (allocModule s m imports gvals erefs).2.exports,
       ExternValT (allocModule s m imports gvals erefs).1 ex.value := by
   intro ex hex
-  obtain ⟨e, he, rfl⟩ := List.mem_map.mp hex
+  obtain ⟨e, he, hmap⟩ := List.mem_filterMap.mp hex
   have hv' := hv.exports e he
   cases hd : e.desc with
   | func x =>
     have hb := address_bound (alloc_funcs hv hm gvals erefs)
       (fun _ _ ⟨fi, hfi, _⟩ => lookup_lt hfi) (by simpa [hd, ExportDesc.Ok] using hv')
-    simpa only [allocModule, hd, ExternValT] using hb
+    simp only [hd, Option.map_some, Option.some.injEq] at hmap
+    subst hmap
+    simpa only [allocModule, ExternValT] using hb
   | table x =>
     have hb := address_bound (alloc_tables hm gvals erefs)
       (fun _ _ ⟨ti, hti, _⟩ => lookup_lt hti) (by simpa [hd, ExportDesc.Ok] using hv')
-    simpa only [allocModule, hd, ExternValT] using hb
+    simp only [hd, Option.map_some, Option.some.injEq] at hmap
+    subst hmap
+    simpa only [allocModule, ExternValT] using hb
   | mem x =>
     have hb := address_bound (alloc_mems hm gvals erefs)
       (fun _ _ ⟨mi, hmi⟩ => lookup_lt hmi) (by simpa [hd, ExportDesc.Ok] using hv')
-    simpa only [allocModule, hd, ExternValT] using hb
+    simp only [hd, Option.map_some, Option.some.injEq] at hmap
+    subst hmap
+    simpa only [allocModule, ExternValT] using hb
   | global x =>
     have hb := address_bound (alloc_globals hm gvals erefs hg)
       (fun _ _ ⟨gi, hgi, _⟩ => lookup_lt hgi) (by simpa [hd, ExportDesc.Ok] using hv')
-    simpa only [allocModule, hd, ExternValT] using hb
+    simp only [hd, Option.map_some, Option.some.injEq] at hmap
+    subst hmap
+    simpa only [allocModule, ExternValT] using hb
+  | tag x => simp [hd, ExportDesc.Ok] at hv'
 
 /-- Allocation metadata supplies an instance context before initializer values are proved
 well typed; imported table and memory minima use their actual current sizes. -/
@@ -99,7 +108,9 @@ theorem alloc_instance {s : Store} {m : Module} {imports : List ExternVal}
         simp only [List.length_append, List.length_map]
         omega
     · exact alloc_exports hv hm gvals erefs hg
-    · simpa [C, inst, allocModule, List.map_map, Function.comp_def] using hv.exportNames
+    · simp only [allocModule]
+      exact nodup_filterMap_map (k := Export.name) (fun e v hv => by
+        obtain ⟨w, -, rfl⟩ := Option.map_eq_some_iff.mp hv; rfl) hv.exportNames
   · refine ⟨rfl, rfl, ?_, ?_, rfl, rfl, Nat.le_refl _, fun _ => rfl,
       rfl, rfl, ?_⟩
     · intro x tt hx

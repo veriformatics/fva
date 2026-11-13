@@ -3,23 +3,29 @@ import FVA.Spec.Binary.Types
 /-!
 # Instructions in the binary format (reviewed spec)
 
-Spec §5.4. Opcodes without immediates are listed as tables in the spec's order, so each entry
-can be checked against the spec's listing line by line.
+Wasm 3.0 `5.3-binary.instructions` (SpecTec `859d3232`) restricted to P′. Opcodes without
+immediates are listed as tables in the spec's order, so each entry can be checked against the
+spec's listing line by line.
 -/
 
 namespace FVA.Wasm.Binary
 
 open FVA.Wasm
 
-/-- Block types: `0x40`, a value type, or a non-negative `s33` type index (spec §5.4.1). -/
+/-- Block types (`Bblocktype`): `0x40`, a value type, or a non-negative `s33` type index. -/
 def BlockTypeB : BlockType → List UInt8 → Prop
   | .empty, bs => bs = [0x40]
   | .val t, bs => ValTypeB t bs
   | .idx x, bs => SLeb 33 x bs
 
-/-- Memory arguments: `align:u32 offset:u32` (spec §5.4.6). -/
+/-- Memory arguments (`Bmemarg`): flags `n:u32` then the offset `u64`; `n < 2^6` = the
+alignment exponent, `2^6 ≤ n < 2^7` = alignment `n − 2^6` followed by a memory index `u32` (0 in
+P′); larger flags are malformed. -/
 def MemArgB (m : MemArg) (bs : List UInt8) : Prop :=
-  ∃ b₁ b₂, ULeb 32 m.align b₁ ∧ ULeb 32 m.offset b₂ ∧ bs = b₁ ++ b₂
+  m.align < 2 ^ 6 ∧
+    ((∃ b₁ b₂, ULeb 32 m.align b₁ ∧ ULeb 64 m.offset b₂ ∧ bs = b₁ ++ b₂) ∨
+     (∃ b₁ b₀ b₂, ULeb 32 (m.align + 2 ^ 6) b₁ ∧ ULeb 32 0 b₀ ∧ ULeb 64 m.offset b₂ ∧
+       bs = b₁ ++ b₀ ++ b₂))
 
 /-- Signed LEB value of an integer constant, as its two's-complement bits of width `w`. -/
 def constBits (w : Width) (n : Int) : Nat :=
@@ -27,10 +33,10 @@ def constBits (w : Width) (n : Int) : Nat :=
   | .w32 => (n % 2 ^ 32).toNat
   | .w64 => (n % 2 ^ 64).toNat
 
-/-- One-byte opcodes without immediates (spec §5.4.1–§5.4.7, numeric `0x45`–`0xC4`). -/
+/-- One-byte opcodes without immediates (`Binstr`; numeric `0x45`–`0xC4`). -/
 def plainOps : List (UInt8 × Instr) :=
-  [ (0x00, .unreachable), (0x01, .nop), (0x0F, .return_), (0x1A, .drop), (0x1B, .select none),
-    (0xD1, .refIsNull),
+  [ (0x00, .unreachable), (0x01, .nop), (0x0A, .throwRef), (0x0F, .return_), (0x1A, .drop),
+    (0x1B, .select none), (0xD1, .refIsNull), (0xD4, .refAsNonNull),
     (0x45, .itestEqz .w32), (0x46, .irelop .w32 .eq), (0x47, .irelop .w32 .ne),
     (0x48, .irelop .w32 (.lt .s)), (0x49, .irelop .w32 (.lt .u)),
     (0x4A, .irelop .w32 (.gt .s)), (0x4B, .irelop .w32 (.gt .u)),
@@ -94,7 +100,7 @@ def fcPlainOps : List (Nat × Instr) :=
     (4, .cvtop (.truncSat .w64 .w32 .s)), (5, .cvtop (.truncSat .w64 .w32 .u)),
     (6, .cvtop (.truncSat .w64 .w64 .s)), (7, .cvtop (.truncSat .w64 .w64 .u)) ]
 
-/-- Load/store opcodes with a `memarg` (spec §5.4.6); the function builds the instruction. -/
+/-- Load/store opcodes with a `memarg`; the function builds the instruction. -/
 def memOps : List (UInt8 × (MemArg → Instr)) :=
   [ (0x28, .load .i32), (0x29, .load .i64), (0x2A, .load .f32), (0x2B, .load .f64),
     (0x2C, .loadPacked .w32 .p8 .s), (0x2D, .loadPacked .w32 .p8 .u),
@@ -108,15 +114,24 @@ def memOps : List (UInt8 × (MemArg → Instr)) :=
     (0x3E, .storePacked .w64 .p32) ]
 
 /-- One-byte opcodes taking one `u32` index (variable instructions, `table.get/set`,
-`ref.func`, `call`, `br`, `br_if`). -/
+`ref.func`, calls by index or type, branches, `throw`). -/
 def idxOps : List (UInt8 × (Nat → Instr)) :=
-  [ (0x0C, .br), (0x0D, .brIf), (0x10, .call), (0xD2, .refFunc),
+  [ (0x08, .throw), (0x0C, .br), (0x0D, .brIf), (0x10, .call), (0x12, .returnCall),
+    (0x14, .callRef), (0x15, .returnCallRef), (0xD2, .refFunc), (0xD5, .brOnNull),
+    (0xD6, .brOnNonNull),
     (0x20, .localGet), (0x21, .localSet), (0x22, .localTee),
     (0x23, .globalGet), (0x24, .globalSet), (0x25, .tableGet), (0x26, .tableSet) ]
 
 /-- `0xFC`-prefixed table opcodes taking one `u32` index. -/
 def fcIdxOps : List (Nat × (Nat → Instr)) :=
   [ (9, .dataDrop), (13, .elemDrop), (15, .tableGrow), (16, .tableSize), (17, .tableFill) ]
+
+/-- `try_table` handler clauses (`Bcatch`). -/
+def CatchB : Catch → List UInt8 → Prop
+  | .tag x l, bs => ∃ b₁ b₂, ULeb 32 x b₁ ∧ ULeb 32 l b₂ ∧ bs = 0x00 :: b₁ ++ b₂
+  | .tagRef x l, bs => ∃ b₁ b₂, ULeb 32 x b₁ ∧ ULeb 32 l b₂ ∧ bs = 0x01 :: b₁ ++ b₂
+  | .all l, bs => ∃ b, ULeb 32 l b ∧ bs = 0x02 :: b
+  | .allRef l, bs => ∃ b, ULeb 32 l b ∧ bs = 0x03 :: b
 
 mutual
 
@@ -148,6 +163,10 @@ inductive InstrB : Instr → List UInt8 → Prop where
   | ifElse {bt : BlockType} {thn els : List Instr} {b₁ b₂ b₃ : List UInt8}
       (ht : BlockTypeB bt b₁) (hb : InstrsB thn b₂) (he : InstrsB els b₃) :
       InstrB (.if_ bt thn els) ([0x04] ++ b₁ ++ b₂ ++ [0x05] ++ b₃ ++ [0x0B])
+  /-- `0x1F bt catch*:vec(catch) instr* 0x0B`. -/
+  | tryTable {bt : BlockType} {cs : List Catch} {body : List Instr} {b₁ b₂ b₃ : List UInt8}
+      (ht : BlockTypeB bt b₁) (hc : Vec CatchB cs b₂) (hb : InstrsB body b₃) :
+      InstrB (.tryTable bt cs body) ([0x1F] ++ b₁ ++ b₂ ++ b₃ ++ [0x0B])
   /-- `0x0E l*:vec(labelidx) l:labelidx`. -/
   | brTable {ls : List Nat} {l : Nat} {b₁ b₂ : List UInt8}
       (hs : Vec (ULeb 32) ls b₁) (hl : ULeb 32 l b₂) :
@@ -155,23 +174,28 @@ inductive InstrB : Instr → List UInt8 → Prop where
   /-- `0x11 y:typeidx x:tableidx` is `call_indirect x y`. -/
   | callIndirect {x y : Nat} {b₁ b₂ : List UInt8} (hy : ULeb 32 y b₁) (hx : ULeb 32 x b₂) :
       InstrB (.callIndirect x y) ([0x11] ++ b₁ ++ b₂)
+  /-- `0x13 y:typeidx x:tableidx` is `return_call_indirect x y`. -/
+  | returnCallIndirect {x y : Nat} {b₁ b₂ : List UInt8} (hy : ULeb 32 y b₁)
+      (hx : ULeb 32 x b₂) : InstrB (.returnCallIndirect x y) ([0x13] ++ b₁ ++ b₂)
   /-- `0x1C t*:vec(valtype)`. -/
   | selectT {ts : List ValType} {b : List UInt8} (h : Vec ValTypeB ts b) :
       InstrB (.select (some ts)) (0x1C :: b)
-  /-- `0xD0 t:reftype`. -/
-  | refNull {t : RefType} {b : List UInt8} (h : RefTypeB t b) : InstrB (.refNull t) (0xD0 :: b)
-  /-- `0x3F 0x00`. -/
-  | memorySize : InstrB .memorySize [0x3F, 0x00]
-  /-- `0x40 0x00`. -/
-  | memoryGrow : InstrB .memoryGrow [0x40, 0x00]
-  /-- `0xFC 8:u32 x:dataidx 0x00`. -/
-  | memoryInit {x : Nat} {b₁ b₂ : List UInt8} (hn : ULeb 32 8 b₁) (hx : ULeb 32 x b₂) :
-      InstrB (.memoryInit x) ([0xFC] ++ b₁ ++ b₂ ++ [0x00])
-  /-- `0xFC 10:u32 0x00 0x00`. -/
-  | memoryCopy {b : List UInt8} (hn : ULeb 32 10 b) :
-      InstrB .memoryCopy ([0xFC] ++ b ++ [0x00, 0x00])
-  /-- `0xFC 11:u32 0x00`. -/
-  | memoryFill {b : List UInt8} (hn : ULeb 32 11 b) : InstrB .memoryFill ([0xFC] ++ b ++ [0x00])
+  /-- `0xD0 ht:heaptype`. -/
+  | refNull {ht : HeapType} {b : List UInt8} (h : HeapTypeB ht b) :
+      InstrB (.refNull ht) (0xD0 :: b)
+  /-- `0x3F x:memidx` (memory 0 in P′). -/
+  | memorySize {b : List UInt8} (hx : ULeb 32 0 b) : InstrB .memorySize (0x3F :: b)
+  /-- `0x40 x:memidx`. -/
+  | memoryGrow {b : List UInt8} (hx : ULeb 32 0 b) : InstrB .memoryGrow (0x40 :: b)
+  /-- `0xFC 8:u32 y:dataidx x:memidx` is `memory.init y`. -/
+  | memoryInit {y : Nat} {b₁ b₂ b₃ : List UInt8} (hn : ULeb 32 8 b₁) (hy : ULeb 32 y b₂)
+      (hx : ULeb 32 0 b₃) : InstrB (.memoryInit y) ([0xFC] ++ b₁ ++ b₂ ++ b₃)
+  /-- `0xFC 10:u32 x₁:memidx x₂:memidx`. -/
+  | memoryCopy {b b₁ b₂ : List UInt8} (hn : ULeb 32 10 b) (h₁ : ULeb 32 0 b₁)
+      (h₂ : ULeb 32 0 b₂) : InstrB .memoryCopy ([0xFC] ++ b ++ b₁ ++ b₂)
+  /-- `0xFC 11:u32 x:memidx`. -/
+  | memoryFill {b b₁ : List UInt8} (hn : ULeb 32 11 b) (hx : ULeb 32 0 b₁) :
+      InstrB .memoryFill ([0xFC] ++ b ++ b₁)
   /-- `0xFC 12:u32 y:elemidx x:tableidx` is `table.init x y`. -/
   | tableInit {x y : Nat} {b₁ b₂ b₃ : List UInt8} (hn : ULeb 32 12 b₁) (hy : ULeb 32 y b₂)
       (hx : ULeb 32 x b₃) : InstrB (.tableInit x y) ([0xFC] ++ b₁ ++ b₂ ++ b₃)
@@ -199,7 +223,7 @@ inductive InstrsB : List Instr → List UInt8 → Prop where
 
 end
 
-/-- `expr`: instructions followed by `end` (`0x0B`) (spec §5.4.9). -/
+/-- `expr`: instructions followed by `end` (`0x0B`) (`Bexpr`). -/
 def ExprB (e : Expr) (bs : List UInt8) : Prop :=
   ∃ b, InstrsB e b ∧ bs = b ++ [0x0B]
 

@@ -14,8 +14,10 @@ U25.malformed-true
 U25.module-false
 U25.module-true
 U25.outcome-protocol
+U25.malformed-invalid
 D30.memory-boundaries
 D30.large-copy
 D30.memory-copy
 D30.wall nixbox
 D30.full-mode
+D29.cpp-lift

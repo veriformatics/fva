@@ -44,6 +44,6 @@ def importsMatchList (s : Store) (types : List FuncType) : List ExternVal → Li
 
 /-- `ImportsMatch` decided. -/
 def importsMatch (s : Store) (m : Module) (imports : List ExternVal) : Bool :=
-  importsMatchList s m.types imports m.imports
+  importsMatchList s m.typeList imports m.imports
 
 end FVA.Wasm.Exec.Ref

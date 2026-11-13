@@ -8,6 +8,8 @@ import FVATest.Valid
 import FVATest.Trust
 import FVATest.Explain
 import FVATest.Props
+import FVATest.Profile
+import FVATest.BaseLines
 
 /-- Runtime checks (no arguments): the lakefile version matches `FVA.version`; the fixed-seed
 property tests (`FVATest.Props`, D69).
@@ -16,6 +18,10 @@ property tests (`FVATest.Props`, D69).
 `spec <script.json>…`: run execution scripts through `Exec.Ref`, with the same tally format
 plus validation-category counts.
 `validate <file.wasm>…`: print `file<TAB>valid|invalid|malformed|unsupported` per artifact.
+`classify <file.wasm>…`: `file<TAB>p-prime|print-failed|<excluded classes><TAB>memories` (U28a E6).
+`profile`: the support manifest `FVA.Profile` as JSON (U28a E7).
+`base-lines`: comment-stripped code lines per `FVA/Spec/**` source + total (U28a E8; under
+`lake env`).
 `floatdiff <dir> <seed> <nBin> <nOther>`: write `f32.wast` + `f64.wast` (U3 E3). -/
 def main : List String → IO UInt32
   | ["reencode", src, dst] => do
@@ -28,6 +34,11 @@ def main : List String → IO UInt32
       IO.eprintln s!"fvatest reencode: {repr e}"
       return 1
   | "validate" :: files => FVA.Test.ValidRun.run files
+  | "classify" :: files => FVA.Test.Profile.run files
+  | ["base-lines"] => FVA.Test.BaseLines.run
+  | ["profile"] => do
+    IO.println FVA.Test.Profile.manifest.pretty
+    return 0
   | "numeric" :: scripts => do
     let mut bad := false
     for path in scripts do

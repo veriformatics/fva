@@ -125,9 +125,9 @@ def Linked (s : Store) (inst : ModuleInst) (alloc free : Nat) : Prop :=
   ∃ a160 a207 a12 a13, inst.funcs[207]? = some a207 ∧
     inst.funcs[12]? = some a12 ∧ inst.funcs[13]? = some a13 ∧
     inst.exportFunc "calc_cpm_raw" = some a160 ∧
-    s.funcs[a160]? = some (.wasm (Lifted.module.types.getD Lifted.func86.type ⟨[], []⟩) inst
+    s.funcs[a160]? = some (.wasm (Lifted.module.typeList.getD Lifted.func86.type ⟨[], []⟩) inst
       Lifted.func86) ∧
-    s.funcs[a207]? = some (.wasm (Lifted.module.types.getD Lifted.func133.type ⟨[], []⟩) inst
+    s.funcs[a207]? = some (.wasm (Lifted.module.typeList.getD Lifted.func133.type ⟨[], []⟩) inst
       Lifted.func133) ∧
     s.funcs[a12]? = some (.host ⟨[.num .i32, .num .i32], [.num .i32]⟩ alloc) ∧
     s.funcs[a13]? = some (.host ⟨[.num .i32], []⟩ free)

@@ -57,9 +57,25 @@ def bits (w : Width) : Gen Nat := do
   else below (2 ^ n)
 
 def width : Gen Width := pick [.w32, .w64] .w32
-def refType : Gen RefType := pick [.funcref, .externref] .funcref
-def valType : Gen ValType :=
-  pick [.num .i32, .num .i64, .num .f32, .num .f64, .ref .funcref, .ref .externref] (.num .i32)
+def heapType : Gen HeapType := do
+  if (← below 4) = 0 then return .idx (← u32)
+  return .abs (← pick [.func, .extern, .exn] .func)
+/-- Reference types, biased to the 2.0 shorthands. -/
+def refType : Gen RefType := do
+  if (← below 2) = 0 then pick [.funcref, .externref] .funcref
+  else return ⟨(← below 2) = 0, ← heapType⟩
+def valType : Gen ValType := do
+  if (← below 4) = 0 then return .ref (← refType)
+  pick [.num .i32, .num .i64, .num .f32, .num .f64] (.num .i32)
+/-- 3.0 `memarg`: alignment exponent below 2^6 (the flag bit), `u64` offset. -/
+def memArg : Gen MemArg := do
+  return ⟨← below 64, ← if (← below 4) = 0 then below (2 ^ 64) else u32⟩
+def catch_ : Gen Catch := do
+  match ← below 4 with
+  | 0 => return .tag (← u32) (← u32)
+  | 1 => return .tagRef (← u32) (← u32)
+  | 2 => return .all (← u32)
+  | _ => return .allRef (← u32)
 def limits : Gen Limits := do
   return ⟨← u32, ← if (← below 2) = 0 then pure none else some <$> u32⟩
 def blockType : Gen BlockType := do
@@ -76,26 +92,28 @@ partial def instr (s d : Nat) : Gen Instr := do
   match ← below 13 with
   | 0 | 1 => pick (plainOps.map (·.2)) .nop
   | 2 => pick (fcPlainOps.map (·.2)) .nop
-  | 3 => return (← pick (memOps.map (·.2)) fun (_ : MemArg) => Instr.nop) ⟨← u32, ← u32⟩
+  | 3 => return (← pick (memOps.map (·.2)) fun (_ : MemArg) => Instr.nop) (← memArg)
   | 4 => return (← pick (idxOps.map (·.2)) fun (_ : Nat) => Instr.nop) (← u32)
   | 5 => return (← pick (fcIdxOps.map (·.2)) fun (_ : Nat) => Instr.nop) (← u32)
   | 6 => let w ← width; return .iconst w (← bits w)
   | 7 => let w ← width; return .fconst w (← bits w)
   | 8 => return .brTable (← listOf s u32) (← u32)
   | 9 => pick [.memorySize, .memoryGrow, .memoryFill, .memoryCopy] .nop
-  | 10 => match ← below 6 with
+  | 10 => match ← below 7 with
     | 0 => return .memoryInit (← u32)
     | 1 => return .tableInit (← u32) (← u32)
     | 2 => return .tableCopy (← u32) (← u32)
     | 3 => return .callIndirect (← u32) (← u32)
-    | 4 => return .select (some [← valType])
-    | _ => return .refNull (← refType)
+    | 4 => return .returnCallIndirect (← u32) (← u32)
+    | 5 => return .select (some [← valType])
+    | _ => return .refNull (← heapType)
   | _ =>
     if d = 0 then return .nop
     let bt ← blockType
-    match ← below 3 with
+    match ← below 4 with
     | 0 => return .block bt (← seq s (d - 1))
     | 1 => return .loop bt (← seq s (d - 1))
+    | 2 => return .tryTable bt (← listOf 3 catch_) (← seq s (d - 1))
     | _ => return .if_ bt (← seq s (d - 1)) (← seq s (d - 1))
 /-- An instruction sequence. -/
 partial def seq (s d : Nat) : Gen (List Instr) := listOf s (instr s d)
@@ -110,30 +128,38 @@ def name : Gen String := do
 def constExpr : Gen Expr := do
   match ← below 3 with
   | 0 => return [.refFunc (← u32)]
-  | 1 => return [.refNull (← refType)]
+  | 1 => return [.refNull (← heapType)]
   | _ => return [.globalGet (← u32)]
 
 /-- A module of size `s` (list lengths ≤ `s`). -/
 def module (s : Nat) : Gen Module := do
-  let types ← listOf s do return ⟨← listOf 4 valType, ← listOf 2 valType⟩
+  let funcType : Gen FuncType := do return ⟨← listOf 4 valType, ← listOf 2 valType⟩
+  -- recursion groups of one type dominate, as in compiled code; `[]` and larger groups encode
+  -- through `rec`
+  let types ← listOf s do
+    if (← below 3) = 0 then listOf 3 funcType else return [← funcType]
   let imports ← listOf s do
-    let desc ← match ← below 4 with
+    let desc ← match ← below 5 with
       | 0 => pure (ImportDesc.func (← u32))
       | 1 => pure (.table ⟨← limits, ← refType⟩)
       | 2 => pure (.mem (← limits))
+      | 3 => pure (.tag (← u32))
       | _ => pure (.global ⟨← pick [.const, .var] .const, ← valType⟩)
     return ⟨← name, ← name, desc⟩
   let funcs ← listOf s do
     return { type := ← u32, locals := ← listOf 3 (do return (← below 70, ← valType)),
              body := ← seq s 2 }
-  let tables ← listOf s do return ⟨← limits, ← refType⟩
+  let tables ← listOf s do
+    let tt : TableType := ⟨← limits, ← refType⟩
+    return ⟨tt, ← if (← below 2) = 0 then pure [.refNull tt.elem.heap] else constExpr⟩
   let mems ← listOf 2 limits
+  let tags ← listOf s do return ⟨← u32⟩
   let globals ← listOf s do
     return ⟨⟨← pick [.const, .var] .const, ← valType⟩, ← seq 2 0⟩
   let exports ← listOf s do
-    let desc ← match ← below 4 with
+    let desc ← match ← below 5 with
       | 0 => pure (ExportDesc.func (← u32)) | 1 => pure (.table (← u32))
-      | 2 => pure (.mem (← u32)) | _ => pure (.global (← u32))
+      | 2 => pure (.mem (← u32)) | 3 => pure (.tag (← u32)) | _ => pure (.global (← u32))
     return ⟨← name, desc⟩
   let start ← if (← below 2) = 0 then pure none else some <$> u32
   let elems ← listOf s do
@@ -146,7 +172,7 @@ def module (s : Nat) : Gen Module := do
     let mode ← if (← below 2) = 0 then pure DataMode.passive
       else pure (.active (← pick [0, 0, ← u32] 0) (← seq 2 0))
     return ⟨← listOf (4 * s) (do return (← below 256).toUInt8), mode⟩
-  return { types, imports, funcs, tables, mems, globals, exports, start, elems, datas }
+  return { types, imports, funcs, tables, mems, tags, globals, exports, start, elems, datas }
 
 /-- The module as `fva lift` renders it. -/
 def render (m : Module) : String := FVA.Tool.Lift.file "P" .empty m

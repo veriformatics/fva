@@ -1,0 +1,17 @@
+p-eh	p-prime	-
+p-tail	p-prime	-
+p-funcref	p-prime	-
+p-rec	p-prime	-
+p-wasm2	p-prime	-
+x-gc-types-struct	gc-types	-
+x-gc-types-sub	gc-types	-
+x-bottom-types	bottom-types	-
+x-gc-instrs	gc-instructions	-
+x-simd	simd	-
+x-threads	threads	-
+x-memory64	memory64	-
+x-multi-memory	multi-memory	-
+x-legacy-eh	legacy-exceptions	-
+x-multi-memory-index	multi-memory	-
+s-two-memories	p-prime	2
+s-one-memory	p-prime	1

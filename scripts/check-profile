@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# U28a E7: the probe tables agree with the support manifest (FVA/Profile.lean, `fvatest profile`):
+# every excluded class has a negative WAT probe pinned to it alone, every class a probe table names
+# is the manifest's, and every probe row names its file. Run by scripts/test-decoder (E6) and,
+# over planted copies, by scripts/test-checks.
+# Usage: check-profile [PROFILE_JSON [PROBES_DIR]] (default: `fvatest profile`,
+# FVATest/Profile/probes). Exit status: 0 agree, 1 drift, 2 setup.
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 2
+probes=${2:-FVATest/Profile/probes}
+if [[ -n ${1:-} ]]; then json=$(cat "$1") || exit 2; else
+	json=$(.lake/build/bin/fvatest profile) || exit 2
+fi
+mapfile -t classes < <(jq -r '.excluded[]' <<<"$json") || exit 2
+((${#classes[@]} > 0)) || {
+	echo "check-profile: the manifest lists no excluded class"
+	exit 2
+}
+[[ -f $probes/expected.tsv && -f $probes/binary.tsv ]] || exit 2
+known() {
+	local c
+	for c in "${classes[@]}"; do [[ $c == "$1" ]] && return 0; done
+	return 1
+}
+bad=0
+for c in "${classes[@]}"; do
+	awk -F'\t' -v c="$c" '$2 == c { found = 1 } END { exit !found }' "$probes/expected.tsv" || {
+		echo "check-profile: class $c has no WAT probe pinned to it alone"
+		bad=1
+	}
+done
+while IFS=$'\t' read -r name want _; do
+	[[ -f $probes/$name.wat ]] || {
+		echo "check-profile: probe $name has no $name.wat"
+		bad=1
+	}
+	[[ $want == p-prime ]] && continue
+	for c in ${want//,/ }; do
+		known "$c" || {
+			echo "check-profile: probe $name names $c, outside the manifest"
+			bad=1
+		}
+	done
+done <"$probes/expected.tsv"
+while IFS=$'\t' read -r name want _; do
+	[[ -f $probes/$name.hex ]] || {
+		echo "check-profile: binary probe $name has no $name.hex"
+		bad=1
+	}
+	case $want in
+	ok | malformed) ;;
+	unsupported:*) known "${want#unsupported:}" || {
+		echo "check-profile: binary probe $name names ${want#unsupported:}, outside the manifest"
+		bad=1
+	} ;;
+	*)
+		echo "check-profile: binary probe $name has verdict $want"
+		bad=1
+		;;
+	esac
+done <"$probes/binary.tsv"
+exit "$bad"

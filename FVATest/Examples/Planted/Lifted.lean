@@ -35,10 +35,11 @@ noncomputable def func2 : Func :=
 
 /-- The decoded module. -/
 noncomputable def module : Module :=
-  { types := [(FuncType.mk [(ValType.num NumType.i32), (ValType.num NumType.i32), (ValType.num NumType.i32)] [(ValType.num NumType.i32)]), (FuncType.mk [(ValType.num NumType.i32), (ValType.num NumType.i32)] [(ValType.num NumType.i32)]), (FuncType.mk [(ValType.num NumType.i32)] [(ValType.num NumType.i32)])],
+  { types := [[(FuncType.mk [(ValType.num NumType.i32), (ValType.num NumType.i32), (ValType.num NumType.i32)] [(ValType.num NumType.i32)])], [(FuncType.mk [(ValType.num NumType.i32), (ValType.num NumType.i32)] [(ValType.num NumType.i32)])], [(FuncType.mk [(ValType.num NumType.i32)] [(ValType.num NumType.i32)])]],
     funcs := [func0, func1, func2],
     tables := [],
     mems := [(Limits.mk 1 none)],
+    tags := [],
     globals := [],
     elems := [],
     datas := [],
