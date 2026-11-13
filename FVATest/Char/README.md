@@ -48,10 +48,11 @@ Every selected script, help call and lift executes on every run.
 - `scripts.tsv`: script, execution mode, pass/fail/skip, then the runner's
   validation counters (module, unlinkable, uninstantiable, invalid, malformed,
   outside, undecodable).
-- `help/`: `lake exe fva help` and each advertised command's `--help`; separate
-  stdout, stderr and exit status. `commands.txt` pins the command inventory.
-- `lift.tsv`: path, exit status, generated-module SHA-256 for every
-  `git ls-files '*.wasm'` entry, through `lake exe fva lift`.
+- `help/`: `fva help` and each advertised command's `--help` (the `fva` binary
+  the script builds first); separate stdout, stderr and exit status.
+  `commands.txt` pins the command inventory.
+- `lift.tsv`: path, exit status, generated-module SHA-256 for every tracked
+  `.wasm` + every one `scripts/fetch-subjects` places, through `fva lift`.
   Input paths are repository-relative; namespace = `CharLift`.
 - `observer.wast` / `observer.tsv`: a function returning 7; one true return
   assertion, one false return assertion and one false trap assertion.

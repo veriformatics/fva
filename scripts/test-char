@@ -101,6 +101,7 @@ run_outcome() {
 		>"$work/$name.stdout" 2>"$work/$name.err"
 	rc=$?
 	if ((rc == 124 || rc >= 128)); then
+		echo "test-char: $name: fvatest spec → rc $rc ($why)" >>"$work/$name.err"
 		rc=3
 	elif ((rc > 1)); then
 		rc=2
@@ -129,6 +130,7 @@ run_outcome() {
 			>"$work/$name.valid" 2>>"$work/$name.err"
 		rc=$?
 		if ((rc == 124 || rc >= 128)); then
+			echo "test-char: $name: fvatest validate → rc $rc ($why)" >>"$work/$name.err"
 			rc=3
 		elif ((rc > 1)); then
 			rc=2
@@ -168,7 +170,9 @@ run_outcome() {
 	return "$rc"
 }
 export -f run_outcome
-export root work
+# a crash exit (rc 3) names its call: the gate prints a failed step's last 20 lines alone
+why='124 = past its time limit, 128 + n = signal n'
+export root work why
 # shellcheck disable=SC2016
 xargs -r -P "$jobs" -n 1 bash -c 'run_outcome "$1"' _ <"$work/names"
 worker_rc=$?
@@ -178,8 +182,10 @@ printf '# script\tmode\tpass\tfail\tskip\tmodule\tunlinkable\tuninstantiable\tin
 	>"$work/actual/scripts.tsv"
 while IFS= read -r name; do
 	if [[ ! -f $work/$name.rc ]]; then
+		echo "test-char: $name: no result (its worker died)" >&2
 		rc=3
 	elif [[ $(<"$work/$name.rc") == 3 ]]; then
+		echo "test-char: $name: crash (rc 3)" >&2
 		rc=3
 	elif [[ $(<"$work/$name.rc") == 2 && $rc != 3 ]]; then
 		rc=2
@@ -194,10 +200,13 @@ fi
 capture_help() {
 	local label=$1 rc
 	shift
-	nice -n 10 timeout 60s lake exe fva "$@" >"$work/actual/help/$label.stdout" \
+	nice -n 10 timeout 60s "$root/.lake/build/bin/fva" "$@" >"$work/actual/help/$label.stdout" \
 		2>"$work/actual/help/$label.stderr"
 	rc=$?
-	if ((rc == 124 || rc >= 128)); then return 3; fi
+	if ((rc == 124 || rc >= 128)); then
+		echo "test-char: fva $* → rc $rc ($why)" >&2
+		return 3
+	fi
 	if ((rc == 126 || rc == 127)); then return 2; fi
 	printf '%s\n' "$rc" >"$work/actual/help/$label.rc"
 }
@@ -227,11 +236,12 @@ scripts/fetch-subjects || exit 2
 lifts=0
 while IFS= read -r -d '' wasm; do
 	rm -f "$work/CharLift.lean"
-	nice -n 10 timeout 60s lake exe fva lift "$wasm" "$work/CharLift.lean" --ns CharLift \
-		>"$work/lift.stdout" 2>"$work/lift.stderr"
+	nice -n 10 timeout 60s "$root/.lake/build/bin/fva" lift "$wasm" "$work/CharLift.lean" \
+		--ns CharLift >"$work/lift.stdout" 2>"$work/lift.stderr"
 	rc=$?
 	if ((rc == 124 || rc >= 128)); then
 		cat "$work/lift.stderr" >&2
+		echo "test-char: fva lift $wasm → rc $rc ($why)" >&2
 		exit 3
 	fi
 	if ((rc == 126 || rc == 127)); then

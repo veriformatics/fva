@@ -8,6 +8,18 @@
 # Runs on a throwaway copy so the working tree is never touched.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
+# the gate shows a failed step's last 20 lines: a failing run repeats its failure lines last
+if [[ -z ${TEST_CHECKS_INNER:-} ]]; then
+	out=$(mktemp) || exit 2
+	TEST_CHECKS_INNER=1 "$PWD/scripts/test-checks" "$@" 2>&1 | tee "$out"
+	rc=${PIPESTATUS[0]}
+	if ((rc)); then
+		echo "test-checks: rc $rc; its failure lines again:"
+		grep -E '^test-[a-z-]+: ' "$out" | grep -vE ' PASS$|: [0-9]+ passed, 0 failed$'
+	fi
+	rm -f "$out"
+	exit "$rc"
+fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 fail=0
