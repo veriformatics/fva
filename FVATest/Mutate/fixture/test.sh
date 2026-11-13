@@ -7,11 +7,12 @@ out=$(.lake/build/bin/fixtest) || exit 2
 read -r dbl slow crashy hungry infra <<<"$out"
 [[ $slow == 2 ]] && sleep 600
 [[ $crashy == 3 ]] && exit 3
-# 16 MiB per step up to 1 GiB, then a hang: a runner ignoring its memory cap times out instead
+# 512 MiB read in one call, then held by a write blocked on a pipe nobody reads: ≈ 0.05 s CPU
+# per 256 MiB, so a starved worker still passes the 256 MiB cap far inside the 10 s stage limit
+# (a bash string grown to the cap costs seconds of CPU); a runner ignoring its memory cap times out
 if [[ $hungry == 3 ]]; then
-	x=
-	while ((${#x} < 1 << 30)); do x+=$(printf '%*s' 16777216 ''); done
-	sleep 600
+	# shellcheck disable=SC2216 # sleep never reads: dd blocks on its write, holding the buffer
+	dd if=/dev/zero bs=512M count=1 status=none | sleep 600
 fi
 [[ $infra == 5 ]] && exit 2
 [[ $dbl == 6 && $slow == 1 && $crashy == 2 && $hungry == 2 && $infra == 4 ]] || exit 1
