@@ -1,0 +1,296 @@
+implementation revision: 353c1f103f062bc00d19283398bfe907d3017a7a
+suite parent revision: 0b8afb8de5201e0a4c40b705f46429a9fff0c739
+runner sha256: fcc5278a4426d28a1f84614cfce7ace6094bd420fc3e97708276ef505b21242a  .lake/build/bin/fvatest
+command: FVA_P2VALID_VERBOSE=1 scripts/test-p2valid
+FAIL calls.wast:3: expected valid, got invalid
+FAIL calls.wast:5: expected valid, got invalid
+PASS calls.wast:7: invalid
+PASS calls.wast:9: invalid
+PASS calls.wast:11: invalid
+FAIL calls.wast:13: expected valid, got invalid
+FAIL calls.wast:15: expected valid, got invalid
+FAIL calls.wast:17: expected valid, got invalid
+PASS calls.wast:19: invalid
+PASS calls.wast:21: invalid
+PASS calls.wast:23: invalid
+FAIL calls.wast:25: expected valid, got invalid
+FAIL calls.wast:27: expected valid, got invalid
+FAIL calls.wast:29: expected valid, got invalid
+PASS calls.wast:31: invalid
+PASS calls.wast:33: invalid
+PASS calls.wast:35: invalid
+FAIL calls.wast:37: expected valid, got invalid
+FAIL calls.wast:39: expected valid, got invalid
+PASS calls.wast:41: invalid
+PASS calls.wast:43: invalid
+PASS calls.wast:45: invalid
+PASS calls.wast:47: valid
+FAIL calls.wast:49: expected valid, got invalid
+PASS calls.wast:51: invalid
+PASS calls.wast:53: invalid
+FAIL calls.wast:55: expected valid, got invalid
+FAIL calls.wast:57: expected valid, got invalid
+PASS calls.wast:59: invalid
+PASS calls.wast:61: invalid
+PASS calls.wast:63: valid
+FAIL calls.wast:65: expected valid, got invalid
+PASS calls.wast:67: valid
+PASS calls.wast:69: invalid
+PASS calls.wast:71: invalid
+FAIL calls.wast:73: expected valid, got invalid
+PASS calls.wast:75: invalid
+FAIL calls.wast:77: expected valid, got invalid
+FAIL core-boundaries.wast:3: expected valid, got invalid
+PASS core-boundaries.wast:5: invalid
+FAIL core-boundaries.wast:7: expected valid, got invalid
+PASS core-boundaries.wast:9: invalid
+FAIL core-boundaries.wast:11: expected valid, got invalid
+PASS core-boundaries.wast:13: invalid
+FAIL core-boundaries.wast:15: expected valid, got invalid
+PASS core-boundaries.wast:17: invalid
+FAIL core-boundaries.wast:19: expected valid, got invalid
+FAIL core-boundaries.wast:21: expected valid, got invalid
+PASS core-boundaries.wast:23: invalid
+PASS core-boundaries.wast:25: invalid
+PASS core-boundaries.wast:27: valid
+PASS core-boundaries.wast:29: invalid
+PASS core-boundaries.wast:31: invalid
+PASS core-boundaries.wast:33: valid
+PASS core-boundaries.wast:35: invalid
+PASS core-boundaries.wast:37: invalid
+PASS core-boundaries.wast:39: invalid
+PASS core-boundaries.wast:41: valid
+PASS core-boundaries.wast:43: valid
+PASS core-boundaries.wast:45: valid
+FAIL exceptions.wast:3: expected valid, got invalid
+FAIL exceptions.wast:5: expected valid, got invalid
+PASS exceptions.wast:7: invalid
+PASS exceptions.wast:9: invalid
+PASS exceptions.wast:11: invalid
+FAIL exceptions.wast:13: expected valid, got invalid
+FAIL exceptions.wast:15: expected valid, got invalid
+FAIL exceptions.wast:17: expected valid, got invalid
+FAIL exceptions.wast:19: expected valid, got invalid
+PASS exceptions.wast:21: invalid
+PASS exceptions.wast:23: invalid
+FAIL exceptions.wast:25: expected valid, got invalid
+FAIL exceptions.wast:27: expected valid, got invalid
+PASS exceptions.wast:29: invalid
+PASS exceptions.wast:31: invalid
+FAIL exceptions.wast:33: expected valid, got invalid
+FAIL exceptions.wast:35: expected valid, got invalid
+PASS exceptions.wast:37: invalid
+PASS exceptions.wast:39: invalid
+FAIL exceptions.wast:41: expected valid, got invalid
+PASS exceptions.wast:43: invalid
+PASS exceptions.wast:45: invalid
+FAIL exceptions.wast:47: expected valid, got invalid
+FAIL exceptions.wast:49: expected valid, got invalid
+PASS exceptions.wast:51: invalid
+PASS exceptions.wast:53: invalid
+FAIL exceptions.wast:55: expected valid, got invalid
+PASS exceptions.wast:57: invalid
+FAIL exceptions.wast:59: expected valid, got invalid
+FAIL exceptions.wast:61: expected valid, got invalid
+PASS exceptions.wast:63: invalid
+PASS exceptions.wast:65: invalid
+FAIL exceptions.wast:67: expected valid, got invalid
+FAIL exceptions.wast:69: expected valid, got invalid
+PASS exceptions.wast:71: invalid
+PASS exceptions.wast:73: invalid
+FAIL exceptions.wast:75: expected valid, got invalid
+PASS exceptions.wast:77: invalid
+PASS exceptions.wast:79: invalid
+FAIL exceptions.wast:81: expected valid, got invalid
+FAIL gc-constants.wast:5: expected valid, got invalid
+FAIL gc-constants.wast:7: expected valid, got invalid
+FAIL gc-constants.wast:9: expected valid, got invalid
+FAIL gc-constants.wast:11: expected valid, got invalid
+FAIL gc-constants.wast:13: expected valid, got invalid
+FAIL gc-constants.wast:15: expected valid, got invalid
+PASS gc-constants.wast:17: invalid
+PASS gc-constants.wast:19: invalid
+PASS gc-constants.wast:21: invalid
+PASS gc-constants.wast:23: invalid
+PASS gc-constants.wast:25: invalid
+PASS gc-constants.wast:27: invalid
+PASS gc-constants.wast:29: invalid
+PASS gc-constants.wast:31: invalid
+PASS gc-constants.wast:33: invalid
+FAIL locals.wast:3: expected valid, got invalid
+PASS locals.wast:5: invalid
+PASS locals.wast:7: invalid
+FAIL locals.wast:9: expected valid, got invalid
+FAIL locals.wast:11: expected valid, got invalid
+FAIL locals.wast:13: expected valid, got invalid
+PASS locals.wast:15: invalid
+PASS locals.wast:17: invalid
+PASS locals.wast:19: invalid
+FAIL locals.wast:21: expected valid, got invalid
+FAIL locals.wast:23: expected valid, got invalid
+PASS locals.wast:25: invalid
+FAIL locals.wast:27: expected valid, got invalid
+PASS locals.wast:29: invalid
+PASS locals.wast:31: invalid
+PASS locals.wast:33: invalid
+PASS locals.wast:35: invalid
+FAIL locals.wast:37: expected valid, got invalid
+FAIL locals.wast:39: expected valid, got invalid
+PASS locals.wast:41: invalid
+PASS locals.wast:43: invalid
+FAIL locals.wast:45: expected valid, got invalid
+PASS locals.wast:47: invalid
+PASS locals.wast:49: invalid
+FAIL locals.wast:51: expected valid, got invalid
+FAIL locals.wast:53: expected valid, got invalid
+PASS locals.wast:55: invalid
+PASS locals.wast:57: invalid
+FAIL locals.wast:59: expected valid, got invalid
+FAIL modules.wast:3: expected valid, got invalid
+PASS modules.wast:5: invalid
+PASS modules.wast:7: invalid
+FAIL modules.wast:9: expected valid, got invalid
+FAIL modules.wast:11: expected valid, got invalid
+PASS modules.wast:13: invalid
+PASS modules.wast:15: invalid
+PASS modules.wast:17: invalid
+PASS modules.wast:19: valid
+PASS modules.wast:21: invalid
+FAIL modules.wast:23: expected valid, got invalid
+PASS modules.wast:25: invalid
+PASS modules.wast:27: valid
+PASS modules.wast:29: valid
+PASS modules.wast:31: invalid
+PASS modules.wast:33: invalid
+PASS modules.wast:35: invalid
+PASS modules.wast:37: invalid
+PASS modules.wast:39: invalid
+PASS modules.wast:41: valid
+PASS modules.wast:43: invalid
+PASS modules.wast:45: invalid
+FAIL modules.wast:47: expected valid, got invalid
+PASS modules.wast:49: invalid
+PASS modules.wast:51: invalid
+PASS modules.wast:53: valid
+PASS modules.wast:55: invalid
+PASS modules.wast:57: invalid
+PASS modules.wast:59: valid
+PASS modules.wast:61: valid
+PASS modules.wast:63: invalid
+PASS operands.wast:3: valid
+FAIL operands.wast:5: expected valid, got invalid
+PASS operands.wast:7: invalid
+PASS operands.wast:9: invalid
+FAIL operands.wast:11: expected valid, got invalid
+FAIL operands.wast:13: expected valid, got invalid
+FAIL operands.wast:15: expected valid, got invalid
+PASS operands.wast:17: invalid
+FAIL operands.wast:19: expected valid, got invalid
+FAIL operands.wast:21: expected valid, got invalid
+PASS operands.wast:23: invalid
+FAIL operands.wast:25: expected valid, got invalid
+PASS operands.wast:27: invalid
+FAIL operands.wast:29: expected valid, got invalid
+FAIL operands.wast:31: expected valid, got invalid
+PASS operands.wast:33: invalid
+FAIL operands.wast:35: expected valid, got invalid
+PASS operands.wast:37: invalid
+PASS operands.wast:39: invalid
+FAIL operands.wast:41: expected valid, got invalid
+FAIL operands.wast:43: expected valid, got invalid
+PASS operands.wast:45: invalid
+PASS operands.wast:47: invalid
+FAIL operands.wast:49: expected valid, got invalid
+FAIL operands.wast:51: expected valid, got invalid
+PASS operands.wast:53: invalid
+FAIL operands.wast:55: expected valid, got invalid
+PASS operands.wast:57: invalid
+PASS operands.wast:59: invalid
+PASS operands.wast:61: valid
+FAIL operands.wast:63: expected valid, got invalid
+PASS operands.wast:65: invalid
+PASS operands.wast:67: invalid
+PASS operands.wast:69: valid
+PASS operands.wast:71: valid
+PASS operands.wast:73: valid
+PASS operands.wast:75: invalid
+PASS operands.wast:77: valid
+PASS operands.wast:79: invalid
+PASS operands.wast:81: valid
+PASS operands.wast:83: invalid
+PASS operands.wast:85: valid
+PASS operands.wast:87: invalid
+PASS operands.wast:89: invalid
+FAIL operands.wast:91: expected valid, got invalid
+PASS operands.wast:93: invalid
+FAIL tables.wast:3: expected valid, got invalid
+FAIL tables.wast:5: expected valid, got invalid
+PASS tables.wast:7: invalid
+FAIL tables.wast:9: expected valid, got invalid
+PASS tables.wast:11: invalid
+FAIL tables.wast:13: expected valid, got invalid
+PASS tables.wast:15: invalid
+FAIL tables.wast:17: expected valid, got invalid
+PASS tables.wast:19: invalid
+FAIL tables.wast:21: expected valid, got invalid
+PASS tables.wast:23: invalid
+PASS tables.wast:25: valid
+PASS tables.wast:27: invalid
+PASS tables.wast:29: invalid
+PASS tables.wast:31: invalid
+FAIL tables.wast:33: expected valid, got invalid
+FAIL tables.wast:35: expected valid, got invalid
+FAIL tables.wast:37: expected valid, got invalid
+PASS tables.wast:39: invalid
+PASS tables.wast:41: invalid
+PASS tables.wast:43: invalid
+FAIL tables.wast:45: expected valid, got invalid
+PASS tables.wast:47: valid
+PASS tables.wast:49: invalid
+PASS tables.wast:51: valid
+PASS tables.wast:53: invalid
+PASS tables.wast:55: invalid
+FAIL tables.wast:57: expected valid, got invalid
+PASS tables.wast:59: valid
+PASS tables.wast:61: invalid
+FAIL types.wast:3: expected valid, got invalid
+PASS types.wast:5: invalid
+PASS types.wast:7: invalid
+PASS types.wast:9: invalid
+PASS types.wast:11: invalid
+FAIL types.wast:13: expected valid, got invalid
+PASS types.wast:15: invalid
+FAIL types.wast:17: expected valid, got invalid
+FAIL types.wast:19: expected valid, got invalid
+PASS types.wast:21: invalid
+FAIL types.wast:23: expected valid, got invalid
+PASS types.wast:25: invalid
+FAIL types.wast:27: expected valid, got invalid
+PASS types.wast:29: invalid
+PASS types.wast:31: invalid
+PASS types.wast:33: invalid
+FAIL types.wast:35: expected valid, got invalid
+PASS types.wast:37: invalid
+PASS types.wast:39: invalid
+PASS types.wast:41: invalid
+PASS types.wast:43: invalid
+PASS types.wast:45: invalid
+PASS types.wast:47: invalid
+FAIL types.wast:49: expected valid, got invalid
+FAIL types.wast:51: expected valid, got invalid
+PASS types.wast:53: invalid
+FAIL types.wast:55: expected valid, got invalid
+PASS types.wast:57: invalid
+FAIL types.wast:59: expected valid, got invalid
+PASS types.wast:61: valid
+PASS types.wast:63: invalid
+FAIL types.wast:65: expected valid, got invalid
+PASS types.wast:67: invalid
+PASS types.wast:69: valid
+FAIL types.wast:71: expected valid, got invalid
+FAIL types.wast:73: expected valid, got invalid
+PASS types.wast:75: invalid
+PASS types.wast:77: invalid
+PASS types.wast:79: invalid
+test-p2valid: 290 commands; 182 pass; 108 FAIL; 0 pending
+rc=1

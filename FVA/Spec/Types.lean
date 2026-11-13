@@ -10,7 +10,11 @@ inside a recursive group the group's own members by their position (`rec_`, `$ro
 defined type is its rolled group + a projection, so two defined types are the same type exactly
 when they are equal terms. A substitution never enters a `def_`: its contents are closed already
 (SpecTec drops `REC` substitutions under a rectype), so every substitution here acts on the heap
-type of each reference alone.
+type of each reference alone. Source annotations are validated by their own domain (`*.Src`:
+abstract or a type index in range, never a closed form); closed types by the well-formedness
+domains (`*.Closed`, 3.0 `Reftype_ok {} ⊢ rt` restricted to P′: a closed type names no source
+index, `rec_ i` names a member of the enclosing group, a nested defined type is closed in its own
+scope).
 -/
 
 namespace FVA.Wasm
@@ -29,6 +33,87 @@ past `dts` stays (only an invalid module has one). -/
 def closeHeap (dts : List DefType) : HeapType → HeapType
   | .idx y => (dts[y]?.map .def_).getD (.idx y)
   | ht => ht
+
+/-- `idx y` ↦ the closed reference type `def_ dts[y]` under `dts`. -/
+def RefType.close (dts : List DefType) (t : RefType) : RefType := ⟨t.null, closeHeap dts t.heap⟩
+
+/-- A table type with its element type closed under `dts`. -/
+def TableType.close (dts : List DefType) (tt : TableType) : TableType :=
+  { tt with elem := tt.elem.close dts }
+
+/-- A global type with its value type closed under `dts`. -/
+def GlobalType.close (dts : List DefType) (gt : GlobalType) : GlobalType :=
+  ⟨gt.mutability, gt.val.mapHeap (closeHeap dts)⟩
+
+/-- A source heap type naming one of the first `k` defined types (3.0 `Heaptype_ok`,
+`Typeuse_ok/typeidx`): abstract, or a type index below `k`; source positions hold no closed form. -/
+def HeapType.Src (k : Nat) : HeapType → Prop
+  | .abs _ => True
+  | .idx y => y < k
+  | _ => False
+
+/-- A source value type naming one of the first `k` defined types (`Valtype_ok`). -/
+def ValType.Src (k : Nat) : ValType → Prop
+  | .num _ => True
+  | .ref t => t.heap.Src k
+
+/-- A source function type naming one of the first `k` defined types (`Comptype_ok/func`). -/
+def FuncType.Src (k : Nat) (f : FuncType) : Prop :=
+  (∀ t ∈ f.params, t.Src k) ∧ ∀ t ∈ f.results, t.Src k
+
+instance HeapType.decSrc (k : Nat) : (h : HeapType) → Decidable (h.Src k)
+  | .abs _ => isTrue trivial
+  | .idx y => inferInstanceAs (Decidable (y < k))
+  | .def_ _ => isFalse id
+  | .rec_ _ => isFalse id
+
+instance ValType.decSrc (k : Nat) : (t : ValType) → Decidable (t.Src k)
+  | .num _ => isTrue trivial
+  | .ref t => HeapType.decSrc k t.heap
+
+/-- Sequentially valid recursive groups (3.0 `Types_ok`, `Type_ok`, `Rectype_ok` with no declared
+supertypes): the group at offset `x` names earlier types or members of its own group. -/
+def TypesSeq : List RecType → Nat → Prop
+  | [], _ => True
+  | g :: gs, x => (∀ f ∈ g, f.Src (x + g.length)) ∧ TypesSeq gs (x + g.length)
+
+mutual
+/-- A heap type closed under a binder of `n` group members. -/
+def HeapType.Closed (n : Nat) : HeapType → Prop
+  | .abs _ => True
+  | .idx _ => False
+  | .def_ d => DefType.Closed d
+  | .rec_ i => i < n
+  termination_by structural h => h
+/-- A reference type closed under `n` group members. -/
+def RefType.Closed (n : Nat) : RefType → Prop
+  | ⟨_, h⟩ => HeapType.Closed n h
+  termination_by structural t => t
+/-- A value type closed under `n` group members. -/
+def ValType.Closed (n : Nat) : ValType → Prop
+  | .num _ => True
+  | .ref t => RefType.Closed n t
+  termination_by structural t => t
+/-- Value types closed under `n` group members. -/
+def ValType.ClosedAll (n : Nat) : List ValType → Prop
+  | [] => True
+  | t :: ts => ValType.Closed n t ∧ ValType.ClosedAll n ts
+  termination_by structural ts => ts
+/-- A function type closed under `n` group members. -/
+def FuncType.Closed (n : Nat) : FuncType → Prop
+  | ⟨ps, rs⟩ => ValType.ClosedAll n ps ∧ ValType.ClosedAll n rs
+  termination_by structural f => f
+/-- Function types closed under `n` group members. -/
+def FuncType.ClosedAll (n : Nat) : List FuncType → Prop
+  | [] => True
+  | f :: fs => FuncType.Closed n f ∧ FuncType.ClosedAll n fs
+  termination_by structural fs => fs
+/-- A closed well-formed defined type: its group closed under its own binder, its projection in
+bounds. -/
+def DefType.Closed : DefType → Prop
+  | ⟨g, i⟩ => FuncType.ClosedAll g.length g ∧ i < g.length
+  termination_by structural d => d
+end
 
 /-- A module's defined types (`$alloctypes`): the group `g` at type index `x` (the number of
 earlier types) rolled — its own indices `x … x+|g|-1` ↦ `rec_ 0 … rec_ (|g|-1)` (`$rollrt`) —

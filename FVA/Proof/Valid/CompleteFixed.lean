@@ -25,35 +25,74 @@ theorem memArg_complete {m : MemArg} {n : Nat} (h : m.WF n) (hn : n ≤ 8) :
   simpa [memArg, Nat.ble_eq, Nat.blt_eq] using ⟨⟨ha, h.1⟩, h.2⟩
 
 theorem seq_append (C : Context) (is js : List Instr) (s : Stack) :
-    seq C (is ++ js) s = (seq C is s).bind (seq C js) := by
-  induction is generalizing s with
+    seq C (is ++ js) s = (seq C is s).bind (seq (C.addSets (is.flatMap Instr.sets)) js) := by
+  induction is generalizing C s with
   | nil => rfl
   | cons i is ih =>
     simp only [List.cons_append, seq]
-    cases instr C i s <;> simp_all
+    cases instr C i s with
+    | none => rfl
+    | some s' =>
+      simp only [ih, List.flatMap_cons, Context.addSets_addSets]
+
+theorem heapSrc_complete {k : Nat} {h : HeapType} (hs : h.Src k) : heapSrc k h = true := by
+  cases h <;> simp_all [heapSrc, HeapType.Src, Nat.blt_eq]
+
+theorem valSrc_complete {k : Nat} {t : ValType} (hs : t.Src k) : valSrc k t = true := by
+  cases t with
+  | num _ => rfl
+  | ref r => exact heapSrc_complete hs
+
+/-- `pop_ref` on an operand matching `ref null h`: its own heap type is at least as precise. -/
+theorem refHeap_complete {a : OpType} {h : Option HeapType} (ha : a.Matches (refOp true h)) :
+    ∃ h', refHeap a = some h' ∧ a.Matches (refOp true h') ∧
+      (refOp false h').Matches (refOp false h) := by
+  cases a with
+  | bot =>
+    refine ⟨none, rfl, trivial, ?_⟩
+    cases h <;> trivial
+  | refBot =>
+    refine ⟨none, rfl, trivial, ?_⟩
+    cases h <;> trivial
+  | val t =>
+    cases h with
+    | none => exact ha.elim
+    | some hh =>
+      cases t with
+      | num _ => exact ha.elim
+      | ref r =>
+        rcases r with ⟨n, hr⟩
+        obtain ⟨_, hhh⟩ := ha
+        exact ⟨some hr, rfl, ⟨fun _ => rfl, .inl rfl⟩, ⟨id, hhh⟩⟩
+
+theorem conforms_snoc {s rest : Stack} {a t : OpType} {pre : List OpType}
+    (hp : pop s = some (a, rest)) (hr : Conforms rest pre) (ha : a.Matches t) :
+    Conforms s (pre ++ [t]) := by
+  obtain ⟨actual, hf, hm⟩ := hr
+  exact ⟨actual ++ [a], pop_fits hp hf, matches_append hm (.cons ha .nil)⟩
+
+theorem num_of_matches {a : OpType} {n : NumType} (h : a.Matches (.val (.num n))) :
+    a = .bot ∨ a = .val (.num n) := by
+  cases a with
+  | bot => exact .inl rfl
+  | refBot => exact h.elim
+  | val t =>
+    cases t with
+    | num m =>
+      simp only [OpType.Matches, ValType.Sub] at h
+      exact .inr (h ▸ rfl)
+    | ref _ => exact h.elim
 
 theorem selectType_complete {a b t : OpType} (ht : t = .bot ∨ ∃ n, t = .val (.num n))
     (ha : a.Matches t) (hb : b.Matches t) :
     ∃ v, selectType a b = some v ∧ v.Matches t := by
   rcases ht with rfl | ⟨n, rfl⟩
   · cases a <;> cases b <;> simp_all [OpType.Matches, selectType]
-  · cases a with
-    | bot =>
-      cases b with
-      | bot => exact ⟨.bot, rfl, trivial⟩
-      | val u =>
-        simp only [OpType.Matches] at hb
-        subst u
-        exact ⟨.val (.num n), rfl, rfl⟩
-    | val u =>
-      simp only [OpType.Matches] at ha
-      subst u
-      cases b with
-      | bot => exact ⟨.val (.num n), rfl, rfl⟩
-      | val v =>
-        simp only [OpType.Matches] at hb
-        subst v
-        exact ⟨.val (.num n), by simp [selectType], rfl⟩
+  · rcases num_of_matches ha with rfl | rfl <;> rcases num_of_matches hb with rfl | rfl
+    · exact ⟨.bot, rfl, trivial⟩
+    · exact ⟨.val (.num n), rfl, OpType.Matches.refl _⟩
+    · exact ⟨.val (.num n), rfl, OpType.Matches.refl _⟩
+    · exact ⟨.val (.num n), by simp [selectType], OpType.Matches.refl _⟩
 
 theorem branch_complete {s : Stack} {pre discard : List OpType} {ts : List ValType}
     (h : Conforms s (pre ++ (discard ++ ops ts))) : branch ts s = some ⟨[], true⟩ := by

@@ -317,18 +317,9 @@ def MStore.alloc (s : MStore) (m : Module) (imports : List ExternVal) (gvals : L
 `Ref.instantiate`: the final state or `none` when an initializer fails or disagrees. -/
 def initRun (fuel : Nat) (s : MStore) (m : Module) (imports : List ExternVal) :
     Option (MState × Bool) := do
-  let (s₀, inst₀) := s.alloc m imports (m.globals.map fun _ => .i32 0)
-    (m.tables.map fun _ => .null) (m.elems.map fun _ => [])
-  let gvals ← m.globals.mapM fun g => Ref.evalConst fuel s₀.abs inst₀ g.init
-  let trefs ← m.tables.mapM fun t => Ref.evalConst fuel s₀.abs inst₀ t.init >>= Ref.asRef
-  let erefs ← m.elems.mapM fun e =>
-    e.init.mapM fun ex => Ref.evalConst fuel s₀.abs inst₀ ex >>= Ref.asRef
+  let (gvals, trefs, erefs) ← Ref.initCandidates fuel s.abs m imports
+  guard (Ref.initAgrees fuel s.abs m imports gvals trefs erefs)
   let (s₁, inst) := s.alloc m imports gvals trefs erefs
-  let gvals₁ ← m.globals.mapM fun g => Ref.evalConst fuel s₁.abs inst g.init
-  let trefs₁ ← m.tables.mapM fun t => Ref.evalConst fuel s₁.abs inst t.init >>= Ref.asRef
-  let erefs₁ ← m.elems.mapM fun e =>
-    e.init.mapM fun ex => Ref.evalConst fuel s₁.abs inst ex >>= Ref.asRef
-  guard (gvals₁ == gvals && trefs₁ == trefs && erefs₁ == erefs)
   some (MState.run fuel
     { store := s₁, frame := ⟨[], inst⟩, stack := [], code := (initCode m).map .plain, ctl := [] })
 

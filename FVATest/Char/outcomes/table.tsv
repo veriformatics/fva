@@ -8,7 +8,7 @@
 10	module	pass	valid
 12	module	pass	valid
 13	module	pass	valid
-14	module	skip:outside-profile	invalid
+14	module	skip:outside-profile	valid
 16	module	pass	valid
 17	module	pass	valid
 19	module	skip:outside-profile	valid
@@ -23,24 +23,24 @@
 44	assert_invalid	pass	not-run:text
 51	assert_invalid	pass	invalid
 52	assert_invalid	pass	invalid
-55	assert_invalid	skip:outside the 2.0 validation profile	invalid
-59	assert_invalid	skip:outside the 2.0 validation profile	invalid
-63	assert_invalid	skip:outside the 2.0 validation profile	invalid
-67	assert_invalid	skip:outside the 2.0 validation profile	invalid
-71	assert_invalid	skip:outside the 2.0 validation profile	invalid
-75	assert_invalid	skip:outside the 2.0 validation profile	invalid
-79	assert_invalid	skip:outside the 2.0 validation profile	invalid
-86	module	skip:outside-profile	invalid
+55	assert_invalid	pass	invalid
+59	assert_invalid	pass	invalid
+63	assert_invalid	pass	invalid
+67	assert_invalid	pass	invalid
+71	assert_invalid	pass	invalid
+75	assert_invalid	pass	invalid
+79	assert_invalid	pass	invalid
+86	module	skip:outside-profile	valid
 91	register	skip:register rejected module	-
-93	module	skip:outside-profile	invalid
+93	module	skip:outside-profile	valid
 112	assert_return	skip:missing/rejected module	-
 113	assert_return	skip:missing/rejected module	-
 114	assert_return	skip:missing/rejected module	-
 115	assert_return	skip:missing/rejected module	-
 116	assert_return	skip:missing/rejected module	-
-120	assert_invalid	skip:outside the 2.0 validation profile	invalid
-128	assert_invalid	skip:outside the 2.0 validation profile	invalid
-136	assert_invalid	skip:outside the 2.0 validation profile	invalid
+120	assert_invalid	pass	invalid
+128	assert_invalid	pass	invalid
+136	assert_invalid	pass	invalid
 147	assert_malformed	skip:text format	not-run:malformed
 154	assert_malformed	skip:text format	not-run:malformed
 161	assert_malformed	skip:text format	not-run:malformed

@@ -126,7 +126,7 @@
 364	assert_invalid	pass	invalid
 368	assert_invalid	pass	invalid
 372	assert_invalid	pass	invalid
-384	assert_invalid	skip:outside the 2.0 validation profile	invalid
+384	assert_invalid	pass	invalid
 392	assert_invalid	pass	invalid
 398	assert_invalid	pass	invalid
 403	module	pass	valid

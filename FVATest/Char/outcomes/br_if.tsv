@@ -116,4 +116,4 @@
 654	assert_invalid	pass	invalid
 658	assert_invalid	pass	invalid
 662	assert_invalid	pass	invalid
-668	assert_invalid	skip:outside the 2.0 validation profile	invalid
+668	assert_invalid	pass	invalid

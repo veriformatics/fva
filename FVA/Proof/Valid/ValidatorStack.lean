@@ -1,13 +1,83 @@
 import FVA.Impl.Valid
+import FVA.Proof.Valid.Entails
 
 namespace FVA.Wasm.Valid
 
 open FVA.Wasm Check
 
+theorem _root_.FVA.Wasm.ValType.sub_refl (t : ValType) : t.Sub t := by
+  cases t with
+  | num _ => rfl
+  | ref _ => exact ⟨id, .inl rfl⟩
+
+theorem OpType.matches_refl (t : OpType) : t.Matches t := by
+  cases t with
+  | bot | refBot => trivial
+  | val t => exact t.sub_refl
+
 namespace ValidatorProof
 
+theorem heapSrc_sound {k : Nat} {h : HeapType} (hs : heapSrc k h = true) : h.Src k := by
+  cases h <;> simp_all [heapSrc, HeapType.Src, Nat.blt_eq]
+
+theorem valSrc_sound {k : Nat} {t : ValType} (hs : valSrc k t = true) : t.Src k := by
+  cases t with
+  | num _ => trivial
+  | ref r => exact heapSrc_sound hs
+
+theorem defFunc_sound {h₁ h₂ : HeapType} (h : defFunc h₁ h₂ = true) :
+    ∃ d, h₁ = .def_ d ∧ h₂ = .abs .func := by
+  cases h₁ with
+  | def_ d =>
+    cases h₂ with
+    | abs a => cases a <;> simp_all [defFunc]
+    | _ => simp [defFunc] at h
+  | _ => simp [defFunc] at h
+
+theorem subType_sound {t u : ValType} (h : subType t u = true) : t.Sub u := by
+  cases t with
+  | num a =>
+    cases u with
+    | num b => simpa [subType, ValType.Sub] using h
+    | ref _ => simp [subType] at h
+  | ref r =>
+    cases u with
+    | num _ => simp [subType] at h
+    | ref r' =>
+      rcases r with ⟨n₁, h₁⟩
+      rcases r' with ⟨n₂, h₂⟩
+      simp only [subType, Bool.and_eq_true, Bool.or_eq_true] at h
+      refine ⟨fun hn => ?_, ?_⟩
+      · cases n₁ <;> cases n₂ <;> simp_all
+      · rcases h.2 with h' | h'
+        · exact .inl (HeapType.eq_of_beq h')
+        · exact .inr (defFunc_sound h')
+
+theorem subTypes_sound {ts us : List ValType} (h : subTypes ts us = true) : ResultSub ts us := by
+  induction ts generalizing us with
+  | nil => cases us <;> simp_all [subTypes, ResultSub]
+  | cons t ts ih =>
+    cases us with
+    | nil => simp [subTypes] at h
+    | cons u us =>
+      simp only [subTypes, Bool.and_eq_true] at h
+      exact .cons (subType_sound h.1) (ih h.2)
+
 theorem matchType_sound {a b : OpType} (h : matchType a b = true) : a.Matches b := by
-  cases a <;> cases b <;> simp_all [matchType, OpType.Matches]
+  cases a with
+  | bot => trivial
+  | refBot =>
+    cases b with
+    | bot => simp [matchType] at h
+    | refBot => trivial
+    | val t =>
+      cases t with
+      | num _ => simp [matchType] at h
+      | ref _ => trivial
+  | val t =>
+    cases b with
+    | val u => exact subType_sound h
+    | _ => simp [matchType] at h
 
 theorem matchTypeList_sound {as bs : List OpType} (h : matchTypeList as bs = true) :
     Matches as bs := by
@@ -23,7 +93,7 @@ theorem matchTypeList_sound {as bs : List OpType} (h : matchTypeList as bs = tru
 theorem matches_refl (ts : List OpType) : Matches ts ts := by
   induction ts with
   | nil => exact .nil
-  | cons t ts ih => exact .cons (by cases t <;> simp [OpType.Matches]) ih
+  | cons t ts ih => exact .cons t.matches_refl ih
 
 theorem matches_append {as bs cs ds : List OpType} (h : Matches as bs) (h' : Matches cs ds) :
     Matches (as ++ cs) (bs ++ ds) := by
@@ -45,6 +115,9 @@ def Fits (s : Stack) (ts : List OpType) : Prop :=
 /-- Every admissible operand prefix has a declarative sequence derivation. -/
 def Typed (C : Context) (es : List Instr) (ins : List OpType) (s : Stack) : Prop :=
   ∀ ts, Fits s ts → SeqT C es ⟨ins, ts⟩
+
+/-- The context the next instruction after `es` is typed in (`SeqT.snoc`). -/
+abbrev Next (C : Context) (es : List Instr) : Context := C.addSets (es.flatMap Instr.sets)
 
 theorem fits_self (s : Stack) : Fits s s.types.reverse := ⟨[], .inr rfl, rfl⟩
 
@@ -101,8 +174,8 @@ theorem push_fits {s : Stack} {ts out : List OpType} (h : Fits (push ts s) out) 
   simpa [push, List.reverse_append, List.append_assoc] using he
 
 theorem apply_typed {C : Context} {i : Instr} {st : StackType} {s s' : Stack}
-    (hi : InstrT C i st) (h : apply st s = some s')
-    {es : List Instr} {ins : List OpType} (ht : Typed C es ins s) :
+    {es : List Instr} (hi : InstrT (Next C es) i st) (h : apply st s = some s')
+    {ins : List OpType} (ht : Typed C es ins s) :
     Typed C (es ++ [i]) ins s' := by
   simp only [apply] at h
   cases hp : pops st.ins.reverse s with

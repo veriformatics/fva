@@ -2,8 +2,9 @@
 # Official validation + execution scripts; exact counts prevent shrinking runs.
 # Four workers; --fast omits bulk + memory_fill.
 # Validation columns: module unlinkable uninstantiable invalid malformed outside undecodable.
-# Differential columns: valid invalid undecoded respelled (binary candidates; wasm2,-simd oracle on
-# the module's AST: respelled = valid under the P′ features alone, judged on FVA's re-encoding).
+# Differential columns: valid invalid undecoded outside (binary candidates; oracle = wasm-tools
+# under the support manifest's features; outside = decoded but beyond the static profile (> 1
+# memory, `fvatest classify`): FVA must reject it, the oracle's verdict is not compared).
 # FVA_SPEC_COUNTS=<file> records actual rows without bypassing comparison; names select scripts.
 # Exit status (U12 K4): 0 pass, 1 assertion failure, 2 setup/infrastructure, 3 the program
 # under test crashed (signal).
@@ -59,11 +60,11 @@ bulk 117 0 0
 address 260 0 0
 align 119 0 46
 annotations 10 0 64
-binary 128 0 1
+binary 129 0 0
 binary-leb128 91 0 0
 block 208 0 15
 br 97 0 0
-br_if 118 0 1
+br_if 119 0 0
 call 91 0 0
 call_indirect 161 0 11
 comments 8 0 0
@@ -71,9 +72,9 @@ const 702 0 76
 conversions 619 0 0
 custom 11 0 0
 data 62 0 6
-elem 122 0 32
+elem 124 0 30
 endianness 69 0 0
-exports 96 0 1
+exports 97 0 0
 f32 2512 0 2
 f32_bitwise 364 0 0
 f32_cmp 2407 0 0
@@ -86,9 +87,9 @@ float_literals 101 0 78
 float_memory 90 0 0
 float_misc 471 0 0
 forward 5 0 0
-func 151 0 24
+func 152 0 23
 func_ptrs 36 0 0
-global 49 0 75
+global 50 0 74
 i32 458 0 2
 i64 414 0 2
 id 1 0 6
@@ -103,7 +104,7 @@ linking 120 0 43
 load 84 0 13
 local_get 36 0 0
 local_set 53 0 0
-local_tee 97 0 1
+local_tee 98 0 0
 loop 106 0 15
 memory 86 0 4
 memory_init 250 0 0
@@ -114,13 +115,13 @@ names 486 0 0
 nop 88 0 0
 ref_func 17 0 0
 return 84 0 0
-select 156 0 1
+select 157 0 0
 skip-stack-guard-page 11 0 0
 stack 7 0 0
 start 19 0 1
 store 61 0 7
 switch 28 0 0
-table 20 0 26
+table 30 0 16
 table_copy 1728 0 0
 table_fill 45 0 0
 table_get 16 0 0
@@ -142,7 +143,7 @@ validation align 25 0 0 44 48 0 0
 differential annotations 4 0 0 0
 validation annotations 10 0 0 0 64 0 0
 differential binary 20 1 0 0
-validation binary 20 0 0 0 108 1 0
+validation binary 20 0 0 1 108 0 0
 differential binary-leb128 33 0 0 0
 validation binary-leb128 33 0 0 0 58 0 0
 differential block 1 155 0 0
@@ -150,7 +151,7 @@ validation block 1 0 0 155 15 0 0
 differential br 1 20 0 0
 validation br 1 0 0 20 0 0 0
 differential br_if 1 30 0 0
-validation br_if 1 0 0 29 0 1 0
+validation br_if 1 0 0 30 0 0 0
 differential bulk 13 0 0 0
 validation bulk 13 0 0 0 0 0 0
 differential call 1 18 0 0
@@ -165,14 +166,14 @@ differential conversions 1 25 0 0
 validation conversions 1 0 0 25 0 0 0
 differential custom 3 0 0 0
 validation custom 3 0 0 0 8 0 0
-differential data 40 26 0 2
+differential data 42 24 0 0
 validation data 26 0 14 20 0 6 0
-differential elem 68 47 0 18
-validation elem 55 0 12 24 0 24 0
+differential elem 85 30 0 0
+validation elem 55 0 12 26 0 22 0
 differential endianness 1 0 0 0
 validation endianness 1 0 0 0 0 0 0
 differential exports 56 32 0 0
-validation exports 56 0 0 31 0 1 0
+validation exports 56 0 0 32 0 0 0
 differential f32 1 11 0 0
 validation f32 1 0 0 11 2 0 0
 differential f32_bitwise 1 3 0 0
@@ -198,11 +199,11 @@ validation float_misc 1 0 0 0 0 0 0
 differential forward 1 0 0 0
 validation forward 1 0 0 0 0 0 0
 differential func 4 52 0 0
-validation func 4 0 0 51 23 1 0
+validation func 4 0 0 52 23 0 0
 differential func_ptrs 3 7 0 0
 validation func_ptrs 3 0 0 7 0 0 0
-differential global 5 44 0 3
-validation global 5 0 0 39 7 5 0
+differential global 8 41 0 0
+validation global 5 0 0 40 7 4 0
 differential i32 1 83 0 0
 validation i32 1 0 0 83 2 0 0
 differential i64 1 29 0 0
@@ -211,7 +212,7 @@ differential id 1 0 0 0
 validation id 1 0 0 0 6 0 0
 differential if 1 92 0 0
 validation if 1 0 0 92 24 0 0
-differential imports 154 8 0 7
+differential imports 161 1 0 0
 validation imports 66 88 0 1 16 7 0
 differential inline-module 1 0 0 0
 validation inline-module 1 0 0 0 0 0 0
@@ -223,7 +224,7 @@ differential labels 1 3 0 0
 validation labels 1 0 0 3 0 0 0
 differential left-to-right 1 0 0 0
 validation left-to-right 1 0 0 0 0 0 0
-differential linking 43 28 0 28
+differential linking 71 0 0 0
 validation linking 17 19 7 0 0 28 0
 differential load 1 46 0 0
 validation load 1 0 0 46 13 0 0
@@ -232,7 +233,7 @@ validation local_get 1 0 0 16 0 0 0
 differential local_set 1 33 0 0
 validation local_set 1 0 0 33 0 0 0
 differential local_tee 1 42 0 0
-validation local_tee 1 0 0 41 0 1 0
+validation local_tee 1 0 0 42 0 0 0
 differential loop 1 27 0 0
 validation loop 1 0 0 27 15 0 0
 differential memory 11 22 0 0
@@ -258,7 +259,7 @@ validation ref_func 3 0 0 3 0 0 0
 differential return 1 20 0 0
 validation return 1 0 0 20 0 0 0
 differential select 3 30 0 0
-validation select 3 0 0 29 0 1 0
+validation select 3 0 0 30 0 0 0
 differential skip-stack-guard-page 1 0 0 0
 validation skip-stack-guard-page 1 0 0 0 0 0 0
 differential stack 2 0 0 0
@@ -269,8 +270,8 @@ differential store 1 51 0 0
 validation store 1 0 0 51 7 0 0
 differential switch 1 1 0 0
 validation switch 1 0 0 1 0 0 0
-differential table 14 19 0 6
-validation table 11 0 0 9 3 16 0
+differential table 17 16 0 0
+validation table 11 0 0 19 3 6 0
 differential table_copy 52 0 0 0
 validation table_copy 52 0 0 0 0 0 0
 differential table_fill 1 9 0 0
@@ -293,7 +294,7 @@ differential type 1 0 0 0
 validation type 1 0 0 0 2 0 0
 differential unreachable 1 0 0 0
 validation unreachable 1 0 0 0 0 0 0
-differential unreached-valid 1 2 0 2
+differential unreached-valid 3 0 0 0
 validation unreached-valid 1 0 0 0 0 2 0
 differential unwind 1 0 0 0
 validation unwind 1 0 0 0 0 0 0
@@ -334,32 +335,13 @@ if [[ $(printf '%s\n' "${names[@]}" | sort -u | wc -l) != "${#names[@]}" ]]; the
 	exit 2
 fi
 
-# oracle FILE: O = wasm-tools' verdict on FILE's AST in the 2.0 profile. 3.0 spells some 2.0 ASTs
-# with encodings wasm2 lacks (an explicit table initializer, a `(ref func)` expression segment;
-# FVA decodes both to the 2.0 AST): a FILE invalid under wasm2 but valid under the P′ features is
-# judged on FVA's re-encoding (2.0 spellings wherever the AST has one), R = 1. rc 2 = setup,
-# 3 = the re-encoder crashed.
+# oracle FILE: O = wasm-tools' verdict under the support manifest's features (U28c E2). rc 2 =
+# setup.
 # shellcheck disable=SC2329
 oracle() {
 	local rc
-	R=0 O=invalid
-	wasm-tools validate --features=wasm2,-simd "$1" >/dev/null 2>&1
-	rc=$?
-	((rc < 2)) || return 2
-	if ((rc == 0)); then
-		O=valid
-		return 0
-	fi
+	O=invalid
 	wasm-tools validate --features="$pfeatures" "$1" >/dev/null 2>&1
-	rc=$?
-	((rc < 2)) || return 2
-	((rc == 0)) || return 0
-	"$root/.lake/build/bin/fvatest" reencode "$1" "$1.2.wasm" >/dev/null 2>&1
-	rc=$?
-	((rc < 128)) || return 3
-	((rc == 0)) || return 2
-	R=1
-	wasm-tools validate --features=wasm2,-simd "$1.2.wasm" >/dev/null 2>&1
 	rc=$?
 	((rc < 2)) || return 2
 	((rc == 0)) && O=valid
@@ -368,7 +350,7 @@ oracle() {
 # Compare every decoded binary candidate, including negative cases; decoder exclusions count.
 # shellcheck disable=SC2329
 diff_script() {
-	local name=$1 file verdict rc bad=0 positive=0 negative=0 excluded=0 respelled=0
+	local name=$1 file verdict rc bad=0 positive=0 negative=0 excluded=0 outside=0 mems
 	local -a files
 	if ! jq -r --arg dir "$work/$name" '.commands[]
 		| select(.type == "module" or .type == "assert_invalid" or
@@ -394,22 +376,35 @@ diff_script() {
 			echo "  FAIL $name: validator batch result count or status" >>"$work/$name.out"
 			bad=1
 		fi
-		while IFS=$'\t' read -r file verdict; do
+		# the static profile apart from validation: memories per module (U28a E6)
+		"$root/.lake/build/bin/fvatest" classify "${files[@]}" >"$work/$name.class"
+		rc=$?
+		if ((rc >= 128)); then
+			: >"$work/$name.crash"
+			return 3
+		fi
+		if ((rc)) || ! cmp -s <(cut -f1 "$work/$name.class") "$work/$name.candidates"; then
+			: >"$work/$name.infra"
+			return 2
+		fi
+		while IFS=$'\t' read -r file verdict _ mems; do
 			case $verdict in
 			valid | invalid)
-				oracle "$file"
-				rc=$?
-				if ((rc == 3)); then
-					: >"$work/$name.crash"
-					return 3
+				# `-` = wasm-tools print failed (binary.wast:1238, a type index past its limits): no
+				# memory count, the oracle decides
+				if [[ $mems != - ]] && ((mems > 1)); then
+					outside=$((outside + 1))
+					if [[ $verdict != invalid ]]; then
+						echo "  FAIL $name: $file holds $mems memories, FVA=$verdict" >>"$work/$name.out"
+						bad=1
+					fi
+					continue
 				fi
-				if ((rc)); then
+				oracle "$file" || {
 					: >"$work/$name.infra"
 					return 2
-				fi
-				respelled=$((respelled + R))
+				}
 				if [[ $O != "$verdict" ]]; then
-					((R)) && O+=' (re-encoded)'
 					echo "  FAIL $name: differential $file FVA=$verdict wasm-tools=$O" >>"$work/$name.out"
 					bad=1
 				fi
@@ -421,9 +416,9 @@ diff_script() {
 				bad=1
 				;;
 			esac
-		done <"$work/$name.valid"
+		done < <(paste "$work/$name.valid" <(cut -f2,3 "$work/$name.class"))
 	fi
-	printf 'differential %s %s %s %s %s\n' "$name" "$positive" "$negative" "$excluded" "$respelled" \
+	printf 'differential %s %s %s %s %s\n' "$name" "$positive" "$negative" "$excluded" "$outside" \
 		>>"$work/$name.out"
 	return "$bad"
 }
@@ -470,7 +465,7 @@ for name in "${names[@]}"; do
 	if [[ -s $work/$name.err ]]; then tail -5 "$work/$name.err"; fi
 done
 corpus=(.cache/corpus/lz4-wasm-block-codec.wasm .cache/corpus/edgeR.so
-	.cache/corpus/lz4-c.wasm .cache/corpus/lz4-flex.wasm FVATest/Examples/*/*.wasm)
+	.cache/corpus/lz4-c.wasm .cache/corpus/lz4-flex.wasm FVATest/Examples/*/*.wasm .cache/corpus/eh.wasm)
 "$root/.lake/build/bin/fvatest" validate "${corpus[@]}" >"$work/corpus.valid"
 corpus_rc=$?
 if ((corpus_rc == 2 || corpus_rc == 126 || corpus_rc == 127)); then : >"$work/corpus.infra"; fi
@@ -482,7 +477,7 @@ if ! cmp -s <(cut -f1 "$work/corpus.valid") <(printf '%s\n' "${corpus[@]}"); the
 fi
 oracle_count=0
 for file in "${corpus[@]}"; do
-	wasm-tools validate --features=wasm2,-simd "$file" >"$work/corpus.oracle" 2>&1
+	wasm-tools validate --features="$pfeatures" "$file" >"$work/corpus.oracle" 2>&1
 	oracle_rc=$?
 	if ((oracle_rc == 0)); then oracle_count=$((oracle_count + 1)); else
 		cat "$work/corpus.oracle" >&2
@@ -492,7 +487,7 @@ for file in "${corpus[@]}"; do
 done
 valid_count=$(awk '$2 == "valid" {n++} END {print n+0}' "$work/corpus.valid")
 printf 'corpus %s %s %s\n' "${#corpus[@]}" "$valid_count" "$oracle_count" >>"$work/actual.txt"
-printf 'corpus 8 8 8\n' >>"$work/expected.txt"
+printf 'corpus 9 9 9\n' >>"$work/expected.txt"
 if [[ -n ${FVA_SPEC_COUNTS-} ]]; then cp "$work/actual.txt" "$FVA_SPEC_COUNTS" || exit 2; fi
 if ! diff <(sort "$work/actual.txt") <(sort "$work/expected.txt") >"$work/diff.txt"; then
 	echo "test-spec: counts differ from the pinned table (< actual, > pinned):"

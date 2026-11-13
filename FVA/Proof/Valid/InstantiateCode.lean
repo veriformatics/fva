@@ -4,45 +4,41 @@ namespace FVA.Wasm.Valid.InitProof
 
 open FVA.Wasm FVA.Wasm.Exec
 
-theorem const_add_globals {C : Context} {i : Instr} {st : StackType}
-    (hi : InstrT C i st) (hc : ConstInstr C i) (more : List GlobalType) :
-    InstrT { C with globals := C.globals ++ more } i st := by
-  cases hi <;> simp only [ConstInstr] at hc
-  case iconst hn => exact .iconst hn
-  case fconst hn => exact .fconst hn
-  case refNull => exact .refNull
-  case refFunc hf hr => exact .refFunc hf hr
-  case globalGet hg => exact .globalGet (lookup_append hg)
+/-- Sequencing in one context: a tail typed where the sequence starts is typed after it (the
+prefix only adds initializations). -/
+theorem seq_append_pure {C : Context} {xs ys : List Instr} {a b c : List OpType}
+    (hx : SeqT C xs ⟨a, b⟩) (hy : SeqT C ys ⟨b, c⟩) : SeqT C (xs ++ ys) ⟨a, c⟩ :=
+  hx.append (hy.transport (Context.Entails.to_addSets C _))
 
-theorem init_expr {m : Module} {e : Expr} {t : ValType}
-    (he : ExprT { moduleContext m with globals := importGlobals m.imports } e [t])
-    (hc : ConstExpr { moduleContext m with globals := importGlobals m.imports } e) :
-    SeqT (moduleContext m) e ⟨[], [.val t]⟩ := by
-  obtain ⟨i, rfl, hci, hi⟩ := const_singleton he hc
-  simpa only [moduleContext] using
-    SeqT.single (const_add_globals hi hci (m.globals.map (·.type)))
+/-- An offset, then `i32.const 0`, `i32.const n` and a three-operand segment instruction. -/
+theorem segment_typed {C : Context} {off : Expr} {n : Nat} {init fin : Instr}
+    (hoff : ExprT C off [.num .i32]) (hn : n < 2 ^ 32)
+    (hinit : InstrT C init ⟨[i32, i32, i32], []⟩) (hfin : InstrT C fin ⟨[], []⟩) :
+    SeqT C (off ++ [.iconst .w32 0, .iconst .w32 n, init, fin]) ⟨[], []⟩ := by
+  obtain ⟨out, hs, hm⟩ := hoff
+  have h₀ : SeqT C off ⟨[], [i32]⟩ := .sub hs hm
+  have c₀ : SeqT C [.iconst .w32 0] ⟨[i32], [i32, i32]⟩ := by
+    exact (SeqT.single (C := C) (InstrT.iconst (w := .w32) (n := 0) (by decide))).frame [i32]
+  have c₁ : SeqT C [.iconst .w32 n] ⟨[i32, i32], [i32, i32, i32]⟩ := by
+    exact (SeqT.single (C := C) (InstrT.iconst (w := .w32) hn)).frame [i32, i32]
+  have all := seq_append_pure (seq_append_pure (seq_append_pure (seq_append_pure h₀ c₀) c₁)
+    (SeqT.single hinit)) (SeqT.single hfin)
+  simpa only [List.append_assoc, List.cons_append, List.nil_append] using all
 
 theorem runElem_typed {m : Module} (hv : ModuleValid m) {e : Elem} {i : Nat}
     (he : m.elems[i]? = some e) : SeqT (moduleContext m) (runElem i e) ⟨[], []⟩ := by
   have hmem := List.mem_of_getElem? he
-  have hmode := (hv.elems e hmem).2
-  have hlookup : (moduleContext m).elems[i]? = some e.type.nullable := by
+  have hmode := (hv.elems e hmem).2.2
+  have hlookup : (moduleContext m).elems[i]? = some (e.type.close m.defTypes) := by
     simp [moduleContext, List.getElem?_map, he]
   cases hm : e.mode with
   | passive => simp only [runElem, hm]; exact .nil
   | declarative => simp only [runElem, hm]; exact SeqT.single (.elemDrop hlookup)
   | active x off =>
     simp only [hm, ElemMode.Ok] at hmode
-    obtain ⟨⟨tt, ht, htype⟩, hex, hconst⟩ := hmode
-    have h₀ := init_expr hex hconst
-    have h₁ := SeqT.snoc (t₀ := [i32]) h₀ List.Forall₂.nil
-      (InstrT.iconst (w := .w32) (n := 0) (by decide))
-    have h₂ := SeqT.snoc (t₀ := [i32, i32]) h₁ List.Forall₂.nil
-      (InstrT.iconst (w := .w32) (hv.elemLengths e hmem))
-    have h₃ := SeqT.snoc (t₀ := []) h₂ (Matches.refl [i32, i32, i32])
-      (InstrT.tableInit ht hlookup htype)
-    have h₄ := SeqT.snoc (t₀ := []) h₃ List.Forall₂.nil (InstrT.elemDrop hlookup)
-    simpa [runElem, hm, List.append_assoc] using h₄
+    obtain ⟨⟨tt, ht, htype⟩, hex, -⟩ := hmode
+    simpa only [runElem, hm] using segment_typed hex (hv.elemLengths e hmem)
+      (InstrT.tableInit ht hlookup htype) (InstrT.elemDrop hlookup)
 
 theorem runData_typed {m : Module} (hv : ModuleValid m) {d : Data} {i : Nat}
     (hd : m.datas[i]? = some d) : SeqT (moduleContext m) (runData i d) ⟨[], []⟩ := by
@@ -53,26 +49,19 @@ theorem runData_typed {m : Module} (hv : ModuleValid m) {d : Data} {i : Nat}
   | passive => simp only [runData, hm]; exact .nil
   | active x off =>
     simp only [hm, DataMode.Ok] at hmode
-    obtain ⟨⟨lim, hl⟩, hex, hconst⟩ := hmode
+    obtain ⟨⟨lim, hl⟩, hex, -⟩ := hmode
     have hzero : 0 < (moduleContext m).mems.length :=
       Nat.lt_of_le_of_lt (Nat.zero_le x) (lookup_lt hl)
     have hm₀ := List.getElem?_eq_getElem hzero
-    have h₀ := init_expr hex hconst
-    have h₁ := SeqT.snoc (t₀ := [i32]) h₀ List.Forall₂.nil
-      (InstrT.iconst (w := .w32) (n := 0) (by decide))
-    have h₂ := SeqT.snoc (t₀ := [i32, i32]) h₁ List.Forall₂.nil
-      (InstrT.iconst (w := .w32) (hv.dataLengths d hmem))
-    have h₃ := SeqT.snoc (t₀ := []) h₂ (Matches.refl [i32, i32, i32])
-      (InstrT.memoryInit hm₀ hidx)
-    have h₄ := SeqT.snoc (t₀ := []) h₃ List.Forall₂.nil (InstrT.dataDrop hidx)
-    simpa [runData, hm, List.append_assoc] using h₄
+    simpa only [runData, hm] using segment_typed hex (hv.dataLengths d hmem)
+      (InstrT.memoryInit hm₀ hidx) (InstrT.dataDrop hidx)
 
 theorem flatMap_typed {α : Type} {C : Context} (xs : List α) (f : α → List Instr)
     (h : ∀ x ∈ xs, SeqT C (f x) ⟨[], []⟩) : SeqT C (xs.flatMap f) ⟨[], []⟩ := by
   induction xs with
   | nil => exact .nil
   | cons x xs ih =>
-    exact SeqT.append (h x (by simp)) (ih (fun x hx => h x (List.mem_cons_of_mem _ hx)))
+    exact seq_append_pure (h x (by simp)) (ih (fun x hx => h x (List.mem_cons_of_mem _ hx)))
 
 theorem initCode_typed {m : Module} (hv : ModuleValid m) :
     SeqT (moduleContext m) (initCode m) ⟨[], []⟩ := by
@@ -82,7 +71,7 @@ theorem initCode_typed {m : Module} (hv : ModuleValid m) :
   have hd := flatMap_typed m.datas.zipIdx (fun p => runData p.2 p.1) (by
     intro p hp
     exact runData_typed hv (List.mem_zipIdx_iff_getElem?.mp hp))
-  apply SeqT.append (SeqT.append he hd)
+  apply seq_append_pure (seq_append_pure he hd)
   cases hstart : m.start with
   | none => exact .nil
   | some x => exact SeqT.single (InstrT.call (hv.start x hstart))

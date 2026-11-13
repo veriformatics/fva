@@ -7,8 +7,8 @@ open FVA.Wasm Check
 namespace ValidatorProof
 
 theorem pop_typed {C : Context} {i : Instr} {s rest : Stack} {a wanted : OpType}
-    {out : List OpType} (hp : pop s = some (a, rest)) (hm : a.Matches wanted)
-    (hi : InstrT C i ⟨[wanted], out⟩) {es : List Instr} {ins : List OpType}
+    {out : List OpType} {es : List Instr} (hp : pop s = some (a, rest)) (hm : a.Matches wanted)
+    (hi : InstrT (Next C es) i ⟨[wanted], out⟩) {ins : List OpType}
     (ht : Typed C es ins s) : Typed C (es ++ [i]) ins (push out rest) := by
   intro ts hs
   obtain ⟨before, hb, rfl⟩ := push_fits hs
@@ -20,8 +20,8 @@ theorem reset_typed {C : Context} {es : List Instr} {ins : List OpType} {s : Sta
   exact .snoc (t₀ := []) (ht _ (fits_self s)) (matches_refl _) .unreachable
 
 theorem branch_typed {C : Context} {i : Instr} {ts : List ValType} {s out : Stack}
-    (hi : ∀ pre result, InstrT C i ⟨pre ++ ops ts, result⟩)
-    (h : branch ts s = some out) {es : List Instr} {ins : List OpType}
+    {es : List Instr} (hi : ∀ pre result, InstrT (Next C es) i ⟨pre ++ ops ts, result⟩)
+    (h : branch ts s = some out) {ins : List OpType}
     (ht : Typed C es ins s) : Typed C (es ++ [i]) ins out := by
   simp only [branch] at h
   cases hp : pops (ops ts).reverse s with
@@ -38,28 +38,45 @@ theorem branch_typed {C : Context} {i : Instr} {ts : List ValType} {s out : Stac
       matches_append (matches_refl _) (by simpa using matches_reverse hm)
     exact .snoc (t₀ := []) hstack hm' (hi rest.types.reverse result)
 
+theorem tailCall_typed {Cv C : Context} {i : Instr} {ft : FuncType} {operands : List ValType}
+    {s out : Stack} {es : List Instr}
+    (hi : ∀ rs, Cv.return_ = some rs → ResultSub ft.results rs →
+      ∀ pre result, InstrT (Next C es) i ⟨pre ++ ops operands, result⟩)
+    (h : tailCall Cv ft operands s = some out) {ins : List OpType}
+    (ht : Typed C es ins s) : Typed C (es ++ [i]) ins out := by
+  simp only [tailCall, Bool.cond_eq_ite] at h
+  split at h
+  · cases h
+  · rename_i rs hr
+    split at h
+    · exact branch_typed (hi rs hr (subTypes_sound (by assumption))) h ht
+    · cases h
+
 theorem selectType_sound {a b v : OpType} (h : selectType a b = some v) :
     (v = .bot ∨ ∃ n, v = .val (.num n)) ∧ a.Matches v ∧ b.Matches v := by
   cases a with
   | bot =>
     cases b with
     | bot => cases h; exact ⟨.inl rfl, trivial, trivial⟩
+    | refBot => simp [selectType] at h
     | val t =>
       cases t with
       | ref r => simp [selectType] at h
       | num n => cases h; exact ⟨.inr ⟨n, rfl⟩, trivial, rfl⟩
+  | refBot => simp [selectType] at h
   | val t =>
     cases t with
     | ref r => cases b <;> simp [selectType] at h
     | num n =>
       cases b with
       | bot => cases h; exact ⟨.inr ⟨n, rfl⟩, rfl, trivial⟩
+      | refBot => simp [selectType] at h
       | val u =>
         cases u with
         | ref r => simp [selectType] at h
         | num m =>
           simp only [selectType, Bool.cond_eq_ite, decide_eq_true_eq] at h
-          split at h <;> simp_all [OpType.Matches]
+          split at h <;> simp_all [OpType.Matches, ValType.Sub]
           subst v
           simp
 
@@ -94,11 +111,12 @@ theorem targets_sound {C : Context} {as : List OpType} {ls : List Nat}
     simp only [hl] at ht
     simpa using matches_reverse (matchTypeList_sound ht)
 
-theorem brTable_typed {C : Context} {ls : List Nat} {l : Nat} {ts : List ValType}
-    {s r₀ r₁ : Stack} {selector actual : List OpType}
-    (hl : C.labels[l]? = some ts) (hp₀ : pops [i32] s = some (selector, r₀))
-    (hp₁ : pops (ops ts).reverse r₀ = some (actual, r₁)) (htg : targets C actual ls = true)
-    {es : List Instr} {ins : List OpType} (ht : Typed C es ins s) :
+theorem brTable_typed {Cv C : Context} {ls : List Nat} {l : Nat} {ts : List ValType}
+    {s r₀ r₁ : Stack} {selector actual : List OpType} {es : List Instr}
+    (hc : Cv.Entails (Next C es))
+    (hl : Cv.labels[l]? = some ts) (hp₀ : pops [i32] s = some (selector, r₀))
+    (hp₁ : pops (ops ts).reverse r₀ = some (actual, r₁)) (htg : targets Cv actual ls = true)
+    {ins : List OpType} (ht : Typed C es ins s) :
     Typed C (es ++ [.brTable ls l]) ins ⟨[], true⟩ := by
   intro out _
   obtain ⟨hs, hf₀⟩ := pops_fits hp₀
@@ -107,6 +125,7 @@ theorem brTable_typed {C : Context} {ls : List Nat} {l : Nat} {ts : List ValType
   apply SeqT.snoc (t₀ := []) hstack
     (matches_append (matches_refl (r₁.types.reverse ++ actual.reverse))
       (by simpa using matches_reverse hs))
+  refine InstrT.transport (C := Cv) ?_ hc
   apply InstrT.brTable (ts := actual.reverse) (t₁ := r₁.types.reverse) (t₂ := out)
   intro k hk
   rcases List.mem_cons.mp hk with rfl | hk

@@ -6,11 +6,11 @@ import FVA.Profile
 # P′ contract harness (U28b E3, FVATest only)
 
 Oracle-assisted execution of P′ scripts on the reference stepper (`Ref.seq`), for the blind P′
-suite and the official P′ scripts until U28c (validation over P′), U28d (the machine) and U28e (the
-public runner) take over. A positive payload must pass `wasm-tools validate` with the support
-manifest's features, FVA's syntax classifier (`p-prime`) and the ≤ 1-memory static profile; a
-2.0-profile payload (`Module.inP2`) that FVA's validator rejects is skipped (3.0 admits more).
-Production validation and claims keep the 2.0 boundary. Commands and outcomes as `fvatest spec`;
+suite and the official P′ scripts until U28d (the machine) and U28e (the public runner) take over.
+A positive payload must pass `wasm-tools validate` with the support manifest's features, FVA's
+syntax classifier (`p-prime`) and the ≤ 1-memory static profile, then FVA's validator (U28c);
+FVA's validator must reject every decodable `assert_invalid` payload. Commands and outcomes as
+`fvatest spec`;
 `assert_exception` passes on an uncaught exception (`[ref.exn a, throw_ref]` final), its category
 alone.
 -/
@@ -68,16 +68,12 @@ def Result.describe : Result → String
   | .trapped => "trap" | .thrown a => s!"exception exn:@{a}" | .exhausted => "fuel exhausted"
   | .stuck => "stuck" | .skipped why => s!"skipped ({why})"
 
-/-- Allocate, evaluate the initializers in the placeholder allocation and run the
+/-- `Ref.instantiate`'s initial values (candidates checked in their own allocation), then the
 initialization code; the store survives a trap (§4.5.4). `none` = an initializer failed. -/
 def runInit (fuel : Nat) (s : Store) (m : FVA.Wasm.Module) (imports : List ExternVal) :
     Option (Config × Result) := do
-  let (s₀, inst₀) := allocModule s m imports (m.globals.map fun _ => .i32 0)
-    (m.tables.map fun _ => .null) (m.elems.map fun _ => [])
-  let gvals ← m.globals.mapM fun g => Ref.evalConst fuel s₀ inst₀ g.init
-  let trefs ← m.tables.mapM fun t => Ref.evalConst fuel s₀ inst₀ t.init >>= Ref.asRef
-  let erefs ← m.elems.mapM fun e =>
-    e.init.mapM fun ex => Ref.evalConst fuel s₀ inst₀ ex >>= Ref.asRef
+  let (gvals, trefs, erefs) ← Ref.initCandidates fuel s m imports
+  guard (Ref.initAgrees fuel s m imports gvals trefs erefs)
   let (s₁, inst) := allocModule s m imports gvals trefs erefs
   some (runRef fuel ⟨s₁, ⟨[], inst⟩, (initCode m).map .plain⟩)
 
@@ -162,9 +158,8 @@ def readModule (dir : System.FilePath) (c : Json) (negative : Bool) :
     | .error (.malformed pos why) => .error (.malformed s!"decoder offset {pos}: {why}")
     | .ok m => .ok m
 
-/-- Positive payloads: in profile (oracle-validated) and, on the 2.0 profile, accepted by FVA's
-validator (else a skip). Negative payloads: FVA's validator must reject a 2.0-profile one; P′
-typing = U28c. -/
+/-- Positive payloads: in profile (oracle-validated) and accepted by FVA's validator. Negative
+payloads: FVA's validator must reject them. -/
 def validatePayload (dir : System.FilePath) (c : Json) (kind : String) (line : Nat) (t : Tally) :
     IO (Tally × Option FVA.Wasm.Module) := do
   match ← readModule dir c (kind == "assert_invalid") with
@@ -175,13 +170,10 @@ def validatePayload (dir : System.FilePath) (c : Json) (kind : String) (line : N
     return (tally t line result, none)
   | .ok m =>
     if kind == "assert_invalid" then
-      if !m.inP2 then return (tally t line (.ok (some "P′ validation = U28c")), none)
       return (tally t line (if FVA.Wasm.Valid.validate m then
         .error "assert_invalid: validator accepted" else .ok none), none)
-    -- the 2.0 validator rejects some 3.0-valid 2.0-syntax modules (3.0 constant expressions read
-    -- earlier globals): P′ validation = U28c, the 2.0 runner keeps the check
-    if m.inP2 && !FVA.Wasm.Valid.validate m then
-      return (tally t line (.ok (some "2.0 validator rejects: P′ validation = U28c")), none)
+    if !FVA.Wasm.Valid.validate m then
+      return (tally t line (.error s!"{kind}: validator rejected"), none)
     return (t, some m)
 
 /-- Interpret one script (`fvatest spec`'s commands, on the reference stepper). -/

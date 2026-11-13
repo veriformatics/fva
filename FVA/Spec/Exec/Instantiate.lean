@@ -92,10 +92,8 @@ def allocModule (s : Store) (m : Module) (imports : List ExternVal) (gvals : Lis
         { pages := lim.min, max := lim.max, byte := fun _ => 0 },
       globals := s.globals ++ (m.globals.zip gvals).map fun (g, v) =>
         { type := ⟨g.type.mutability, g.type.val.mapHeap (closeHeap dts)⟩, value := v },
-      -- 2.0 typing of element segments, until U28c: the nullable projection of 3.0's
-      -- `(ref func)` for function-index segments (`ModuleValid`)
       elems := s.elems ++ (m.elems.zip erefs).map fun (e, rs) =>
-        { type := closeRef e.type.nullable, elem := rs },
+        { type := closeRef e.type, elem := rs },
       datas := s.datas ++ m.datas.map fun d => { data := d.init },
       exns := s.exns }
   (s', inst)

@@ -1,0 +1,325 @@
+#!/usr/bin/env bash
+# U28c E3: blind fixtures -> independent oracle receipt -> FVA validator.
+set -euo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+export PATH="$root/.tools/bin:$PATH"
+fixtures="$root/FVATest/P2Valid"
+manifest="$fixtures/commands.tsv"
+oracle=${FVA_P2VALID_WASM_TOOLS:-wasm-tools}
+runner=${FVA_P2VALID_RUNNER:-$root/.lake/build/bin/fvatest}
+regen=0
+self_test=0
+case ${1:-} in
+'') ;;
+--regen) regen=1 ;;
+--self-test) self_test=1 ;;
+*)
+	echo 'usage: scripts/test-p2valid [--regen|--self-test]' >&2
+	exit 2
+	;;
+esac
+[[ $# -le 1 ]] || {
+	echo 'test-p2valid: too many arguments' >&2
+	exit 2
+}
+fail_setup() {
+	echo "test-p2valid: $*" >&2
+	exit 2
+}
+for tool in "$oracle" jq awk mktemp cmp sha256sum; do
+	command -v "$tool" >/dev/null || fail_setup "missing tool: $tool"
+done
+[[ -x $runner ]] || fail_setup "missing runner: $runner (lake build fvatest)"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+# The public manifest is the sole source of oracle feature flags.
+set +e
+"$runner" profile >"$tmp/profile" 2>"$tmp/profile.err"
+rc=$?
+set -e
+if ((rc >= 128)); then
+	cat "$tmp/profile.err" >&2
+	exit 3
+fi
+((rc == 0)) || fail_setup "profile command failed (rc $rc)"
+features=$(jq -er '.wasmToolsFeatures | select(type == "string" and length > 0)' "$tmp/profile") ||
+	fail_setup 'profile JSON lacks wasmToolsFeatures'
+if ((self_test)); then
+	control="$tmp/control"
+	mkdir -p "$control/scripts" "$control/FVATest/P2Valid"
+	driver="$control/scripts/test-p2valid"
+	cp "$root/scripts/test-p2valid" "$driver"
+	cat >"$control/FVATest/P2Valid/probe.wast" <<'WAST'
+;; @case empty V2.bot control: valid empty module
+(module)
+;; @case identity V1.numeric control: valid typed function
+(module (func (param i32) (result i32) local.get 0))
+;; @case missing V1.result control: invalid missing result
+(assert_invalid (module (func (result i32))) "type mismatch")
+WAST
+	cp "$control/FVATest/P2Valid/probe.wast" "$tmp/probe.wast"
+	export P2VALID_CONTROL_PROFILE="$tmp/profile"
+	P2VALID_CONTROL_ORACLE=$(command -v "$oracle")
+	export P2VALID_CONTROL_ORACLE
+	cat >"$tmp/runner" <<'RUNNER'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ $1 == profile ]]; then
+  case ${P2VALID_MODE:-clean} in
+    profile-json) echo '{'; exit 0 ;;
+    profile-setup) exit 2 ;;
+    profile-crash) kill -TERM $$ ;;
+  esac
+  cat "$P2VALID_CONTROL_PROFILE"
+  exit 0
+fi
+[[ $1 == validate ]] || exit 2
+shift
+case ${P2VALID_MODE:-clean} in
+  setup) exit 2 ;;
+  crash) kill -TERM $$ ;;
+esac
+first=1
+index=0
+for path in "$@"; do
+  verdict=valid
+  ((index != 2)) || verdict=invalid
+  index=$((index + 1))
+  case ${P2VALID_MODE:-clean} in
+    all-valid) verdict=valid ;;
+    all-invalid) verdict=invalid ;;
+    missing) if ((first)); then first=0; continue; fi ;;
+    malformed) if ((first)); then printf '%s\tvalid\textra\n' "$path"; first=0; continue; fi ;;
+    misclassified) if ((first)); then verdict=unsupported; fi ;;
+  esac
+  printf '%s\t%s\n' "$path" "$verdict"
+  if [[ ${P2VALID_MODE:-clean} == duplicate ]] && ((first)); then
+    printf '%s\t%s\n' "$path" "$verdict"
+  fi
+  first=0
+done
+[[ ${P2VALID_MODE:-clean} != extra ]] || printf 'unrequested.wasm\tvalid\n'
+exit 1
+RUNNER
+	cat >"$tmp/oracle" <<'ORACLE'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ $1 == json-from-wast ]]; then
+  case ${P2VALID_MODE:-clean} in
+    json-setup) exit 127 ;;
+    json-crash) kill -TERM $$ ;;
+  esac
+fi
+if [[ $1 == validate ]]; then
+  case ${P2VALID_MODE:-clean} in
+    oracle-setup) exit 127 ;;
+    oracle-crash) kill -TERM $$ ;;
+  esac
+fi
+exec "$P2VALID_CONTROL_ORACLE" "$@"
+ORACLE
+	chmod +x "$tmp/runner" "$tmp/oracle"
+	control_pass=0
+	control_fail=0
+	check_control() {
+		local name=$1 expected_rc=$2 mode=$3 actual_rc
+		shift 3
+		set +e
+		FVA_P2VALID_RUNNER="$tmp/runner" FVA_P2VALID_WASM_TOOLS="$tmp/oracle" \
+			P2VALID_MODE="$mode" "$driver" "$@" >"$tmp/control.log" 2>&1
+		actual_rc=$?
+		set -e
+		if ((actual_rc == expected_rc)); then
+			echo "ok p2valid-driver.$name (rc $actual_rc)"
+			control_pass=$((control_pass + 1))
+		else
+			echo "FAIL p2valid-driver.$name: expected rc $expected_rc, got $actual_rc"
+			tail -n 8 "$tmp/control.log"
+			control_fail=$((control_fail + 1))
+		fi
+	}
+	check_control regen 0 clean --regen
+	receipt="$control/FVATest/P2Valid/commands.tsv"
+	[[ -f $receipt ]] || fail_setup 'control oracle did not produce a manifest'
+	cp "$receipt" "$tmp/receipt"
+	check_control green 0 clean
+	for mode in all-valid all-invalid missing duplicate extra malformed misclassified; do
+		check_control "$mode" 1 "$mode"
+	done
+	for mode in setup profile-json profile-setup json-setup; do
+		check_control "$mode" 2 "$mode"
+	done
+	for mode in crash profile-crash json-crash; do
+		check_control "$mode" 3 "$mode"
+	done
+	check_control oracle-setup 2 oracle-setup --regen
+	check_control oracle-crash 3 oracle-crash --regen
+	awk '!/^#/ {print; exit}' "$tmp/receipt" >>"$receipt"
+	check_control duplicate-manifest 2 clean
+	cp "$tmp/receipt" "$receipt"
+	awk 'NR>1 {print previous} {previous=$0}' "$tmp/receipt" >"$receipt"
+	check_control missing-manifest-row 2 clean
+	cp "$tmp/receipt" "$receipt"
+	awk -F '\t' 'BEGIN {OFS="\t"} !/^#/ && !done++ {$6=($4=="valid"?"invalid":"valid")} {print}' \
+		"$tmp/receipt" >"$receipt"
+	check_control expected-not-oracle 2 clean
+	cp "$tmp/receipt" "$receipt"
+	awk -F '\t' 'BEGIN {OFS="\t"} !/^#/ && !done++ {$4="invalid"; $5="error: planted"; $6="invalid"} {print}' \
+		"$tmp/receipt" >"$receipt"
+	check_control kind-not-oracle 2 clean
+	cp "$tmp/receipt" "$receipt"
+	awk -F '\t' 'BEGIN {OFS="\t"} !/^#/ && $4=="invalid" {$5="-"} {print}' \
+		"$tmp/receipt" >"$receipt"
+	check_control missing-oracle-diagnostic 2 clean
+	cp "$tmp/receipt" "$receipt"
+	printf '\n' >>"$control/FVATest/P2Valid/probe.wast"
+	check_control changed-fixture-bytes 2 clean
+	cp "$tmp/probe.wast" "$control/FVATest/P2Valid/probe.wast"
+	rm "$receipt"
+	check_control missing-manifest 2 clean
+	cp "$tmp/receipt" "$receipt"
+	rm "$control/FVATest/P2Valid/probe.wast"
+	check_control empty-fixtures 2 clean
+	printf 'test-p2valid driver: %d pass; %d FAIL\n' "$control_pass" "$control_fail"
+	((control_fail == 0))
+	exit
+fi
+shopt -s nullglob
+files=("$fixtures"/*.wast)
+((${#files[@]})) || fail_setup 'no fixtures'
+: >"$tmp/inventory"
+: >"$tmp/payloads"
+: >"$tmp/hashes"
+for wast in "${files[@]}"; do
+	name=${wast##*/}
+	digest=$(sha256sum "$wast")
+	printf '# sha256 %s %s\n' "$name" "${digest%% *}" >>"$tmp/hashes"
+	mkdir "$tmp/$name"
+	set +e
+	"$oracle" json-from-wast "$wast" --wasm-dir "$tmp/$name" -o "$tmp/$name/script.json" \
+		>"$tmp/$name/parse.out" 2>"$tmp/$name/parse.err"
+	rc=$?
+	set -e
+	if ((rc >= 128)); then
+		cat "$tmp/$name/parse.err" >&2
+		exit 3
+	fi
+	if ((rc != 0)); then
+		cat "$tmp/$name/parse.err" >&2
+		fail_setup "$name does not parse (rc $rc)"
+	fi
+	jq -e '.commands | length > 0 and all(.[]; .type == "module" or .type == "assert_invalid")' \
+		"$tmp/$name/script.json" >/dev/null || fail_setup "$name has missing or unexpected commands"
+	awk '/^;; @case / {rules=$4; id=$3; next}
+    /^\((module|assert_invalid)($|[ ()])/ {
+      if (rules == "" || id == "" || seen[id]++) exit 1
+      print NR "\t" rules
+      rules=""; id=""
+    }
+    END {if (rules != "" || id != "") exit 1}' "$wast" >"$tmp/$name/rules" ||
+		fail_setup "$name lacks unique case metadata"
+	jq -er '.commands[] | [.line, .type, .filename] | @tsv' "$tmp/$name/script.json" \
+		>"$tmp/$name/commands" || fail_setup "$name JSON commands lack fields"
+	[[ $(wc -l <"$tmp/$name/rules") == "$(wc -l <"$tmp/$name/commands")" ]] ||
+		fail_setup "$name metadata/command count differs"
+	while IFS=$'\t' read -r line kind binary; do
+		[[ $binary != */* && -f $tmp/$name/$binary ]] || fail_setup "$name:$line missing payload"
+		rules=$(awk -F '\t' -v line="$line" '$1 == line {print $2; n++} END {if(n!=1) exit 1}' \
+			"$tmp/$name/rules") || fail_setup "$name:$line lacks metadata"
+		printf '%s\t%s\t%s\t%s\n' "$name" "$line" "$kind" "$rules" >>"$tmp/inventory"
+		printf '%s\t%s\t%s\n' "$name" "$line" "$tmp/$name/$binary" >>"$tmp/payloads"
+	done <"$tmp/$name/commands"
+done
+if ((regen)); then
+	version=$("$oracle" --version) || fail_setup 'oracle version failed'
+	printf '# %s; features=%s\n# file\tline\tkind\toracle\tmessage\texpected\trules\n' \
+		"$version" "$features" >"$tmp/commands.tsv"
+	cat "$tmp/hashes" >>"$tmp/commands.tsv"
+	exec 4<"$tmp/inventory"
+	while IFS=$'\t' read -r file line binary; do
+		IFS=$'\t' read -r invfile invline kind rules <&4 || fail_setup 'inventory ended early'
+		[[ $file == "$invfile" && $line == "$invline" ]] || fail_setup 'inventory order differs'
+		set +e
+		"$oracle" validate --features="$features" "$binary" >"$tmp/oracle.out" 2>"$tmp/oracle.err"
+		rc=$?
+		set -e
+		if ((rc >= 128)); then
+			cat "$tmp/oracle.err" >&2
+			exit 3
+		fi
+		if ((rc == 0)); then
+			verdict=valid
+			message=-
+		elif ((rc == 1)) && [[ -s $tmp/oracle.err ]]; then
+			verdict=invalid
+			message=$(tr '\t\r\n' '   ' <"$tmp/oracle.err" | sed -E 's/ +/ /g; s/ $//')
+		else
+			cat "$tmp/oracle.err" >&2
+			fail_setup "$file:$line oracle failed (rc $rc)"
+		fi
+		expected=$verdict
+		if [[ $kind == module && $verdict != valid || $kind == assert_invalid && $verdict != invalid ]]; then
+			fail_setup "$file:$line $kind disagrees with oracle: $verdict ($message)"
+		fi
+		printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+			"$file" "$line" "$kind" "$verdict" "$message" "$expected" "$rules" >>"$tmp/commands.tsv"
+	done <"$tmp/payloads"
+	exec 4<&-
+	mv "$tmp/commands.tsv" "$manifest"
+	echo "test-p2valid: regenerated $(wc -l <"$tmp/inventory") oracle rows"
+	exit 0
+fi
+[[ -f $manifest ]] || fail_setup 'missing commands.tsv; run --regen'
+IFS= read -r header <"$manifest" || fail_setup 'empty commands.tsv'
+[[ $header == *"; features=$features" ]] || fail_setup 'oracle features changed; run --regen'
+awk '/^# sha256 /' "$manifest" >"$tmp/pinned-hashes"
+cmp -s "$tmp/hashes" "$tmp/pinned-hashes" || fail_setup 'fixture bytes changed; run --regen'
+awk -F '\t' '!/^#/ {
+  if (NF != 7 || $2 !~ /^[0-9]+$/ || ($3 != "module" && $3 != "assert_invalid") ||
+      ($4 != "valid" && $4 != "invalid") ||
+      ($3 == "module" && $4 != "valid") || ($3 == "assert_invalid" && $4 != "invalid") ||
+      ($4 == "valid" && $5 != "-") || ($4 == "invalid" && ($5 == "-" || $5 == "")) ||
+      $6 != $4 || seen[$1 SUBSEP $2]++) exit 1
+  print $1 "\t" $2 "\t" $3 "\t" $7
+}' "$manifest" >"$tmp/pinned-inventory" || fail_setup 'malformed or duplicate manifest row'
+if ! cmp -s "$tmp/inventory" "$tmp/pinned-inventory"; then
+	diff -u "$tmp/pinned-inventory" "$tmp/inventory" >&2 || true
+	fail_setup 'fixture inventory changed; run --regen'
+fi
+mapfile -t binaries < <(cut -f3 "$tmp/payloads")
+set +e
+"$runner" validate "${binaries[@]}" >"$tmp/actual" 2>"$tmp/actual.err"
+rc=$?
+set -e
+if ((rc >= 128)); then
+	cat "$tmp/actual.err" >&2
+	exit 3
+fi
+if ((rc != 0 && rc != 1)); then
+	cat "$tmp/actual.err" >&2
+	fail_setup "validator command failed (rc $rc)"
+fi
+# Exact payload inventory: extra, duplicate, missing and malformed output all fail.
+awk -F '\t' '
+  FILENAME == ARGV[1] {key[$3]=$1 ":" $2; order[++n]=$3; next}
+  FILENAME == ARGV[2] && !/^#/ {expect[$1 ":" $2]=$6; next}
+  FILENAME == ARGV[3] {
+    if (NF != 2 || !($1 in key) || seen[$1]++ ||
+        ($2 != "valid" && $2 != "invalid" && $2 != "malformed" && $2 != "unsupported")) {
+      print "FAIL runner output: " $0; failures++; next
+    }
+    got[$1]=$2
+  }
+  END {
+    for (i=1;i<=n;i++) {
+      path=order[i]; label=key[path]; want=expect[label]
+      if (!(path in got)) {print "FAIL " label ": missing result"; failures++}
+      else if (got[path] == want) {
+        passes++
+        if (ENVIRON["FVA_P2VALID_VERBOSE"] == "1") print "PASS " label ": " got[path]
+      }
+      else {print "FAIL " label ": expected " want ", got " got[path]; failures++}
+    }
+    printf "test-p2valid: %d commands; %d pass; %d FAIL; 0 pending\n", n,passes,failures
+    exit (failures != 0)
+  }' "$tmp/payloads" "$manifest" "$tmp/actual"

@@ -28,9 +28,10 @@ theorem const_length {C : Context} {e : Expr} {st : StackType}
     have hlen := Matches.length_eq hm
     exact hlen.symm.trans (ih hc)
 
+/-- A constant expression of one result is one constant instruction, whose result matches it. -/
 theorem const_singleton {C : Context} {e : Expr} {t : ValType}
     (he : ExprT C e [t]) (hc : ConstExpr C e) :
-    ∃ i, e = [i] ∧ ConstInstr C i ∧ InstrT C i ⟨[], [.val t]⟩ := by
+    ∃ i u, e = [i] ∧ ConstInstr C i ∧ InstrT C i ⟨[], [.val u]⟩ ∧ u.Sub t := by
   obtain ⟨out, hs, hm⟩ := he
   have he_len : e.length = 1 := by
     have hlen := const_length hs hc
@@ -39,6 +40,7 @@ theorem const_singleton {C : Context} {e : Expr} {t : ValType}
   obtain ⟨i, rfl⟩ := List.length_eq_one_iff.mp he_len
   have hci := hc i (by simp)
   obtain ⟨p, x, y, z, ho, hn, hm', hi⟩ := (SeqT.snoc_iff (es := []) (e := i)).mp hs
+  simp only [List.flatMap_nil, Context.addSets_nil] at hi
   have heq : p ++ x = [] := by
     have hnil := Matches.length_eq (SeqT.nil_iff.mp hn)
     exact List.eq_nil_of_length_eq_zero hnil.symm
@@ -47,11 +49,10 @@ theorem const_singleton {C : Context} {e : Expr} {t : ValType}
   obtain ⟨u, hy, hz⟩ := const_shape hi hci
   dsimp at hy hz
   subst y z
-  have hut : u = t := by
-    have ht := Matches.of_ops (ts := [u]) (by simpa [ops] using hty)
-    simpa [ops] using ht.symm
-  subst u
-  exact ⟨i, rfl, hci, hi⟩
+  have hut : u.Sub t := by
+    have h' : Matches [.val u] [.val t] := by simpa [ops] using hty
+    cases h' with | cons h _ => exact h
+  exact ⟨i, u, rfl, hci, hi, hut⟩
 
 theorem value_inj {v w : Val} (h : v.instr = w.instr) : v = w := by
   have hv := congrArg Ref.toVal h
@@ -71,15 +72,16 @@ theorem value_of_step {H : HostSem} {c : Config} {s : Store} {f : Frame} {v w : 
 /-- Initializer values need only the imported globals and the allocated function addresses;
 validity of the allocated store is not an assumption. -/
 theorem constant_value {H : HostSem} {s : Store} {inst : ModuleInst} {C : Context}
-    (funcs : ∀ (x : Nat) (ft : FuncType), C.funcs[x]? = some ft →
-      ∃ a, inst.funcs[x]? = some a ∧ a < s.funcs.length)
+    (funcs : ∀ (x : Nat) (dt : DefType), C.funcs[x]? = some dt →
+      ∃ a fi, inst.funcs[x]? = some a ∧ s.funcs[a]? = some fi ∧ fi.type = dt)
     (globals : ∀ (x : Nat) (gt : GlobalType), C.globals[x]? = some gt →
       ∃ (a : Nat) (gi : GlobalInst), inst.globals[x]? = some a ∧ s.globals[a]? = some gi ∧
         gi.value.HasType s gt.val)
     {e : Expr} {t : ValType} {v : Val} (he : ExprT C e [t]) (hc : ConstExpr C e)
     (steps : Steps H ⟨s, ⟨[], inst⟩, e.map .plain⟩ ⟨s, ⟨[], inst⟩, [v.instr]⟩) :
     v.HasType s t := by
-  obtain ⟨i, rfl, hci, hi⟩ := const_singleton he hc
+  obtain ⟨i, u, rfl, hci, hi, hut⟩ := const_singleton he hc
+  refine Val.HasType.sub ?_ hut
   cases i <;> simp only [ConstInstr] at hci
   case iconst w n =>
     cases hi
@@ -119,15 +121,16 @@ theorem constant_value {H : HostSem} {s : Store} {inst : ModuleInst} {C : Contex
     simp [value_of_step hs hu steps, Val.HasType]
   case refFunc x =>
     cases hi
-    rename_i ft hf hr
-    obtain ⟨a, ha, hb⟩ := funcs x ft hf
+    rename_i dt hf hr
+    obtain ⟨a, fi, ha, hfi, hdt⟩ := funcs x dt hf
     have hs : Ref.step ⟨s, ⟨[], inst⟩, [.plain (.refFunc x)]⟩ =
         some ⟨s, ⟨[], inst⟩, [(Val.ref (.func a)).instr]⟩ := by
       simp [Ref.step, Ref.seq, Ref.toVal, Ref.atInstr, Ref.instrStep, ha, Val.instr]
     have hu : Ref.uniqueStep false ⟨s, ⟨[], inst⟩, [.plain (.refFunc x)]⟩ = true := by
       simp [Ref.uniqueStep, Ref.seqUnique, Ref.toVal, Ref.atUnique, Ref.instrUnique]
     have hv := value_of_step hs hu steps
-    simpa [hv, Val.HasType] using hb
+    subst hv hdt
+    exact ⟨fi, hfi, fun h => h, .inl rfl⟩
   case globalGet x =>
     cases hi
     rename_i gt hg

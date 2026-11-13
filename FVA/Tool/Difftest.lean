@@ -176,16 +176,10 @@ def Eng.invoke (e : Eng) (fuel a : Nat) (args : List Val) : Eng × Run × Outcom
 def Eng.instantiate (e : Eng) (fuel : Nat) (m : Module) (imports : List ExternVal) :
     Except String (Eng × ModuleInst) := do
   let s := e.store
-  let (s₀, inst₀) := allocModule s m imports (m.globals.map fun _ => .i32 0)
-    (m.tables.map fun _ => .null) (m.elems.map fun _ => [])
-  let consts (s : Store) (inst : ModuleInst) :=
-    (m.globals.mapM fun g => Ref.evalConst fuel s inst g.init,
-     m.tables.mapM fun t => Ref.evalConst fuel s inst t.init >>= Ref.asRef,
-     m.elems.mapM fun el => el.init.mapM fun ex => Ref.evalConst fuel s inst ex >>= Ref.asRef)
-  let (some gvals, some trefs, some erefs) := consts s₀ inst₀
+  let some (gvals, trefs, erefs) := Ref.initCandidates fuel s m imports
     | throw "an initializer is not constant"
+  unless Ref.initAgrees fuel s m imports gvals trefs erefs do throw "initializers disagree"
   let (s₁, inst) := allocModule s m imports gvals trefs erefs
-  unless consts s₁ inst == (some gvals, some trefs, some erefs) do throw "initializers disagree"
   let e₁ := ({ e with store := s₁ } : Eng).mirrorFrom s.mems.length
   let (r, o) := Run.go fuel
     { c := ⟨e₁.store, ⟨[], inst⟩, (initCode m).map .plain⟩, mirrors := e₁.mirrors }

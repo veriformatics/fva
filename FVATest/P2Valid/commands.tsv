@@ -1,0 +1,301 @@
+# wasm-tools 1.262.0 (e22db44da 2026-10-13); features=wasm2,-simd,exceptions,tail-call,function-references,gc,multi-memory,memory64
+# file	line	kind	oracle	message	expected	rules
+# sha256 calls.wast b980e72e279a474865191997093e33df6ffca8bdb32c8e0687a9973ea15198fc
+# sha256 core-boundaries.wast 9e0102e78978fe253b717f2bcce98ad74c54dfe945563a692bf21afe1dff9741
+# sha256 exceptions.wast c08b72524587cd5d5e82d410ac699ecbeadb12175614d1d32f485995d314f0d3
+# sha256 gc-constants.wast 7417a59b52d24d9b11b13814ce208de5f0453aedb6b24be175669d79955ee196
+# sha256 locals.wast 373b1171bf3f5f59b9b4b4b59c06f487a1e209e3075ac41f4a9e7fa0928896dc
+# sha256 modules.wast c2aeb4c76ca1c087e17444f23fc1e226abbdcc69d95a1f3cdc991ab5c8735307
+# sha256 operands.wast 124a33fa9fae70b18913a794f3043f089a66cc26cffa12b7f233296bdd50e53d
+# sha256 tables.wast 48fc968fc9588a5ffafb7223e2175063d5cee9295c7c75111acbdf7018b31794
+# sha256 types.wast bdf57ebc4e55a4fb758922029f7d6ba68a4cc78fc85b45737f969c4068f53bd5
+calls.wast	3	module	valid	-	valid	V4.call-ref
+calls.wast	5	module	valid	-	valid	V4.call-ref
+calls.wast	7	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref null $type), found (ref $type) (at offset 0x23)	invalid	V4.call-ref
+calls.wast	9	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref null $type), found funcref (at offset 0x1d)	invalid	V4.call-ref
+calls.wast	11	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i64, found i32 (at offset 0x21)	invalid	V4.call-ref
+calls.wast	13	module	valid	-	valid	V1.sub-def-identity,V4.call-ref
+calls.wast	15	module	valid	-	valid	V4.return-call
+calls.wast	17	module	valid	-	valid	V4.return-call
+calls.wast	19	assert_invalid	invalid	error: func 1 failed to validate Caused by: 0: type mismatch: current function requires result type [(ref func)] but callee returns [funcref] (at offset 0x26)	invalid	V4.return-call
+calls.wast	21	assert_invalid	invalid	error: func 1 failed to validate Caused by: 0: type mismatch: current function requires result type [] but callee returns [i32] (at offset 0x21)	invalid	V4.return-call
+calls.wast	23	assert_invalid	invalid	error: func 1 failed to validate Caused by: 0: type mismatch: expected i64, found i32 (at offset 0x21)	invalid	V4.return-call
+calls.wast	25	module	valid	-	valid	V4.return-call
+calls.wast	27	module	valid	-	valid	V4.return-call-indirect
+calls.wast	29	module	valid	-	valid	V4.return-call-indirect
+calls.wast	31	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: current function requires result type [(ref func)] but callee returns [funcref] (at offset 0x25)	invalid	V4.return-call-indirect
+calls.wast	33	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: indirect calls must go through a table with type <= funcref (at offset 0x1f)	invalid	V4.return-call-indirect
+calls.wast	35	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown table 0: table index out of bounds (at offset 0x19)	invalid	V4.return-call-indirect
+calls.wast	37	module	valid	-	valid	V4.return-call-ref
+calls.wast	39	module	valid	-	valid	V4.return-call-ref
+calls.wast	41	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: current function requires result type [(ref func)] but callee returns [funcref] (at offset 0x21)	invalid	V4.return-call-ref
+calls.wast	43	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: current function requires result type [] but callee returns [i32] (at offset 0x1f)	invalid	V4.return-call-ref
+calls.wast	45	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref null $type), found (ref $type) (at offset 0x23)	invalid	V4.return-call-ref
+calls.wast	47	module	valid	-	valid	V4.call-indirect
+calls.wast	49	module	valid	-	valid	V4.call-indirect
+calls.wast	51	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: indirect calls must go through a table with type <= funcref (at offset 0x1f)	invalid	V4.call-indirect
+calls.wast	53	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: indirect calls must go through a table with type <= funcref (at offset 0x1f)	invalid	V4.call-indirect
+calls.wast	55	module	valid	-	valid	V4.call-indirect
+calls.wast	57	module	valid	-	valid	V4.ref-func,V5.refs
+calls.wast	59	assert_invalid	invalid	error: func 1 failed to validate Caused by: 0: undeclared function reference (at offset 0x1b)	invalid	V4.ref-func
+calls.wast	61	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown function 2: function index out of bounds (at offset 0x17)	invalid	V4.ref-func
+calls.wast	63	module	valid	-	valid	V5.refs
+calls.wast	65	module	valid	-	valid	V5.refs
+calls.wast	67	module	valid	-	valid	V5.refs
+calls.wast	69	assert_invalid	invalid	error: func 2 failed to validate Caused by: 0: undeclared function reference (at offset 0x26)	invalid	V5.refs
+calls.wast	71	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref null $type), found i32 (at offset 0x23)	invalid	V4.call-ref
+calls.wast	73	module	valid	-	valid	V4.return-call-ref
+calls.wast	75	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref null $type), found i32 (at offset 0x23)	invalid	V4.return-call-ref
+calls.wast	77	module	valid	-	valid	V4.call-ref
+core-boundaries.wast	3	module	valid	-	valid	V4.call-return
+core-boundaries.wast	5	assert_invalid	invalid	error: func 1 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x28)	invalid	V4.call-return
+core-boundaries.wast	7	module	valid	-	valid	V4.call-return
+core-boundaries.wast	9	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref extern), found externref (at offset 0x1c)	invalid	V4.call-return
+core-boundaries.wast	11	module	valid	-	valid	V4.br-if
+core-boundaries.wast	13	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x1f)	invalid	V4.br-if
+core-boundaries.wast	15	module	valid	-	valid	V4.br-if
+core-boundaries.wast	17	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x21)	invalid	V4.br-if
+core-boundaries.wast	19	module	valid	-	valid	V4.global-ops
+core-boundaries.wast	21	module	valid	-	valid	V4.global-ops
+core-boundaries.wast	23	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x24)	invalid	V4.global-ops
+core-boundaries.wast	25	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: global is immutable: cannot modify it with `global.set` (at offset 0x23)	invalid	V4.global-ops
+core-boundaries.wast	27	module	valid	-	valid	V4.memarg
+core-boundaries.wast	29	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: invalid memop alignment: alignment must not be larger than natural (at offset 0x1e)	invalid	V4.memarg
+core-boundaries.wast	31	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i32, found i64 (at offset 0x20)	invalid	V4.memarg
+core-boundaries.wast	33	module	valid	-	valid	V4.memory
+core-boundaries.wast	35	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i32, found i64 (at offset 0x1e)	invalid	V4.memory
+core-boundaries.wast	37	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown data segment 0 (at offset 0x1a)	invalid	V4.segment-indices
+core-boundaries.wast	39	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown elem segment 0: segment index out of bounds (at offset 0x17)	invalid	V4.segment-indices
+core-boundaries.wast	41	module	valid	-	valid	V4.segment-indices
+core-boundaries.wast	43	module	valid	-	valid	V5.limits
+core-boundaries.wast	45	module	valid	-	valid	V5.one-memory
+exceptions.wast	3	module	valid	-	valid	V4.throw
+exceptions.wast	5	module	valid	-	valid	V4.throw
+exceptions.wast	7	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i64, found i32 (at offset 0x22)	invalid	V4.throw
+exceptions.wast	9	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i32 but nothing on stack (at offset 0x23)	invalid	V4.throw
+exceptions.wast	11	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown tag 1: tag index out of bounds (at offset 0x1c)	invalid	V4.throw
+exceptions.wast	13	module	valid	-	valid	V4.throw
+exceptions.wast	15	module	valid	-	valid	V4.throw-ref
+exceptions.wast	17	module	valid	-	valid	V4.throw-ref
+exceptions.wast	19	module	valid	-	valid	V4.throw-ref
+exceptions.wast	21	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected exnref, found funcref (at offset 0x19)	invalid	V4.throw-ref
+exceptions.wast	23	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected exnref, found i32 (at offset 0x19)	invalid	V4.throw-ref
+exceptions.wast	25	module	valid	-	valid	V4.try-table
+exceptions.wast	27	module	valid	-	valid	V4.try-table
+exceptions.wast	29	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i64, found i32 (at offset 0x1d)	invalid	V4.try-table
+exceptions.wast	31	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i64, found i32 (at offset 0x1d)	invalid	V4.try-table
+exceptions.wast	33	module	valid	-	valid	V4.catch
+exceptions.wast	35	module	valid	-	valid	V4.catch
+exceptions.wast	37	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x23)	invalid	V4.catch
+exceptions.wast	39	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: catch label must have same number of types as tag (at offset 0x22)	invalid	V4.catch
+exceptions.wast	41	module	valid	-	valid	V4.catch
+exceptions.wast	43	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown label: branch depth too large (at offset 0x1c)	invalid	V4.catch,V4.label-depth
+exceptions.wast	45	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown tag 0: tag index out of bounds (at offset 0x17)	invalid	V4.catch
+exceptions.wast	47	module	valid	-	valid	V4.catch-ref
+exceptions.wast	49	module	valid	-	valid	V4.catch-ref
+exceptions.wast	51	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: catch_ref label must have one more type than tag types (at offset 0x22)	invalid	V4.catch-ref
+exceptions.wast	53	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected exnref, found i32 (at offset 0x27)	invalid	V4.catch-ref
+exceptions.wast	55	module	valid	-	valid	V4.catch-all
+exceptions.wast	57	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: catch_all label must have no result types (at offset 0x19)	invalid	V4.catch-all
+exceptions.wast	59	module	valid	-	valid	V4.catch-all-ref
+exceptions.wast	61	module	valid	-	valid	V4.catch-all-ref
+exceptions.wast	63	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: catch_all_ref label must have exactly one result type (at offset 0x19)	invalid	V4.catch-all-ref
+exceptions.wast	65	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: catch_all_ref label must a subtype of (ref exn) (at offset 0x19)	invalid	V4.catch-all-ref
+exceptions.wast	67	module	valid	-	valid	V5.tag
+exceptions.wast	69	module	valid	-	valid	V5.tag
+exceptions.wast	71	assert_invalid	invalid	error: invalid exception type: non-empty tag result type (at offset 0x12)	invalid	V5.tag
+exceptions.wast	73	assert_invalid	invalid	error: unknown type 3: type index out of bounds (at offset 0xb)	invalid	V5.tag
+exceptions.wast	75	module	valid	-	valid	V5.tag-import-export
+exceptions.wast	77	assert_invalid	invalid	error: invalid exception type: non-empty tag result type (at offset 0x12)	invalid	V5.tag-import-export
+exceptions.wast	79	assert_invalid	invalid	error: unknown tag 1: exported tag index out of bounds (at offset 0x16)	invalid	V5.tag-import-export
+exceptions.wast	81	module	valid	-	valid	V4.label-depth
+gc-constants.wast	5	module	valid	-	valid	V5.gc-constants
+gc-constants.wast	7	module	valid	-	valid	V5.gc-constants
+gc-constants.wast	9	module	valid	-	valid	V5.gc-constants
+gc-constants.wast	11	module	valid	-	valid	V5.gc-constants
+gc-constants.wast	13	module	valid	-	valid	V5.gc-constants
+gc-constants.wast	15	module	valid	-	valid	V5.gc-constants
+gc-constants.wast	17	assert_invalid	invalid	error: unknown global 0: global index out of bounds (at offset 0x1b)	invalid	V5.gc-constants
+gc-constants.wast	19	assert_invalid	invalid	error: unknown global 0: global index out of bounds (at offset 0xd)	invalid	V5.gc-constants
+gc-constants.wast	21	assert_invalid	invalid	error: unknown global 1: global index out of bounds (at offset 0xd)	invalid	V5.gc-constants
+gc-constants.wast	23	assert_invalid	invalid	error: unknown global 1: global index out of bounds (at offset 0x17)	invalid	V5.gc-constants
+gc-constants.wast	25	assert_invalid	invalid	error: constant expression required: global.get of mutable global (at offset 0x12)	invalid	V5.gc-constants
+gc-constants.wast	27	assert_invalid	invalid	error: constant expression required: global.get of mutable global (at offset 0x19)	invalid	V5.gc-constants
+gc-constants.wast	29	assert_invalid	invalid	error: constant expression required: global.get of mutable global (at offset 0x1a)	invalid	V5.gc-constants
+gc-constants.wast	31	assert_invalid	invalid	error: constant expression required: global.get of mutable global (at offset 0x16)	invalid	V5.gc-constants
+gc-constants.wast	33	assert_invalid	invalid	error: constant expression required: global.get of mutable global (at offset 0x1a)	invalid	V5.gc-constants
+locals.wast	3	module	valid	-	valid	V4.local-get-unset
+locals.wast	5	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 0 (at offset 0x1a)	invalid	V4.local-get-unset
+locals.wast	7	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 0 (at offset 0x1b)	invalid	V4.local-get-unset
+locals.wast	9	module	valid	-	valid	V4.local-get-unset
+locals.wast	11	module	valid	-	valid	V4.local-set-get
+locals.wast	13	module	valid	-	valid	V4.local-set-get
+locals.wast	15	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x1c)	invalid	V4.local-set-get
+locals.wast	17	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref extern), found externref (at offset 0x1c)	invalid	V4.local-set-get
+locals.wast	19	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 2 (at offset 0x20)	invalid	V4.local-set-get
+locals.wast	21	module	valid	-	valid	V4.local-set-get
+locals.wast	23	module	valid	-	valid	V4.param-set
+locals.wast	25	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown local 1: local index out of bounds (at offset 0x19)	invalid	V4.param-set
+locals.wast	27	module	valid	-	valid	V4.block-reset
+locals.wast	29	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 1 (at offset 0x23)	invalid	V4.block-reset
+locals.wast	31	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 1 (at offset 0x23)	invalid	V4.block-reset
+locals.wast	33	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 1 (at offset 0x2a)	invalid	V4.block-reset
+locals.wast	35	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 1 (at offset 0x24)	invalid	V4.block-reset
+locals.wast	37	module	valid	-	valid	V4.block-reset
+locals.wast	39	module	valid	-	valid	V4.block-reset
+locals.wast	41	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 1 (at offset 0x25)	invalid	V4.block-reset
+locals.wast	43	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 1 (at offset 0x24)	invalid	V4.block-reset
+locals.wast	45	module	valid	-	valid	V4.if-arms
+locals.wast	47	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 1 (at offset 0x25)	invalid	V4.if-arms
+locals.wast	49	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 1 (at offset 0x20)	invalid	V4.if-arms
+locals.wast	51	module	valid	-	valid	V4.if-arms
+locals.wast	53	module	valid	-	valid	V3.local-runs
+locals.wast	55	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: uninitialized local: 4 (at offset 0x24)	invalid	V3.local-runs
+locals.wast	57	assert_invalid	invalid	error: func 1 failed to validate Caused by: 0: uninitialized local: 0 (at offset 0x2a)	invalid	V3.local-runs
+locals.wast	59	module	valid	-	valid	V4.local-set-get
+modules.wast	3	module	valid	-	valid	V5.imports
+modules.wast	5	assert_invalid	invalid	error: unknown type 2: type index out of bounds (at offset 0xb)	invalid	V5.imports
+modules.wast	7	assert_invalid	invalid	error: unknown type 3: type index out of bounds (at offset 0xb)	invalid	V5.imports
+modules.wast	9	module	valid	-	valid	V5.global-init
+modules.wast	11	module	valid	-	valid	V5.global-init
+modules.wast	13	assert_invalid	invalid	error: type mismatch: expected (ref func), found funcref (at offset 0x10)	invalid	V5.global-init
+modules.wast	15	assert_invalid	invalid	error: type mismatch: expected externref, found exnref (at offset 0xf)	invalid	V5.global-init
+modules.wast	17	assert_invalid	invalid	error: constant expression required: non-constant operator: visit_call (at offset 0x18)	invalid	V5.global-init
+modules.wast	19	module	valid	-	valid	V5.const-imported
+modules.wast	21	assert_invalid	invalid	error: constant expression required: global.get of mutable global (at offset 0x17)	invalid	V5.const-imported
+modules.wast	23	module	valid	-	valid	V5.const-imported
+modules.wast	25	assert_invalid	invalid	error: type mismatch: expected (ref extern), found externref (at offset 0x1a)	invalid	V5.const-imported
+modules.wast	27	module	valid	-	valid	V5.offsets,V5.const-imported
+modules.wast	29	module	valid	-	valid	V5.offsets,V5.const-imported
+modules.wast	31	assert_invalid	invalid	error: type mismatch: expected i32, found i64 (at offset 0x13)	invalid	V5.offsets
+modules.wast	33	assert_invalid	invalid	error: type mismatch: expected i32, found i64 (at offset 0x14)	invalid	V5.offsets
+modules.wast	35	assert_invalid	invalid	error: constant expression required: non-constant operator: visit_call (at offset 0x24)	invalid	V5.offsets
+modules.wast	37	assert_invalid	invalid	error: unknown memory 0: memory index out of bounds (at offset 0xb)	invalid	V5.offsets
+modules.wast	39	assert_invalid	invalid	error: unknown table 0: table index out of bounds (at offset 0xb)	invalid	V5.offsets
+modules.wast	41	module	valid	-	valid	V5.start-exports
+modules.wast	43	assert_invalid	invalid	error: invalid start function type (at offset 0x15)	invalid	V5.start-exports
+modules.wast	45	assert_invalid	invalid	error: invalid start function type (at offset 0x15)	invalid	V5.start-exports
+modules.wast	47	module	valid	-	valid	V5.start-exports
+modules.wast	49	assert_invalid	invalid	error: duplicate export name `x` already defined (at offset 0x1e)	invalid	V5.start-exports
+modules.wast	51	assert_invalid	invalid	error: unknown function 0: exported function index out of bounds (at offset 0xb)	invalid	V5.start-exports
+modules.wast	53	module	valid	-	valid	V5.limits
+modules.wast	55	assert_invalid	invalid	error: memory size must be at most 0x10000 65536-byte pages (at offset 0xb)	invalid	V5.limits
+modules.wast	57	assert_invalid	invalid	error: size minimum must not be greater than maximum (at offset 0xb)	invalid	V5.limits
+modules.wast	59	module	valid	-	valid	V5.limits
+modules.wast	61	module	valid	-	valid	V5.one-memory
+modules.wast	63	assert_invalid	invalid	error: constant expression required: non-constant operator: i32.add (at offset 0x11)	invalid	V5.extended-const
+operands.wast	3	module	valid	-	valid	V2.bot
+operands.wast	5	module	valid	-	valid	V2.bot
+operands.wast	7	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i64, found i32 (at offset 0x1b)	invalid	V2.bot
+operands.wast	9	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x1c)	invalid	V2.bot
+operands.wast	11	module	valid	-	valid	V2.refbot-as-non-null
+operands.wast	13	module	valid	-	valid	V2.refbot-as-non-null
+operands.wast	15	module	valid	-	valid	V2.refbot-as-non-null
+operands.wast	17	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i32, found heap type (at offset 0x1a)	invalid	V2.refbot-as-non-null
+operands.wast	19	module	valid	-	valid	V2.refbot-br-on-null
+operands.wast	21	module	valid	-	valid	V2.refbot-br-on-null
+operands.wast	23	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i32, found heap type (at offset 0x1c)	invalid	V2.refbot-br-on-null
+operands.wast	25	module	valid	-	valid	V2.refbot-br-table
+operands.wast	27	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref $type), found (ref $type) (at offset 0x2a)	invalid	V2.refbot-br-table
+operands.wast	29	module	valid	-	valid	V4.ref-as-non-null
+operands.wast	31	module	valid	-	valid	V4.ref-as-non-null
+operands.wast	33	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected ref but found i32 (at offset 0x19)	invalid	V4.ref-as-non-null
+operands.wast	35	module	valid	-	valid	V4.br-on-null
+operands.wast	37	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i32, found f64 (at offset 0x26)	invalid	V4.br-on-null
+operands.wast	39	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown label: branch depth too large (at offset 0x19)	invalid	V4.br-on-null,V4.label-depth
+operands.wast	41	module	valid	-	valid	V4.br-on-non-null
+operands.wast	43	module	valid	-	valid	V4.br-on-non-null
+operands.wast	45	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: br_on_non_null target does not end with heap type (at offset 0x1d)	invalid	V4.br-on-non-null
+operands.wast	47	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected funcref, found externref (at offset 0x1d)	invalid	V4.br-on-non-null
+operands.wast	49	module	valid	-	valid	V4.ref-is-null
+operands.wast	51	module	valid	-	valid	V4.ref-is-null
+operands.wast	53	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected ref but found f32 (at offset 0x1c)	invalid	V4.ref-is-null
+operands.wast	55	module	valid	-	valid	V4.select
+operands.wast	57	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: select only takes integral types (at offset 0x1f)	invalid	V4.select
+operands.wast	59	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x20)	invalid	V4.select
+operands.wast	61	module	valid	-	valid	V4.select
+operands.wast	63	module	valid	-	valid	V4.br-table
+operands.wast	65	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x21)	invalid	V4.br-table
+operands.wast	67	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: br_table target labels have different number of types (at offset 0x1c)	invalid	V4.br-table
+operands.wast	69	module	valid	-	valid	V4.blocktype-idx
+operands.wast	71	module	valid	-	valid	V4.blocktype-idx
+operands.wast	73	module	valid	-	valid	V4.blocktype-idx
+operands.wast	75	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i64, found i32 (at offset 0x1d)	invalid	V4.blocktype-idx
+operands.wast	77	module	valid	-	valid	V4.label-depth
+operands.wast	79	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown label: branch depth too large (at offset 0x17)	invalid	V4.label-depth
+operands.wast	81	module	valid	-	valid	V4.label-depth
+operands.wast	83	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown label: branch depth too large (at offset 0x19)	invalid	V4.label-depth
+operands.wast	85	module	valid	-	valid	V4.label-depth
+operands.wast	87	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown label: branch depth too large (at offset 0x19)	invalid	V4.label-depth
+operands.wast	89	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown label: branch depth too large (at offset 0x19)	invalid	V4.label-depth
+operands.wast	91	module	valid	-	valid	V4.label-depth
+operands.wast	93	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i32, found heap type (at offset 0x23)	invalid	V2.refbot-br-table
+tables.wast	3	module	valid	-	valid	V4.table-ops
+tables.wast	5	module	valid	-	valid	V4.table-ops
+tables.wast	7	assert_invalid	invalid	error: func 1 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x2b)	invalid	V4.table-ops
+tables.wast	9	module	valid	-	valid	V4.table-ops
+tables.wast	11	assert_invalid	invalid	error: func 1 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x2b)	invalid	V4.table-ops
+tables.wast	13	module	valid	-	valid	V4.table-ops
+tables.wast	15	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected externref, found funcref (at offset 0x23)	invalid	V4.table-ops
+tables.wast	17	module	valid	-	valid	V4.table-ops
+tables.wast	19	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown table 0: table index out of bounds (at offset 0x19)	invalid	V4.table-ops
+tables.wast	21	module	valid	-	valid	V4.table-copy-init
+tables.wast	23	assert_invalid	invalid	error: func 1 failed to validate Caused by: 0: type mismatch (at offset 0x30)	invalid	V4.table-copy-init
+tables.wast	25	module	valid	-	valid	V4.table-copy-init
+tables.wast	27	assert_invalid	invalid	error: func 1 failed to validate Caused by: 0: type mismatch (at offset 0x36)	invalid	V4.table-copy-init
+tables.wast	29	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch (at offset 0x36)	invalid	V4.table-copy-init
+tables.wast	31	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown elem segment 0: segment index out of bounds (at offset 0x23)	invalid	V4.table-copy-init
+tables.wast	33	module	valid	-	valid	V5.table-init
+tables.wast	35	module	valid	-	valid	V5.table-init
+tables.wast	37	module	valid	-	valid	V5.table-init
+tables.wast	39	assert_invalid	invalid	error: type mismatch: non-defaultable element type (at offset 0xb)	invalid	V5.table-init
+tables.wast	41	assert_invalid	invalid	error: type mismatch: expected (ref func), found funcref (at offset 0x13)	invalid	V5.table-init
+tables.wast	43	assert_invalid	invalid	error: constant expression required: non-constant operator: visit_call (at offset 0x1b)	invalid	V5.table-init
+tables.wast	45	module	valid	-	valid	V5.table-init,V5.const-imported
+tables.wast	47	module	valid	-	valid	V5.elem-typing
+tables.wast	49	assert_invalid	invalid	error: type mismatch: expected (ref func), found funcref (at offset 0x11)	invalid	V5.elem-typing
+tables.wast	51	module	valid	-	valid	V5.elem-typing
+tables.wast	53	assert_invalid	invalid	error: type mismatch: invalid element type `funcref` for table type `(ref func)` (at offset 0x21)	invalid	V5.elem-typing
+tables.wast	55	assert_invalid	invalid	error: type mismatch: expected (ref $type), found (ref $type) (at offset 0x20)	invalid	V5.elem-typing
+tables.wast	57	module	valid	-	valid	V5.elem-typing
+tables.wast	59	module	valid	-	valid	V5.elem-typing
+tables.wast	61	assert_invalid	invalid	error: constant expression required: non-constant operator: visit_call (at offset 0x19)	invalid	V5.elem-typing
+types.wast	3	module	valid	-	valid	V1.idx-range
+types.wast	5	assert_invalid	invalid	error: unknown type 2: type index out of bounds (at offset 0xe)	invalid	V1.idx-range
+types.wast	7	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown type 5: type index out of bounds (at offset 0x17)	invalid	V1.idx-range
+types.wast	9	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown type 7: type index out of bounds (at offset 0x18)	invalid	V1.idx-range
+types.wast	11	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown type: type index out of bounds (at offset 0x17)	invalid	V1.idx-range
+types.wast	13	module	valid	-	valid	V1.sub-null
+types.wast	15	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref func), found funcref (at offset 0x1c)	invalid	V1.sub-null
+types.wast	17	module	valid	-	valid	V1.sub-def-func
+types.wast	19	module	valid	-	valid	V1.sub-def-func
+types.wast	21	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref null $type), found funcref (at offset 0x1f)	invalid	V1.sub-def-func
+types.wast	23	module	valid	-	valid	V1.sub-def-identity
+types.wast	25	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref $type), found (ref $type) (at offset 0x25)	invalid	V1.sub-def-identity
+types.wast	27	module	valid	-	valid	V1.sub-def-identity
+types.wast	29	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref $type), found (ref $type) (at offset 0x28)	invalid	V1.sub-def-identity
+types.wast	31	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref $type), found (ref $type) (at offset 0x31)	invalid	V1.sub-def-identity
+types.wast	33	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref $type), found (ref $type) (at offset 0x26)	invalid	V1.sub-def-identity
+types.wast	35	module	valid	-	valid	V1.sub-abs
+types.wast	37	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected externref, found funcref (at offset 0x1b)	invalid	V1.sub-abs
+types.wast	39	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected exnref, found externref (at offset 0x1b)	invalid	V1.sub-abs
+types.wast	41	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected funcref, found exnref (at offset 0x1b)	invalid	V1.sub-abs
+types.wast	43	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected exnref, found funcref (at offset 0x1b)	invalid	V1.sub-abs
+types.wast	45	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected funcref, found externref (at offset 0x1b)	invalid	V1.sub-abs
+types.wast	47	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected externref, found exnref (at offset 0x1b)	invalid	V1.sub-abs
+types.wast	49	module	valid	-	valid	V1.rec-group,V5.types-seq
+types.wast	51	module	valid	-	valid	V1.rec-group,V5.types-seq
+types.wast	53	assert_invalid	invalid	error: unknown type 1: type index out of bounds (at offset 0xb)	invalid	V1.rec-group
+types.wast	55	module	valid	-	valid	V5.types-seq
+types.wast	57	assert_invalid	invalid	error: unknown type 2: type index out of bounds (at offset 0xb)	invalid	V5.types-seq
+types.wast	59	module	valid	-	valid	V1.rec-group
+types.wast	61	module	valid	-	valid	V1.numeric
+types.wast	63	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected i64, found i32 (at offset 0x1b)	invalid	V1.numeric
+types.wast	65	module	valid	-	valid	V1.result
+types.wast	67	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected funcref but nothing on stack (at offset 0x1d)	invalid	V1.result
+types.wast	69	module	valid	-	valid	V4.ref-null
+types.wast	71	module	valid	-	valid	V4.ref-null
+types.wast	73	module	valid	-	valid	V4.ref-null
+types.wast	75	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: type mismatch: expected (ref extern), found externref (at offset 0x1b)	invalid	V4.ref-null
+types.wast	77	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown type 99: type index out of bounds (at offset 0x18)	invalid	V1.idx-range
+types.wast	79	assert_invalid	invalid	error: func 0 failed to validate Caused by: 0: unknown type: type index out of bounds (at offset 0x18)	invalid	V1.idx-range

@@ -17,7 +17,7 @@ theorem ASeqT.load {s : Store} {C : Context} {i : BitVec 32} {t : NumType} {m : 
   · intro x y hi
     cases hi with | plain hi => cases hi; rfl
   · intro x y hi _
-    cases hi with | plain hi => cases hi; exact .single (.value (numVal_typed s t v))
+    cases hi with | plain hi => cases hi; exact (AInstrT.value (numVal_typed s t v))
 
 theorem ASeqT.loadPacked {s : Store} {C : Context} {i : BitVec 32} {w : Width}
     {p : PackSize} {sx : Sx} {m : MemArg} {a b : List OpType}
@@ -29,7 +29,7 @@ theorem ASeqT.loadPacked {s : Store} {C : Context} {i : BitVec 32} {w : Width}
   · intro x y hi _
     cases hi with | plain hi =>
       cases hi
-      exact .single (.value (packedVal_typed s w p.bits sx v))
+      exact (AInstrT.value (packedVal_typed s w p.bits sx v))
 
 theorem ASeqT.store {s : Store} {C : Context} {i : BitVec 32} {v : Val} {t : NumType}
     {m : MemArg} {a b : List OpType}
@@ -59,7 +59,7 @@ theorem ASeqT.memorySize {s : Store} {C : Context} {a b : List OpType}
   · intro x y hi
     cases hi with | plain hi => cases hi; rfl
   · intro x y hi _
-    cases hi with | plain hi => cases hi; exact .single (.value trivial)
+    cases hi with | plain hi => cases hi; exact (AInstrT.value trivial)
 
 theorem ASeqT.memoryGrow {s : Store} {C : Context} {i : BitVec 32} {a b : List OpType}
     (h : ASeqT s C [(Val.i32 i).instr, .plain .memoryGrow] ⟨a, b⟩) (v : BitVec 32) :
@@ -68,7 +68,7 @@ theorem ASeqT.memoryGrow {s : Store} {C : Context} {i : BitVec 32} {a b : List O
   · intro x y hi
     cases hi with | plain hi => cases hi; rfl
   · intro x y hi _
-    cases hi with | plain hi => cases hi; exact .single (.value trivial)
+    cases hi with | plain hi => cases hi; exact (AInstrT.value trivial)
 
 theorem ASeqT.memoryFillZero {s : Store} {C : Context} {i n : BitVec 32} {v : Val}
     {a b : List OpType}
@@ -105,7 +105,7 @@ theorem ASeqT.memoryFill {s : Store} {C : Context} {i n : BitVec 32} {v : Val}
                 (ts := [.num .i32, .num .i32, .num .i32])
                 (.cons trivial (.cons hv (.cons trivial .nil))))
               (Matches.refl _) (.plain (.memoryFill hm))
-            exact h₁.append h₂
+            exact h₁.append_pure h₂
 
 theorem ASeqT.memoryCopyZero {s : Store} {C : Context} {d src n : BitVec 32}
     {a b : List OpType}
@@ -156,7 +156,7 @@ theorem ASeqT.memoryCopyUp {s : Store} {C : Context} {d src n : BitVec 32}
       cases hi with | memoryCopy hm =>
         simpa only [vi32, BitVec.ofNat_toNat, BitVec.setWidth_eq, List.cons_append,
           List.nil_append] using
-          (copy_chunk (s := s) hm d.toNat src.toNat).append
+          (copy_chunk (s := s) hm d.toNat src.toNat).append_pure
             (copy_again hm (BitVec.ofNat 32 (d.toNat + 1))
               (BitVec.ofNat 32 (src.toNat + 1)) (BitVec.ofNat 32 (n.toNat - 1)))
 
@@ -174,7 +174,7 @@ theorem ASeqT.memoryCopyDown {s : Store} {C : Context} {d src n : BitVec 32}
   · intro x y hi _
     cases hi with | plain hi =>
       cases hi with | memoryCopy hm =>
-        exact (copy_chunk hm (d.toNat + n.toNat - 1) (src.toNat + n.toNat - 1)).append
+        exact (copy_chunk hm (d.toNat + n.toNat - 1) (src.toNat + n.toNat - 1)).append_pure
           (copy_again hm d src (BitVec.ofNat 32 (n.toNat - 1)))
 
 theorem ASeqT.memoryInitZero {s : Store} {C : Context} {d src n : BitVec 32} {idx : Nat}
@@ -211,7 +211,7 @@ theorem ASeqT.memoryInit {s : Store} {C : Context} {d src n : BitVec 32} {idx : 
             (ts := [.num .i32, .num .i32, .num .i32])
             (.cons trivial (.cons trivial (.cons trivial .nil))))
           (Matches.refl _) (.plain (.memoryInit hm hd))
-        exact h₁.append h₂
+        exact h₁.append_pure h₂
 
 theorem ASeqT.dataDrop {s : Store} {C : Context} {idx : Nat} {a b : List OpType}
     (h : ASeqT s C [.plain (.dataDrop idx)] ⟨a, b⟩) : Matches a b := by

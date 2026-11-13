@@ -28,19 +28,27 @@ private theorem global_extends_refl (g : GlobalInst) : g.Extends g := ⟨rfl, Or
 private theorem elem_extends_refl (e : ElemInst) : e.Extends e := ⟨rfl, Or.inl rfl⟩
 private theorem data_extends_refl (d : DataInst) : d.Extends d := Or.inl rfl
 
-private theorem reassemble {s s' : Store} (he : s.Extends s')
+private theorem reassemble {s s' : Store} (he : s.Extends s') (htags : s'.tags = s.tags)
+    (hexns : s'.exns = s.exns) (h : StoreOK s)
     (hf : ∀ fi ∈ s'.funcs, FuncInstOK s fi)
-    (ht : ∀ ti ∈ s'.tables, ti.type.Ok ∧ ti.elem.length = ti.type.limits.min ∧
+    (ht : ∀ ti ∈ s'.tables, ti.type.Ok ∧ (ValType.ref ti.type.elem).Closed 0 ∧
+      ti.elem.length = ti.type.limits.min ∧
       ∀ r ∈ ti.elem, Val.HasType s (.ref r) (.ref ti.type.elem))
     (hm : ∀ mi ∈ s'.mems, memTypeOk ⟨mi.pages, mi.max⟩)
-    (hg : ∀ gi ∈ s'.globals, Val.HasType s gi.value gi.type.val)
-    (hel : ∀ ei ∈ s'.elems, ∀ r ∈ ei.elem, Val.HasType s (.ref r) (.ref ei.type)) :
+    (hg : ∀ gi ∈ s'.globals, gi.type.val.Closed 0 ∧ Val.HasType s gi.value gi.type.val)
+    (hel : ∀ ei ∈ s'.elems, (ValType.ref ei.type).Closed 0 ∧
+      ∀ r ∈ ei.elem, Val.HasType s (.ref r) (.ref ei.type)) :
     StoreOK s' := by
-  refine ⟨fun fi hfi => (hf fi hfi).extends he, ?_, hm,
-    fun gi hgi => he.value (hg gi hgi), fun ei hei r hr => he.value (hel ei hei r hr)⟩
-  intro ti hti
-  obtain ⟨hok, hlen, href⟩ := ht ti hti
-  exact ⟨hok, hlen, fun r hr => he.value (href r hr)⟩
+  refine ⟨by rw [htags]; exact h.tags, fun fi hfi => (hf fi hfi).extends he, ?_, hm,
+    fun gi hgi => ⟨(hg gi hgi).1, he.value (hg gi hgi).2⟩,
+    fun ei hei => ⟨(hel ei hei).1, fun r hr => he.value ((hel ei hei).2 r hr)⟩, ?_⟩
+  · intro ti hti
+    obtain ⟨hok, hcl, hlen, href⟩ := ht ti hti
+    exact ⟨hok, hcl, hlen, fun r hr => he.value (href r hr)⟩
+  · intro e hx
+    rw [hexns] at hx
+    obtain ⟨ti, ts, hti, hts, hfs⟩ := h.exns e hx
+    exact ⟨ti, ts, by rw [htags]; exact hti, hts, he.values hfs⟩
 
 theorem StoreOK.setMem {s : Store} (h : StoreOK s) {a : Nat} {m m' : MemInst}
     (ha : s.mems[a]? = some m) (he : m.Extends m') (hm : memTypeOk ⟨m'.pages, m'.max⟩) :
@@ -49,18 +57,18 @@ theorem StoreOK.setMem {s : Store} (h : StoreOK s) {a : Nat} {m m' : MemInst}
   have hs : s.Extends (s.setMem a m') :=
     ⟨hr.1, hr.2.1, listExtends_set mem_extends_refl ha he,
       hr.2.2.2.1, hr.2.2.2.2.1, hr.2.2.2.2.2⟩
-  exact ⟨hs, reassemble hs h.funcs h.tables (forall_set h.mems hm) h.globals h.elems⟩
+  exact ⟨hs, reassemble hs rfl rfl h h.funcs h.tables (forall_set h.mems hm) h.globals h.elems⟩
 
 theorem StoreOK.setTable {s : Store} (h : StoreOK s) {a : Nat} {t t' : TableInst}
     (ha : s.tables[a]? = some t) (he : t.Extends t')
-    (ht : t'.type.Ok ∧ t'.elem.length = t'.type.limits.min ∧
+    (ht : t'.type.Ok ∧ (ValType.ref t'.type.elem).Closed 0 ∧ t'.elem.length = t'.type.limits.min ∧
       ∀ r ∈ t'.elem, Val.HasType s (.ref r) (.ref t'.type.elem)) :
     s.Extends (s.setTable a t') ∧ StoreOK (s.setTable a t') := by
   have hr := Store.Extends.refl s
   have hs : s.Extends (s.setTable a t') :=
     ⟨hr.1, listExtends_set table_extends_refl ha he, hr.2.2.1,
       hr.2.2.2.1, hr.2.2.2.2.1, hr.2.2.2.2.2⟩
-  exact ⟨hs, reassemble hs h.funcs (forall_set h.tables ht) h.mems h.globals h.elems⟩
+  exact ⟨hs, reassemble hs rfl rfl h h.funcs (forall_set h.tables ht) h.mems h.globals h.elems⟩
 
 theorem StoreOK.setGlobal {s : Store} (h : StoreOK s) {a : Nat} {g : GlobalInst} {v : Val}
     (ha : s.globals[a]? = some g) (hmut : g.type.mutability = .var)
@@ -72,7 +80,8 @@ theorem StoreOK.setGlobal {s : Store} (h : StoreOK s) {a : Nat} {g : GlobalInst}
     ⟨hr.1, hr.2.1, hr.2.2.1,
       listExtends_set global_extends_refl ha ⟨rfl, Or.inl hmut⟩,
       hr.2.2.2.2.1, hr.2.2.2.2.2⟩
-  exact ⟨hs, reassemble hs h.funcs h.tables h.mems (forall_set h.globals hv) h.elems⟩
+  exact ⟨hs, reassemble hs rfl rfl h h.funcs h.tables h.mems
+    (forall_set h.globals ⟨(h.globals g (List.mem_of_getElem? ha)).1, hv⟩) h.elems⟩
 
 theorem StoreOK.dropElem {s : Store} (h : StoreOK s) {a : Nat} {e : ElemInst}
     (ha : s.elems[a]? = some e) :
@@ -82,8 +91,8 @@ theorem StoreOK.dropElem {s : Store} (h : StoreOK s) {a : Nat} {e : ElemInst}
   have hs : s.Extends { s with elems := s.elems.set a { e with elem := [] } } :=
     ⟨hr.1, hr.2.1, hr.2.2.1, hr.2.2.2.1,
       listExtends_set elem_extends_refl ha ⟨rfl, Or.inr rfl⟩, hr.2.2.2.2.2⟩
-  exact ⟨hs, reassemble hs h.funcs h.tables h.mems h.globals
-    (forall_set h.elems (by simp))⟩
+  exact ⟨hs, reassemble hs rfl rfl h h.funcs h.tables h.mems h.globals
+    (forall_set h.elems ⟨(h.elems e (List.mem_of_getElem? ha)).1, by simp⟩)⟩
 
 theorem StoreOK.dropData {s : Store} (h : StoreOK s) {a : Nat} {d : DataInst}
     (ha : s.datas[a]? = some d) :
@@ -93,7 +102,7 @@ theorem StoreOK.dropData {s : Store} (h : StoreOK s) {a : Nat} {d : DataInst}
   have hs : s.Extends { s with datas := s.datas.set a { data := [] } } :=
     ⟨hr.1, hr.2.1, hr.2.2.1, hr.2.2.2.1, hr.2.2.2.2.1,
       listExtends_set data_extends_refl ha (Or.inr rfl), hr.2.2.2.2.2.2⟩
-  exact ⟨hs, reassemble hs h.funcs h.tables h.mems h.globals h.elems⟩
+  exact ⟨hs, reassemble hs rfl rfl h h.funcs h.tables h.mems h.globals h.elems⟩
 
 theorem StoreOK.writeMem {s : Store} (h : StoreOK s) {a : Nat} {m : MemInst}
     (ha : s.mems[a]? = some m) (ea k v : Nat) :
@@ -105,10 +114,10 @@ theorem StoreOK.writeTable {s : Store} (h : StoreOK s) {a : Nat} {t : TableInst}
     (hv : Val.HasType s (.ref r) (.ref t.type.elem)) :
     s.Extends (s.setTable a { t with elem := t.elem.set i r }) ∧
       StoreOK (s.setTable a { t with elem := t.elem.set i r }) := by
-  obtain ⟨hok, hlen, href⟩ := h.tables _ (List.mem_of_getElem? ha)
+  obtain ⟨hok, hcl, hlen, href⟩ := h.tables _ (List.mem_of_getElem? ha)
   apply h.setTable ha
   · exact ⟨rfl, rfl, by simp⟩
-  · exact ⟨hok, by simpa only [List.length_set] using hlen, forall_set href hv⟩
+  · exact ⟨hok, hcl, by simpa only [List.length_set] using hlen, forall_set href hv⟩
 
 theorem StoreOK.growMem {s : Store} (h : StoreOK s) {a : Nat} {m m' : MemInst} {n : Nat}
     (ha : s.mems[a]? = some m) (hg : m.grow n = some m') :
@@ -136,7 +145,7 @@ theorem StoreOK.growTable {s : Store} (h : StoreOK s) {a : Nat} {t t' : TableIns
     {n : Nat} {r : Ref} (ha : s.tables[a]? = some t) (hg : t.grow n r = some t')
     (hv : Val.HasType s (.ref r) (.ref t.type.elem)) :
     s.Extends (s.setTable a t') ∧ StoreOK (s.setTable a t') := by
-  obtain ⟨⟨hmin, hmax⟩, hlen, href⟩ := h.tables _ (List.mem_of_getElem? ha)
+  obtain ⟨⟨hmin, hmax⟩, hcl, hlen, href⟩ := h.tables _ (List.mem_of_getElem? ha)
   dsimp only [TableInst.grow] at hg
   split at hg
   · cases hg
@@ -144,7 +153,7 @@ theorem StoreOK.growTable {s : Store} (h : StoreOK s) {a : Nat} {t t' : TableIns
     cases hg
     apply h.setTable ha
     · exact ⟨rfl, rfl, by simp⟩
-    · refine ⟨⟨?_, ?_⟩, by simp, ?_⟩
+    · refine ⟨⟨?_, ?_⟩, hcl, by simp, ?_⟩
       · have hlt : t.elem.length + n < 2 ^ 32 :=
           Nat.lt_of_not_ge (fun hge => hlim (Or.inl hge))
         change t.elem.length + n ≤ 2 ^ 32 - 1
@@ -163,6 +172,31 @@ theorem StoreOK.growTable {s : Store} (h : StoreOK s) {a : Nat} {t t' : TableIns
         · have hvr := List.mem_replicate.mp h_new
           simpa only [hvr.2] using hv
 
+/-- `throw` allocates an exception of an existing tag, its fields typed by the tag's
+parameters. -/
+theorem StoreOK.addExn {s : Store} (h : StoreOK s) {ta : Nat} {ti : TagInst} {ts : List ValType}
+    {vs : List Val} (hti : s.tags[ta]? = some ti) (hts : ti.type.expand = some ⟨ts, []⟩)
+    (hvs : List.Forall₂ (Val.HasType s) vs ts) :
+    s.Extends { s with exns := s.exns ++ [⟨ta, vs⟩] } ∧
+      StoreOK { s with exns := s.exns ++ [⟨ta, vs⟩] } := by
+  have hr := Store.Extends.refl s
+  have hs : s.Extends { s with exns := s.exns ++ [⟨ta, vs⟩] } :=
+    ⟨hr.1, hr.2.1, hr.2.2.1, hr.2.2.2.1, hr.2.2.2.2.1, hr.2.2.2.2.2.1, hr.2.2.2.2.2.2.1,
+      fun i x hx => ⟨x, List.getElem?_append_left (List.getElem?_eq_some_iff.mp hx).1 ▸ hx,
+        rfl⟩⟩
+  refine ⟨hs, h.tags, fun fi hfi => (h.funcs fi hfi).extends hs, ?_, h.mems,
+    fun gi hgi => ⟨(h.globals gi hgi).1, hs.value (h.globals gi hgi).2⟩,
+    fun ei hei => ⟨(h.elems ei hei).1, fun r hr => hs.value ((h.elems ei hei).2 r hr)⟩, ?_⟩
+  · intro ti' hti'
+    obtain ⟨hok, hcl, hlen, href⟩ := h.tables ti' hti'
+    exact ⟨hok, hcl, hlen, fun r hr => hs.value (href r hr)⟩
+  · intro e he
+    rcases List.mem_append.mp he with he | he
+    · obtain ⟨ti', ts', hti', hts', hfs⟩ := h.exns e he
+      exact ⟨ti', ts', hti', hts', hs.values hfs⟩
+    · rw [List.mem_singleton.mp he]
+      exact ⟨ti, ts, hti, hts, hs.values hvs⟩
+
 theorem forall₂_set_left {α β : Type} {R : α → β → Prop} {xs : List α} {ys : List β}
     (h : List.Forall₂ R xs ys) {i : Nat} {x : α} {y : β} (hy : ys[i]? = some y)
     (hx : R x y) : List.Forall₂ R (xs.set i x) ys := by
@@ -176,11 +210,47 @@ theorem forall₂_set_left {α β : Type} {R : α → β → Prop} {xs : List α
       exact .cons hx hs
     | succ i => exact .cons hab (ih hy)
 
+theorem forall₂_set {α β : Type} {R : α → β → Prop} {xs : List α} {ys : List β}
+    (h : List.Forall₂ R xs ys) (i : Nat) {x : α} {y : β} (hr : R x y) :
+    List.Forall₂ R (xs.set i x) (ys.set i y) := by
+  induction h generalizing i with
+  | nil => exact .nil
+  | cons hab hs ih =>
+    cases i with
+    | zero => exact .cons hr hs
+    | succ i => exact .cons hab (ih i)
+
+/-- `local.set x`: the frame holds `v` at `x`, the local now set; the context after the write
+reads every local the context with `x` initialized did. -/
 theorem FrameCtx.setLocal {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
-    {x : Nat} {t : ValType} {v : Val} (hx : localAt C.locals x = some t)
-    (hv : v.HasType s t) : FrameCtx s { f with locals := f.locals.set x (some v) } C := by
-  obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, hvs, rfl⟩, rfl⟩ := h
-  refine ⟨_, ls, ret, ⟨C₁, ts, hi, ?_, rfl⟩, rfl⟩
-  exact forall₂_set_left hvs ((localAt_singletons ts x).symm.trans hx) ⟨v, rfl, hv⟩
+    {x : Nat} {lt : LocalType} {v : Val} (hx : localAt C.locals x = some lt)
+    (hv : v.HasType s lt.type) :
+    ∃ C', FrameCtx s { f with locals := f.locals.set x (some v) } C' ∧
+      (C.addSets [x]).Entails C' := by
+  obtain ⟨C₀, ls, ret, ⟨C₁, lts, hi, hvs, rfl⟩, rfl⟩ := h
+  have hx' : lts[x]? = some lt := (localAt_singletons lts x).symm.trans hx
+  obtain ⟨ov, hov, hl⟩ := forall₂_lookup_right hvs hx'
+  have hcl : lt.type.Closed 0 := by cases ov <;> simp_all [LocalOK]
+  let lts' := lts.set x ⟨true, lt.type⟩
+  refine ⟨{ C₁ with locals := lts'.map (1, ·), labels := ls, return_ := ret },
+    ⟨_, ls, ret, ⟨C₁, lts', hi, forall₂_set hvs x ⟨rfl, hcl, hv⟩, rfl⟩, rfl⟩, ?_⟩
+  refine ⟨rfl, rfl, rfl, fun _ tt h => ⟨tt, h, rfl⟩, fun _ lim h => ⟨lim, h⟩, rfl, rfl,
+    Nat.le_refl _, ?_, rfl, rfl, fun _ h => h, fun hd => hd⟩
+  intro y lty hy
+  simp only [Context.addSets, List.reverse_cons, List.reverse_nil, List.nil_append,
+    List.singleton_append, List.mem_cons, hi.noSets, hi.noDead, List.not_mem_nil, or_false,
+    Bool.false_eq_true] at hy ⊢
+  rw [localAt_singletons] at hy ⊢
+  by_cases hxy : y = x
+  · subst hxy
+    rw [hx'] at hy
+    cases hy
+    exact ⟨⟨true, lt.type⟩,
+      by simp [lts', List.getElem?_set_self (List.getElem?_eq_some_iff.mp hx').1],
+      rfl, fun _ => rfl⟩
+  · refine ⟨lty, by simp [lts', List.getElem?_set_ne (Ne.symm hxy), hy], rfl, ?_⟩
+    rintro (h' | h')
+    · exact h'
+    · exact absurd h' hxy
 
 end FVA.Wasm.Valid

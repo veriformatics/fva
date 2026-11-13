@@ -1,4 +1,10 @@
 script	line	type	c2	rows
+constants.wast	3	module	pass	-
+constants.wast	22	assert_return	pass	V5.global-prefix
+constants.wast	23	assert_return	pass	V5.global-prefix
+constants.wast	24	assert_return	pass	V5.global-prefix
+constants.wast	25	assert_return	pass	V5.segment-globals
+constants.wast	26	assert_return	pass	V5.segment-globals
 contexts.wast	2	module	pass	-
 contexts.wast	52	assert_return	pass	S1.outside-label
 contexts.wast	53	assert_return	pass	S1.br-skips-handler

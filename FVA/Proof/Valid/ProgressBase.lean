@@ -1,4 +1,4 @@
-import FVA.Proof.Valid.Call
+import FVA.Proof.Valid.Exception
 
 namespace FVA.Wasm.Valid
 
@@ -15,6 +15,13 @@ inductive FragmentProgress (H : HostSem) (s : Store) (f : Frame) (C : Context) :
   | return_ {k : Nat} {vs : List Val} {ts : List ValType} (L : BlockCtx k)
       (ht : C.return_ = some ts) (hlen : vs.length = ts.length) :
       FragmentProgress H s f C (L.fill (vals vs ++ [.plain .return_]))
+  | returnInvoke {k a : Nat} {vs : List Val} {ts : List ValType} {fn : FuncInst}
+      {ft : FuncType} (L : BlockCtx k) (ht : C.return_ = some ts)
+      (hfn : s.funcs[a]? = some fn) (hft : fn.type.expand = some ft)
+      (hlen : vs.length = ft.params.length) :
+      FragmentProgress H s f C (L.fill (vals vs ++ [.returnInvoke a]))
+  /-- An exception in flight, unwound to the fragment's top. -/
+  | throwing (a : Nat) : FragmentProgress H s f C (throwing a)
   | step {es : List AInstr} {c' : Config} (h : Step H ⟨s, f, es⟩ c') :
       FragmentProgress H s f C es
 
@@ -54,6 +61,15 @@ theorem FragmentProgress.prepend {H : HostSem} {s : Store} {f : Frame} {C : Cont
   | return_ L ht hlen =>
     simpa only [surround_fill, List.append_nil] using
       FragmentProgress.return_ (H := H) (s := s) (f := f) (surround L pre []) ht hlen
+  | returnInvoke L ht hfn hft hlen =>
+    simpa only [surround_fill, List.append_nil] using
+      FragmentProgress.returnInvoke (H := H) (s := s) (f := f) (surround L pre []) ht hfn hft hlen
+  | throwing a =>
+    by_cases hp : pre = []
+    · subst pre; exact .throwing a
+    · simpa only [List.append_nil] using FragmentProgress.step (C := C)
+        (StepP.throwRefInstrs (H := H) (s := s) (f := f) (a := a) (vs := pre) (rest := [])
+          (.inl hp))
   | step hs =>
     simpa only [List.append_nil] using FragmentProgress.step (C := C)
       (StepP.seq (vs := pre) (rest := []) hs)
@@ -81,6 +97,18 @@ theorem FragmentProgress.append_or_values {H : HostSem} {s : Store} {f : Frame}
     right
     simpa only [surround_fill, List.map_nil, List.nil_append] using
       FragmentProgress.return_ (H := H) (s := s) (f := f) (surround L [] post) ht hlen
+  | returnInvoke L ht hfn hft hlen =>
+    right
+    simpa only [surround_fill, List.map_nil, List.nil_append] using
+      FragmentProgress.returnInvoke (H := H) (s := s) (f := f) (surround L [] post) ht hfn hft
+        hlen
+  | throwing a =>
+    right
+    by_cases hp : post = []
+    · subst post; simpa only [List.append_nil] using FragmentProgress.throwing a
+    · simpa only [List.map_nil, List.nil_append] using FragmentProgress.step (C := C)
+        (StepP.throwRefInstrs (H := H) (s := s) (f := f) (a := a) (vs := []) (rest := post)
+          (.inr hp))
   | step hs =>
     right
     exact .step (.seq (vs := []) (rest := post) hs)
@@ -91,13 +119,13 @@ theorem typed_matches {s : Store} {vs : List Val} {a b : List OpType}
   induction h generalizing b with
   | nil => cases hm; exact .nil
   | @cons v t vs ts hv hs ih =>
-    cases hm with | cons ht hts =>
+    cases hm with | @cons _ u _ _ ht hts =>
       cases t with
-      | bot => cases hv
+      | bot | refBot => cases hv
       | val t =>
-        have he := OpType.Matches.of_val ht
-        subst he
-        exact .cons hv (ih hts)
+        cases u with
+        | bot | refBot => cases ht
+        | val u => exact .cons (Val.HasType.sub hv ht) (ih hts)
 
 theorem typed_split {s : Store} {vs : List Val} {a b : List OpType}
     (h : List.Forall₂ (HasOpType s) vs (a ++ b)) :
@@ -112,25 +140,38 @@ theorem ASeqT.values_op {s : Store} {C : Context} {vs : List Val} {ts : List OpT
   | nil => exact .nil
   | @cons v t vs ts hv hs ih =>
     simpa only [List.append_nil, List.singleton_append, List.map_cons] using
-      (ASeqT.hasOp_value hv).append (ih.frame [t])
+      (ASeqT.hasOp_value hv).append_pure (ih.frame [t]) (by simp [↓Val.instr_sets'])
+        (by simp [↓Val.instr_dead'])
 
 theorem ASeqT.values_typed {s : Store} {C : Context} {vs : List Val} {ts : List OpType}
     (h : ASeqT s C (vals vs) ⟨[], ts⟩) : List.Forall₂ (HasOpType s) vs ts := by
   obtain ⟨vts, hm, hv⟩ := h.values_inv
   exact typed_matches (hasOp_ops hv) hm
 
+/-- The last instruction of a sequence is typed after its prefix (`C.after es`); it is the
+redex only once the prefix has reduced to values, which leave the context unchanged. -/
 theorem progress_snoc {H : HostSem} {s : Store} {f : Frame} {C : Context}
     {vs : List Val} {es : List AInstr} {e : AInstr} {a p x y : List OpType}
-    (hs : ASeqT s C es ⟨a, p ++ x⟩) (hm : Matches x y)
+    (hf : FrameCtx s f C) (hs : ASeqT s C es ⟨a, p ++ x⟩) (hm : Matches x y)
     (hvs : List.Forall₂ (HasOpType s) vs a)
     (hp : FragmentProgress H s f C (vals vs ++ es))
-    (hi : ∀ args, List.Forall₂ (HasOpType s) args y →
-      FragmentProgress H s f C (vals args ++ [e])) :
+    (hi : FrameCtx s f (C.after es) → ∀ args, List.Forall₂ (HasOpType s) args y →
+      FragmentProgress H s f (C.after es) (vals args ++ [e])) :
     FragmentProgress H s f C (vals vs ++ (es ++ [e])) := by
   rcases hp.append_or_values [e] with ⟨ws, heq⟩ | hp'
-  · have hws : ASeqT s C (vals ws) ⟨[], p ++ x⟩ := by
+  · have hes : es = vals (ws.drop vs.length) := by
+      have h1 : (vals vs ++ es).drop vs.length = es := List.drop_left' (by simp)
+      rw [heq] at h1
+      rw [← h1]
+      simp
+    have hC : C.after es = C := by
+      rw [hes]
+      exact ASeqT.after_pure C (ASeqT.vals_sets' _) (ASeqT.vals_dead' _)
+    rw [hC] at hi
+    have hi := hi hf
+    have hws : ASeqT s C (vals ws) ⟨[], p ++ x⟩ := by
       rw [← heq]
-      exact (ASeqT.values_op hvs).append hs
+      exact (ASeqT.values_op hvs).append_pure hs (ASeqT.vals_sets' vs) (ASeqT.vals_dead' vs)
     have hargs := typed_matches hws.values_typed ((Matches.refl p).append hm)
     obtain ⟨pre, args, hsplit, _, harg⟩ := typed_split hargs
     rw [← List.append_assoc, heq, hsplit]

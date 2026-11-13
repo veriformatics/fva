@@ -11,50 +11,12 @@ earlier type or a member of its own group), unrolling (`DefType.expand`) keeps t
 instantiation enters only closed types into the store and the instance (`allocModule_closed`)
 when the source annotations name existing types. The identities consumers use: closure is the
 identity on closed terms, and a singleton group whose member names no group member expands to that
-member. U28c's validator supplies the source premises (`Module.SourceOK`).
+member. Module validity supplies the source premises (`ModuleValid.sourceOK`).
 -/
 
 namespace FVA.Wasm
 
 open Exec
-
-mutual
-/-- A heap type closed under a binder of `n` group members. -/
-def HeapType.Closed (n : Nat) : HeapType → Prop
-  | .abs _ => True
-  | .idx _ => False
-  | .def_ d => DefType.Closed d
-  | .rec_ i => i < n
-  termination_by structural h => h
-/-- A reference type closed under `n` group members. -/
-def RefType.Closed (n : Nat) : RefType → Prop
-  | ⟨_, h⟩ => HeapType.Closed n h
-  termination_by structural t => t
-/-- A value type closed under `n` group members. -/
-def ValType.Closed (n : Nat) : ValType → Prop
-  | .num _ => True
-  | .ref t => RefType.Closed n t
-  termination_by structural t => t
-/-- Value types closed under `n` group members. -/
-def ValType.ClosedAll (n : Nat) : List ValType → Prop
-  | [] => True
-  | t :: ts => ValType.Closed n t ∧ ValType.ClosedAll n ts
-  termination_by structural ts => ts
-/-- A function type closed under `n` group members. -/
-def FuncType.Closed (n : Nat) : FuncType → Prop
-  | ⟨ps, rs⟩ => ValType.ClosedAll n ps ∧ ValType.ClosedAll n rs
-  termination_by structural f => f
-/-- Function types closed under `n` group members. -/
-def FuncType.ClosedAll (n : Nat) : List FuncType → Prop
-  | [] => True
-  | f :: fs => FuncType.Closed n f ∧ FuncType.ClosedAll n fs
-  termination_by structural fs => fs
-/-- A closed well-formed defined type: its group closed under its own binder, its projection in
-bounds. -/
-def DefType.Closed : DefType → Prop
-  | ⟨g, i⟩ => FuncType.ClosedAll g.length g ∧ i < g.length
-  termination_by structural d => d
-end
 
 theorem ValType.closedAll_iff {n : Nat} : ∀ {ts : List ValType},
     ValType.ClosedAll n ts ↔ ∀ t ∈ ts, t.Closed n
@@ -169,21 +131,6 @@ theorem not_closed_rec_out_of_group :
 
 /-! ## Closure -/
 
-/-- A source heap type naming one of the first `k` types: abstract or an index below `k`. -/
-def HeapType.Src (k : Nat) : HeapType → Prop
-  | .abs _ => True
-  | .idx y => y < k
-  | _ => False
-
-/-- A source value type naming one of the first `k` types. -/
-def ValType.Src (k : Nat) : ValType → Prop
-  | .num _ => True
-  | .ref t => t.heap.Src k
-
-/-- A source function type naming one of the first `k` types. -/
-def FuncType.Src (k : Nat) (f : FuncType) : Prop :=
-  (∀ t ∈ f.params, t.Src k) ∧ ∀ t ∈ f.results, t.Src k
-
 theorem ValType.closed_mapHeap_src {k n : Nat} {σ : HeapType → HeapType}
     (hσ : ∀ h, h.Src k → (σ h).Closed n) {t : ValType} (ht : t.Src k) :
     (t.mapHeap σ).Closed n := by
@@ -246,12 +193,6 @@ theorem closed_rollHeap {dts : List DefType} (hd : ∀ d ∈ dts, d.Closed) {n :
     · rename_i hy
       exact closed_closeHeap hd (by simp only [HeapType.Src]; omega)
   | _ => exact absurd hh (by simp [HeapType.Src])
-
-/-- Sequentially valid source groups (SpecTec `2.4`): each group's types name earlier types or
-members of the group. -/
-def TypesSeq : List RecType → Nat → Prop
-  | [], _ => True
-  | g :: gs, x => (∀ f ∈ g, f.Src (x + g.length)) ∧ TypesSeq gs (x + g.length)
 
 theorem defTypes_step_eq (dts : List DefType) (g : RecType) :
     (let roll : HeapType → HeapType

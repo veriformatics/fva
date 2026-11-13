@@ -51,15 +51,17 @@ it). -/
 def invokeConfig (s : Store) (a : Nat) (args : List Val) : Config :=
   ⟨s, ⟨[], {}⟩, vals args ++ [.invoke a]⟩
 
-/-- `S ⊢ val : t` (appendix "Soundness", values): numbers by type, null at every nullable
-reference type (2.0's typing until U28c), a function reference to an existing function, any
-external reference, a reference to an existing exception. -/
+/-- `S ⊢ val : t` (3.0 `Val_ok`, `Ref_ok` + `/sub`): numbers by type; null at every nullable
+reference type; a function reference at every reference type above its function's defined type
+(`(ref dt)`, `(ref func)`, their nullable forms); an external reference at `(ref null? extern)`;
+a reference to an existing exception at `(ref null? exn)`. -/
 def Val.HasType (s : Store) : Val → ValType → Prop
   | .i32 _, .num .i32 | .i64 _, .num .i64 | .f32 _, .num .f32 | .f64 _, .num .f64 => True
   | .ref .null, .ref t => t.null = true
-  | .ref (.func a), .ref .funcref => a < s.funcs.length
-  | .ref (.extern _), .ref .externref => True
-  | .ref (.exn a), .ref .exnref => a < s.exns.length
+  | .ref (.func a), .ref t => ∃ fi, s.funcs[a]? = some fi ∧
+      ValType.Sub (.ref ⟨false, .def_ fi.type⟩) (.ref t)
+  | .ref (.extern _), .ref t => t.heap = .abs .extern
+  | .ref (.exn a), .ref t => a < s.exns.length ∧ t.heap = .abs .exn
   | _, _ => False
 
 /-- The invocation of `a` on `args` is defined (§4.5.5): `a` is a function address and the

@@ -7,12 +7,14 @@ open FVA.Wasm FVA.Wasm.Exec
 theorem declaredRefs_bound {m : Module} (hv : ModuleValid m) {x : Nat}
     (hx : x ∈ declaredRefs m) : x < (moduleContext m).funcs.length := by
   simp only [declaredRefs, List.mem_append, List.mem_flatMap] at hx
-  rcases hx with (⟨g, hg, hx⟩ | ⟨e, he, hx⟩) | hx
-  · exact refFunc_bound (hv.globals g hg).1 hx
+  rcases hx with ((⟨g, hg, hx⟩ | ⟨t, ht, hx⟩) | ⟨e, he, hx⟩) | hx
+  · obtain ⟨k, hk⟩ := List.mem_iff_getElem?.mp hg
+    exact refFunc_bound (hv.globals k g hk).2.1 hx
+  · exact refFunc_bound (hv.tables t ht).2.2.1 hx
   · rcases hx with hx | hx
     · obtain ⟨ex, hex, hx⟩ := hx
-      exact refFunc_bound ((hv.elems e he).1 ex hex).1 hx
-    · have hm := (hv.elems e he).2
+      exact refFunc_bound ((hv.elems e he).2.1 ex hex).1 hx
+    · have hm := (hv.elems e he).2.2
       cases heq : e.mode with
       | passive | declarative => simp [heq] at hx
       | active table off =>
@@ -45,7 +47,7 @@ theorem alloc_exports {s : Store} {m : Module} {imports : List ExternVal}
       (fun _ _ ⟨fi, hfi, _⟩ => lookup_lt hfi) (by simpa [hd, ExportDesc.Ok] using hv')
     simpa only [allocModule, ExternValT, hd] using hb
   | table x =>
-    have hb := address_bound (alloc_tables hv hm gvals trefs erefs ht)
+    have hb := address_bound (alloc_tables hm gvals trefs erefs ht)
       (fun _ _ ⟨ti, hti, _⟩ => lookup_lt hti) (by simpa [hd, ExportDesc.Ok] using hv')
     simpa only [allocModule, ExternValT, hd] using hb
   | mem x =>
@@ -53,10 +55,13 @@ theorem alloc_exports {s : Store} {m : Module} {imports : List ExternVal}
       (fun _ _ ⟨mi, hmi⟩ => lookup_lt hmi) (by simpa [hd, ExportDesc.Ok] using hv')
     simpa only [allocModule, ExternValT, hd] using hb
   | global x =>
-    have hb := address_bound (alloc_globals hv hm gvals trefs erefs hg)
+    have hb := address_bound (alloc_globals hm gvals trefs erefs hg)
       (fun _ _ ⟨gi, hgi, _⟩ => lookup_lt hgi) (by simpa [hd, ExportDesc.Ok] using hv')
     simpa only [allocModule, ExternValT, hd] using hb
-  | tag x => simp [hd, ExportDesc.Ok] at hv'
+  | tag x =>
+    have hb := address_bound (alloc_tags hv hm gvals trefs erefs)
+      (fun _ _ ⟨ti, hti, _⟩ => lookup_lt hti) (by simpa [hd, ExportDesc.Ok] using hv')
+    simpa only [allocModule, ExternValT, hd] using hb
 
 /-- Allocation metadata supplies an instance context before initializer values are proved
 well typed; imported table and memory minima use their actual current sizes. -/
@@ -69,12 +74,13 @@ theorem alloc_instance {s : Store} {m : Module} {imports : List ExternVal}
   let s₁ := (allocModule s m imports gvals trefs erefs).1
   let inst := (allocModule s m imports gvals trefs erefs).2
   have hfuncs := alloc_funcs hv hm gvals trefs erefs
-  have hglobals := alloc_globals hv hm gvals trefs erefs hg
-  have helems := alloc_elems (s := s) (imports := imports) hv gvals trefs erefs he
+  have htags := alloc_tags hv hm gvals trefs erefs
+  have hglobals := alloc_globals hm gvals trefs erefs hg
+  have helems := alloc_elems (s := s) (imports := imports) gvals trefs erefs he
   obtain ⟨tables, ht, hshape⟩ := forall₂_exists_right
     (S := fun a tt => ∃ ti, s₁.tables[a]? = some ti ∧ ti.type = tt)
     (T := fun tt tt' : TableType => tt'.elem = tt.elem)
-    (alloc_tables hv hm gvals trefs erefs htl) (by
+    (alloc_tables hm gvals trefs erefs htl) (by
       rintro a tt ⟨ti, hti, he⟩
       exact ⟨ti.type, ⟨ti, hti, rfl⟩, he⟩)
   obtain ⟨mems, hm', _⟩ := forall₂_exists_right
@@ -90,8 +96,8 @@ theorem alloc_instance {s : Store} {m : Module} {imports : List ExternVal}
   have hmem_len : (moduleContext m).mems.length = mems.length :=
     (alloc_mems hm gvals trefs erefs).length_eq.symm.trans hm'.length_eq
   refine ⟨C, ?_, ?_⟩
-  · refine ⟨forall₂_defTypes (Module.inP2_spec hv.profile).types, hfuncs, ht, hm', hglobals,
-      helems, ?_, ?_, ?_, rfl, rfl, rfl, rfl⟩
+  · refine ⟨rfl, defTypes_closed hv.types, htags, hfuncs, ht, hm', hglobals,
+      helems, ?_, ?_, ?_, rfl, rfl, rfl, rfl, rfl, rfl⟩
     · constructor
       · simp [C, allocModule, moduleContext]
       · intro a ha
@@ -103,8 +109,8 @@ theorem alloc_instance {s : Store} {m : Module} {imports : List ExternVal}
         omega
     · exact alloc_exports hv hm gvals trefs erefs hg htl
     · simpa only [allocModule, List.map_map, Function.comp_def] using hv.exportNames
-  · refine ⟨rfl, rfl, ?_, ?_, rfl, rfl, Nat.le_refl _, fun _ => rfl,
-      rfl, rfl, ?_⟩
+  · refine ⟨rfl, rfl, rfl, ?_, ?_, rfl, rfl, Nat.le_refl _, fun _ lt h => ⟨lt, h, rfl, id⟩,
+      rfl, rfl, ?_, id⟩
     · intro x tt hx
       exact forall₂_lookup_left hshape hx
     · intro x lim hx
