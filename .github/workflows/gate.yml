@@ -1,5 +1,6 @@
 # The full gate (scripts/gate) as a CI fan-out (D32): one build, then one job per gate group
-# (`scripts/gate --groups`); together the groups cover every step, which a full local run checks.
+# (`scripts/gate --groups`; subjects-K = shard K of the subjects step); together the jobs cover
+# every step, which a full local run checks.
 # Mathlib oleans come from its cache, never a rebuild. `ci/**` pushes = an agent's full gate, except
 # `ci/fuzz-*` (a fuzz campaign, fuzz.yml) and `ci/mut-*` (mutation shards, mutation.yml).
 name: gate
@@ -43,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [lean, trust, init, subjects, static]
+        group: [lean, trust, init, subjects-1, subjects-2, subjects-3, static]
     steps:
       # The runner image leaves ≈ 2 GB free once the Mathlib cache and the build are restored; the
       # init lane's fva init project (vendored FVA, hard-linked Mathlib, its own build) ran the
@@ -75,22 +76,22 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       # D79: subjects reuse the verdicts of main's latest green subjects run (scripts/subject-matrix
       # still keys each entry by its input closure); main pushes alone save the cache, so a ci/** or
-      # PR run reads it and never writes it
+      # PR run reads it and never writes it; each shard keeps its own
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: matrix.group == 'subjects'
+        if: startsWith(matrix.group, 'subjects-')
         with:
           path: .cache/subjects
-          key: fva-subjects-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: fva-subjects-
+          key: fva-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: fva-${{ matrix.group }}-
       - name: Gate
         env:
           GROUP: ${{ matrix.group }}
         run: df -h / && scripts/gate --group "$GROUP"
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: matrix.group == 'subjects' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: startsWith(matrix.group, 'subjects-') && github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           path: .cache/subjects
-          key: fva-subjects-${{ github.run_id }}-${{ github.run_attempt }}
+          key: fva-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
       # free space after the run (the lean lane's parallel steps write the most)
       - name: Disk
         if: always()

@@ -3,7 +3,8 @@
 # scripts/test-mutation-fixture, the subject matrix via scripts/test-subject-matrix, the
 # characterization comparator + trace join via scripts/test-char-fixture): each must fail.
 # Also the gate's step ledger (scripts/gate-ledger): a red step's row, its classification, the summary;
-# and the full gate's CI-group coverage, over a stubbed copy of scripts/gate.
+# and the full gate's CI-group coverage, over a stubbed copy of scripts/gate; and test-subjects'
+# shard map (the subjects CI fan-out).
 # Also the bench grading batteries (bench/grade/check-drivers, check-fidelity) over neutered drivers.
 # Runs on a throwaway copy so the working tree is never touched.
 set -uo pipefail
@@ -261,6 +262,53 @@ if ((rc != 1)) || ! grep -q "gate.yml's matrix misses group static" "$d/out"; th
 	echo "test-checks: gate.yml's matrix without the static group → rc $rc, want 1 naming it"
 	fail=1
 fi
+cp "$d/gate" "$d/scripts/gate" && gate_copy 's/, subjects-2,/,/'
+rc=$?
+if ((rc != 1)) || ! grep -q "gate.yml's matrix misses group subjects-2" "$d/out"; then
+	echo "test-checks: gate.yml's matrix without the subjects-2 shard → rc $rc, want 1 naming it"
+	fail=1
+fi
+# subjects CI fan-out: test-subjects' shards (--list) partition its checks, and its shard map fails
+# closed before any fetch (rc 2); a copy whose stub fetch-canaries marks a run past the map
+d=$tmp/shards && mkdir -p "$d/scripts" && cp scripts/test-subjects "$d/" &&
+	printf '#!/bin/sh\necho fetch-reached\nexit 2\n' >"$d/scripts/fetch-canaries" &&
+	chmod +x "$d/scripts/fetch-canaries" || exit 2
+n=$(sed -n 's/^subject_shards=\([1-9][0-9]*\)$/\1/p' scripts/gate) all='' parts=''
+[[ -n $n ]] || {
+	echo "test-checks: scripts/gate sets no subject_shards"
+	n=1 fail=1
+}
+cp "$d/test-subjects" "$d/scripts/" && all=$("$d/scripts/test-subjects" --shard "all/$n" --list) &&
+	parts=$(for ((k = 1; k <= n; k++)); do "$d/scripts/test-subjects" --shard "$k/$n" --list || echo "rc $?"; done)
+if [[ -z $all || $(sort <<<"$parts") != "$(sort <<<"$all")" ]]; then
+	echo "test-checks: test-subjects' $n shards do not partition its checks (each exactly once)"
+	fail=1
+fi
+"$d/scripts/test-subjects" --shard "1/$n" >"$d/out" 2>&1
+rc=$?
+if ((rc != 2)) || ! grep -qx fetch-reached "$d/out"; then
+	echo "test-checks: test-subjects --shard 1/$n → rc $rc without the stub fetch's marker, want the map passed + the stub's rc 2"
+	fail=1
+fi
+shard_plant() { # label sed-edit shard → rc 2, a shard message, no fetch
+	cp "$d/test-subjects" "$d/scripts/" && sed -i "$2" "$d/scripts/test-subjects" || exit 2
+	if [[ -n $2 ]] && cmp -s "$d/test-subjects" "$d/scripts/test-subjects"; then
+		echo "test-checks: shard plant '$1' changed nothing"
+		fail=1
+	fi
+	"$d/scripts/test-subjects" --shard "$3" >"$d/out" 2>&1
+	local rc=$?
+	if ((rc != 2)) || ! grep -q '^test-subjects: .*shard' "$d/out" || grep -qx fetch-reached "$d/out"; then
+		echo "test-checks: test-subjects with $1 → rc $rc, want 2 + a shard message before any fetch"
+		fail=1
+	fi
+}
+shard_plant "a directory without a shard" '/^\t\[Tmm\]=/d' "1/$n"
+shard_plant "a directory past shard N" "s/^\t\[Tmm\]=.*/\t[Tmm]=$((n + 1))/" "1/$n"
+shard_plant "a shard holding no directory" '' "1/$((n + 1))"
+shard_plant "a map entry owning no check" 's/^declare -A shard=($/&\n\t[Elsewhere]=1/' "1/$n"
+shard_plant "shard 0" '' "0/$n"
+shard_plant "shard N + 1" '' "$((n + 1))/$n"
 # test-accept (merged acceptance checks) over a stub suite printing canned lines: each listed ID
 # prints `ok ID` exactly once, an `ID HOST` row off HOST its `pending ID:` line; suite setup → rc 2
 # shellcheck disable=SC2016 # the stub expands its own variables

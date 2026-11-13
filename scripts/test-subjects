@@ -3,9 +3,10 @@
 # is `fva trust` PASS with its review surface pinned, claims about the lifted subject (link check
 # against the subject's .wasm: FVA's own committed, a third-party one fetched); each FVATest/Subjects/<Subj>/Neg/* module must fail to build (a
 # mutated expected byte or weakened spec clause). rc 0 = all as pinned.
+# --shard K/N = the checks of the directories `shard` maps to K (all = every one) of the gate's N
+# (scripts/gate: CI job subjects-K); --list prints them and exits.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
-scripts/fetch-canaries || exit 2
 fva=.lake/build/bin/fva
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -42,6 +43,85 @@ proofs=(FVATest.Subjects.Lz4C.ExtDirect FVATest.Subjects.Lz4C.ExtRefine
 negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
 	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same FVATest.Subjects.Tmm.Neg.Exact)
 
+# CI fan-out: each directory's rows, proof roots, negatives + own checks (`blocks`, guarded by
+# `block`) run in one shard; the map fails closed before any fetch (rc 2): a directory without a
+# shard or owning no check, a shard outside 1..N or holding no directory
+declare -A shard=(
+	[EdgerCpm]=1
+	[GlmCall]=2
+	[GlmIround]=2
+	[Tmm]=2
+	[Lz4C]=3
+	[Lz4Wasm]=3
+)
+blocks=(GlmCall)
+k=all n='' list=0
+while (($#)); do
+	case $1 in
+	--shard)
+		[[ ${2:-} =~ ^(all|[1-9][0-9]*)/([1-9][0-9]*)$ ]] || {
+			echo "test-subjects: --shard K/N, K = 1..N or all (got '${2:-}')"
+			exit 2
+		}
+		k=${BASH_REMATCH[1]} n=${BASH_REMATCH[2]}
+		shift 2
+		;;
+	--list)
+		list=1
+		shift
+		;;
+	*)
+		echo "test-subjects: unknown argument '$1' (--shard K/N, --list)"
+		exit 2
+		;;
+	esac
+done
+bad() {
+	echo "test-subjects: shard map: $*"
+	exit 2
+}
+dir_of() { # FVATest.Subjects.<dir>[.…] → <dir>
+	local m=${1#FVATest.Subjects.}
+	echo "${m%%.*}"
+}
+declare -A owns=() held=()
+for s in "${subjects[@]}"; do owns[$(dir_of "${s%% *}")]=1; done
+for m in "${proofs[@]}" "${negs[@]}"; do owns[$(dir_of "$m")]=1; done
+for d in "${blocks[@]}"; do owns[$d]=1; done
+for d in "${!owns[@]}"; do [[ -n ${shard[$d]:-} ]] || bad "$d has no shard"; done
+top=0
+for d in "${!shard[@]}"; do
+	[[ -n ${owns[$d]:-} ]] || bad "$d owns no check"
+	[[ ${shard[$d]} =~ ^[1-9][0-9]*$ ]] || bad "$d → '${shard[$d]}', want 1..N"
+	held[${shard[$d]}]+=" $d"
+	((shard[$d] > top)) && top=${shard[$d]}
+done
+n=${n:-$top}
+((top <= n)) || bad "${held[$top]# } → shard $top of $n"
+[[ $k == all ]] || ((k <= n)) || bad "no shard $k of $n"
+for ((s = 1; s <= n; s++)); do [[ -n ${held[$s]:-} ]] || bad "shard $s of $n holds no directory"; done
+in_shard() { [[ $k == all || ${shard[$1]} == "$k" ]]; }
+block() { # DIR → its own check runs in this shard (DIR listed in blocks)
+	[[ " ${blocks[*]} " == *" $1 "* ]] || bad "block $1 is not in blocks"
+	in_shard "$1"
+}
+keep=()
+for s in "${subjects[@]}"; do in_shard "$(dir_of "${s%% *}")" && keep+=("$s"); done
+subjects=("${keep[@]}") keep=()
+for m in "${proofs[@]}"; do in_shard "$(dir_of "$m")" && keep+=("$m"); done
+proofs=("${keep[@]}") keep=()
+for m in "${negs[@]}"; do in_shard "$(dir_of "$m")" && keep+=("$m"); done
+negs=("${keep[@]}")
+if ((list)); then
+	for s in "${subjects[@]}"; do echo "row ${s%% *}"; done
+	for m in "${proofs[@]}"; do echo "proof $m"; done
+	for m in "${negs[@]}"; do echo "neg $m"; done
+	for d in "${blocks[@]}"; do in_shard "$d" && echo "block $d"; done
+	exit 0
+fi
+echo "test-subjects: shard $k of $n:$(for d in "${!shard[@]}"; do in_shard "$d" && echo " $d"; done | sort | tr -d '\n')"
+scripts/fetch-canaries || exit 2
+
 # third-party subjects (Decisions: Repository contents) are fetched + lifted here, never committed:
 # scripts/fetch-subjects places each binary, `fva lift` writes its Lifted module (rewritten only
 # when its bytes change, so an unchanged module keeps Lake's trace)
@@ -59,19 +139,21 @@ for lift in EdgerCpm/edgeR.so:EdgerCpm Lz4Wasm/lz4-block-codec.wasm:Lz4Wasm Lz4C
 done
 
 # D55: the GlmCall subject is `fva call`'s output for T7's input, byte for byte
-c=$tmp/call/FVATest/Subjects
-mkdir -p "$c/GlmIround" && cp FVATest/Subjects/GlmIround/{Lifted.lean,glm-iround.wasm} "$c/GlmIround/" ||
-	exit 2
-(cd "$tmp/call" && "$OLDPWD/$fva" call FVATest/Subjects/GlmIround/Lifted.lean iround \
-	f64:0x3fdfffffffffffff --spec FVATest/Subjects/GlmCall/Spec.lean \
-	--proof FVATest/Subjects/GlmCall/Proof.lean --name iroundBelowHalf --ns Subjects.GlmCall) \
-	>/dev/null || exit 2
-for f in Spec Proof; do
-	if ! cmp -s "$c/GlmCall/$f.lean" "FVATest/Subjects/GlmCall/$f.lean"; then
-		echo "test-subjects: FVATest/Subjects/GlmCall/$f.lean is not fva call's output (regenerate it)"
-		fail=1
-	fi
-done
+if block GlmCall; then
+	c=$tmp/call/FVATest/Subjects
+	mkdir -p "$c/GlmIround" && cp FVATest/Subjects/GlmIround/{Lifted.lean,glm-iround.wasm} "$c/GlmIround/" ||
+		exit 2
+	(cd "$tmp/call" && "$OLDPWD/$fva" call FVATest/Subjects/GlmIround/Lifted.lean iround \
+		f64:0x3fdfffffffffffff --spec FVATest/Subjects/GlmCall/Spec.lean \
+		--proof FVATest/Subjects/GlmCall/Proof.lean --name iroundBelowHalf --ns Subjects.GlmCall) \
+		>/dev/null || exit 2
+	for f in Spec Proof; do
+		if ! cmp -s "$c/GlmCall/$f.lean" "FVATest/Subjects/GlmCall/$f.lean"; then
+			echo "test-subjects: FVATest/Subjects/GlmCall/$f.lean is not fva call's output (regenerate it)"
+			fail=1
+		fi
+	done
+fi
 
 roots=(fva FVA "${proofs[@]}")
 for s in "${subjects[@]}"; do
@@ -88,11 +170,13 @@ fi
 # docs/contracts/U22-subject-matrix.md)
 # D74: a host that keeps .cache reuses each (root, mode) PASS whose input closure is unchanged
 # (FVA_SUBJECT_CACHE= runs every subject; CI restores main's cache, D79)
-printf '%s\n' "${subjects[@]}" | FVA=$fva FVA_SUBJECT_CACHE=${FVA_SUBJECT_CACHE-.cache/subjects} scripts/subject-matrix
-rc=$?
-((rc == 2)) && exit 2
-((rc == 3)) && crash=1
-((rc == 0)) || fail=1
+if ((${#subjects[@]})); then
+	printf '%s\n' "${subjects[@]}" | FVA=$fva FVA_SUBJECT_CACHE=${FVA_SUBJECT_CACHE-.cache/subjects} scripts/subject-matrix
+	rc=$?
+	((rc == 2)) && exit 2
+	((rc == 3)) && crash=1
+	((rc == 0)) || fail=1
+fi
 
 for neg in "${negs[@]}"; do
 	if lake build "$neg" >"$tmp/neg" 2>&1; then

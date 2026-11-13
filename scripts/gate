@@ -4,9 +4,9 @@
 # Lean steps run in sequence (one lake workspace), the rest in parallel. Fast = latency-bounded:
 # skips the network/history scanners (osv-scanner, gitleaks history) and the mutation table, whose
 # stale rows each unit updates before its commit (fva-mutation.md); full = CI + closing commits.
-# --group G = the full gate's steps of CI group G alone (gate.yml: one job per group, D32);
-# --groups = the group names. A full run fails when a step belongs to no group or gate.yml's
-# matrix misses a group, so the CI fan-out always covers every step.
+# --group G = the full gate's steps of CI group G alone (gate.yml: one job per group, D32;
+# subjects-K = shard K of the subjects step); --groups = the CI job names. A full run fails when a
+# step belongs to no group or gate.yml's matrix misses a job, so the CI fan-out covers every step.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 declare -A groups=(
@@ -16,15 +16,31 @@ declare -A groups=(
 	[subjects]="build subjects"
 	[static]="format-lean shellcheck shfmt spec-lint scope json notices actionlint zizmor gitleaks-tree gitleaks-history osv-scanner"
 )
-fast=0 group=
+# the subjects step = CI jobs subjects-1..N, each one shard of scripts/test-subjects (its map assigns
+# each subject directory); a run without a subjects-K group takes every shard in one step
+subject_shards=3
+ci_groups() {
+	local g k
+	for g in "${!groups[@]}"; do
+		[[ $g == subjects ]] || {
+			echo "$g"
+			continue
+		}
+		for ((k = 1; k <= subject_shards; k++)); do echo "subjects-$k"; done
+	done | sort
+}
+fast=0 group='' shard=all
 case ${1:-} in
 --fast) fast=1 ;;
 --groups)
-	printf '%s\n' "${!groups[@]}" | sort
+	ci_groups
 	exit 0
 	;;
 --group)
 	group=${2:-}
+	if [[ $group =~ ^subjects-([1-9][0-9]*)$ ]] && ((BASH_REMATCH[1] <= subject_shards)); then
+		shard=${BASH_REMATCH[1]} group=subjects
+	fi
 	[[ -n ${groups[$group]+x} ]] || {
 		echo "gate: no group '$group' (--groups lists them)" >&2
 		exit 1
@@ -37,6 +53,7 @@ tree=$(scripts/gate-ledger tree)
 mode=full
 ((fast)) && mode=fast
 [[ -n $group ]] && mode=group:$group
+[[ $shard == all ]] || mode+=-$shard
 scripts/fetch-tools || exit 1
 export PATH="$PWD/.tools/bin:$PATH"
 # Inputs the lanes read, fetched once before they start: parallel fetch-corpus runs share its
@@ -98,7 +115,7 @@ lean_lane() {
 	# fva init end to end (a consumer project + its trust run): full gate only
 	if ((! fast)); then run init scripts/test-init; fi
 	# U14 subject demonstrations (fva trust per subject + planted negatives): full gate only
-	if ((! fast)); then run subjects scripts/test-subjects; fi
+	if ((! fast)); then run subjects scripts/test-subjects --shard "$shard/$subject_shards"; fi
 	# U12 mutation table current (check mode): full gate only, stale rows = each unit's --update
 	if ((! fast)); then run mutation scripts/test-mutation; fi
 	wait
@@ -132,7 +149,7 @@ if [[ -z $group ]] && ((! fast)); then
 			echo 1 >"$logs/ci-groups.rc"
 		}
 	done
-	for g in "${!groups[@]}"; do
+	for g in $(ci_groups); do
 		grep -qE "^ +group: \[.*\b$g\b.*\]" .github/workflows/gate.yml || {
 			echo "gate: gate.yml's matrix misses group $g" >>"$logs/ci-groups.out"
 			echo 1 >"$logs/ci-groups.rc"
