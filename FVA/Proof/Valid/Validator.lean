@@ -29,13 +29,15 @@ theorem importDesc_sound {C : Context} {d : ImportDesc} (h : importDesc C d = tr
   | table tt => exact limits_sound h
   | mem lim => exact limits_sound h
   | global gt => trivial
+  | tag x => cases h
 
 theorem func_sound {C : Context} {f : Func} (h : func C f = true) : ∃ ft, FuncT C f ft := by
   simp only [func] at h
   split at h
   · cases h
   · rename_i ft hf
-    exact ⟨ft, hf, expr_sound h⟩
+    simp only [Bool.and_eq_true, List.all_eq_true] at h
+    exact ⟨ft, hf, h.1, expr_sound h.2⟩
 
 theorem elemMode_sound {C : Context} {t : RefType} {mode : ElemMode}
     (h : elemMode C t mode = true) : mode.Ok C t := by
@@ -60,7 +62,9 @@ theorem dataMode_sound {C : Context} {mode : DataMode} (h : dataMode C mode = tr
     · exact ⟨⟨_, by assumption⟩, constExpr_sound h⟩
 
 theorem exportDesc_sound {C : Context} {d : ExportDesc} (h : exportDesc C d = true) : d.Ok C := by
-  cases d <;> simpa [exportDesc, ExportDesc.Ok, Nat.blt_eq] using h
+  cases d with
+  | tag x => cases h
+  | _ => simpa [exportDesc, ExportDesc.Ok, Nat.blt_eq] using h
 
 theorem distinct_sound {names : List String} (h : distinct names = true) : names.Nodup := by
   induction names with
@@ -74,17 +78,17 @@ end ValidatorProof
 /-- Every accepted raw AST satisfies the reviewed module-validity judgment. -/
 theorem validate_sound {m : Module} (h : validate m = true) : ModuleValid m := by
   simp only [validate, Bool.and_eq_true, and_assoc, List.all_eq_true] at h
-  obtain ⟨hmemory, htypes, himports, hfuncs, htables, hmems, hglobals, helems, hdatas,
+  obtain ⟨hprofile, hmemory, htypes, himports, hfuncs, htables, hmems, hglobals, helems, hdatas,
     helen, hdlen, hstart, hexports, hnames⟩ := h
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨hprofile, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · intro f hf
     simpa [Nat.blt_eq] using htypes f hf
   · intro im hi
     exact ValidatorProof.importDesc_sound (himports im hi)
   · intro f hf
     exact ValidatorProof.func_sound (hfuncs f hf)
-  · intro tt ht
-    exact ValidatorProof.limits_sound (htables tt ht)
+  · intro t ht
+    exact ValidatorProof.limits_sound (htables t ht)
   · intro lim hl
     exact ValidatorProof.limits_sound (hmems lim hl)
   · intro g hg

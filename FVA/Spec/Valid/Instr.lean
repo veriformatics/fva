@@ -150,7 +150,7 @@ inductive InstrT : Context → Instr → StackType → Prop where
   | cvtop {C} {op : CvtOp} :
       InstrT C (.cvtop op) ⟨[.val (.num op.types.1)], [.val (.num op.types.2)]⟩
   -- reference (§3.3.2)
-  | refNull {C} {t : RefType} : InstrT C (.refNull t) ⟨[], [.val (.ref t)]⟩
+  | refNull {C} {ht : HeapType} : InstrT C (.refNull ht) ⟨[], [.val (.ref ⟨true, ht⟩)]⟩
   | refIsNull {C} {t : RefType} : InstrT C .refIsNull ⟨[.val (.ref t)], [i32]⟩
   | refFunc {C : Context} {x : Nat} {ft : FuncType} (hf : C.funcs[x]? = some ft)
       (hr : x ∈ C.refs) : InstrT C (.refFunc x) ⟨[], [.val (.ref .funcref)]⟩

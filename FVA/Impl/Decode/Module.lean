@@ -15,29 +15,55 @@ namespace FVA.Wasm.Decode
 
 open FVA.Wasm
 
-/-- Limits: flag `0x00` (min) or `0x01` (min, max); flags up to `0x07` are outside the
-profile (shared memory, 64-bit). -/
+/-- Limits: flag `0x00` (min) or `0x01` (min, max), each a `u64`; shared (`0x02`, `0x03`,
+`0x06`, `0x07`) and 64-bit (`0x04`, `0x05`) limits are outside the profile. -/
 def limits (v n : Nat) : Res Limits :=
   (byte v n).bind fun f v' n' =>
-  bif Nat.beq f 0 then (u32 v' n').bind fun a v n => .ok { min := a, max := none } v n
+  bif Nat.beq f 0 then (u64 v' n').bind fun a v n => .ok { min := a, max := none } v n
   else bif Nat.beq f 1 then
-    (u32 v' n').bind fun a v n => (u32 v n).bind fun b v n => .ok { min := a, max := some b } v n
-  else bif Nat.blt f 8 then .unsup n "shared memory or 64-bit limits"
-  else .bad n "integer too large"
+    (u64 v' n').bind fun a v n => (u64 v n).bind fun b v n => .ok { min := a, max := some b } v n
+  else bif Nat.beq f 4 || Nat.beq f 5 then excluded .memory64 n "64-bit limits"
+  else bif Nat.blt f 8 then excluded .threads n "shared limits"
+  else .bad n "malformed limits flags"
 
-/-- Function types: `0x60 vec(valtype) vec(valtype)`. -/
-def funcType (v n : Nat) : Res FuncType :=
+/-- A function type after its `0x60`: `vec(valtype) vec(valtype)`. -/
+def funcTypeBody (v n : Nat) : Res FuncType :=
+  (vec valType v n).bind fun ps v n => (vec valType v n).bind fun rs v n =>
+  .ok { params := ps, results := rs } v n
+
+/-- A P′ sub type: a bare function type, or `0x4F` with no supertypes and a function type
+(both final). Non-final sub types (`0x50`), declared supertypes and struct/array types
+(`0x5F`/`0x5E`) are GC. -/
+def subType (v n : Nat) : Res FuncType :=
   (byte v n).bind fun b v' n' =>
-  bif Nat.beq b 0x60 then
-    (vec valType v' n').bind fun ps v n => (vec valType v n).bind fun rs v n =>
-    .ok { params := ps, results := rs } v n
-  else bif Nat.beq b 0x4E || Nat.beq b 0x4F || Nat.beq b 0x50 || Nat.beq b 0x5E ||
-      Nat.beq b 0x5F then .unsup n "GC types"
-  else .bad n "integer representation too long"
+  bif Nat.beq b 0x60 then funcTypeBody v' n'
+  else bif Nat.beq b 0x4F then
+    (vec u32 v' n').bind fun xs v n =>
+    bif !xs.isEmpty then excluded .gcTypes n "declared supertype" else
+    (byte v n).bind fun c v' n' =>
+    bif Nat.beq c 0x60 then funcTypeBody v' n'
+    else bif Nat.beq c 0x5E || Nat.beq c 0x5F then excluded .gcTypes n "struct or array type"
+    else .bad n "malformed composite type"
+  else bif Nat.beq b 0x50 || Nat.beq b 0x5E || Nat.beq b 0x5F then
+    excluded .gcTypes n "sub, struct or array type"
+  else .bad n "malformed sub type"
+
+/-- A recursive type: `0x4E vec(subtype)`, or one sub type alone. -/
+def recType (v n : Nat) : Res RecType :=
+  match n with
+  | 0 => .bad 0 "unexpected end"
+  | n' + 1 =>
+    bif Nat.beq (Nat.land v 255) 0x4E then vec subType (Nat.shiftRight v 8) n'
+    else (subType v (n' + 1)).bind fun ft v n => .ok [ft] v n
 
 /-- Table types: `reftype limits`. -/
 def tableType (v n : Nat) : Res TableType :=
   (refType v n).bind fun t v n => (limits v n).bind fun l v n => .ok { limits := l, elem := t } v n
+
+/-- Tag types: `0x00` and a function type index. -/
+def tagType (v n : Nat) : Res Nat :=
+  (byte v n).bind fun a v' n' =>
+  bif Nat.beq a 0 then u32 v' n' else .bad n "malformed tag attribute"
 
 /-- Global types: `valtype mut`. -/
 def globalType (v n : Nat) : Res GlobalType :=
@@ -54,7 +80,7 @@ def import_ (v n : Nat) : Res Import :=
     else bif Nat.beq k 1 then (tableType v' n').bind fun t v n => .ok (.table t) v n
     else bif Nat.beq k 2 then (limits v' n').bind fun t v n => .ok (.mem t) v n
     else bif Nat.beq k 3 then (globalType v' n').bind fun t v n => .ok (.global t) v n
-    else bif Nat.beq k 4 then .unsup n "exception handling (tag import)"
+    else bif Nat.beq k 4 then (tagType v' n').bind fun x v n => .ok (.tag x) v n
     else .bad n "malformed import kind"
   desc.bind fun d v n => .ok { module := md, name := nm, desc := d } v n
 
@@ -64,17 +90,34 @@ def export_ (v n : Nat) : Res Export :=
   let ok (d : ExportDesc) : Res Export := .ok { name := nm, desc := d } v'' n''
   bif Nat.beq k 0 then ok (.func x) else bif Nat.beq k 1 then ok (.table x)
   else bif Nat.beq k 2 then ok (.mem x) else bif Nat.beq k 3 then ok (.global x)
-  else bif Nat.beq k 4 then .unsup n "exception handling (tag export)"
+  else bif Nat.beq k 4 then ok (.tag x)
   else .bad n "malformed export kind"
 
 /-- Globals. -/
 def global (v n : Nat) : Res Global :=
   (globalType v n).bind fun t v n => (expr v n).bind fun e v n => .ok { type := t, init := e } v n
 
-/-- `elemkind`: only `0x00` (funcref). -/
+/-- Tables: a table type (elements start as its heap type's null), or `0x40 0x00`, the table
+type and an initializer expression. -/
+def table (v n : Nat) : Res Table :=
+  match n with
+  | 0 => .bad 0 "unexpected end"
+  | n' + 1 =>
+    bif Nat.beq (Nat.land v 255) 0x40 then
+      (byte (Nat.shiftRight v 8) n').bind fun z v n =>
+      bif !Nat.beq z 0 then .bad n "malformed table" else
+      (tableType v n).bind fun t v n => (expr v n).bind fun e v n =>
+      .ok { type := t, init := e } v n
+    else (tableType v (n' + 1)).bind fun t v n =>
+      .ok { type := t, init := [.refNull t.elem.heap] } v n
+
+/-- Tags. -/
+def tag (v n : Nat) : Res Tag := (tagType v n).bind fun x v n => .ok { type := x } v n
+
+/-- `elemkind`: only `0x00`, `(ref func)`. -/
 def elemKind (v n : Nat) : Res RefType :=
   (byte v n).bind fun b v' n' =>
-  bif Nat.beq b 0 then .ok .funcref v' n' else .bad n "malformed element kind"
+  bif Nat.beq b 0 then .ok ⟨false, .abs .func⟩ v' n' else .bad n "malformed element kind"
 
 /-- `(ref.func y) end` initializers from function indices. -/
 def funcInits (ys : List Nat) : List Expr := ys.map fun y => [Instr.refFunc y]
@@ -94,8 +137,10 @@ def elem (v n : Nat) : Res Elem :=
     else bif Nat.beq k 0 then (expr v n).bind fun e v n => .ok (.active 0 e, false) v n
     else (u32 v n).bind fun x v n => (expr v n).bind fun e v n => .ok (.active x e, true) v n
   mode.bind fun (md, typed) v n =>
+  -- flag 0's implicit type = `(ref func)`, flag 4's = `(ref null func)`
   let ty : Res RefType :=
-    bif typed then (bif exprs then refType v n else elemKind v n) else .ok .funcref v n
+    bif typed then (bif exprs then refType v n else elemKind v n)
+    else .ok (bif exprs then .funcref else ⟨false, .abs .func⟩) v n
   ty.bind fun t v n =>
   let inits : Res (List Expr) :=
     bif exprs then vec expr v n else (vec u32 v n).bind fun ys v n => .ok (funcInits ys) v n
@@ -133,6 +178,7 @@ def usesData : Instr → Bool
   | .memoryInit _ | .dataDrop _ => true
   | .block _ b | .loop _ b => usesDataList b
   | .if_ _ t e => usesDataList t || usesDataList e
+  | .tryTable _ _ b => usesDataList b
   | _ => false
 /-- Whether any instruction in the sequence uses a data index. -/
 def usesDataList : List Instr → Bool
@@ -155,14 +201,16 @@ structure Acc where
 def sectionInto (id : Nat) (a : Acc) (v n : Nat) : Res Acc :=
   bif Nat.beq id 10 then (vec code v n).bind fun cs v n => .ok { a with codes := cs } v n
   else bif Nat.beq id 1 then
-    (vec funcType v n).bind fun ts v n => .ok { a with m := { a.m with types := ts } } v n
+    (vec recType v n).bind fun ts v n => .ok { a with m := { a.m with types := ts } } v n
   else bif Nat.beq id 2 then
     (vec import_ v n).bind fun is v n => .ok { a with m := { a.m with imports := is } } v n
   else bif Nat.beq id 3 then (vec u32 v n).bind fun xs v n => .ok { a with typeIdxs := xs } v n
   else bif Nat.beq id 4 then
-    (vec tableType v n).bind fun ts v n => .ok { a with m := { a.m with tables := ts } } v n
+    (vec table v n).bind fun ts v n => .ok { a with m := { a.m with tables := ts } } v n
   else bif Nat.beq id 5 then
     (vec limits v n).bind fun ms v n => .ok { a with m := { a.m with mems := ms } } v n
+  else bif Nat.beq id 13 then
+    (vec tag v n).bind fun ts v n => .ok { a with m := { a.m with tags := ts } } v n
   else bif Nat.beq id 6 then
     (vec global v n).bind fun gs v n => .ok { a with m := { a.m with globals := gs } } v n
   else bif Nat.beq id 7 then
@@ -174,8 +222,9 @@ def sectionInto (id : Nat) (a : Acc) (v n : Nat) : Res Acc :=
   else bif Nat.beq id 12 then (u32 v n).bind fun c v n => .ok { a with dataCount := some c } v n
   else (vec data v n).bind fun ds v n => .ok { a with m := { a.m with datas := ds } } v n
 
-/-- Section ids in the order a module lists them (spec §5.5.16); data count (12) precedes code. -/
-def slotIds : List Nat := [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 10, 11]
+/-- Section ids in the order a module lists them (`Bmodule`): tags (13) between memories and
+globals, data count (12) before code. -/
+def slotIds : List Nat := [1, 2, 3, 4, 5, 13, 6, 7, 8, 9, 12, 10, 11]
 
 /-- Custom sections while the next id byte is 0: names checked, contents skipped. Structural on
 `fuel` (callers pass the byte count; each section takes ≥ 2 bytes). -/
@@ -199,7 +248,7 @@ def slots : List Nat → Acc → Nat → Nat → Res Acc
       (sub k (sectionInto id a) v n).bind fun a v n => slots ids a v n
     else slots ids a v n
 
-/-- The module from its sections, after the cross-section checks of spec §5.5.16. -/
+/-- The module from its sections, after `Bmodule`'s cross-section checks. -/
 def finish (a : Acc) (n : Nat) : Res Module :=
   bif !Nat.beq a.typeIdxs.length a.codes.length then
     .bad n "function and code section have inconsistent lengths"
@@ -217,7 +266,7 @@ where
       funcs := List.zipWith (fun t c => { type := t, locals := c.1, body := c.2 }) a.typeIdxs
         a.codes }
 
-/-- Decode a whole module from `len` bytes packed little-endian in `bytes` (spec §5.5.16). -/
+/-- Decode a whole module from `len` bytes packed little-endian in `bytes` (`Bmodule`). -/
 def decode (bytes len : Nat) : Except DecodeError Module :=
   let r : Res Module :=
     (leNat 4 bytes len).bind fun magic v n =>
@@ -226,8 +275,7 @@ def decode (bytes len : Nat) : Except DecodeError Module :=
     bif !Nat.beq version 1 then .bad (len - 4) "unknown binary version" else
     (slots slotIds {} v n).bind fun a v n =>
     bif Nat.beq n 0 then finish a n
-    else bif Nat.beq (Nat.land v 255) 13 then .unsup n "exception handling (tag section)"
-    else bif Nat.blt 12 (Nat.land v 255) then .bad n "malformed section id"
+    else bif Nat.blt 13 (Nat.land v 255) then .bad n "malformed section id"
     else .bad n "unexpected content after last section"
   match r with
   | .ok m _ _ => .ok m

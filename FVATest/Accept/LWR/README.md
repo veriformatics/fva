@@ -81,10 +81,9 @@ Wasm's syntax and validation judgments are distinct; an `assert_malformed` on th
 false. Wasmtime's WAST harness accepts it. The suite therefore also requires independent
 controls on the extracted binary: `wasm-tools print` rc 0 and `wasm-tools validate
 --features=wasm2,-simd` rc 1. The FVA assertion must fail. A validator rejection cannot stand
-in for a decoder rejection. The validating false assertion belongs to U25. MAIN's interim
-rule keeps a decoded-but-validation-invalid binary as `skip: line L: rejected only by validation`,
-never a pass, until U28a's Wasm 3.0 memarg grammar lands. This case stays pending U28a and
-keeps the phase suite non-green; the required final behavior is that the malformed assertion fails.
+in for a decoder rejection. The validating false assertion belongs to U25. Since U28a (Wasm
+3.0's binary grammar restricted to P′), a binary that decodes fails the malformed assertion
+(`assert_malformed: module decodes`), and the check is merged.
 
 `U25.outcome-protocol` repeats the four-command matching-import case and requires a complete
 trace. On `3ed6b36`, the aggregate is `4 0 0`, rc 0, but the trace is empty. Its checker prints
@@ -194,7 +193,7 @@ MAIN supplies the exact public system vocabulary. The stock SDK runtime remains 
 | --- | --- | --- |
 | D29.cpp-build | `FVATest/Subjects/CppEH/build TMP/eh.wasm`; rc 0, `cmp` with shipped 44,913-byte artifact equal | green |
 | D29.cpp-oracle | `wasmtime run -W exceptions=y,tail-call=y,function-references=y,gc=y --invoke eh eh.wasm X`; all eight calls rc 0 | green |
-| D29.cpp-lift | `fva lift eh.wasm TMP/Lifted.lean --ns Subjects.CppEH.Lifted`; rc 2 (unsupported EH) | RED |
+| D29.cpp-lift | `fva lift FVATest/Subjects/CppEH/eh.wasm TMP/Lifted.lean --ns Subjects.CppEH.Lifted` from the project root; rc 1 (`malformed value type`: no EH) | RED |
 | D29.cpp-trust-default | `fva trust . --spec-module FVATest.Subjects.CppEH.Spec --root-module FVATest.Subjects.CppEH.Proof --subject FVATest.Subjects.CppEH.Lifted` | pending U27+U29b |
 | D29.cpp-trust-paranoid | Same command + `--paranoid` | pending U27+U29b |
 

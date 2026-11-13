@@ -46,10 +46,7 @@
       "file": "edgeR_4.99.10.tgz",
       "sha256": "4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93",
       "license": "GPL-2.0-or-later",
-      "formerly": "https://r2.ropensci.org/4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93",
-      "places": [
-        ".cache/corpus/edgeR_4.99.10.tgz"
-      ]
+      "formerly": "https://r2.ropensci.org/4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93"
     },
     {
       "id": "edger-wasm",
@@ -160,6 +157,7 @@
       "source": "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz (lib/lz4.c) + bench/subjects/build-lz4 + bench/subjects/c-memory.c",
       "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v1/lz4-c.wasm",
       "places": [
+        "bench/subjects/wasm/lz4-c.wasm",
         "FVATest/Subjects/Lz4C/lz4-c.wasm"
       ]
     },
@@ -184,7 +182,10 @@
       "upstream": "https://github.com/PSeitz/lz4_flex",
       "version": "0.14.0",
       "source": "https://static.crates.io/crates/lz4_flex/lz4_flex-0.14.0.crate + bench/subjects/lz4-flex-shim + bench/subjects/build-lz4",
-      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v1/lz4-flex.wasm"
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v1/lz4-flex.wasm",
+      "places": [
+        "bench/subjects/wasm/lz4-flex.wasm"
+      ]
     },
     {
       "id": "glm-iround-wasm",

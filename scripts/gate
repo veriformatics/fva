@@ -10,11 +10,11 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 declare -A groups=(
-	[lean]="build checks test char accept decoder numerics floatdiff spec difftest fuzz-replay lint mutation pins olean-pins"
+	[lean]="build checks test char accept decoder numerics floatdiff spec difftest fuzz-replay lint mutation pins olean-pins base-manifest"
 	[trust]="build trust"
 	[init]="build init"
 	[subjects]="build subjects"
-	[static]="format-lean shellcheck shfmt spec-lint base-manifest scope json notices actionlint zizmor gitleaks-tree gitleaks-history osv-scanner"
+	[static]="format-lean shellcheck shfmt spec-lint scope json notices actionlint zizmor gitleaks-tree gitleaks-history osv-scanner"
 )
 fast=0 group=
 case ${1:-} in
@@ -41,8 +41,6 @@ scripts/fetch-tools || exit 1
 export PATH="$PWD/.tools/bin:$PATH"
 # Inputs the lanes read, fetched once before they start: parallel fetch-corpus runs share its
 # .part files (two runs into an empty corpus: one fails the other's sha256 check).
-# fetch-subjects first: it also places the edgeR archive (veriformatics/fva-artifacts; R-universe
-# dropped 4.99.10) until fetch-corpus names it there (U33 M4, a mutation digest input: U28b).
 scripts/fetch-subjects || {
 	echo "gate: scripts/fetch-subjects failed" >&2
 	exit 1

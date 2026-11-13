@@ -1,0 +1,11 @@
+b-rec-empty	ok	empty recursion group (zero type indices)
+b-s33-padded	ok	(ref null 0), the index a 2-byte s33
+b-limits-u64-padded	ok	memory minimum 1 as a 6-byte LEB (u64 limits)
+b-memidx-padded	ok	memory.size, memory index 0 as 0x80 0x00
+b-memarg-memidx0	ok	i32.load, memarg flags 2 + 2^6 with memory index 0
+b-sub-final-alias	ok	0x4F with no supertypes = the bare function type
+b-sub-open	unsupported:gc-types	0x50 sub type (not final)
+b-memarg-flags-128	malformed	memarg flags 128
+b-trytable-datadrop-nocount	malformed	data.drop inside try_table, no data count section
+b-tag-twice	malformed	two tag sections
+b-tag-after-global	malformed	tag section after the global section

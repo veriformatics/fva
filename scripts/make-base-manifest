@@ -2,7 +2,9 @@
 # Writes FVA/Tool/BaseManifest.lean: the sha256 of every FVA library source (FVA.lean and
 # FVA/**/*.lean, this output excepted). `fva trust` counts a module as FVA base only when its
 # source has exactly this content, never by its name, so a project that edits a vendored FVA
-# file reviews that file. --check: rc 1 if the committed manifest is stale.
+# file reviews that file. Also writes trust/base-lines.tsv: the comment-stripped code lines of
+# every FVA/Spec source (`fvatest base-lines`, U28a E8), so each change to the reviewed-once base
+# shows its size. --check: rc 1 if either committed file is stale.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 out=FVA/Tool/BaseManifest.lean
@@ -20,11 +22,25 @@ gen() {
 	done | sed '$ s/,$//'
 	printf ']\n\nend FVA.Tool\n'
 }
+lines=trust/base-lines.tsv
+genLines() {
+	[[ -x .lake/build/bin/fvatest ]] || lake build fvatest >/dev/null || return 2
+	lake env .lake/build/bin/fvatest base-lines
+}
 if [[ ${1:-} == --check ]]; then
+	rc=0
 	if ! cmp -s <(gen) "$out"; then
 		echo "make-base-manifest: $out is stale (run scripts/make-base-manifest)" >&2
-		exit 1
+		rc=1
 	fi
-	exit 0
+	fresh=$(genLines) || exit 2
+	if ! cmp -s <(printf '%s\n' "$fresh") "$lines"; then
+		echo "make-base-manifest: $lines is stale (run scripts/make-base-manifest):" >&2
+		diff <(printf '%s\n' "$fresh") "$lines" | head -10 >&2
+		rc=1
+	fi
+	exit "$rc"
 fi
 gen >"$out"
+fresh=$(genLines) || exit 2
+printf '%s\n' "$fresh" >"$lines"

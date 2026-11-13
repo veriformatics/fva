@@ -1,4 +1,5 @@
 import FVA.Spec.Syntax
+import FVA.Profile
 
 /-!
 # Byte input for the kernel-evaluated decoder
@@ -38,6 +39,10 @@ inductive Res (α : Type) where
   | bad (rem : Nat) (msg : String)
   /-- Input outside the profile. -/
   | unsup (rem : Nat) (msg : String)
+
+/-- Input outside the profile, its class first in the message (`FVA.Profile.Excluded`). -/
+abbrev excluded {α : Type} (c : FVA.Profile.Excluded) (rem : Nat) (detail : String) : Res α :=
+  .unsup rem (c.id ++ ": " ++ detail)
 
 /-- Continue with the value and the rest of the input; failures pass through. -/
 def Res.bind {α β : Type} (x : Res α) (f : α → Nat → Nat → Res β) : Res β :=
@@ -104,6 +109,9 @@ def sleb : Nat → Nat → Nat → Nat → Res Nat
 
 /-- `u32`. -/
 def u32 (v n : Nat) : Res Nat := uleb 5 32 v n
+
+/-- `u64`. -/
+def u64 (v n : Nat) : Res Nat := uleb 10 64 v n
 
 /-- `count` repetitions of `p`. -/
 def many {α : Type} (p : Nat → Nat → Res α) : Nat → Nat → Nat → Res (List α)

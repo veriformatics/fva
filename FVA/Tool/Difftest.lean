@@ -225,7 +225,7 @@ def digestBody : List Instr :=
 /-- The probe: the subject's memory, imported from `(mod, name)`, with `fill` and `digest`. -/
 def probe (mod name : String) : Module :=
   let i32 : ValType := .num .i32
-  { types := [⟨[i32, i32, i32], []⟩, ⟨[i32, i32], [.num .i64]⟩],
+  { types := [[⟨[i32, i32, i32], []⟩], [⟨[i32, i32], [.num .i64]⟩]],
     imports := [⟨mod, name, .mem ⟨0, none⟩⟩],
     funcs := [⟨0, [], fillBody⟩, ⟨1, [(1, .num .i64)], digestBody⟩],
     exports := [⟨"fill", .func 0⟩, ⟨"digest", .func 1⟩] }
@@ -250,10 +250,11 @@ def providerInit (name : String) (sp : Nat) (gt : GlobalType) : Expr :=
   | .num .i64 => [.iconst .w64 0]
   | .num .f32 => [.fconst .w32 0]
   | .num .f64 => [.fconst .w64 0]
-  | .ref t => [.refNull t]
+  | .ref t => [.refNull t.heap]
 
 /-- A module supplying `ims` (one import module's entries), each exported under its import
-name: functions trap, memories and tables take the import's limits. -/
+name: functions trap, memories and tables take the import's limits (tags: none in the profile
+`fva difftest` runs). -/
 def provider (types : List FuncType) (ims : List Import) (sp : Nat) : Module := Id.run do
   let mut md : Module := {}
   let mut seen : List String := []
@@ -262,11 +263,11 @@ def provider (types : List FuncType) (ims : List Import) (sp : Nat) : Module := 
     seen := im.name :: seen
     match im.desc with
     | .func x =>
-      md := { md with types := md.types ++ [types[x]?.getD ⟨[], []⟩],
-                      funcs := md.funcs ++ [⟨md.types.length, [], [.unreachable]⟩],
+      md := { md with types := md.types ++ [[types[x]?.getD ⟨[], []⟩]],
+                      funcs := md.funcs ++ [⟨md.typeList.length, [], [.unreachable]⟩],
                       exports := md.exports ++ [⟨im.name, .func md.funcs.length⟩] }
     | .table tt =>
-      md := { md with tables := md.tables ++ [tt],
+      md := { md with tables := md.tables ++ [⟨tt, [.refNull tt.elem.heap]⟩],
                       exports := md.exports ++ [⟨im.name, .table md.tables.length⟩] }
     | .mem lim =>
       md := { md with mems := md.mems ++ [lim],
@@ -274,6 +275,7 @@ def provider (types : List FuncType) (ims : List Import) (sp : Nat) : Module := 
     | .global gt =>
       md := { md with globals := md.globals ++ [⟨gt, providerInit im.name sp gt⟩],
                       exports := md.exports ++ [⟨im.name, .global md.globals.length⟩] }
+    | .tag _ => pure ()
   return md
 
 /-- Encode a fixture and decode it back with the verified decoder, so Lean runs exactly the
@@ -304,8 +306,10 @@ def valLit : Val → String
   | .i64 v => s!"(i64.const {v.toNat})"
   | .f32 v => s!"(f32.const {lit f32fmt v.toNat})"
   | .f64 v => s!"(f64.const {lit f64fmt v.toNat})"
-  | .ref (.null .funcref) => "(ref.null func)"
-  | .ref (.null .externref) => "(ref.null extern)"
+  | .ref (.null (.abs .func)) => "(ref.null func)"
+  | .ref (.null (.abs .extern)) => "(ref.null extern)"
+  | .ref (.null (.abs .exn)) => "(ref.null exn)"
+  | .ref (.null (.idx x)) => s!"(ref.null {x})"
   | .ref (.func _) => "(ref.func)"
   | .ref (.extern a) => s!"(ref.extern {a})"
 
@@ -372,7 +376,7 @@ def Subject.make (bytes : ByteArray) (m : Module) : Except String Subject := do
   let mods := m.imports.foldl
     (fun acc im => if acc.contains im.module then acc else acc ++ [im.module]) []
   let providers ← mods.mapM fun mod => do
-    let (bs, pm) ← roundTrip (provider m.types (m.imports.filter (·.module == mod)) sp)
+    let (bs, pm) ← roundTrip (provider m.typeList (m.imports.filter (·.module == mod)) sp)
     return (mod, bs, pm)
   let memExport := m.exports.find? fun e => match e.desc with | .mem _ => true | _ => false
   let memSource := match memImport, memExport with
@@ -461,7 +465,7 @@ def genArg (memSize : Nat) (sh : Shape) (structured : Bool) (t : ValType) : Gen 
   | .num .i64 => return .i64 (BitVec.ofNat 64 (← int 64))
   | .num .f32 => return .f32 (BitVec.ofNat 32 (← operand f32fmt none))
   | .num .f64 => return .f64 (BitVec.ofNat 64 (← operand f64fmt none))
-  | .ref t => return .ref (.null t)
+  | .ref t => return .ref (.null t.heap)
 
 /-- A case's shape, input fill seed (if the memory is observable and the case fills) and
 arguments. -/

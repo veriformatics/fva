@@ -14,7 +14,7 @@ Tier: kernel (consultant-6 V4: no downstream check detects an omitted or overwri
 
 ## Scheduling (equal strength; affects time only)
 - Budget = CPUs from `nproc` (affinity-aware) and memory = min(`MemAvailable`, cgroup `memory.max` − `memory.current` where a limit exists).
-- Weights: default run = 2 CPU + 6 GiB (its 2 kernels side by side, ≈ 2.8 GiB peak each on the decoder export); paranoid run = 6 CPU + 9 GiB (3 kernels at a time incl. nanoda's 4 worker threads). A job starts when its weight fits the remaining budget; with nothing running, the next job always starts (progress on small hosts). Canary runs are cached per kernel + canary, and `scripts/test-trust` usually warms that cache before this step; a cold run (a standalone call, a test-trust failure, an uncached timeout: `FVA/Trust/Canary.lean`) fans out up to 4 canary jobs beyond these weights — time only, never a verdict.
+- Weights: default run = 2 CPU + 6 GiB (its 2 kernels side by side, ≈ 2.8 GiB peak each on the decoder export); paranoid run = 6 CPU + 9 GiB (3 kernels at a time). A job starts when its weight fits the remaining budget; with nothing running, the next job always starts (progress on small hosts). Canary runs are cached per kernel + canary, and `scripts/test-trust` usually warms that cache before this step; a cold run (a standalone call, a test-trust failure, an uncached timeout: `FVA/Trust/Canary.lean`) fans out up to 4 canary jobs beyond these weights — time only, never a verdict.
 
 ## Acceptance (planted, in `scripts/test-checks`, stub `FVA` = a script returning a configured rc + log per (root, mode))
 - all runs pass with pinned surfaces → rc 0, 2N `subject-matrix:` lines;

@@ -34,7 +34,7 @@ def ExternVal.Matches (s : Store) (types : List FuncType) : ExternVal → Import
 
 /-- Every import is supplied by a matching external value, in order. -/
 def ImportsMatch (s : Store) (m : Module) (imports : List ExternVal) : Prop :=
-  List.Forall₂ (fun ev im => ev.Matches s m.types im.desc) imports m.imports
+  List.Forall₂ (fun ev im => ev.Matches s m.typeList im.desc) imports m.imports
 
 /-- The addresses of one kind among external values (`funcs(externval*)` etc.). -/
 def ExternVal.funcs (evs : List ExternVal) : List Nat :=
@@ -58,25 +58,32 @@ def allocModule (s : Store) (m : Module) (imports : List ExternVal) (gvals : Lis
   let tables := ExternVal.tables imports ++ fresh s.tables.length m.tables.length
   let mems := ExternVal.mems imports ++ fresh s.mems.length m.mems.length
   let globals := ExternVal.globals imports ++ fresh s.globals.length m.globals.length
-  let exportValue : ExportDesc → ExternVal
-    | .func x => .func (funcs[x]?.getD 0)
-    | .table x => .table (tables[x]?.getD 0)
-    | .mem x => .mem (mems[x]?.getD 0)
-    | .global x => .global (globals[x]?.getD 0)
+  -- a tag export has no extern value before U28b's tag instances: such modules are invalid
+  -- (`ModuleValid.profile`), and their tag exports are left out
+  let exportValue : ExportDesc → Option ExternVal
+    | .func x => some (.func (funcs[x]?.getD 0))
+    | .table x => some (.table (tables[x]?.getD 0))
+    | .mem x => some (.mem (mems[x]?.getD 0))
+    | .global x => some (.global (globals[x]?.getD 0))
+    | .tag _ => none
   let inst : ModuleInst :=
-    { types := m.types, funcs, tables, mems, globals,
+    { types := m.typeList, funcs, tables, mems, globals,
       elems := fresh s.elems.length m.elems.length,
       datas := fresh s.datas.length m.datas.length,
-      exports := m.exports.map fun e => { name := e.name, value := exportValue e.desc } }
+      exports := m.exports.filterMap fun e =>
+        (exportValue e.desc).map fun v => { name := e.name, value := v } }
   let s' : Store :=
-    { funcs := s.funcs ++ m.funcs.map fun fn => .wasm (m.types[fn.type]?.getD ⟨[], []⟩) inst fn,
-      tables := s.tables ++ m.tables.map fun tt =>
-        { type := tt, elem := List.replicate tt.limits.min (.null tt.elem) },
+    { funcs := s.funcs ++ m.funcs.map fun fn => .wasm (m.typeList[fn.type]?.getD ⟨[], []⟩) inst fn,
+      tables := s.tables ++ m.tables.map fun t =>
+        { type := t.type, elem := List.replicate t.type.limits.min (.null t.type.elem.heap) },
       mems := s.mems ++ m.mems.map fun lim =>
         { pages := lim.min, max := lim.max, byte := fun _ => 0 },
       globals := s.globals ++ (m.globals.zip gvals).map fun (g, v) =>
         { type := g.type, value := v },
-      elems := s.elems ++ (m.elems.zip erefs).map fun (e, rs) => { type := e.type, elem := rs },
+      -- 2.0 typing of element segments, until U28c: the nullable projection of 3.0's
+      -- `(ref func)` for function-index segments (`ModuleValid`)
+      elems := s.elems ++ (m.elems.zip erefs).map fun (e, rs) =>
+        { type := e.type.nullable, elem := rs },
       datas := s.datas ++ m.datas.map fun d => { data := d.init } }
   (s', inst)
 

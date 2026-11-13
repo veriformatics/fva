@@ -47,11 +47,12 @@ it). -/
 def invokeConfig (s : Store) (a : Nat) (args : List Val) : Config :=
   ⟨s, ⟨[], {}⟩, vals args ++ [.invoke a]⟩
 
-/-- `S ⊢ val : t` (appendix "Soundness", values): numbers by type, null by its reference type,
-a function reference to an existing function, any external reference. -/
+/-- `S ⊢ val : t` (appendix "Soundness", values): numbers by type, null at the nullable
+reference type of its heap type, a function reference to an existing function, any external
+reference. -/
 def Val.HasType (s : Store) : Val → ValType → Prop
   | .i32 _, .num .i32 | .i64 _, .num .i64 | .f32 _, .num .f32 | .f64 _, .num .f64 => True
-  | .ref (.null t), .ref t' => t = t'
+  | .ref (.null ht), .ref t => t = ⟨true, ht⟩
   | .ref (.func a), .ref .funcref => a < s.funcs.length
   | .ref (.extern _), .ref .externref => True
   | _, _ => False

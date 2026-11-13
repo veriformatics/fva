@@ -56,77 +56,16 @@ theorem pure_parses {α : Type} (a : α) :
 
 /-! ## Types and immediates -/
 
-theorem valTypeOf_some {k : Nat} {t : ValType} (h : valTypeOf k = some t) :
-    ValTypeB t [k.toUInt8] := by
-  simp only [valTypeOf, Bool.cond_eq_ite, Nat.blt_eq, Nat.beq_eq] at h
-  repeat' split at h
-  all_goals (cases h <;> subst_vars <;> rfl)
-
-theorem valTypeOf_none {k : Nat} (h : k < 0x6F ∨ 0x7F < k) : valTypeOf k = none := by
-  simp only [valTypeOf, Bool.cond_eq_ite, Nat.blt_eq, Nat.beq_eq]
-  repeat' split
-  all_goals first | rfl | omega
-
-theorem valTypeB_byte {t : ValType} {bs : List UInt8} (h : ValTypeB t bs) :
-    ∃ b : UInt8, bs = [b] ∧ valTypeOf b.toNat = some t ∧ 0x6F ≤ b.toNat ∧ b.toNat ≤ 0x7F := by
-  cases t with
-  | num t =>
-    cases t <;>
-      (simp only [ValTypeB, NumTypeB] at h; subst h; exact ⟨_, rfl, rfl, by decide, by decide⟩)
-  | ref t =>
-    cases t <;>
-      (simp only [ValTypeB, RefTypeB] at h; subst h; exact ⟨_, rfl, rfl, by decide, by decide⟩)
-
-theorem valType_parses : Parses valType ValTypeB := by
-  constructor
-  · intro bs t v n h
-    obtain ⟨_, v', n', hb, hk⟩ := Res.bind_eq_ok.1 h
-    obtain ⟨_, rest, rfl, ⟨b, rfl, rfl⟩, rfl, rfl⟩ := byte_parses.sound hb
-    split at hk
-    · rename_i ht
-      simp only [Res.ok.injEq] at hk
-      obtain ⟨rfl, rfl, rfl⟩ := hk
-      exact ⟨[b], rest, rfl, by simpa using valTypeOf_some ht, rfl, rfl⟩
-    · revert hk; cases Nat.beq b.toNat 123 <;> simp
-  · intro t pre rest h
-    obtain ⟨b, rfl, ht, -⟩ := valTypeB_byte h
-    simp only [valType, List.cons_append, List.nil_append, byte, List.length_cons, land_pack_cons,
-      shiftRight_pack_cons, Res.bind_ok, ht]
-
-theorem refType_parses : Parses refType RefTypeB := by
-  constructor
-  · intro bs t v n h
-    obtain ⟨_, v', n', hb, hk⟩ := Res.bind_eq_ok.1 h
-    obtain ⟨_, rest, rfl, ⟨b, rfl, rfl⟩, rfl, rfl⟩ := byte_parses.sound hb
-    cases h1 : Nat.beq b.toNat 0x70
-    · simp only [h1, Bool.cond_false] at hk
-      cases h2 : Nat.beq b.toNat 0x6F
-      · simp only [h2, Bool.cond_false] at hk; simp at hk
-      · simp only [h2, Bool.cond_true, Res.ok.injEq] at hk
-        obtain ⟨rfl, rfl, rfl⟩ := hk
-        have hb : b = 0x6F := UInt8.toNat_inj.1 (beq_true.1 h2)
-        subst hb
-        exact ⟨[0x6F], rest, rfl, rfl, rfl, rfl⟩
-    · simp only [h1, Bool.cond_true, Res.ok.injEq] at hk
-      obtain ⟨rfl, rfl, rfl⟩ := hk
-      have hb : b = 0x70 := UInt8.toNat_inj.1 (beq_true.1 h1)
-      subst hb
-      exact ⟨[0x70], rest, rfl, rfl, rfl, rfl⟩
-  · intro t pre rest h
-    cases t <;> simp only [RefTypeB] at h <;> subst h <;>
-      simp only [refType, List.cons_append, List.nil_append, byte, List.length_cons,
-        land_pack_cons, shiftRight_pack_cons, Res.bind_ok] <;> rfl
-
-theorem memArg_parses : Parses memArg MemArgB := by
-  rw [show memArg = fun v n => (u32 v n).bind fun a v n => (u32 v n).bind fun o v n =>
-    .ok (MemArg.mk a o) v n from rfl]
-  exact (u32_parses.bind fun a => u32_parses.bind fun o => pure_parses (MemArg.mk a o)).congr
-    fun m bs => by
-      constructor
-      · rintro ⟨a, b₁, _, h₁, ⟨o, b₂, _, h₂, ⟨rfl, rfl⟩, rfl⟩, rfl⟩
-        exact ⟨b₁, b₂, h₁, h₂, by simp⟩
-      · rintro ⟨b₁, b₂, h₁, h₂, rfl⟩
-        exact ⟨m.align, b₁, b₂, h₁, ⟨m.offset, b₂, [], h₂, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
+/-- Parsing then wrapping the value: the wrapped success splits the input like the parser's. -/
+theorem Parses.map_sound {α β : Type} {p : Nat → Nat → Res α} {R : α → List UInt8 → Prop}
+    (hp : Parses p R) {f : α → β} {bs : List UInt8} {b : β} {v n : Nat}
+    (h : (p (pack bs) bs.length).bind (fun x v n => .ok (f x) v n) = .ok b v n) :
+    ∃ x imm rest, bs = imm ++ rest ∧ R x imm ∧ b = f x ∧ v = pack rest ∧ n = rest.length := by
+  obtain ⟨x, v', n', hx, hk⟩ := Res.bind_eq_ok.1 h
+  simp only [Res.ok.injEq] at hk
+  obtain ⟨rfl, rfl, rfl⟩ := hk
+  obtain ⟨imm, rest, rfl, hR, rfl, rfl⟩ := hp.sound hx
+  exact ⟨x, imm, rest, rfl, hR, rfl, rfl, rfl⟩
 
 /-- An `sN` encoding (`N > 0`) has at most `⌈N/7⌉` bytes. -/
 theorem _root_.FVA.Wasm.Binary.SLeb.length_le {N : Nat} {i : Int} {bs : List UInt8}
@@ -173,77 +112,404 @@ theorem _root_.FVA.Wasm.Binary.SLeb.range {N : Nat} {i : Int} {bs : List UInt8} 
     simp only [show (2 : Int) ^ 7 = 128 by decide] at h7' ⊢
     constructor <;> omega
 
+/-- A non-negative `s33` (a type index): `sleb 5 33`, then the `< 2^32` check. -/
+theorem s33_sound {bs : List UInt8} {x : Nat} {v n : Nat}
+    (hs : sleb 5 33 (pack bs) bs.length = .ok x v n) (hx : Nat.blt x (2 ^ 32) = true) :
+    ∃ pre rest, bs = pre ++ rest ∧ SLeb 33 (x : Int) pre ∧ v = pack rest ∧ n = rest.length := by
+  obtain ⟨pre, rest, hpre, ⟨i, hi, rfl, -⟩, rfl, rfl⟩ := (sleb_parses 5 33).sound hs
+  have hr := hi.range (by decide)
+  have hlt := blt_true.1 hx
+  have hi0 : 0 ≤ i := by
+    rcases Int.lt_or_le i 0 with hneg | hpos
+    · have : i % 2 ^ 33 = i + 2 ^ 33 := by
+        rw [← Int.add_emod_right, Int.emod_eq_of_lt (by simp at hr; omega) (by omega)]
+      rw [this] at hlt; simp at hr hlt; omega
+    · exact hpos
+  refine ⟨pre, rest, hpre, ?_, rfl, rfl⟩
+  rwa [Int.emod_eq_of_lt hi0 (by simp at hr; omega), Int.toNat_of_nonneg hi0]
+
+theorem s33_complete {x : Nat} {pre : List UInt8} (h : SLeb 33 (x : Int) pre)
+    (rest : List UInt8) :
+    sleb 5 33 (pack (pre ++ rest)) (pre ++ rest).length = .ok x (pack rest) rest.length ∧
+      Nat.blt x (2 ^ 32) = true := by
+  have hr := h.range (by decide)
+  have hx : ((x : Int) % 2 ^ 33).toNat = x := by
+    rw [Int.emod_eq_of_lt (by omega) (by simp at hr; omega)]; simp
+  exact ⟨(sleb_parses 5 33).complete rest ⟨x, h, hx.symm, by have := h.length_le; omega⟩,
+    blt_true.2 (by simp at hr; omega)⟩
+
+/-- The first byte of a non-negative `s33` is below `0x40` or at least `0x80`. -/
+theorem s33_head {x : Nat} {b : UInt8} {pre : List UInt8} (h : SLeb 33 (x : Int) (b :: pre)) :
+    b.toNat < 0x40 ∨ 0x80 ≤ b.toNat := by
+  rcases h.head_cases with ⟨_, _⟩ | ⟨_, _, hneg⟩ | _
+  · omega
+  · omega
+  · omega
+
+theorem numTypeOf_some {k : Nat} {t : NumType} (h : numTypeOf k = some t) :
+    NumTypeB t [k.toUInt8] := by
+  simp only [numTypeOf, Bool.cond_eq_ite, Nat.beq_eq] at h
+  repeat' split at h
+  all_goals (cases h <;> subst_vars <;> rfl)
+
+theorem numTypeOf_none {k : Nat} (h : k < 0x7C ∨ 0x7F < k) : numTypeOf k = none := by
+  simp only [numTypeOf, Bool.cond_eq_ite, Nat.beq_eq]
+  repeat' split
+  all_goals first | rfl | omega
+
+theorem numTypeB_byte {t : NumType} {bs : List UInt8} (h : NumTypeB t bs) :
+    ∃ b : UInt8, bs = [b] ∧ numTypeOf b.toNat = some t ∧ 0x7C ≤ b.toNat ∧ b.toNat ≤ 0x7F := by
+  cases t <;> (simp only [NumTypeB] at h; subst h; exact ⟨_, rfl, rfl, by decide, by decide⟩)
+
+theorem absHeapOf_some {k : Nat} {a : AbsHeapType} (h : absHeapOf k = some a) :
+    (k.toUInt8, a) ∈ absHeapOps := by
+  simp only [absHeapOf, Bool.cond_eq_ite, Nat.beq_eq] at h
+  repeat' split at h
+  all_goals (cases h <;> subst_vars <;> decide)
+
+theorem absHeapOf_none {k : Nat} (h : k < 0x69 ∨ 0x70 < k) : absHeapOf k = none := by
+  simp only [absHeapOf, Bool.cond_eq_ite, Nat.beq_eq]
+  repeat' split
+  all_goals first | rfl | omega
+
+theorem absHeapExcluded_none {k : Nat} (h : k < 0x6A ∨ 0x74 < k) : absHeapExcluded k = none := by
+  simp only [absHeapExcluded, Bool.cond_eq_ite, Bool.and_eq_true, Bool.or_eq_true, Nat.ble_eq,
+    Nat.beq_eq]
+  repeat' split
+  all_goals first | rfl | omega
+
+/-- A P′ abstract heap type's byte is decoded as that type and is no excluded one. -/
+theorem absHeapOps_byte {b : UInt8} {a : AbsHeapType} (h : (b, a) ∈ absHeapOps) :
+    absHeapOf b.toNat = some a ∧ 0x69 ≤ b.toNat ∧ b.toNat ≤ 0x70 := by
+  simp only [absHeapOps, List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at h
+  rcases h with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;> exact ⟨rfl, by decide, by decide⟩
+
+theorem heapType_parses : Parses heapType HeapTypeB := by
+  constructor
+  · intro bs ht v n h
+    cases bs with
+    | nil => simp [heapType] at h
+    | cons b bs =>
+      simp only [heapType, List.length_cons, land_pack_cons, shiftRight_pack_cons] at h
+      split at h
+      · rename_i a ha
+        simp only [Res.ok.injEq] at h
+        obtain ⟨rfl, rfl, rfl⟩ := h
+        exact ⟨[b], bs, rfl, ⟨b, by simpa using absHeapOf_some ha, rfl⟩, rfl, rfl⟩
+      · split at h
+        · simp at h
+        · obtain ⟨x, v', n', hs, hk⟩ := Res.bind_eq_ok.1 h
+          cases hx : Nat.blt x (2 ^ 32)
+          · simp [hx] at hk
+          · simp only [hx, Bool.cond_true, Res.ok.injEq] at hk
+            obtain ⟨rfl, rfl, rfl⟩ := hk
+            obtain ⟨pre, rest, hpre, hS, rfl, rfl⟩ :=
+              s33_sound (bs := b :: bs) (by simpa using hs) hx
+            exact ⟨pre, rest, hpre, hS, rfl, rfl⟩
+  · intro ht pre rest h
+    cases ht with
+    | abs a =>
+      obtain ⟨b, hm, rfl⟩ := h
+      obtain ⟨hb, -, -⟩ := absHeapOps_byte hm
+      simp only [heapType, List.cons_append, List.nil_append, List.length_cons, land_pack_cons,
+        shiftRight_pack_cons, hb]
+    | idx x =>
+      have h' : SLeb 33 (x : Int) pre := h
+      cases pre with
+      | nil => exact absurd rfl h'.ne_nil
+      | cons b pre =>
+        have hb := s33_head h'
+        obtain ⟨hs, hx⟩ := s33_complete h' rest
+        simp only [heapType, List.cons_append, List.length_cons, land_pack_cons,
+          absHeapOf_none (show b.toNat < 0x69 ∨ 0x70 < b.toNat by omega),
+          absHeapExcluded_none (show b.toNat < 0x6A ∨ 0x74 < b.toNat by omega)]
+        simp only [List.cons_append, List.length_cons] at hs
+        rw [hs, Res.bind_ok, hx]; rfl
+
+theorem refType_parses : Parses refType RefTypeB := by
+  constructor
+  · intro bs t v n h
+    obtain ⟨_, v', n', hb, hk⟩ := Res.bind_eq_ok.1 h
+    obtain ⟨_, rest, rfl, ⟨b, rfl, rfl⟩, rfl, rfl⟩ := byte_parses.sound hb
+    cases h1 : Nat.beq b.toNat 0x63
+    · simp only [h1, Bool.cond_false] at hk
+      cases h2 : Nat.beq b.toNat 0x64
+      · simp only [h2, Bool.cond_false] at hk
+        split at hk
+        · rename_i a ha
+          simp only [Res.ok.injEq] at hk
+          obtain ⟨rfl, rfl, rfl⟩ := hk
+          exact ⟨[b], rest, rfl, .short (by simpa using absHeapOf_some ha), rfl, rfl⟩
+        · split at hk <;> simp at hk
+      · simp only [h2, Bool.cond_true] at hk
+        obtain ⟨ht, imm, rest', rfl, hH, rfl, rfl, rfl⟩ := heapType_parses.map_sound hk
+        obtain rfl : b = 0x64 := UInt8.toNat_inj.1 (beq_true.1 h2)
+        exact ⟨0x64 :: imm, rest', rfl, .nonNull hH, rfl, rfl⟩
+    · simp only [h1, Bool.cond_true] at hk
+      obtain ⟨ht, imm, rest', rfl, hH, rfl, rfl, rfl⟩ := heapType_parses.map_sound hk
+      obtain rfl : b = 0x63 := UInt8.toNat_inj.1 (beq_true.1 h1)
+      exact ⟨0x63 :: imm, rest', rfl, .null hH, rfl, rfl⟩
+  · intro t pre rest h
+    cases h with
+    | @null ht b hH =>
+      simp only [refType, List.cons_append, byte, List.length_cons, land_pack_cons,
+        shiftRight_pack_cons, Res.bind_ok, show Nat.beq (UInt8.toNat 0x63) 0x63 = true from rfl,
+        Bool.cond_true]
+      rw [heapType_parses.complete rest hH, Res.bind_ok]
+    | @nonNull ht b hH =>
+      simp only [refType, List.cons_append, byte, List.length_cons, land_pack_cons,
+        shiftRight_pack_cons, Res.bind_ok, show Nat.beq (UInt8.toNat 0x64) 0x63 = false from rfl,
+        show Nat.beq (UInt8.toNat 0x64) 0x64 = true from rfl, Bool.cond_false, Bool.cond_true]
+      rw [heapType_parses.complete rest hH, Res.bind_ok]
+    | @short a b hm =>
+      obtain ⟨hb, h1, h2⟩ := absHeapOps_byte hm
+      simp only [refType, List.cons_append, List.nil_append, byte, List.length_cons,
+        land_pack_cons, shiftRight_pack_cons, Res.bind_ok,
+        beq_false.2 (show b.toNat ≠ 0x63 by omega), beq_false.2 (show b.toNat ≠ 0x64 by omega),
+        Bool.cond_false, hb]
+
+/-- The first byte of a reference type: `0x63`, `0x64` or a P′ abstract heap type's. -/
+theorem refTypeB_head {t : RefType} {bs : List UInt8} (h : RefTypeB t bs) :
+    ∃ b rest, bs = b :: rest ∧ 0x63 ≤ b.toNat ∧ b.toNat ≤ 0x70 ∧
+      (Nat.beq b.toNat 0x63 || Nat.beq b.toNat 0x64 || (absHeapOf b.toNat).isSome) = true := by
+  cases h with
+  | null => exact ⟨0x63, _, rfl, by decide, by decide, rfl⟩
+  | nonNull => exact ⟨0x64, _, rfl, by decide, by decide, rfl⟩
+  | @short a b hm =>
+    obtain ⟨hb, h1, h2⟩ := absHeapOps_byte hm
+    exact ⟨b, [], rfl, by omega, h2, by simp [hb]⟩
+
+theorem valType_parses : Parses valType ValTypeB := by
+  constructor
+  · intro bs t v n h
+    cases bs with
+    | nil => simp [valType] at h
+    | cons b bs =>
+      simp only [valType, List.length_cons, land_pack_cons, shiftRight_pack_cons] at h
+      split at h
+      · rename_i t' ht
+        simp only [Res.ok.injEq] at h
+        obtain ⟨rfl, rfl, rfl⟩ := h
+        exact ⟨[b], bs, rfl, by simpa [ValTypeB] using numTypeOf_some ht, rfl, rfl⟩
+      · simp only [Bool.cond_eq_ite] at h
+        split at h
+        · simp at h
+        · split at h
+          · obtain ⟨t, imm, rest, hbs, hR, rfl, rfl, rfl⟩ :=
+              refType_parses.map_sound (bs := b :: bs) (by simpa using h)
+            exact ⟨imm, rest, hbs, hR, rfl, rfl⟩
+          · simp at h
+  · intro t pre rest h
+    cases t with
+    | num t =>
+      obtain ⟨b, rfl, ht, -⟩ := numTypeB_byte h
+      simp only [valType, List.cons_append, List.nil_append, List.length_cons, land_pack_cons,
+        shiftRight_pack_cons, ht]
+    | ref t =>
+      have h' : RefTypeB t pre := h
+      obtain ⟨b, pre', rfl, h1, h2, hs⟩ := refTypeB_head h'
+      have hc := refType_parses.complete rest h'
+      simp only [List.cons_append, List.length_cons] at hc
+      have hstart : (Nat.beq b.toNat 0x63 || Nat.beq b.toNat 0x64 || (absHeapOf b.toNat).isSome ||
+          (absHeapExcluded b.toNat).isSome) = true := by
+        simp only [Bool.or_eq_true] at hs ⊢
+        rcases hs with (h | h) | h <;> simp [h]
+      simp only [valType, List.cons_append, List.length_cons, land_pack_cons,
+        numTypeOf_none (show b.toNat < 0x7C ∨ 0x7F < b.toNat by omega),
+        beq_false.2 (show b.toNat ≠ 0x7B by omega), Bool.cond_false, hstart, Bool.cond_true]
+      rw [hc, Res.bind_ok]
+
+theorem valTypeStart_false {k : Nat} (h : k < 0x63 ∨ 0x7F < k) : valTypeStart k = false := by
+  simp only [valTypeStart, numTypeOf_none (show k < 0x7C ∨ 0x7F < k by omega),
+    absHeapOf_none (show k < 0x69 ∨ 0x70 < k by omega),
+    absHeapExcluded_none (show k < 0x6A ∨ 0x74 < k by omega), Option.isSome_none,
+    Bool.or_false, Bool.false_or, Bool.or_eq_false_iff, beq_false]
+  omega
+
+/-- The first byte of a value type starts one (`valTypeStart`) and is not `0x40`. -/
+theorem valTypeB_head {t : ValType} {bs : List UInt8} (h : ValTypeB t bs) :
+    ∃ b rest, bs = b :: rest ∧ valTypeStart b.toNat = true ∧ b.toNat ≠ 0x40 := by
+  cases t with
+  | num t =>
+    obtain ⟨b, rfl, ht, h1, h2⟩ := numTypeB_byte h
+    exact ⟨b, [], rfl, by simp [valTypeStart, ht], by omega⟩
+  | ref t =>
+    obtain ⟨b, rest, rfl, h1, h2, hs⟩ := refTypeB_head (show RefTypeB t bs from h)
+    refine ⟨b, rest, rfl, ?_, by omega⟩
+    simp only [Bool.or_eq_true] at hs
+    simp only [valTypeStart, Bool.or_eq_true]
+    rcases hs with (h | h) | h <;> simp [h]
+
+theorem ValTypeB.ne_nil {t : ValType} {bs : List UInt8} (h : ValTypeB t bs) : bs ≠ [] := by
+  obtain ⟨b, rest, rfl, -⟩ := valTypeB_head h; simp
+
 theorem blockType_parses : Parses blockType BlockTypeB := by
   constructor
   · intro bs bt v n h
-    obtain ⟨_, v', n', hb, hk⟩ := Res.bind_eq_ok.1 h
-    obtain ⟨_, rest, rfl, ⟨b, rfl, rfl⟩, rfl, rfl⟩ := byte_parses.sound hb
-    cases h1 : Nat.beq b.toNat 0x40
-    · simp only [h1, Bool.cond_false] at hk
-      split at hk
-      · rename_i t ht
-        simp only [Res.ok.injEq] at hk
-        obtain ⟨rfl, rfl, rfl⟩ := hk
-        exact ⟨[b], rest, rfl, by simpa [BlockTypeB] using valTypeOf_some ht, rfl, rfl⟩
-      · cases h2 : Nat.beq b.toNat 0x7B
-        · simp only [h2, Bool.cond_false] at hk
-          obtain ⟨x, v'', n'', hs, hk⟩ := Res.bind_eq_ok.1 hk
-          obtain ⟨pre, rest', hpre, ⟨i, hi, rfl, -⟩, rfl, rfl⟩ := (sleb_parses 5 33).sound hs
-          cases h3 : Nat.blt (i % 2 ^ 33).toNat (2 ^ 32)
-          · simp only [h3, Bool.cond_false] at hk; simp at hk
-          · simp only [h3, Bool.cond_true, Res.ok.injEq] at hk
+    cases bs with
+    | nil => simp [blockType] at h
+    | cons b bs =>
+      simp only [blockType, List.length_cons, land_pack_cons, shiftRight_pack_cons] at h
+      cases h1 : Nat.beq b.toNat 0x40
+      · simp only [h1, Bool.cond_false] at h
+        cases h2 : valTypeStart b.toNat
+        · simp only [h2, Bool.cond_false] at h
+          obtain ⟨x, v', n', hs, hk⟩ := Res.bind_eq_ok.1 h
+          cases hx : Nat.blt x (2 ^ 32)
+          · simp [hx] at hk
+          · simp only [hx, Bool.cond_true, Res.ok.injEq] at hk
             obtain ⟨rfl, rfl, rfl⟩ := hk
-            have hr := hi.range (by decide)
-            have hlt := blt_true.1 h3
-            have hi0 : 0 ≤ i := by
-              rcases Int.lt_or_le i 0 with hneg | hpos
-              · have : i % 2 ^ 33 = i + 2 ^ 33 := by
-                  rw [← Int.add_emod_right, Int.emod_eq_of_lt (by simp at hr; omega) (by omega)]
-                rw [this] at hlt; simp at hr hlt; omega
-              · exact hpos
-            refine ⟨pre, rest', hpre, ?_, rfl, rfl⟩
-            simp only [BlockTypeB]
-            rwa [Int.emod_eq_of_lt hi0 (by simp at hr; omega), Int.toNat_of_nonneg hi0]
-        · simp only [h2, Bool.cond_true] at hk; simp at hk
-    · simp only [h1, Bool.cond_true, Res.ok.injEq] at hk
-      obtain ⟨rfl, rfl, rfl⟩ := hk
-      have hb : b = 0x40 := UInt8.toNat_inj.1 (beq_true.1 h1)
-      subst hb
-      exact ⟨[0x40], rest, rfl, rfl, rfl, rfl⟩
+            obtain ⟨pre, rest, hpre, hS, rfl, rfl⟩ :=
+              s33_sound (bs := b :: bs) (by simpa using hs) hx
+            exact ⟨pre, rest, hpre, hS, rfl, rfl⟩
+        · simp only [h2, Bool.cond_true] at h
+          obtain ⟨t, imm, rest, hbs, hR, rfl, rfl, rfl⟩ :=
+            valType_parses.map_sound (bs := b :: bs) (by simpa using h)
+          exact ⟨imm, rest, hbs, hR, rfl, rfl⟩
+      · simp only [h1, Bool.cond_true, Res.ok.injEq] at h
+        obtain ⟨rfl, rfl, rfl⟩ := h
+        obtain rfl : b = 0x40 := UInt8.toNat_inj.1 (beq_true.1 h1)
+        exact ⟨[0x40], bs, rfl, rfl, rfl, rfl⟩
   · intro bt pre rest h
     cases bt with
     | empty =>
       simp only [BlockTypeB] at h; subst h
-      simp only [blockType, List.cons_append, List.nil_append, byte, List.length_cons,
-        land_pack_cons, shiftRight_pack_cons, Res.bind_ok]; rfl
+      simp only [blockType, List.cons_append, List.nil_append, List.length_cons,
+        land_pack_cons, shiftRight_pack_cons]; rfl
     | val t =>
-      obtain ⟨b, rfl, ht, h6f, -⟩ := valTypeB_byte h
-      have h1 : Nat.beq b.toNat 0x40 = false := beq_false.2 (by omega)
-      simp only [blockType, List.cons_append, List.nil_append, byte, List.length_cons,
-        land_pack_cons, shiftRight_pack_cons, Res.bind_ok, h1, Bool.cond_false, ht]
+      have h' : ValTypeB t pre := h
+      obtain ⟨b, pre', rfl, hs, h40⟩ := valTypeB_head h'
+      have hc := valType_parses.complete rest h'
+      simp only [List.cons_append, List.length_cons] at hc
+      simp only [blockType, List.cons_append, List.length_cons, land_pack_cons,
+        beq_false.2 h40, hs, Bool.cond_false, Bool.cond_true]
+      rw [hc, Res.bind_ok]
     | idx x =>
-      simp only [BlockTypeB] at h
-      have hr := h.range (by decide)
-      have hx : ((x : Int) % 2 ^ 33).toNat = x := by
-        rw [Int.emod_eq_of_lt (by omega) (by simp at hr; omega)]; simp
-      have hs := (sleb_parses 5 33).complete rest ⟨x, h, hx.symm, by
-        have := h.length_le; omega⟩
-      have h3 : Nat.blt x (2 ^ 32) = true := blt_true.2 (by simp at hr; omega)
+      have h' : SLeb 33 (x : Int) pre := h
       cases pre with
-      | nil => exact absurd rfl h.ne_nil
+      | nil => exact absurd rfl h'.ne_nil
       | cons b pre =>
-        have hb : b.toNat < 64 ∨ 128 ≤ b.toNat := by
-          rcases h.head_cases with ⟨h6, _⟩ | ⟨_, _, hneg⟩ | h7
-          · omega
-          · omega
-          · omega
-        have h1 : Nat.beq b.toNat 0x40 = false := beq_false.2 (by omega)
-        have h2 : Nat.beq b.toNat 0x7B = false := beq_false.2 (by omega)
-        simp only [blockType, List.cons_append, byte, List.length_cons, land_pack_cons,
-          shiftRight_pack_cons, Res.bind_ok, h1, Bool.cond_false,
-          valTypeOf_none (show b.toNat < 0x6F ∨ 0x7F < b.toNat by omega), h2]
+        have hb := s33_head h'
+        obtain ⟨hs, hx⟩ := s33_complete h' rest
         simp only [List.cons_append, List.length_cons] at hs
-        rw [hs, Res.bind_ok, h3]; rfl
+        simp only [blockType, List.cons_append, List.length_cons, land_pack_cons,
+          beq_false.2 (show b.toNat ≠ 0x40 by omega),
+          valTypeStart_false (show b.toNat < 0x63 ∨ 0x7F < b.toNat by omega), Bool.cond_false]
+        rw [hs, Res.bind_ok, hx]; rfl
+
+theorem memIdx0_parses : Parses memIdx0 (fun _ bs => ULeb 32 0 bs) := by
+  constructor
+  · intro bs u v n h
+    obtain ⟨x, v', n', hx, hk⟩ := Res.bind_eq_ok.1 h
+    obtain ⟨pre, rest, rfl, hu, rfl, rfl⟩ := u32_parses.sound hx
+    cases h0 : Nat.beq x 0
+    · simp [h0] at hk
+    · simp only [h0, Bool.cond_true, Res.ok.injEq] at hk
+      obtain ⟨-, rfl, rfl⟩ := hk
+      obtain rfl : x = 0 := beq_true.1 h0
+      exact ⟨pre, rest, rfl, hu, rfl, rfl⟩
+  · intro u pre rest h
+    simp only [memIdx0]
+    rw [u32_parses.complete rest h, Res.bind_ok]; rfl
+
+theorem memArg_parses : Parses memArg MemArgB := by
+  constructor
+  · intro bs m v n h
+    obtain ⟨f, v₁, n₁, hf, hk⟩ := Res.bind_eq_ok.1 h
+    obtain ⟨b₁, r₁, rfl, hu, rfl, rfl⟩ := u32_parses.sound hf
+    cases h1 : Nat.blt f 64
+    · simp only [h1, Bool.cond_false] at hk
+      cases h2 : Nat.blt f 128
+      · simp [h2] at hk
+      · simp only [h2, Bool.cond_true] at hk
+        obtain ⟨_, v₂, n₂, h₂, hk⟩ := Res.bind_eq_ok.1 hk
+        obtain ⟨b₀, r₂, rfl, h0, rfl, rfl⟩ := memIdx0_parses.sound h₂
+        obtain ⟨o, b₂, rest, rfl, ho, rfl, rfl, rfl⟩ := u64_parses.map_sound hk
+        have := blt_false.1 h1
+        have := blt_true.1 h2
+        refine ⟨b₁ ++ b₀ ++ b₂, rest, by simp, ⟨by simp; omega,
+          .inr ⟨b₁, b₀, b₂, ?_, h0, ho, rfl⟩⟩, rfl, rfl⟩
+        simpa [show f - 64 + 2 ^ 6 = f by omega] using hu
+    · simp only [h1, Bool.cond_true] at hk
+      obtain ⟨o, b₂, rest, rfl, ho, rfl, rfl, rfl⟩ := u64_parses.map_sound hk
+      exact ⟨b₁ ++ b₂, rest, by simp, ⟨by simpa using blt_true.1 h1,
+        .inl ⟨b₁, b₂, hu, ho, rfl⟩⟩, rfl, rfl⟩
+  · rintro m pre rest ⟨ha, ⟨b₁, b₂, hu, ho, rfl⟩ | ⟨b₁, b₀, b₂, hu, h0, ho, rfl⟩⟩
+    · simp only [memArg, List.append_assoc]
+      rw [u32_parses.complete _ hu, Res.bind_ok, blt_true.2 ha, Bool.cond_true,
+        u64_parses.complete rest ho, Res.bind_ok]
+    · simp only [memArg, List.append_assoc]
+      rw [u32_parses.complete _ hu, Res.bind_ok, blt_false.2 (by omega), Bool.cond_false,
+        blt_true.2 (by omega), Bool.cond_true, memIdx0_parses.complete (a := ()) _ h0, Res.bind_ok,
+        u64_parses.complete rest ho, Res.bind_ok]
+      simp
+
+theorem catchClause_parses : Parses catchClause CatchB := by
+  constructor
+  · intro bs c v n h
+    obtain ⟨_, v', n', hb, hk⟩ := Res.bind_eq_ok.1 h
+    obtain ⟨_, rest, rfl, ⟨b, rfl, rfl⟩, rfl, rfl⟩ := byte_parses.sound hb
+    simp only [Bool.cond_eq_ite, Nat.beq_eq] at hk
+    split at hk
+    · rename_i hb0
+      obtain ⟨x, v₂, n₂, h₂, h₃⟩ := Res.bind_eq_ok.1 hk
+      obtain ⟨b₁, r₁, rfl, hx, rfl, rfl⟩ := u32_parses.sound h₂
+      obtain ⟨l, b₂, r, rfl, hl, rfl, rfl, rfl⟩ := u32_parses.map_sound h₃
+      obtain rfl : b = 0 := UInt8.toNat_inj.1 hb0
+      exact ⟨0 :: (b₁ ++ b₂), r, by simp, ⟨b₁, b₂, hx, hl, rfl⟩, rfl, rfl⟩
+    · split at hk
+      · rename_i _ hb1
+        obtain ⟨x, v₂, n₂, h₂, h₃⟩ := Res.bind_eq_ok.1 hk
+        obtain ⟨b₁, r₁, rfl, hx, rfl, rfl⟩ := u32_parses.sound h₂
+        obtain ⟨l, b₂, r, rfl, hl, rfl, rfl, rfl⟩ := u32_parses.map_sound h₃
+        obtain rfl : b = 1 := UInt8.toNat_inj.1 hb1
+        exact ⟨1 :: (b₁ ++ b₂), r, by simp, ⟨b₁, b₂, hx, hl, rfl⟩, rfl, rfl⟩
+      · split at hk
+        · rename_i _ _ hb2
+          obtain ⟨l, b₂, r, rfl, hl, rfl, rfl, rfl⟩ := u32_parses.map_sound hk
+          obtain rfl : b = 2 := UInt8.toNat_inj.1 hb2
+          exact ⟨2 :: b₂, r, rfl, ⟨b₂, hl, rfl⟩, rfl, rfl⟩
+        · split at hk
+          · rename_i _ _ _ hb3
+            obtain ⟨l, b₂, r, rfl, hl, rfl, rfl, rfl⟩ := u32_parses.map_sound hk
+            obtain rfl : b = 3 := UInt8.toNat_inj.1 hb3
+            exact ⟨3 :: b₂, r, rfl, ⟨b₂, hl, rfl⟩, rfl, rfl⟩
+          · simp at hk
+  · intro c pre rest h
+    cases c with
+    | tag x l =>
+      obtain ⟨b₁, b₂, hx, hl, rfl⟩ := h
+      simp only [catchClause, List.cons_append, byte, List.length_cons, land_pack_cons,
+        shiftRight_pack_cons, Res.bind_ok, List.append_assoc,
+        show Nat.beq (UInt8.toNat 0) 0 = true from rfl, Bool.cond_true]
+      rw [u32_parses.complete _ hx, Res.bind_ok, u32_parses.complete _ hl, Res.bind_ok]
+    | tagRef x l =>
+      obtain ⟨b₁, b₂, hx, hl, rfl⟩ := h
+      simp only [catchClause, List.cons_append, byte, List.length_cons, land_pack_cons,
+        shiftRight_pack_cons, Res.bind_ok, List.append_assoc,
+        show Nat.beq (UInt8.toNat 1) 0 = false from rfl,
+        show Nat.beq (UInt8.toNat 1) 1 = true from rfl, Bool.cond_false, Bool.cond_true]
+      rw [u32_parses.complete _ hx, Res.bind_ok, u32_parses.complete _ hl, Res.bind_ok]
+    | all l =>
+      obtain ⟨b₂, hl, rfl⟩ := h
+      simp only [catchClause, List.cons_append, byte, List.length_cons, land_pack_cons,
+        shiftRight_pack_cons, Res.bind_ok,
+        show Nat.beq (UInt8.toNat 2) 0 = false from rfl,
+        show Nat.beq (UInt8.toNat 2) 1 = false from rfl,
+        show Nat.beq (UInt8.toNat 2) 2 = true from rfl, Bool.cond_false, Bool.cond_true]
+      rw [u32_parses.complete _ hl, Res.bind_ok]
+    | allRef l =>
+      obtain ⟨b₂, hl, rfl⟩ := h
+      simp only [catchClause, List.cons_append, byte, List.length_cons, land_pack_cons,
+        shiftRight_pack_cons, Res.bind_ok,
+        show Nat.beq (UInt8.toNat 3) 0 = false from rfl,
+        show Nat.beq (UInt8.toNat 3) 1 = false from rfl,
+        show Nat.beq (UInt8.toNat 3) 2 = false from rfl,
+        show Nat.beq (UInt8.toNat 3) 3 = true from rfl, Bool.cond_false, Bool.cond_true]
+      rw [u32_parses.complete _ hl, Res.bind_ok]
+
+theorem CatchB.ne_nil {c : Catch} {bs : List UInt8} (h : CatchB c bs) : bs ≠ [] := by
+  cases c <;> obtain ⟨_, _, _⟩ := h <;> simp_all
 
 /-! ## Opcode tables
 
@@ -255,20 +521,22 @@ def memOpAt (op : Nat) : Option (MemArg → Instr) :=
   bif Nat.blt op 0x36 then nth loadOps (op - 0x28) else nth storeOps (op - 0x36)
 
 theorem numOp_table : (List.range 128).map (fun k => (UInt8.ofNat (0x45 + k), numOp (0x45 + k))) =
-    (plainOps.drop 6).map (fun p => (p.1, some p.2)) := by rfl
+    (plainOps.drop 8).map (fun p => (p.1, some p.2)) := by rfl
 
 theorem memOp_table : (List.range 23).map (fun k => (UInt8.ofNat (0x28 + k), memOpAt (0x28 + k))) =
     memOps.map (fun p => (p.1, some p.2)) := by rfl
 
 theorem varOp_table :
     (List.range 7).map (fun k => (UInt8.ofNat (0x20 + k), nth varOps (0x20 + k - 0x20))) =
-    (idxOps.drop 4).map (fun p => (p.1, some p.2)) := by rfl
+    (idxOps.drop 10).map (fun p => (p.1, some p.2)) := by rfl
 
-theorem plainOps_eq : plainOps = [(0x00, .unreachable), (0x01, .nop), (0x0F, .return_),
-    (0x1A, .drop), (0x1B, .select none), (0xD1, .refIsNull)] ++ plainOps.drop 6 := rfl
+theorem plainOps_eq : plainOps = [(0x00, .unreachable), (0x01, .nop), (0x0A, .throwRef),
+    (0x0F, .return_), (0x1A, .drop), (0x1B, .select none), (0xD1, .refIsNull),
+    (0xD4, .refAsNonNull)] ++ plainOps.drop 8 := rfl
 
-theorem idxOps_eq : idxOps = [(0x0C, .br), (0x0D, .brIf), (0x10, .call), (0xD2, .refFunc)] ++
-    idxOps.drop 4 := rfl
+theorem idxOps_eq : idxOps = [(0x08, .throw), (0x0C, .br), (0x0D, .brIf), (0x10, .call),
+    (0x12, .returnCall), (0x14, .callRef), (0x15, .returnCallRef), (0xD2, .refFunc),
+    (0xD5, .brOnNull), (0xD6, .brOnNonNull)] ++ idxOps.drop 10 := rfl
 
 /-- A table entry found by the decoder's lookup is in the spec table. -/
 theorem mem_of_table {α : Type} {base len : Nat} {f : Nat → Option α} {tbl : List (UInt8 × α)}
@@ -307,17 +575,6 @@ theorem table_of_mem {α : Type} {base len : Nat} {f : Nat → Option α} {tbl :
 def InstrOk (op : UInt8) (i : Instr) (bs : List UInt8) (v n : Nat) : Prop :=
   ∃ imm rest, bs = imm ++ rest ∧ InstrB i (op :: imm) ∧ v = pack rest ∧ n = rest.length
 
-/-- Parsing then wrapping the value: the wrapped success splits the input like the parser's. -/
-theorem Parses.map_sound {α β : Type} {p : Nat → Nat → Res α} {R : α → List UInt8 → Prop}
-    (hp : Parses p R) {f : α → β} {bs : List UInt8} {b : β} {v n : Nat}
-    (h : (p (pack bs) bs.length).bind (fun x v n => .ok (f x) v n) = .ok b v n) :
-    ∃ x imm rest, bs = imm ++ rest ∧ R x imm ∧ b = f x ∧ v = pack rest ∧ n = rest.length := by
-  obtain ⟨x, v', n', hx, hk⟩ := Res.bind_eq_ok.1 h
-  simp only [Res.ok.injEq] at hk
-  obtain ⟨rfl, rfl, rfl⟩ := hk
-  obtain ⟨imm, rest, rfl, hR, rfl, rfl⟩ := hp.sound hx
-  exact ⟨x, imm, rest, rfl, hR, rfl, rfl, rfl⟩
-
 theorem withIdx_parses (mk : Nat → Instr) :
     Parses (withIdx mk) (fun i bs => ∃ x, i = mk x ∧ ULeb 32 x bs) :=
   (u32_parses.bind fun x => pure_parses (mk x)).congr fun i bs => by
@@ -326,23 +583,6 @@ theorem withIdx_parses (mk : Nat → Instr) :
       exact ⟨x, rfl, by simpa using hu⟩
     · rintro ⟨x, rfl, hu⟩
       exact ⟨x, bs, [], hu, ⟨rfl, rfl⟩, by simp⟩
-
-theorem zeroByte_parses : Parses zeroByte (fun _ bs => bs = [0x00]) := by
-  constructor
-  · intro bs u v n h
-    obtain ⟨_, v', n', hb, hk⟩ := Res.bind_eq_ok.1 h
-    obtain ⟨_, rest, rfl, ⟨b, rfl, rfl⟩, rfl, rfl⟩ := byte_parses.sound hb
-    cases h1 : Nat.beq b.toNat 0
-    · simp only [h1, Bool.cond_false] at hk; simp at hk
-    · simp only [h1, Bool.cond_true, Res.ok.injEq] at hk
-      obtain ⟨-, rfl, rfl⟩ := hk
-      have : b = 0 := UInt8.toNat_inj.1 (beq_true.1 h1)
-      subst this
-      exact ⟨[0x00], rest, rfl, rfl, rfl, rfl⟩
-  · rintro ⟨⟩ pre rest rfl
-    simp only [zeroByte, List.cons_append, List.nil_append, byte, List.length_cons,
-      land_pack_cons, shiftRight_pack_cons, Res.bind_ok]
-    rfl
 
 theorem sound_plain {op : UInt8} {i₀ i : Instr} {bs : List UInt8} {v n : Nat}
     (hm : (op, i₀) ∈ plainOps) (h : Res.ok i₀ (pack bs) bs.length = .ok i v n) :
@@ -359,9 +599,6 @@ theorem sound_idx {op : UInt8} {mk : Nat → Instr} {i : Instr} {bs : List UInt8
 
 theorem ULeb.ne_nil {N x : Nat} {bs : List UInt8} (h : ULeb N x bs) : bs ≠ [] := by
   cases h <;> simp
-
-theorem ValTypeB.ne_nil {t : ValType} {bs : List UInt8} (h : ValTypeB t bs) : bs ≠ [] := by
-  obtain ⟨b, rfl, -⟩ := valTypeB_byte h; simp
 
 theorem sound_brTable {bs : List UInt8} {i : Instr} {v n : Nat}
     (h : ((vec u32 (pack bs) bs.length).bind fun ls v n =>
@@ -382,6 +619,15 @@ theorem sound_callIndirect {bs : List UInt8} {i : Instr} {v n : Nat}
   obtain ⟨x, b₂, rest, rfl, hx, rfl, rfl, rfl⟩ := u32_parses.map_sound h₂
   exact ⟨b₁ ++ b₂, rest, by simp, by simpa using InstrB.callIndirect hy hx, rfl, rfl⟩
 
+theorem sound_returnCallIndirect {bs : List UInt8} {i : Instr} {v n : Nat}
+    (h : ((u32 (pack bs) bs.length).bind fun y v n =>
+      (u32 v n).bind fun x v n => .ok (Instr.returnCallIndirect x y) v n) = .ok i v n) :
+    InstrOk 0x13 i bs v n := by
+  obtain ⟨y, v', n', h₁, h₂⟩ := Res.bind_eq_ok.1 h
+  obtain ⟨b₁, rest₁, rfl, hy, rfl, rfl⟩ := u32_parses.sound h₁
+  obtain ⟨x, b₂, rest, rfl, hx, rfl, rfl, rfl⟩ := u32_parses.map_sound h₂
+  exact ⟨b₁ ++ b₂, rest, by simp, by simpa using InstrB.returnCallIndirect hy hx, rfl, rfl⟩
+
 theorem sound_selectT {bs : List UInt8} {i : Instr} {v n : Nat}
     (h : ((vec valType (pack bs) bs.length).bind fun ts v n =>
       .ok (Instr.select (some ts)) v n) = .ok i v n) : InstrOk 0x1C i bs v n := by
@@ -396,12 +642,15 @@ theorem lowInstr_sound {k : Nat} {bs : List UInt8} {i : Instr} {v n r : Nat} (hk
   all_goals try subst_vars
   all_goals first
     | (simp at h; done)
-    | exact sound_plain (by simp [plainOps]) h
-    | exact sound_idx (by simp [idxOps]) h
+    | (refine sound_plain ?_ h; simp [plainOps]; done)
+    | (refine sound_idx ?_ h; simp [idxOps]; done)
     | exact sound_callIndirect h
+    | exact sound_returnCallIndirect h
     | exact sound_selectT h
     | (obtain rfl : k = 0x0E := by omega
        exact sound_brTable h)
+    | (obtain rfl : k = 0x15 := by omega
+       refine sound_idx ?_ h; simp [idxOps])
 
 theorem fcInstr_sound {bs : List UInt8} {i : Instr} {v n : Nat}
     (h : fcInstr (pack bs) bs.length = .ok i v n) : InstrOk 0xFC i bs v n := by
@@ -424,14 +673,15 @@ theorem fcInstr_sound {bs : List UInt8} {i : Instr} {v n : Nat}
          rfl, rfl⟩)
     | (obtain ⟨x, v₂, n₂, h₂, h₃⟩ := Res.bind_eq_ok.1 hk
        obtain ⟨b₂, rest₂, rfl, hx, rfl, rfl⟩ := u32_parses.sound h₂
-       obtain ⟨_, b₃, rest, rfl, rfl, rfl, rfl, rfl⟩ := zeroByte_parses.map_sound h₃
-       exact ⟨b₁ ++ b₂ ++ [0x00], rest, by simp, by simpa using InstrB.memoryInit hu hx, rfl, rfl⟩)
+       obtain ⟨_, b₃, rest, rfl, h0, rfl, rfl, rfl⟩ := memIdx0_parses.map_sound h₃
+       exact ⟨b₁ ++ b₂ ++ b₃, rest, by simp, by simpa using InstrB.memoryInit hu hx h0, rfl,
+         rfl⟩)
     | (obtain ⟨_, v₂, n₂, h₂, h₃⟩ := Res.bind_eq_ok.1 hk
-       obtain ⟨b₂, rest₂, rfl, rfl, rfl, rfl⟩ := zeroByte_parses.sound h₂
-       obtain ⟨_, b₃, rest, rfl, rfl, rfl, rfl, rfl⟩ := zeroByte_parses.map_sound h₃
-       exact ⟨b₁ ++ [0x00, 0x00], rest, by simp, by simpa using InstrB.memoryCopy hu, rfl, rfl⟩)
-    | (obtain ⟨_, b₂, rest, rfl, rfl, rfl, rfl, rfl⟩ := zeroByte_parses.map_sound hk
-       exact ⟨b₁ ++ [0x00], rest, by simp, by simpa using InstrB.memoryFill hu, rfl, rfl⟩)
+       obtain ⟨b₂, rest₂, rfl, h0, rfl, rfl⟩ := memIdx0_parses.sound h₂
+       obtain ⟨_, b₃, rest, rfl, h1, rfl, rfl, rfl⟩ := memIdx0_parses.map_sound h₃
+       exact ⟨b₁ ++ b₂ ++ b₃, rest, by simp, by simpa using InstrB.memoryCopy hu h0 h1, rfl, rfl⟩)
+    | (obtain ⟨_, b₂, rest, rfl, h0, rfl, rfl, rfl⟩ := memIdx0_parses.map_sound hk
+       exact ⟨b₁ ++ b₂, rest, by simp, by simpa using InstrB.memoryFill hu h0, rfl, rfl⟩)
     | (obtain ⟨y, v₂, n₂, h₂, h₃⟩ := Res.bind_eq_ok.1 hk
        obtain ⟨b₂, rest₂, rfl, hy, rfl, rfl⟩ := u32_parses.sound h₂
        obtain ⟨x, b₃, rest, rfl, hx, rfl, rfl, rfl⟩ := u32_parses.map_sound h₃
@@ -472,15 +722,15 @@ theorem nth_some_lt {α : Type} {xs : List α} {k : Nat} {a : α} (h : nth xs k 
 
 theorem highInstr_sound {k : Nat} {bs : List UInt8} {i : Instr} {v n r : Nat}
     (h : highInstr k (pack bs) bs.length r = .ok i v n) : InstrOk (UInt8.ofNat k) i bs v n := by
-  simp only [highInstr, Bool.cond_eq_ite, Nat.blt_eq, Nat.beq_eq] at h
+  simp only [highInstr, Bool.cond_eq_ite, Nat.beq_eq] at h
   repeat' split at h
   all_goals try subst_vars
   all_goals first
     | (simp at h; done)
-    | exact sound_plain (by simp [plainOps]) h
-    | exact sound_idx (by simp [idxOps]) h
+    | (refine sound_plain ?_ h; simp [plainOps]; done)
+    | (refine sound_idx ?_ h; simp [idxOps]; done)
     | exact fcInstr_sound h
-    | (obtain ⟨t, imm, rest, rfl, ht, rfl, rfl, rfl⟩ := refType_parses.map_sound h
+    | (obtain ⟨t, imm, rest, rfl, ht, rfl, rfl, rfl⟩ := heapType_parses.map_sound h
        exact ⟨imm, rest, rfl, .refNull ht, rfl, rfl⟩)
 
 theorem instr_sound_nat {k : Nat} {bs : List UInt8} {i : Instr} {v n r : Nat} (hk : k < 256)
@@ -510,10 +760,10 @@ theorem instr_sound_nat {k : Nat} {bs : List UInt8} {i : Instr} {v n r : Nat} (h
           repeat' split at h
           all_goals try subst_vars
           all_goals first
-            | (obtain ⟨_, imm, rest, rfl, rfl, rfl, rfl, rfl⟩ := zeroByte_parses.map_sound h
+            | (obtain ⟨_, imm, rest, rfl, h0, rfl, rfl, rfl⟩ := memIdx0_parses.map_sound h
                first
-                 | exact ⟨[0x00], rest, rfl, .memorySize, rfl, rfl⟩
-                 | exact ⟨[0x00], rest, rfl, .memoryGrow, rfl, rfl⟩)
+                 | exact ⟨imm, rest, rfl, .memorySize h0, rfl, rfl⟩
+                 | exact ⟨imm, rest, rfl, .memoryGrow h0, rfl, rfl⟩)
             | (obtain ⟨_, imm, rest, rfl, ⟨i', hi, rfl, -⟩, rfl, rfl, rfl⟩ :=
                  (sleb_parses _ _).map_sound h
                first
@@ -587,7 +837,7 @@ theorem complete_of_eq {op : Nat} {p : Nat → Nat → Res Instr} {R : Instr →
 
 /-- The opcode and immediates of a non-structured instruction, decodable by `instr`. -/
 def InstrDec (i : Instr) (bs : List UInt8) : Prop :=
-  ∃ op imm, bs = op :: imm ∧ (op.toNat < 2 ∨ 5 < op.toNat ∧ op.toNat ≠ 0x0B) ∧
+  ∃ op imm, bs = op :: imm ∧ (op.toNat < 2 ∨ 5 < op.toNat ∧ op.toNat ≠ 0x0B ∧ op.toNat ≠ 0x1F) ∧
     ∀ rest r, instr op.toNat (pack (imm ++ rest)) (imm ++ rest).length r =
       .ok i (pack rest) rest.length
 
@@ -597,8 +847,8 @@ theorem dec_plain {i : Instr} {op : UInt8} (hm : (op, i) ∈ plainOps) :
   rw [plainOps_eq, List.mem_append] at hm
   rcases hm with hm | hm
   · simp only [List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at hm
-    rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
-      exact ⟨by decide, fun _ _ => rfl⟩
+    rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ |
+      ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;> exact ⟨by decide, fun _ _ => rfl⟩
   · obtain ⟨h₁, h₂, hf⟩ := table_of_mem numOp_table (by decide) (List.mem_of_mem_drop hm)
     refine ⟨by omega, fun rest r => ?_⟩
     rw [instr_num h₁ h₂, hf]; rfl
@@ -630,7 +880,8 @@ theorem dec_idx {mk : Nat → Instr} {op : UInt8} {x : Nat} {b : List UInt8} (hm
   rw [idxOps_eq, List.mem_append] at hm
   rcases hm with hm | hm
   · simp only [List.mem_cons, Prod.mk.injEq, List.mem_nil_iff, or_false] at hm
-    rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
+    rcases hm with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ |
+      ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
       exact ⟨_, _, rfl, by decide, fun rest r => (withIdx_parses _).complete rest ⟨_, rfl, hx⟩⟩
   · obtain ⟨h₁, h₂, hf⟩ := table_of_mem (f := fun x => nth varOps (x - 0x20)) varOp_table
       (by decide) hm
@@ -672,6 +923,17 @@ theorem dec_callIndirect {x y : Nat} {b₁ b₂ : List UInt8} (hy : ULeb 32 y b�
   simp only [List.append_assoc] at this ⊢
   exact this
 
+theorem dec_returnCallIndirect {x y : Nat} {b₁ b₂ : List UInt8} (hy : ULeb 32 y b₁)
+    (hx : ULeb 32 x b₂) : InstrDec (.returnCallIndirect x y) ([0x13] ++ b₁ ++ b₂) := by
+  refine ⟨0x13, b₁ ++ b₂, by simp, by decide, fun rest r => ?_⟩
+  show ((u32 _ _).bind fun y v n =>
+    (u32 v n).bind fun x v n => .ok (Instr.returnCallIndirect x y) v n) = _
+  have := (u32_parses.bind fun y => u32_parses.bind fun x =>
+    pure_parses (Instr.returnCallIndirect x y)).complete
+    rest ⟨y, b₁, b₂, hy, ⟨x, b₂, [], hx, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
+  simp only [List.append_assoc] at this ⊢
+  exact this
+
 theorem dec_selectT {ts : List ValType} {b : List UInt8} (h : Vec ValTypeB ts b) :
     InstrDec (.select (some ts)) (0x1C :: b) := by
   refine ⟨0x1C, _, rfl, by decide, fun rest r => ?_⟩
@@ -679,58 +941,59 @@ theorem dec_selectT {ts : List ValType} {b : List UInt8} (h : Vec ValTypeB ts b)
   exact ((vec_parses valType_parses fun _ _ h => ValTypeB.ne_nil h).bind fun ts =>
     pure_parses (Instr.select (some ts))).complete rest ⟨_, _, [], h, ⟨rfl, rfl⟩, by simp⟩
 
-theorem dec_refNull {t : RefType} {b : List UInt8} (h : RefTypeB t b) :
-    InstrDec (.refNull t) (0xD0 :: b) := by
+theorem dec_refNull {ht : HeapType} {b : List UInt8} (h : HeapTypeB ht b) :
+    InstrDec (.refNull ht) (0xD0 :: b) := by
   refine ⟨0xD0, _, rfl, by decide, fun rest r => ?_⟩
-  show ((refType _ _).bind fun t v n => .ok (Instr.refNull t) v n) = _
-  exact (refType_parses.bind fun t => pure_parses (Instr.refNull t)).complete rest
+  show ((heapType _ _).bind fun ht v n => .ok (Instr.refNull ht) v n) = _
+  exact (heapType_parses.bind fun ht => pure_parses (Instr.refNull ht)).complete rest
     ⟨_, _, [], h, ⟨rfl, rfl⟩, by simp⟩
 
-theorem dec_memorySize :
-    InstrDec .memorySize [0x3F, 0x00] := by
-  exact ⟨0x3F, [0x00], rfl, by decide, fun rest r =>
-    (zeroByte_parses.bind fun u => pure_parses Instr.memorySize).complete rest
-      ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩⟩
+theorem dec_memorySize {b : List UInt8} (hx : ULeb 32 0 b) :
+    InstrDec .memorySize (0x3F :: b) :=
+  ⟨0x3F, b, rfl, by decide, fun rest r =>
+    (memIdx0_parses.bind fun _ => pure_parses Instr.memorySize).complete rest
+      ⟨(), b, [], hx, ⟨rfl, rfl⟩, by simp⟩⟩
 
-theorem dec_memoryGrow :
-    InstrDec .memoryGrow [0x40, 0x00] := by
-  exact ⟨0x40, [0x00], rfl, by decide, fun rest r =>
-    (zeroByte_parses.bind fun u => pure_parses Instr.memoryGrow).complete rest
-      ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩⟩
+theorem dec_memoryGrow {b : List UInt8} (hx : ULeb 32 0 b) :
+    InstrDec .memoryGrow (0x40 :: b) :=
+  ⟨0x40, b, rfl, by decide, fun rest r =>
+    (memIdx0_parses.bind fun _ => pure_parses Instr.memoryGrow).complete rest
+      ⟨(), b, [], hx, ⟨rfl, rfl⟩, by simp⟩⟩
 
-theorem dec_memoryInit {x : Nat} {b₁ b₂ : List UInt8} (hn : ULeb 32 8 b₁) (hx : ULeb 32 x b₂) :
-    InstrDec (.memoryInit x) ([0xFC] ++ b₁ ++ b₂ ++ [0x00]) := by
-  refine ⟨0xFC, b₁ ++ b₂ ++ [0x00], by simp, by decide, fun rest r => ?_⟩
+theorem dec_memoryInit {y : Nat} {b₁ b₂ b₃ : List UInt8} (hn : ULeb 32 8 b₁) (hy : ULeb 32 y b₂)
+    (hx : ULeb 32 0 b₃) :
+    InstrDec (.memoryInit y) ([0xFC] ++ b₁ ++ b₂ ++ b₃) := by
+  refine ⟨0xFC, b₁ ++ b₂ ++ b₃, by simp, by decide, fun rest r => ?_⟩
   show fcInstr _ _ = _
   simp only [fcInstr, List.append_assoc]
   rw [u32_parses.complete _ hn, Res.bind_ok]
-  have := (u32_parses.bind fun x => zeroByte_parses.bind fun _ =>
-    pure_parses (Instr.memoryInit x)).complete rest
-    ⟨x, b₂, [0x00], hx, ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩, rfl⟩
-  simp only [List.append_assoc, List.cons_append, List.nil_append] at this ⊢
+  have := (u32_parses.bind fun y => memIdx0_parses.bind fun _ =>
+    pure_parses (Instr.memoryInit y)).complete rest
+    ⟨y, b₂, b₃, hy, ⟨(), b₃, [], hx, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
+  simp only [List.append_assoc] at this ⊢
   exact this
 
-theorem dec_memoryCopy {b : List UInt8} (hn : ULeb 32 10 b) :
-    InstrDec .memoryCopy ([0xFC] ++ b ++ [0x00, 0x00]) := by
-  refine ⟨0xFC, b ++ [0x00, 0x00], by simp, by decide, fun rest r => ?_⟩
+theorem dec_memoryCopy {b b₁ b₂ : List UInt8} (hn : ULeb 32 10 b) (h₁ : ULeb 32 0 b₁)
+    (h₂ : ULeb 32 0 b₂) :
+    InstrDec .memoryCopy ([0xFC] ++ b ++ b₁ ++ b₂) := by
+  refine ⟨0xFC, b ++ b₁ ++ b₂, by simp, by decide, fun rest r => ?_⟩
   show fcInstr _ _ = _
   simp only [fcInstr, List.append_assoc]
   rw [u32_parses.complete _ hn, Res.bind_ok]
-  have := (zeroByte_parses.bind fun _ => zeroByte_parses.bind fun _ =>
+  have := (memIdx0_parses.bind fun _ => memIdx0_parses.bind fun _ =>
     pure_parses Instr.memoryCopy).complete rest
-    ⟨(), [0x00], [0x00], rfl, ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩, rfl⟩
-  simp only [List.cons_append, List.nil_append] at this ⊢
+    ⟨(), b₁, b₂, h₁, ⟨(), b₂, [], h₂, ⟨rfl, rfl⟩, by simp⟩, rfl⟩
+  simp only [List.append_assoc] at this ⊢
   exact this
 
-theorem dec_memoryFill {b : List UInt8} (hn : ULeb 32 11 b) :
-    InstrDec .memoryFill ([0xFC] ++ b ++ [0x00]) := by
-  refine ⟨0xFC, b ++ [0x00], by simp, by decide, fun rest r => ?_⟩
+theorem dec_memoryFill {b b₁ : List UInt8} (hn : ULeb 32 11 b) (hx : ULeb 32 0 b₁) :
+    InstrDec .memoryFill ([0xFC] ++ b ++ b₁) := by
+  refine ⟨0xFC, b ++ b₁, by simp, by decide, fun rest r => ?_⟩
   show fcInstr _ _ = _
   simp only [fcInstr, List.append_assoc]
   rw [u32_parses.complete _ hn, Res.bind_ok]
-  have := (zeroByte_parses.bind fun _ => pure_parses Instr.memoryFill).complete rest
-    ⟨(), [0x00], [], rfl, ⟨rfl, rfl⟩, rfl⟩
-  simp only [List.cons_append, List.nil_append] at this ⊢
+  have := (memIdx0_parses.bind fun _ => pure_parses Instr.memoryFill).complete (pre := b₁) rest
+    ⟨(), b₁, [], hx, ⟨rfl, rfl⟩, by simp⟩
   exact this
 
 theorem dec_tableInit {x y : Nat} {b₁ b₂ b₃ : List UInt8} (hn : ULeb 32 12 b₁) (hy : ULeb 32 y b₂)
@@ -801,12 +1064,14 @@ theorem dec_f64Const {bits : Nat} {b : List UInt8} (h : FloatBits .w64 bits b) :
 
 theorem instr_complete {i : Instr} {bs : List UInt8} (h : InstrB i bs) :
     InstrDec i bs ∨ (∃ bt body, i = .block bt body) ∨ (∃ bt body, i = .loop bt body) ∨
-      ∃ bt t e, i = .if_ bt t e := by
+      (∃ bt t e, i = .if_ bt t e) ∨ ∃ bt cs body, i = .tryTable bt cs body := by
   cases h with
   | block => exact .inr (.inl ⟨_, _, rfl⟩)
   | loop => exact .inr (.inr (.inl ⟨_, _, rfl⟩))
-  | ifNoElse => exact .inr (.inr (.inr ⟨_, _, _, rfl⟩))
-  | ifElse => exact .inr (.inr (.inr ⟨_, _, _, rfl⟩))
+  | ifNoElse => exact .inr (.inr (.inr (.inl ⟨_, _, _, rfl⟩)))
+  | ifElse => exact .inr (.inr (.inr (.inl ⟨_, _, _, rfl⟩)))
+  | tryTable => exact .inr (.inr (.inr (.inr ⟨_, _, _, rfl⟩)))
+  | @returnCallIndirect x y b₁ b₂ hy hx => exact .inl (dec_returnCallIndirect hy hx)
   | plain hm => exact .inl (dec_plain hm)
   | fcPlain hm hn => exact .inl (dec_fcPlain hm hn)
   | @mem mk op m b hm hma => exact .inl (dec_mem hm hma)
@@ -816,11 +1081,11 @@ theorem instr_complete {i : Instr} {bs : List UInt8} (h : InstrB i bs) :
   | @callIndirect x y b₁ b₂ hy hx => exact .inl (dec_callIndirect hy hx)
   | selectT h => exact .inl (dec_selectT h)
   | refNull h => exact .inl (dec_refNull h)
-  | memorySize => exact .inl (dec_memorySize)
-  | memoryGrow => exact .inl (dec_memoryGrow)
-  | @memoryInit x b₁ b₂ hn hx => exact .inl (dec_memoryInit hn hx)
-  | @memoryCopy b hn => exact .inl (dec_memoryCopy hn)
-  | @memoryFill b hn => exact .inl (dec_memoryFill hn)
+  | memorySize hx => exact .inl (dec_memorySize hx)
+  | memoryGrow hx => exact .inl (dec_memoryGrow hx)
+  | @memoryInit y b₁ b₂ b₃ hn hy hx => exact .inl (dec_memoryInit hn hy hx)
+  | @memoryCopy b b₁ b₂ hn h₁ h₂ => exact .inl (dec_memoryCopy hn h₁ h₂)
+  | @memoryFill b b₁ hn hx => exact .inl (dec_memoryFill hn hx)
   | @tableInit x y b₁ b₂ b₃ hn hy hx => exact .inl (dec_tableInit hn hy hx)
   | @tableCopy x y b₁ b₂ b₃ hn hx hy => exact .inl (dec_tableCopy hn hx hy)
   | i32Const h => exact .inl (dec_i32Const h)
@@ -840,7 +1105,14 @@ theorem seq_succ_cons (F : Nat) (acc : List Instr) (op : UInt8) (bs : List UInt8
       (let plain := (instr op.toNat (pack bs) bs.length (bs.length + 1)).bind
           fun i v n => seq F (i :: acc) v n
        bif Nat.blt 0x05 op.toNat then
-         (bif Nat.beq op.toNat 0x0B then .ok (acc, op.toNat) (pack bs) bs.length else plain)
+         (bif Nat.beq op.toNat 0x0B then .ok (acc, op.toNat) (pack bs) bs.length
+          else bif Nat.beq op.toNat 0x1F then
+            (blockType (pack bs) bs.length).bind fun bt v n =>
+            (vec catchClause v n).bind fun cs v n =>
+            (seq F [] v n).bind fun body v n =>
+            bif Nat.beq body.2 0x0B then seq F (.tryTable bt cs body.1.reverse :: acc) v n
+            else .bad n "else without if"
+          else plain)
        else bif Nat.blt op.toNat 0x02 then plain
        else bif Nat.beq op.toNat 0x05 then .ok (acc, op.toNat) (pack bs) bs.length
        else (blockType (pack bs) bs.length).bind fun bt v n =>
@@ -862,10 +1134,11 @@ theorem step_of_dec {i : Instr} {b : List UInt8} (d : InstrDec i b) : Step i b :
   intro F acc r _
   rw [List.cons_append, seq_succ_cons]
   simp only
-  rcases hop with h | ⟨h₁, h₂⟩
+  rcases hop with h | ⟨h₁, h₂, h₃⟩
   · rw [blt_false.2 (by omega : op.toNat ≤ 5), blt_true.2 h, Bool.cond_false, Bool.cond_true,
       hdec r _, Res.bind_ok]
-  · rw [blt_true.2 h₁, beq_false.2 h₂, Bool.cond_true, Bool.cond_false, hdec r _, Res.bind_ok]
+  · rw [blt_true.2 h₁, beq_false.2 h₂, beq_false.2 h₃, Bool.cond_true, Bool.cond_false,
+      Bool.cond_false, hdec r _, Res.bind_ok]
 
 theorem InstrB.ne_nil {i : Instr} {b : List UInt8} (h : InstrB i b) : b ≠ [] := by
   cases h <;> simp
@@ -912,6 +1185,22 @@ theorem structured_if_prefix {F : Nat} {acc : List Instr} {bt : BlockType} {b₁
     show Nat.beq (UInt8.toNat 0x04) 0x04 = true from rfl, Bool.cond_false, Bool.cond_true]
   rw [blockType_parses.complete _ ht, Res.bind_ok]
 
+theorem structured_tryTable {F : Nat} {acc : List Instr} {bt : BlockType} {cs : List Catch}
+    {body : List Instr} {b₁ b₂ b₃ r : List UInt8} (ht : BlockTypeB bt b₁) (hc : Vec CatchB cs b₂)
+    (hbody : seq F [] (pack (b₃ ++ 0x0B :: r)) (b₃ ++ 0x0B :: r).length =
+      .ok (body.reverse ++ [], 0x0B) (pack r) r.length) :
+    seq (F + 1) acc (pack (0x1F :: (b₁ ++ (b₂ ++ (b₃ ++ 0x0B :: r)))))
+      (0x1F :: (b₁ ++ (b₂ ++ (b₃ ++ 0x0B :: r)))).length =
+      seq F (.tryTable bt cs body :: acc) (pack r) r.length := by
+  rw [seq_succ_cons]
+  simp only [show Nat.blt 0x05 (UInt8.toNat 0x1F) = true from rfl,
+    show Nat.beq (UInt8.toNat 0x1F) 0x0B = false from rfl,
+    show Nat.beq (UInt8.toNat 0x1F) 0x1F = true from rfl, Bool.cond_true, Bool.cond_false]
+  rw [blockType_parses.complete _ ht, Res.bind_ok,
+    (vec_parses catchClause_parses fun _ _ h => CatchB.ne_nil h).complete _ hc, Res.bind_ok,
+    hbody, Res.bind_ok]
+  simp
+
 /-- `seq` on the encoding of `is` followed by a terminator returns `is` (reversed onto `acc`). -/
 def SeqOk (is : List Instr) (pre : List UInt8) : Prop :=
   ∀ (F : Nat) (acc : List Instr) (t : UInt8) (rest : List UInt8), Term t → pre.length < F →
@@ -942,13 +1231,14 @@ theorem seqOk_of_instrsB {is : List Instr} {pre : List UInt8} (h : InstrsB is pr
     (fcIdx := fun hm hn hx => step_of_dec (dec_fcIdx hm hn hx))
     (brTable := fun hs hl => step_of_dec (dec_brTable hs hl))
     (callIndirect := fun hy hx => step_of_dec (dec_callIndirect hy hx))
+    (returnCallIndirect := fun hy hx => step_of_dec (dec_returnCallIndirect hy hx))
     (selectT := fun h => step_of_dec (dec_selectT h))
     (refNull := fun h => step_of_dec (dec_refNull h))
-    (memorySize := step_of_dec dec_memorySize)
-    (memoryGrow := step_of_dec dec_memoryGrow)
-    (memoryInit := fun hn hx => step_of_dec (dec_memoryInit hn hx))
-    (memoryCopy := fun hn => step_of_dec (dec_memoryCopy hn))
-    (memoryFill := fun hn => step_of_dec (dec_memoryFill hn))
+    (memorySize := fun hx => step_of_dec (dec_memorySize hx))
+    (memoryGrow := fun hx => step_of_dec (dec_memoryGrow hx))
+    (memoryInit := fun hn hy hx => step_of_dec (dec_memoryInit hn hy hx))
+    (memoryCopy := fun hn h₁ h₂ => step_of_dec (dec_memoryCopy hn h₁ h₂))
+    (memoryFill := fun hn hx => step_of_dec (dec_memoryFill hn hx))
     (tableInit := fun hn hy hx => step_of_dec (dec_tableInit hn hy hx))
     (tableCopy := fun hn hx hy => step_of_dec (dec_tableCopy hn hx hy))
     (i32Const := fun h => step_of_dec (dec_i32Const h))
@@ -977,6 +1267,10 @@ theorem seqOk_of_instrsB {is : List Instr} {pre : List UInt8} (h : InstrsB is pr
       simp only [show Nat.beq (UInt8.toNat 0x05) 0x0B = false from rfl, Bool.cond_false]
       rw [hels, Res.bind_ok]
       simp)
+    (tryTable := fun {bt} {cs} {body} {b₁} {b₂} {b₃} ht hc _ ih => fun F acc r hF => by
+      have hbody := ih F [] 0x0B r (.inl rfl) (by simp at hF; omega)
+      have := structured_tryTable (F := F) (acc := acc) (r := r) ht hc hbody
+      simpa using this)
     (nil := seqOk_nil)
     (cons := fun hi _ ihi ihs => seqOk_cons hi ihi ihs)
     h
@@ -1070,7 +1364,25 @@ theorem seq_sound (F : Nat) : ∀ {acc : List Instr} {bs : List UInt8} {res : Li
       · simp only [h₁, Bool.cond_true] at h
         cases h₂ : Nat.beq b.toNat 0x0B
         · simp only [h₂, Bool.cond_false] at h
-          exact plain h
+          cases h₃ : Nat.beq b.toNat 0x1F
+          · simp only [h₃, Bool.cond_false] at h
+            exact plain h
+          · simp only [h₃, Bool.cond_true] at h
+            obtain rfl : b = 0x1F := UInt8.toNat_inj.1 (beq_true.1 h₃)
+            obtain ⟨bt, v₂, n₂, hbt, hk₁⟩ := Res.bind_eq_ok.1 h
+            obtain ⟨btb, r₁, rfl, ht, rfl, rfl⟩ := blockType_parses.sound hbt
+            obtain ⟨cs, v₃, n₃, hcs, hk₂⟩ := Res.bind_eq_ok.1 hk₁
+            obtain ⟨csb, r₂, rfl, hc, rfl, rfl⟩ :=
+              (vec_parses catchClause_parses fun _ _ h => CatchB.ne_nil h).sound hcs
+            obtain ⟨body, v₄, n₄, hbody, hk₃⟩ := Res.bind_eq_ok.1 hk₂
+            obtain ⟨is₁, pre₁, t₁, r₃, rfl, his₁, ht₁, rfl, rfl, rfl⟩ := ih hbody
+            simp only [List.append_nil, List.reverse_reverse] at hk₃
+            cases h₅ : Nat.beq t₁.toNat 0x0B
+            · simp [h₅] at hk₃
+            · simp only [h₅, Bool.cond_true] at hk₃
+              obtain rfl := term_of_toNat (beq_true.1 h₅)
+              have := seqRes_cons (InstrB.tryTable ht hc his₁) (ih hk₃)
+              simpa using this
         · simp only [h₂, Bool.cond_true, Res.ok.injEq] at h
           obtain ⟨rfl, rfl, rfl⟩ := h
           exact ⟨[], [], b, bs, rfl, .nil, .inl (beq_true.1 h₂), by simp, rfl, rfl⟩

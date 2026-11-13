@@ -174,8 +174,8 @@ theorem value {s s' : Store} (h : s.Extends s') {v : Val} {t : ValType}
   all_goals try exact hv
   case ref.num r n => cases r <;> cases hv
   case ref.ref r rt =>
-    cases r <;> cases rt <;> try exact hv
-    exact Nat.lt_of_lt_of_le hv h.funcs_length
+    rcases rt with ⟨_ | _, (_ | _ | _) | _⟩ <;> cases r <;> first
+      | exact hv | exact Nat.lt_of_lt_of_le hv h.funcs_length
 
 theorem values {s s' : Store} (h : s.Extends s') {vs : List Val} {ts : List ValType}
     (hv : List.Forall₂ (Val.HasType s) vs ts) : List.Forall₂ (Val.HasType s') vs ts := by

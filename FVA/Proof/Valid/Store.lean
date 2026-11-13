@@ -98,8 +98,8 @@ theorem FrameT.extends {s s' : Store} {f : Frame} {C : Context}
 
 theorem FuncT.transport {C D : Context} {f : Func} {ft : FuncType}
     (hf : FuncT C f ft) (h : C.Entails D) : FuncT D f ft := by
-  refine ⟨by simpa only [← h.types] using hf.1, ?_⟩
-  obtain ⟨ts, hs, hm⟩ := hf.2
+  refine ⟨by simpa only [← h.types] using hf.1, hf.2.1, ?_⟩
+  obtain ⟨ts, hs, hm⟩ := hf.2.2
   exact ⟨ts, hs.transport ((h.withLocals (ft.params.map (1, ·) ++ f.locals)).withControl
     [ft.results] (some ft.results)), hm⟩
 

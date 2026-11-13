@@ -336,7 +336,9 @@ if selected CppEH || [[ $group == D29 ]]; then
 		[[ $actual == "$expected" ]] || smoke_good=false
 	done
 	if $smoke_good; then pass D29.cpp-oracle; else fail D29.cpp-oracle 'an input disagrees with the unsigned contract'; fi
-	run D29.cpp-lift "$root/.lake/build/bin/fva" lift "$cpp/eh.wasm" "$work/Lifted.lean" --ns Subjects.CppEH.Lifted
+	# `fva lift` takes the artifact path relative to the project root (the link records it)
+	run D29.cpp-lift "$root/.lake/build/bin/fva" lift FVATest/Subjects/CppEH/eh.wasm "$work/Lifted.lean" \
+		--ns Subjects.CppEH.Lifted
 	if execution_error D29.cpp-lift; then
 		:
 	elif ((last_rc == 0)) && [[ -s $work/Lifted.lean ]]; then

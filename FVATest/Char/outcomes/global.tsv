@@ -111,14 +111,14 @@
 610	assert_invalid	pass	invalid
 629	module	pass	valid
 632	register	pass	-
-634	module	skip:outside-profile	malformed
+634	module	skip:outside-profile	invalid
 659	assert_return	skip:missing/rejected module	-
 660	assert_return	skip:missing/rejected module	-
 661	assert_return	skip:missing/rejected module	-
 663	assert_return	skip:missing/rejected module	-
 664	assert_return	skip:missing/rejected module	-
 667	assert_invalid	pass	invalid
-675	assert_invalid	skip:decode-error	malformed
+675	assert_invalid	skip:outside the 2.0 validation profile	invalid
 686	assert_malformed	skip:text format	not-run:malformed
 693	assert_malformed	skip:text format	not-run:malformed
 700	assert_malformed	skip:text format	not-run:malformed

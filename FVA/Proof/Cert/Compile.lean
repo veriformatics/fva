@@ -67,20 +67,21 @@ theorem toyBody_eq {m : Module} {body : List Instr} (h : toyBody m = some body) 
   unfold toyBody at h
   split at h
   · rename_i f hf
-    cases hb : (decide (m.types = [⟨[.num .i32], [.num .i32]⟩]) && Nat.beq f.type 0 &&
-        f.locals.isEmpty && m.tables.isEmpty && m.mems.isEmpty && m.globals.isEmpty &&
-        m.elems.isEmpty && m.datas.isEmpty && m.start.isNone && m.imports.isEmpty &&
-        decide (m.exports = [⟨"f", .func 0⟩]))
+    cases hb : (decide (m.types = [[⟨[.num .i32], [.num .i32]⟩]]) && Nat.beq f.type 0 &&
+        f.locals.isEmpty && m.tables.isEmpty && m.mems.isEmpty && m.tags.isEmpty &&
+        m.globals.isEmpty && m.elems.isEmpty && m.datas.isEmpty && m.start.isNone &&
+        m.imports.isEmpty && decide (m.exports = [⟨"f", .func 0⟩]))
     · rw [hb] at h; cases h
     · rw [hb, Bool.cond_true, Option.some.injEq] at h
       subst h
       simp only [Bool.and_eq_true, decide_eq_true_eq, List.isEmpty_iff, Option.isNone_iff_eq_none,
         Nat.beq_eq] at hb
-      obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨ht, hty⟩, hl⟩, htab⟩, hmem⟩, hg⟩, he⟩, hd⟩, hs⟩, hi⟩, hx⟩ := hb
-      obtain ⟨types, funcs, tables, mems, globals, elems, datas, start, imports, exports⟩ := m
+      obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨ht, hty⟩, hl⟩, htab⟩, hmem⟩, htag⟩, hg⟩, he⟩, hd⟩, hs⟩, hi⟩, hx⟩ := hb
+      obtain ⟨types, funcs, tables, mems, tags, globals, elems, datas, start, imports, exports⟩ :=
+        m
       obtain ⟨fty, flocals, fbody⟩ := f
-      simp only at hf ht hty hl htab hmem hg he hd hs hi hx
-      subst hf ht hty hl htab hmem hg he hd hs hi hx
+      simp only at hf ht hty hl htab hmem htag hg he hd hs hi hx
+      subst hf ht hty hl htab hmem htag hg he hd hs hi hx
       rfl
   · cases h
 

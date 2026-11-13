@@ -1,12 +1,13 @@
 /-!
 # Wasm abstract syntax (reviewed spec)
 
-Mirrors the Wasm 2.0 specification §2 (Structure) for FVA's binary profile, SIMD excluded.
-Decoding yields this syntax; it carries no validity guarantee (index ranges, typing, memory
-count and constant-expression rules belong to validation, U6). Indices are `Nat`; the binary
-grammar (`FVA.Spec.Binary`) bounds them by 2^32. Instruction sequences are `List Instr` nested in
-`Instr`; Lean derives neither `DecidableEq` nor `Repr` for that nesting, and nothing needs them:
-`decode_eq` is checked by kernel defeq.
+Mirrors the Wasm 3.0 specification §2 (Structure; SpecTec `859d3232`) for FVA's profile P′
+(`FVA.Profile`): Wasm 2.0 without SIMD, plus exception handling, tail calls, function references
+and recursive groups of function types. Decoding yields this syntax; it carries no validity
+guarantee (index ranges, typing, memory count and constant-expression rules belong to
+validation). Indices are `Nat`; the binary grammar (`FVA.Spec.Binary`) bounds them by 2^32.
+Instruction sequences are `List Instr` nested in `Instr`; Lean derives neither `DecidableEq` nor
+`Repr` for that nesting, and nothing needs them: `decode_eq` is checked by kernel defeq.
 -/
 
 namespace FVA.Wasm
@@ -16,10 +17,35 @@ inductive NumType where
   | i32 | i64 | f32 | f64
   deriving DecidableEq, Repr
 
-/-- Reference types. -/
-inductive RefType where
-  | funcref | externref
+/-- Abstract heap types of the profile (3.0 `absheaptype`): functions, external references,
+exceptions. -/
+inductive AbsHeapType where
+  | func | extern | exn
   deriving DecidableEq, Repr
+
+/-- Heap types (`heaptype`): abstract, or the defined type with this type index. -/
+inductive HeapType where
+  | abs (a : AbsHeapType)
+  | idx (x : Nat)
+  deriving DecidableEq, Repr
+
+/-- Reference types (`reftype`): `ref null? ht`. -/
+structure RefType where
+  /-- Whether `null` is a value of the type. -/
+  null : Bool
+  /-- The referenced heap type. -/
+  heap : HeapType
+  deriving DecidableEq, Repr
+
+/-- `funcref` = `ref null func`. -/
+@[match_pattern] abbrev RefType.funcref : RefType := ⟨true, .abs .func⟩
+/-- `externref` = `ref null extern`. -/
+@[match_pattern] abbrev RefType.externref : RefType := ⟨true, .abs .extern⟩
+/-- `exnref` = `ref null exn`. -/
+@[match_pattern] abbrev RefType.exnref : RefType := ⟨true, .abs .exn⟩
+
+/-- The nullable reference type of the same heap type. -/
+def RefType.nullable (t : RefType) : RefType := { t with null := true }
 
 /-- Value types. -/
 inductive ValType where
@@ -34,6 +60,11 @@ structure FuncType where
   /-- Result types. -/
   results : List ValType
   deriving DecidableEq, Repr
+
+/-- Recursive types (`rectype`), in P′: function types defined together, each the final subtype of
+no declared supertype (`sub final ε (func ft)`); they refer to each other and to earlier types by
+type index. -/
+abbrev RecType := List FuncType
 
 /-- Limits of a memory (in pages) or a table (in elements). -/
 structure Limits where
@@ -145,6 +176,15 @@ inductive PackSize where
   | p8 | p16 | p32
   deriving DecidableEq, Repr
 
+/-- Handler clauses of `try_table` (`catch`): catch exceptions of tag `x`, or any exception, with
+the exception reference (`…Ref`) or without, and branch to label `l`. -/
+inductive Catch where
+  | tag (x l : Nat)
+  | tagRef (x l : Nat)
+  | all (l : Nat)
+  | allRef (l : Nat)
+  deriving DecidableEq, Repr
+
 /-- Instructions of the profile (spec §2.4); structured control carries nested bodies. -/
 inductive Instr where
   -- numeric
@@ -169,12 +209,14 @@ inductive Instr where
   /-- Conversion. -/
   | cvtop (op : CvtOp)
   -- reference
-  /-- `ref.null t`. -/
-  | refNull (t : RefType)
+  /-- `ref.null ht`. -/
+  | refNull (ht : HeapType)
   /-- `ref.is_null`. -/
   | refIsNull
   /-- `ref.func x`. -/
   | refFunc (x : Nat)
+  /-- `ref.as_non_null`. -/
+  | refAsNonNull
   -- parametric
   /-- `drop`. -/
   | drop
@@ -252,6 +294,24 @@ inductive Instr where
   | call (x : Nat)
   /-- `call_indirect x y` (table `x`, type `y`). -/
   | callIndirect (x y : Nat)
+  /-- `call_ref x` (type `x`). -/
+  | callRef (x : Nat)
+  /-- `return_call x`. -/
+  | returnCall (x : Nat)
+  /-- `return_call_indirect x y` (table `x`, type `y`). -/
+  | returnCallIndirect (x y : Nat)
+  /-- `return_call_ref x` (type `x`). -/
+  | returnCallRef (x : Nat)
+  /-- `br_on_null l`. -/
+  | brOnNull (l : Nat)
+  /-- `br_on_non_null l`. -/
+  | brOnNonNull (l : Nat)
+  /-- `throw x` (tag `x`). -/
+  | throw (x : Nat)
+  /-- `throw_ref`. -/
+  | throwRef
+  /-- `try_table bt catches body end`. -/
+  | tryTable (bt : BlockType) (catches : List Catch) (body : List Instr)
 
 /-- Expressions: instruction sequences (the trailing `end` is implicit). -/
 abbrev Expr := List Instr
@@ -264,6 +324,19 @@ structure Func where
   locals : List (Nat × ValType)
   /-- Body. -/
   body : Expr
+
+/-- Tables (`table`): a type and the initializer every element starts as. -/
+structure Table where
+  /-- Type. -/
+  type : TableType
+  /-- Initializer expression. -/
+  init : Expr
+
+/-- Tags (`tag`): the function type index of the exceptions' parameters. -/
+structure Tag where
+  /-- Type index. -/
+  type : Nat
+  deriving DecidableEq, Repr
 
 /-- Globals. -/
 structure Global where
@@ -305,6 +378,8 @@ inductive ImportDesc where
   | table (t : TableType)
   | mem (t : Limits)
   | global (t : GlobalType)
+  /-- A tag of the function type with this index. -/
+  | tag (x : Nat)
   deriving DecidableEq, Repr
 
 /-- Imports. -/
@@ -323,6 +398,7 @@ inductive ExportDesc where
   | table (x : Nat)
   | mem (x : Nat)
   | global (x : Nat)
+  | tag (x : Nat)
   deriving DecidableEq, Repr
 
 /-- Exports. -/
@@ -335,14 +411,16 @@ structure Export where
 
 /-- Modules (spec §2.5). Custom sections are not part of the abstract syntax. -/
 structure Module where
-  /-- Function types. -/
-  types : List FuncType := []
+  /-- Recursive type groups, in definition order (`typeList` = the type index space). -/
+  types : List RecType := []
   /-- Functions defined by the module. -/
   funcs : List Func := []
   /-- Tables. -/
-  tables : List TableType := []
+  tables : List Table := []
   /-- Memories. -/
   mems : List Limits := []
+  /-- Tags. -/
+  tags : List Tag := []
   /-- Globals. -/
   globals : List Global := []
   /-- Element segments. -/
@@ -355,5 +433,8 @@ structure Module where
   imports : List Import := []
   /-- Exports. -/
   exports : List Export := []
+
+/-- The type index space: every recursive group's members in definition order. -/
+def Module.typeList (m : Module) : List FuncType := m.types.flatten
 
 end FVA.Wasm

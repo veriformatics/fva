@@ -8,8 +8,11 @@ import FVA.Tool.Lift
 Writes a decoded module back to bytes from the spec's opcode tables (`FVA.Wasm.Binary.plainOps`,
 …), independent of the decoder's dispatch, so `wasm-tools print` of the original (custom
 sections stripped) and of the re-encoding agree exactly when the decoder kept every field.
-Encoding choices the syntax does not record: minimal LEBs, no explicit empty `else`, element
-segments in function-index form whenever every initializer is `ref.func`.
+Encoding choices the syntax does not record: minimal LEBs, no explicit empty `else`, memory
+index 0 left implicit, short reference types (`funcref` for `ref null func`), bare function
+types for one-type recursion groups, the short table form for a `ref.null` initializer of the
+table's heap type, and element segments of type `(ref func)` with only `ref.func` initializers
+in function-index form (the only element type that form decodes to).
 -/
 
 namespace FVA.Tool.Encode
@@ -36,13 +39,21 @@ def vec {α : Type} (f : α → List UInt8) (xs : List α) : List UInt8 :=
 /-- `name`. -/
 def name (s : String) : List UInt8 := vec (fun b => [b]) s.toUTF8.toList
 
+/-- Heap types. -/
+def heapType : HeapType → List UInt8
+  | .abs .func => [0x70] | .abs .extern => [0x6F] | .abs .exn => [0x69] | .idx x => sleb x
+
+/-- Reference types: the one-byte form for a nullable abstract heap type. -/
+def refType (t : RefType) : List UInt8 :=
+  match t.null, t.heap with
+  | true, .abs _ => heapType t.heap
+  | true, _ => 0x63 :: heapType t.heap
+  | false, _ => 0x64 :: heapType t.heap
+
 /-- Value types. -/
 def valType : ValType → List UInt8
   | .num .i32 => [0x7F] | .num .i64 => [0x7E] | .num .f32 => [0x7D] | .num .f64 => [0x7C]
-  | .ref .funcref => [0x70] | .ref .externref => [0x6F]
-
-/-- Reference types. -/
-def refType : RefType → List UInt8 | .funcref => [0x70] | .externref => [0x6F]
+  | .ref t => refType t
 
 /-- Block types. -/
 def blockType : BlockType → List UInt8
@@ -50,6 +61,11 @@ def blockType : BlockType → List UInt8
 
 /-- Memory arguments. -/
 def memArg (m : MemArg) : List UInt8 := uleb m.align ++ uleb m.offset
+
+/-- Handler clauses. -/
+def catch_ : Catch → List UInt8
+  | .tag x l => 0x00 :: uleb x ++ uleb l | .tagRef x l => 0x01 :: uleb x ++ uleb l
+  | .all l => 0x02 :: uleb l | .allRef l => 0x03 :: uleb l
 
 /-- Instructions compare by their rendering (the syntax has no `DecidableEq`). -/
 def key (i : Instr) : String := FVA.Tool.Lift.instr i
@@ -95,9 +111,11 @@ partial def instr (i : Instr) : List UInt8 :=
   | .if_ bt t [] => [0x04] ++ blockType bt ++ seq t ++ [0x0B]
   | .if_ bt t e => [0x04] ++ blockType bt ++ seq t ++ [0x05] ++ seq e ++ [0x0B]
   | .brTable ls l => [0x0E] ++ vec uleb ls ++ uleb l
+  | .tryTable bt cs b => [0x1F] ++ blockType bt ++ vec catch_ cs ++ seq b ++ [0x0B]
   | .callIndirect x y => [0x11] ++ uleb y ++ uleb x
+  | .returnCallIndirect x y => [0x13] ++ uleb y ++ uleb x
   | .select (some ts) => 0x1C :: vec valType ts
-  | .refNull t => 0xD0 :: refType t
+  | .refNull t => 0xD0 :: heapType t
   | .memorySize => [0x3F, 0x00] | .memoryGrow => [0x40, 0x00]
   | .memoryInit x => [0xFC] ++ uleb 8 ++ uleb x ++ [0x00]
   | .memoryCopy => [0xFC] ++ uleb 10 ++ [0x00, 0x00]
@@ -116,6 +134,9 @@ partial def instr (i : Instr) : List UInt8 :=
   | .dataDrop x => idx .dataDrop x | .elemDrop x => idx .elemDrop x
   | .tableGrow x => idx .tableGrow x | .tableSize x => idx .tableSize x
   | .tableFill x => idx .tableFill x
+  | .throw x => idx .throw x | .returnCall x => idx .returnCall x
+  | .callRef x => idx .callRef x | .returnCallRef x => idx .returnCallRef x
+  | .brOnNull l => idx .brOnNull l | .brOnNonNull l => idx .brOnNonNull l
   | _ => panic! s!"no encoding for {key i}"
 /-- A memory instruction from its zero-`memarg` form and its `memarg`. -/
 partial def memOp (i₀ : Instr) (m : MemArg) : List UInt8 :=
@@ -148,6 +169,22 @@ def globalType (g : GlobalType) : List UInt8 :=
 /-- Table types. -/
 def tableType (t : TableType) : List UInt8 := refType t.elem ++ limits t.limits
 
+/-- Tables: the short form when the initializer is `ref.null` of the table's heap type. -/
+def table (t : Table) : List UInt8 :=
+  match t.init with
+  | [.refNull ht] => if ht = t.type.elem.heap then tableType t.type
+    else [0x40, 0x00] ++ tableType t.type ++ expr t.init
+  | _ => [0x40, 0x00] ++ tableType t.type ++ expr t.init
+
+/-- Function types. -/
+def funcType (ft : FuncType) : List UInt8 :=
+  [0x60] ++ vec valType ft.params ++ vec valType ft.results
+
+/-- Recursion groups: a bare function type for a group of one. -/
+def recType : RecType → List UInt8
+  | [ft] => funcType ft
+  | g => 0x4E :: vec funcType g
+
 /-- Function indices when every initializer is `ref.func y`. -/
 def funcIdxs : List Expr → Option (List Nat)
   | [] => some []
@@ -157,11 +194,12 @@ def funcIdxs : List Expr → Option (List Nat)
 /-- Element segments. -/
 def elem (e : Elem) : List UInt8 :=
   match e.type, funcIdxs e.init, e.mode with
-  | .funcref, some ys, .active 0 off => uleb 0 ++ expr off ++ vec uleb ys
-  | .funcref, some ys, .passive => uleb 1 ++ [0x00] ++ vec uleb ys
-  | .funcref, some ys, .active x off => uleb 2 ++ uleb x ++ expr off ++ [0x00] ++ vec uleb ys
-  | .funcref, some ys, .declarative => uleb 3 ++ [0x00] ++ vec uleb ys
-  | .funcref, none, .active 0 off => uleb 4 ++ expr off ++ vec expr e.init
+  | ⟨false, .abs .func⟩, some ys, .active 0 off => uleb 0 ++ expr off ++ vec uleb ys
+  | ⟨false, .abs .func⟩, some ys, .passive => uleb 1 ++ [0x00] ++ vec uleb ys
+  | ⟨false, .abs .func⟩, some ys, .active x off =>
+    uleb 2 ++ uleb x ++ expr off ++ [0x00] ++ vec uleb ys
+  | ⟨false, .abs .func⟩, some ys, .declarative => uleb 3 ++ [0x00] ++ vec uleb ys
+  | .funcref, _, .active 0 off => uleb 4 ++ expr off ++ vec expr e.init
   | t, _, .passive => uleb 5 ++ refType t ++ vec expr e.init
   | t, _, .active x off => uleb 6 ++ uleb x ++ expr off ++ refType t ++ vec expr e.init
   | t, _, .declarative => uleb 7 ++ refType t ++ vec expr e.init
@@ -192,16 +230,19 @@ def needsDataCount (m : Module) : Bool := m.funcs.any fun f => FVA.Wasm.Decode.u
 
 /-- The whole module. -/
 def module (m : Module) : List UInt8 :=
-  preamble ++ vecSec 1 (fun ft => [0x60] ++ vec valType ft.params ++ vec valType ft.results) m.types
+  preamble ++ vecSec 1 recType m.types
     ++ vecSec 2 (fun im => name im.module ++ name im.name ++ match im.desc with
         | .func x => 0x00 :: uleb x | .table t => 0x01 :: tableType t
-        | .mem l => 0x02 :: limits l | .global g => 0x03 :: globalType g) m.imports
+        | .mem l => 0x02 :: limits l | .global g => 0x03 :: globalType g
+        | .tag x => 0x04 :: 0x00 :: uleb x) m.imports
     ++ vecSec 3 (fun f => uleb f.type) m.funcs
-    ++ vecSec 4 tableType m.tables ++ vecSec 5 limits m.mems
+    ++ vecSec 4 table m.tables ++ vecSec 5 limits m.mems
+    ++ vecSec 13 (fun t => 0x00 :: uleb t.type) m.tags
     ++ vecSec 6 (fun g => globalType g.type ++ expr g.init) m.globals
     ++ vecSec 7 (fun ex => name ex.name ++ match ex.desc with
         | .func x => 0x00 :: uleb x | .table x => 0x01 :: uleb x
-        | .mem x => 0x02 :: uleb x | .global x => 0x03 :: uleb x) m.exports
+        | .mem x => 0x02 :: uleb x | .global x => 0x03 :: uleb x
+        | .tag x => 0x04 :: uleb x) m.exports
     ++ section_ 8 (m.start.map uleb) ++ vecSec 9 elem m.elems
     ++ section_ 12 (if needsDataCount m then some (uleb m.datas.length) else none)
     ++ vecSec 10 code m.funcs ++ vecSec 11 data m.datas

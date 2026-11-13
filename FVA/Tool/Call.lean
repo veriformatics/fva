@@ -63,7 +63,7 @@ def Val.ty : Val → ValType
   | .i64 _ => .num .i64
   | .f32 _ => .num .f32
   | .f64 _ => .num .f64
-  | .ref (.null t) => .ref t
+  | .ref (.null t) => .ref ⟨true, t⟩
   | .ref (.func _) => .ref .funcref
   | .ref (.extern _) => .ref .externref
 

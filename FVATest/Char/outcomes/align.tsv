@@ -159,7 +159,7 @@
 911	assert_invalid	pass	invalid
 930	assert_invalid	pass	invalid
 949	assert_invalid	pass	invalid
-968	assert_malformed	skip:rejected only by validation	not-run:malformed
-987	assert_malformed	skip:rejected only by validation	not-run:malformed
-1005	assert_invalid	skip:decode-error	malformed
-1017	assert_invalid	skip:decode-error	malformed
+968	assert_malformed	pass	not-run:malformed
+987	assert_malformed	pass	not-run:malformed
+1005	assert_invalid	pass	invalid
+1017	assert_invalid	pass	invalid

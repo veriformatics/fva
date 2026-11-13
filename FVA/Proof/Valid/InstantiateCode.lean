@@ -26,7 +26,7 @@ theorem runElem_typed {m : Module} (hv : ModuleValid m) {e : Elem} {i : Nat}
     (he : m.elems[i]? = some e) : SeqT (moduleContext m) (runElem i e) ⟨[], []⟩ := by
   have hmem := List.mem_of_getElem? he
   have hmode := (hv.elems e hmem).2
-  have hlookup : (moduleContext m).elems[i]? = some e.type := by
+  have hlookup : (moduleContext m).elems[i]? = some e.type.nullable := by
     simp [moduleContext, List.getElem?_map, he]
   cases hm : e.mode with
   | passive => simp only [runElem, hm]; exact .nil

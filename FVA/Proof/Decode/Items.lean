@@ -33,18 +33,19 @@ theorem limits_parses : Parses limits LimitsB := by
       cases h₁ : Nat.beq b.toNat 1
       · simp only [h₁, Bool.cond_false] at hk
         simp only [Bool.cond_eq_ite] at hk
-        split at hk <;> cases hk
+        repeat' split at hk
+        all_goals cases hk
       · have hb : b = 1 := UInt8.toNat_inj.1 (beq_true.1 h₁)
         subst hb
         simp only [h₁, Bool.cond_true] at hk
         obtain ⟨a, v₂, n₂, ha, hk⟩ := Res.bind_eq_ok.1 hk
-        obtain ⟨b₁, rest₂, rfl, hpa, rfl, rfl⟩ := u32_parses.sound ha
-        obtain ⟨c, b₂, rest, rfl, hc, rfl, rfl, rfl⟩ := u32_parses.map_sound hk
+        obtain ⟨b₁, rest₂, rfl, hpa, rfl, rfl⟩ := u64_parses.sound ha
+        obtain ⟨c, b₂, rest, rfl, hc, rfl, rfl, rfl⟩ := u64_parses.map_sound hk
         exact ⟨[1] ++ b₁ ++ b₂, rest, by simp, ⟨b₁, b₂, hpa, hc, rfl⟩, rfl, rfl⟩
     · have hb : b = 0 := UInt8.toNat_inj.1 (beq_true.1 h₀)
       subst hb
       simp only [h₀, Bool.cond_true] at hk
-      obtain ⟨a, b₁, rest, rfl, ha, rfl, rfl, rfl⟩ := u32_parses.map_sound hk
+      obtain ⟨a, b₁, rest, rfl, ha, rfl, rfl, rfl⟩ := u64_parses.map_sound hk
       exact ⟨[0] ++ b₁, rest, rfl, ⟨b₁, ha, rfl⟩, rfl, rfl⟩
   · rintro ⟨a, m⟩ pre rest h
     cases m with
@@ -52,38 +53,140 @@ theorem limits_parses : Parses limits LimitsB := by
       obtain ⟨b, hb, rfl⟩ := h
       simp only [List.cons_append, List.nil_append, limits, byte, List.length_cons,
         land_pack_cons, shiftRight_pack_cons, Res.bind_ok]
-      change (u32 (pack (b ++ rest)) (b ++ rest).length).bind _ = _
-      rw [u32_parses.complete rest hb, Res.bind_ok]
+      change (u64 (pack (b ++ rest)) (b ++ rest).length).bind _ = _
+      rw [u64_parses.complete rest hb, Res.bind_ok]
     | some c =>
       obtain ⟨b₁, b₂, ha, hc, rfl⟩ := h
       simp only [List.append_assoc, List.cons_append, List.nil_append, limits, byte,
         List.length_cons, land_pack_cons, shiftRight_pack_cons, Res.bind_ok]
-      change (u32 (pack (b₁ ++ (b₂ ++ rest))) (b₁ ++ (b₂ ++ rest)).length).bind _ = _
-      rw [u32_parses.complete (b₂ ++ rest) ha, Res.bind_ok,
-        u32_parses.complete rest hc, Res.bind_ok]
+      change (u64 (pack (b₁ ++ (b₂ ++ rest))) (b₁ ++ (b₂ ++ rest)).length).bind _ = _
+      rw [u64_parses.complete (b₂ ++ rest) ha, Res.bind_ok,
+        u64_parses.complete rest hc, Res.bind_ok]
 
-theorem funcType_parses : Parses funcType FuncTypeB := by
+theorem funcTypeBody_parses : Parses funcTypeBody
+    (fun ft bs => ∃ b₁ b₂, ResultTypeB ft.params b₁ ∧ ResultTypeB ft.results b₂ ∧
+      bs = b₁ ++ b₂) := by
   have hv := vec_parses valType_parses fun _ _ h => ValTypeB.ne_nil h
   constructor
   · intro bs ft v n h
-    obtain ⟨f, v₁, n₁, hb, hk⟩ := Res.bind_eq_ok.1 h
+    obtain ⟨ps, v₂, n₂, hp, hk⟩ := Res.bind_eq_ok.1 h
+    obtain ⟨b₁, rest₂, rfl, hps, rfl, rfl⟩ := hv.sound hp
+    obtain ⟨rs, b₂, rest, rfl, hr, rfl, rfl, rfl⟩ := hv.map_sound hk
+    exact ⟨b₁ ++ b₂, rest, by simp, ⟨b₁, b₂, hps, hr, rfl⟩, rfl, rfl⟩
+  · rintro ft _ rest ⟨b₁, b₂, hp, hr, rfl⟩
+    simp only [funcTypeBody, List.append_assoc]
+    rw [hv.complete (b₂ ++ rest) hp, Res.bind_ok, hv.complete rest hr, Res.bind_ok]
+
+/-- `vec(B)` with no elements: the count 0. -/
+theorem vec_nil_iff {α : Type} {R : α → List UInt8 → Prop} {bs : List UInt8} :
+    Vec R [] bs ↔ ULeb 32 0 bs := by
+  constructor
+  · rintro ⟨b₁, b₂, hu, hs, rfl⟩
+    cases hs
+    simpa using hu
+  · intro h
+    exact ⟨bs, [], h, .nil, by simp⟩
+
+theorem subType_parses : Parses subType SubTypeB := by
+  have hvu := vec_parses u32_parses fun _ _ h => ULeb.ne_nil h
+  constructor
+  · intro bs ft v n h
+    obtain ⟨_, v₁, n₁, hb, hk⟩ := Res.bind_eq_ok.1 h
     obtain ⟨_, rest₁, rfl, ⟨b, rfl, rfl⟩, rfl, rfl⟩ := byte_parses.sound hb
     cases h₀ : Nat.beq b.toNat 0x60
     · simp only [h₀, Bool.cond_false] at hk
-      simp only [Bool.cond_eq_ite] at hk
-      split at hk <;> cases hk
+      cases h₁ : Nat.beq b.toNat 0x4F
+      · simp only [h₁, Bool.cond_false] at hk
+        simp only [Bool.cond_eq_ite] at hk
+        repeat' split at hk
+        all_goals cases hk
+      · have hb : b = 0x4F := UInt8.toNat_inj.1 (beq_true.1 h₁)
+        subst hb
+        simp only [h₁, Bool.cond_true] at hk
+        obtain ⟨xs, v₂, n₂, hx, hk⟩ := Res.bind_eq_ok.1 hk
+        obtain ⟨b₀, rest₂, rfl, hxs, rfl, rfl⟩ := hvu.sound hx
+        cases xs with
+        | cons x xs => simp at hk
+        | nil =>
+          simp only [List.isEmpty_nil, Bool.not_true, Bool.cond_false] at hk
+          obtain ⟨_, v₃, n₃, hc, hk⟩ := Res.bind_eq_ok.1 hk
+          obtain ⟨_, rest₃, rfl, ⟨c, rfl, rfl⟩, rfl, rfl⟩ := byte_parses.sound hc
+          cases h₂ : Nat.beq c.toNat 0x60
+          · simp only [h₂, Bool.cond_false] at hk
+            simp only [Bool.cond_eq_ite] at hk
+            repeat' split at hk
+            all_goals cases hk
+          · have hc : c = 0x60 := UInt8.toNat_inj.1 (beq_true.1 h₂)
+            subst hc
+            simp only [h₂, Bool.cond_true] at hk
+            obtain ⟨bf, rest, rfl, hf, rfl, rfl⟩ := funcTypeBody_parses.sound hk
+            obtain ⟨b₁, b₂, hp, hr, rfl⟩ := hf
+            exact ⟨0x4F :: (b₀ ++ (0x60 :: (b₁ ++ b₂))), rest, by simp,
+              .inr ⟨b₀, 0x60 :: (b₁ ++ b₂), vec_nil_iff.1 hxs, ⟨b₁, b₂, hp, hr, by simp⟩, rfl⟩,
+              rfl, rfl⟩
     · have hb : b = 0x60 := UInt8.toNat_inj.1 (beq_true.1 h₀)
       subst hb
       simp only [h₀, Bool.cond_true] at hk
-      obtain ⟨ps, v₂, n₂, hp, hk⟩ := Res.bind_eq_ok.1 hk
-      obtain ⟨b₁, rest₂, rfl, hps, rfl, rfl⟩ := hv.sound hp
-      obtain ⟨rs, b₂, rest, rfl, hr, rfl, rfl, rfl⟩ := hv.map_sound hk
-      exact ⟨[0x60] ++ b₁ ++ b₂, rest, by simp, ⟨b₁, b₂, hps, hr, rfl⟩, rfl, rfl⟩
-  · rintro ft _ rest ⟨b₁, b₂, hp, hr, rfl⟩
-    simp only [List.append_assoc, List.cons_append, List.nil_append, funcType, byte,
-      List.length_cons, land_pack_cons, shiftRight_pack_cons, Res.bind_ok]
-    change (vec valType (pack (b₁ ++ (b₂ ++ rest))) (b₁ ++ (b₂ ++ rest)).length).bind _ = _
-    rw [hv.complete (b₂ ++ rest) hp, Res.bind_ok, hv.complete rest hr, Res.bind_ok]
+      obtain ⟨bf, rest, rfl, hf, rfl, rfl⟩ := funcTypeBody_parses.sound hk
+      obtain ⟨b₁, b₂, hp, hr, rfl⟩ := hf
+      exact ⟨0x60 :: (b₁ ++ b₂), rest, by simp, .inl ⟨b₁, b₂, hp, hr, by simp⟩, rfl, rfl⟩
+  · intro ft pre rest h
+    rcases h with ⟨b₁, b₂, hp, hr, rfl⟩ | ⟨b₀, b, h0, ⟨b₁, b₂, hp, hr, rfl⟩, rfl⟩
+    · simp only [List.append_assoc, List.cons_append, List.nil_append, subType, byte,
+        List.length_cons, land_pack_cons, shiftRight_pack_cons, Res.bind_ok,
+        show Nat.beq (UInt8.toNat 0x60) 0x60 = true from rfl, Bool.cond_true]
+      have := funcTypeBody_parses.complete rest ⟨b₁, b₂, hp, hr, rfl⟩
+      simpa only [List.append_assoc] using this
+    · simp only [List.append_assoc, List.cons_append, List.nil_append, subType, byte,
+        List.length_cons, land_pack_cons, shiftRight_pack_cons, Res.bind_ok,
+        show Nat.beq (UInt8.toNat 0x4F) 0x60 = false from rfl,
+        show Nat.beq (UInt8.toNat 0x4F) 0x4F = true from rfl, Bool.cond_false, Bool.cond_true]
+      rw [hvu.complete _ (vec_nil_iff.2 h0), Res.bind_ok]
+      simp only [List.isEmpty_nil, Bool.not_true, Bool.cond_false]
+      simp only [List.length_cons, land_pack_cons, shiftRight_pack_cons, Res.bind_ok,
+        show Nat.beq (UInt8.toNat 0x60) 0x60 = true from rfl, Bool.cond_true]
+      have := funcTypeBody_parses.complete rest ⟨b₁, b₂, hp, hr, rfl⟩
+      simpa only [List.append_assoc] using this
+
+theorem SubTypeB.ne_nil {ft : FuncType} {bs : List UInt8} (h : SubTypeB ft bs) : bs ≠ [] := by
+  rcases h with ⟨b₁, b₂, _, _, rfl⟩ | ⟨b₀, b, _, _, rfl⟩ <;> simp
+
+/-- The first byte of a P′ sub type: `0x60` or `0x4F`. -/
+theorem SubTypeB.head {ft : FuncType} {bs : List UInt8} (h : SubTypeB ft bs) :
+    ∃ b rest, bs = b :: rest ∧ (b.toNat = 0x60 ∨ b.toNat = 0x4F) := by
+  rcases h with ⟨b₁, b₂, _, _, rfl⟩ | ⟨b₀, b, _, _, rfl⟩
+  · exact ⟨0x60, _, rfl, .inl rfl⟩
+  · exact ⟨0x4F, _, rfl, .inr rfl⟩
+
+theorem recType_parses : Parses recType RecTypeB := by
+  have hvs := vec_parses subType_parses fun _ _ h => SubTypeB.ne_nil h
+  constructor
+  · intro bs rt v n h
+    cases bs with
+    | nil => simp [recType] at h
+    | cons b bs =>
+      simp only [recType, List.length_cons, land_pack_cons, shiftRight_pack_cons] at h
+      cases h₀ : Nat.beq b.toNat 0x4E
+      · simp only [h₀, Bool.cond_false] at h
+        obtain ⟨ft, imm, rest, hbs, hs, rfl, rfl, rfl⟩ :=
+          subType_parses.map_sound (bs := b :: bs) (by simpa using h)
+        exact ⟨imm, rest, hbs, .inr ⟨ft, rfl, hs⟩, rfl, rfl⟩
+      · simp only [h₀, Bool.cond_true] at h
+        obtain ⟨pre, rest, rfl, hv, rfl, rfl⟩ := hvs.sound h
+        obtain rfl : b = 0x4E := UInt8.toNat_inj.1 (beq_true.1 h₀)
+        exact ⟨0x4E :: pre, rest, rfl, .inl ⟨pre, hv, rfl⟩, rfl, rfl⟩
+  · intro rt pre rest h
+    rcases h with ⟨b, hv, rfl⟩ | ⟨ft, rfl, hs⟩
+    · simp only [recType, List.cons_append, List.length_cons, land_pack_cons,
+        shiftRight_pack_cons, show Nat.beq (UInt8.toNat 0x4E) 0x4E = true from rfl,
+        Bool.cond_true]
+      exact hvs.complete rest hv
+    · obtain ⟨b, pre', rfl, hb⟩ := SubTypeB.head hs
+      have hc := subType_parses.complete rest hs
+      simp only [List.cons_append, List.length_cons] at hc
+      simp only [recType, List.cons_append, List.length_cons, land_pack_cons,
+        beq_false.2 (show b.toNat ≠ 0x4E by omega), Bool.cond_false]
+      rw [hc, Res.bind_ok]
 
 theorem tableType_parses : Parses tableType TableTypeB := by
   exact (refType_parses.bind fun t => limits_parses.map fun l => TableType.mk l t).congr
@@ -93,6 +196,37 @@ theorem tableType_parses : Parses tableType TableTypeB := by
         exact ⟨b₁, b₂, hr, hl, rfl⟩
       · rintro ⟨b₁, b₂, hr, hl, rfl⟩
         exact ⟨t.elem, b₁, b₂, hr, ⟨t.limits, hl, rfl⟩, rfl⟩
+
+theorem tagType_parses : Parses tagType TagTypeB := by
+  constructor
+  · intro bs x v n h
+    obtain ⟨_, v₁, n₁, hb, hk⟩ := Res.bind_eq_ok.1 h
+    obtain ⟨_, rest₁, rfl, ⟨b, rfl, rfl⟩, rfl, rfl⟩ := byte_parses.sound hb
+    cases h₀ : Nat.beq b.toNat 0
+    · simp [h₀] at hk
+    · simp only [h₀, Bool.cond_true] at hk
+      obtain ⟨bx, rest, rfl, hx, rfl, rfl⟩ := u32_parses.sound hk
+      obtain rfl : b = 0 := UInt8.toNat_inj.1 (beq_true.1 h₀)
+      exact ⟨0 :: bx, rest, rfl, ⟨bx, hx, rfl⟩, rfl, rfl⟩
+  · rintro x _ rest ⟨b, hx, rfl⟩
+    simp only [tagType, List.cons_append, byte, List.length_cons, land_pack_cons,
+      shiftRight_pack_cons, Res.bind_ok, show Nat.beq (UInt8.toNat 0) 0 = true from rfl,
+      Bool.cond_true]
+    exact u32_parses.complete rest hx
+
+theorem tag_parses : Parses tag TagB := by
+  rw [show tag = fun v n => (tagType v n).bind fun x v n => .ok (Tag.mk x) v n from rfl]
+  exact (tagType_parses.map Tag.mk).congr fun t bs => by
+    constructor
+    · rintro ⟨x, hx, rfl⟩; exact hx
+    · intro h; exact ⟨t.type, h, rfl⟩
+
+/-- The first byte of a table type is a reference type's (`0x63` or above). -/
+theorem TableTypeB.head {t : TableType} {bs : List UInt8} (h : TableTypeB t bs) :
+    ∃ b rest, bs = b :: rest ∧ 0x63 ≤ b.toNat := by
+  obtain ⟨b₁, b₂, hr, _, rfl⟩ := h
+  obtain ⟨b, r, rfl, h1, -⟩ := refTypeB_head hr
+  exact ⟨b, r ++ b₂, rfl, h1⟩
 
 theorem globalType_parses : Parses globalType GlobalTypeB := by
   constructor
@@ -162,6 +296,12 @@ theorem import_parses : Parses import_ ImportB := by
          obtain ⟨t, bd, rest, rfl, ht, rfl, rfl, rfl⟩ := globalType_parses.map_sound hd
          exact ⟨b₁ ++ b₂ ++ (3 :: bd), rest, by simp,
            ⟨b₁, b₂, 3 :: bd, hmdB, hnmB, ⟨bd, ht, rfl⟩, rfl⟩, rfl, rfl⟩)
+      | (rename_i hb
+         have he : b = 4 := UInt8.toNat_inj.1 hb
+         subst he
+         obtain ⟨x, bd, rest, rfl, hx, rfl, rfl, rfl⟩ := tagType_parses.map_sound hd
+         exact ⟨b₁ ++ b₂ ++ (4 :: bd), rest, by simp,
+           ⟨b₁, b₂, 4 :: bd, hmdB, hnmB, ⟨bd, hx, rfl⟩, rfl⟩, rfl, rfl⟩)
   · rintro ⟨md, nm, d⟩ _ rest ⟨b₁, b₂, b₃, hmd, hnm, hd, rfl⟩
     cases d <;> obtain ⟨bd, hv, rfl⟩ := hd
     all_goals
@@ -174,6 +314,7 @@ theorem import_parses : Parses import_ ImportB := by
         | rw [tableType_parses.complete rest hv]; rfl
         | rw [limits_parses.complete rest hv]; rfl
         | rw [globalType_parses.complete rest hv]; rfl
+        | rw [tagType_parses.complete rest hv]; rfl
 
 theorem export_parses : Parses export_ ExportB := by
   constructor
@@ -212,6 +353,12 @@ theorem export_parses : Parses export_ ExportB := by
          cases h₃
          exact ⟨b₁ ++ (3 :: bd), rest, by simp,
            ⟨b₁, 3 :: bd, hnmB, ⟨bd, hxB, rfl⟩, rfl⟩, rfl, rfl⟩)
+      | (rename_i hb
+         have he : b = 4 := UInt8.toNat_inj.1 hb
+         subst he
+         cases h₃
+         exact ⟨b₁ ++ (4 :: bd), rest, by simp,
+           ⟨b₁, 4 :: bd, hnmB, ⟨bd, hxB, rfl⟩, rfl⟩, rfl, rfl⟩)
   · rintro ⟨nm, d⟩ _ rest ⟨b₁, b₂, hnm, hd, rfl⟩
     cases d <;> obtain ⟨bd, hx, rfl⟩ := hd
     all_goals
@@ -230,6 +377,48 @@ theorem global_parses : Parses global GlobalB := by
         exact ⟨b₁, b₂, ht, he, rfl⟩
       · rintro ⟨b₁, b₂, ht, he, rfl⟩
         exact ⟨g.type, b₁, b₂, ht, ⟨g.init, he, rfl⟩, rfl⟩
+
+theorem table_parses : Parses table TableB := by
+  have hte := tableType_parses.bind fun t => expr_parses.map fun e => Table.mk t e
+  constructor
+  · intro bs t v n h
+    cases bs with
+    | nil => simp [table] at h
+    | cons b bs =>
+      simp only [table, List.length_cons, land_pack_cons, shiftRight_pack_cons] at h
+      cases h₀ : Nat.beq b.toNat 0x40
+      · simp only [h₀, Bool.cond_false] at h
+        obtain ⟨tt, imm, rest, hbs, htt, rfl, rfl, rfl⟩ :=
+          tableType_parses.map_sound (bs := b :: bs) (by simpa using h)
+        exact ⟨imm, rest, hbs, .inl ⟨rfl, htt⟩, rfl, rfl⟩
+      · simp only [h₀, Bool.cond_true] at h
+        obtain rfl : b = 0x40 := UInt8.toNat_inj.1 (beq_true.1 h₀)
+        obtain ⟨z, v₁, n₁, hz, hk⟩ := Res.bind_eq_ok.1 h
+        obtain ⟨_, rest₁, rfl, ⟨c, rfl, rfl⟩, rfl, rfl⟩ := byte_parses.sound hz
+        cases h₁ : Nat.beq c.toNat 0
+        · simp [h₁] at hk
+        · simp only [h₁, Bool.not_true, Bool.cond_false] at hk
+          obtain rfl : c = 0 := UInt8.toNat_inj.1 (beq_true.1 h₁)
+          obtain ⟨pre, rest, rfl, ⟨tt, b₁, b₂, htt, ⟨e, he, rfl⟩, rfl⟩, rfl, rfl⟩ := hte.sound hk
+          exact ⟨0x40 :: 0x00 :: (b₁ ++ b₂), rest, by simp, .inr ⟨b₁, b₂, htt, he, rfl⟩, rfl, rfl⟩
+  · intro t pre rest h
+    rcases h with ⟨hinit, htt⟩ | ⟨b₁, b₂, htt, he, rfl⟩
+    · obtain ⟨b, pre', rfl, hb⟩ := TableTypeB.head htt
+      have hc := tableType_parses.complete rest htt
+      simp only [List.cons_append, List.length_cons] at hc
+      simp only [table, List.cons_append, List.length_cons, land_pack_cons,
+        beq_false.2 (show b.toNat ≠ 0x40 by omega), Bool.cond_false]
+      rw [hc, Res.bind_ok]
+      cases t
+      simp_all
+    · cases t with
+      | mk tt init =>
+      have := hte.complete rest ⟨tt, b₁, b₂, htt, ⟨init, he, rfl⟩, rfl⟩
+      simp only [table, List.cons_append, List.nil_append, List.append_assoc, List.length_cons,
+        land_pack_cons, shiftRight_pack_cons, show Nat.beq (UInt8.toNat 0x40) 0x40 = true from rfl,
+        Bool.cond_true, byte, Res.bind_ok, show Nat.beq (UInt8.toNat 0x00) 0 = true from rfl,
+        Bool.not_true, Bool.cond_false]
+      simpa only [List.append_assoc] using this
 
 theorem localsRun_parses : Parses localsRun LocalsB := by
   exact (u32_parses.bind fun c => valType_parses.map fun t => (c, t)).congr
@@ -262,6 +451,20 @@ theorem FuncTypeB.ne_nil {t : FuncType} {bs : List UInt8} (h : FuncTypeB t bs) :
 theorem TableTypeB.ne_nil {t : TableType} {bs : List UInt8} (h : TableTypeB t bs) : bs ≠ [] := by
   obtain ⟨b₁, b₂, _, hl, rfl⟩ := h
   simp [List.append_eq_nil_iff, LimitsB.ne_nil hl]
+
+theorem RecTypeB.ne_nil {rt : RecType} {bs : List UInt8} (h : RecTypeB rt bs) : bs ≠ [] := by
+  rcases h with ⟨b, _, rfl⟩ | ⟨ft, _, hs⟩
+  · simp
+  · exact SubTypeB.ne_nil hs
+
+theorem TableB.ne_nil {t : Table} {bs : List UInt8} (h : TableB t bs) : bs ≠ [] := by
+  rcases h with ⟨_, ht⟩ | ⟨b₁, b₂, _, _, rfl⟩
+  · exact TableTypeB.ne_nil ht
+  · simp
+
+theorem TagB.ne_nil {t : Tag} {bs : List UInt8} (h : TagB t bs) : bs ≠ [] := by
+  obtain ⟨b, _, rfl⟩ := h
+  simp
 
 theorem GlobalTypeB.ne_nil {t : GlobalType} {bs : List UInt8} (h : GlobalTypeB t bs) :
     bs ≠ [] := by

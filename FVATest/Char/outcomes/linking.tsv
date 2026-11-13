@@ -29,36 +29,36 @@
 83	assert_return	pass	-
 87	assert_unlinkable	pass	valid
 91	assert_unlinkable	pass	valid
-96	module	skip:outside-profile	malformed
+96	module	skip:outside-profile	invalid
 110	register	skip:register rejected module	-
-112	module	skip:outside-profile	malformed
+112	module	skip:outside-profile	invalid
 133	assert_unlinkable	skip:unavailable import	valid
-138	assert_unlinkable	skip:outside-profile	malformed
-142	assert_unlinkable	skip:outside-profile	malformed
-146	assert_unlinkable	skip:outside-profile	malformed
-151	assert_unlinkable	skip:outside-profile	malformed
-155	assert_unlinkable	skip:outside-profile	malformed
-159	assert_unlinkable	skip:outside-profile	malformed
-164	assert_unlinkable	skip:outside-profile	malformed
-168	assert_unlinkable	skip:outside-profile	malformed
-172	assert_unlinkable	skip:outside-profile	malformed
-176	assert_unlinkable	skip:outside-profile	malformed
+138	assert_unlinkable	skip:outside-profile	invalid
+142	assert_unlinkable	skip:outside-profile	invalid
+146	assert_unlinkable	skip:outside-profile	invalid
+151	assert_unlinkable	skip:outside-profile	invalid
+155	assert_unlinkable	skip:outside-profile	invalid
+159	assert_unlinkable	skip:outside-profile	invalid
+164	assert_unlinkable	skip:outside-profile	invalid
+168	assert_unlinkable	skip:outside-profile	invalid
+172	assert_unlinkable	skip:outside-profile	invalid
+176	assert_unlinkable	skip:outside-profile	invalid
 182	assert_unlinkable	skip:unavailable import	valid
 186	assert_unlinkable	skip:unavailable import	valid
 190	assert_unlinkable	skip:unavailable import	valid
 194	assert_unlinkable	skip:unavailable import	valid
-199	assert_unlinkable	skip:outside-profile	malformed
-203	assert_unlinkable	skip:outside-profile	malformed
-207	assert_unlinkable	skip:outside-profile	malformed
-211	assert_unlinkable	skip:outside-profile	malformed
-216	assert_unlinkable	skip:outside-profile	malformed
-220	assert_unlinkable	skip:outside-profile	malformed
-224	assert_unlinkable	skip:outside-profile	malformed
-228	assert_unlinkable	skip:outside-profile	malformed
-233	assert_unlinkable	skip:outside-profile	malformed
-237	assert_unlinkable	skip:outside-profile	malformed
-241	assert_unlinkable	skip:outside-profile	malformed
-245	assert_unlinkable	skip:outside-profile	malformed
+199	assert_unlinkable	skip:outside-profile	invalid
+203	assert_unlinkable	skip:outside-profile	invalid
+207	assert_unlinkable	skip:outside-profile	invalid
+211	assert_unlinkable	skip:outside-profile	invalid
+216	assert_unlinkable	skip:outside-profile	invalid
+220	assert_unlinkable	skip:outside-profile	invalid
+224	assert_unlinkable	skip:outside-profile	invalid
+228	assert_unlinkable	skip:outside-profile	invalid
+233	assert_unlinkable	skip:outside-profile	invalid
+237	assert_unlinkable	skip:outside-profile	invalid
+241	assert_unlinkable	skip:outside-profile	invalid
+245	assert_unlinkable	skip:outside-profile	invalid
 250	assert_unlinkable	skip:unavailable import	valid
 254	assert_unlinkable	skip:unavailable import	valid
 258	assert_unlinkable	skip:unavailable import	valid
@@ -118,13 +118,13 @@
 411	assert_trap	pass	-
 414	assert_uninstantiable	pass	valid
 423	assert_return	pass	-
-426	module	skip:outside-profile	malformed
+426	module	skip:outside-profile	invalid
 432	register	skip:register rejected module	-
-434	module	skip:outside-profile	malformed
+434	module	skip:outside-profile	invalid
 442	assert_unlinkable	skip:unavailable import	valid
 446	assert_unlinkable	skip:unavailable import	valid
-451	assert_unlinkable	skip:outside-profile	malformed
-455	assert_unlinkable	skip:outside-profile	malformed
+451	assert_unlinkable	skip:outside-profile	invalid
+455	assert_unlinkable	skip:outside-profile	invalid
 460	assert_unlinkable	skip:unavailable import	valid
 464	assert_unlinkable	skip:unavailable import	valid
 471	module	pass	valid

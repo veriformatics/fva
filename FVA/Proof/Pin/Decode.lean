@@ -15,9 +15,14 @@ theorem decode_magic : decode 0 8 = .error (.malformed 0 "magic header not detec
 theorem decode_version :
     decode 0x000000026d736100 8 = .error (.malformed 4 "unknown binary version") := rfl
 
+/-- A tag section id with no size: section framing fails at the end of input. -/
 theorem decode_tag_section :
-    decode 0x0d000000016d736100 9 =
-      .error (.unsupported 8 "exception handling (tag section)") := rfl
+    decode 0x0d000000016d736100 9 = .error (.malformed 9 "unexpected end") := rfl
+
+/-- A struct type in the type section: outside P′, the class first in the message. -/
+theorem decode_struct_type :
+    decode 0x5f010301000000016d736100 13 =
+      .error (.unsupported 11 "gc-types: sub, struct or array type") := rfl
 
 theorem byte_end : byte 0 0 = .bad 0 "unexpected end" := rfl
 
@@ -31,7 +36,7 @@ theorem sub_short : sub 3 (leNat 1) 0 5 = .bad 4 "section size mismatch" := rfl
 
 theorem sub_overrun : sub 3 (leNat 4) 0 5 = .bad 5 "unexpected end" := rfl
 
-theorem sub_unsup : sub 3 valType 0x7b 5 = .unsup 5 "v128 (SIMD)" := rfl
+theorem sub_unsup : sub 3 valType 0x7b 5 = .unsup 5 "simd: v128 value type" := rfl
 
 theorem utf8_continuation : utf8 1 0x80 1 = .bad 1 "malformed UTF-8 encoding" := rfl
 

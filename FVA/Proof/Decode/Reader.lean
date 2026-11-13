@@ -253,6 +253,10 @@ theorem _root_.FVA.Wasm.Binary.ULeb.length_lt {N x : Nat} {bs : List UInt8} (h :
 theorem u32_parses : Parses u32 (ULeb 32) :=
   (uleb_parses 5 32).congr fun _ _ => ⟨fun h => h.1, fun h => ⟨h, by have := h.length_lt; omega⟩⟩
 
+/-- `u64`. -/
+theorem u64_parses : Parses u64 (ULeb 64) :=
+  (uleb_parses 10 64).congr fun _ _ => ⟨fun h => h.1, fun h => ⟨h, by have := h.length_lt; omega⟩⟩
+
 theorem pow_pred_le (N : Nat) : 2 ^ (N - 1) ≤ 2 ^ N := Nat.pow_le_pow_right (by decide) (by omega)
 
 /-- `sN` bits of a one-byte non-negative value. -/

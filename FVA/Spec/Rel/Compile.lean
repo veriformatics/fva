@@ -43,7 +43,7 @@ def Arith.text : Arith → List UInt8
 /-- The compiler's module: one function of type `[i32] → [i32]` with no declared locals and
 the given body, exported as `f`, and nothing else. -/
 def toyModule (body : List Instr) : Module :=
-  { types := [⟨[.num .i32], [.num .i32]⟩], funcs := [{ type := 0, locals := [], body }],
+  { types := [[⟨[.num .i32], [.num .i32]⟩]], funcs := [{ type := 0, locals := [], body }],
     exports := [⟨"f", .func 0⟩] }
 
 /-- The stack height after `body` from height `h`: `local.get 0` and an in-range `i32.const`

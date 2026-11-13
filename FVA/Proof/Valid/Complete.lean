@@ -31,10 +31,12 @@ theorem importDesc_complete {C : Context} {d : ImportDesc} (h : d.Ok C) :
   | table tt => exact limits_complete h
   | mem lim => exact limits_complete h
   | global gt => rfl
+  | tag x => cases h
 
 theorem func_complete {C : Context} {f : Func} {ft : FuncType} (h : FuncT C f ft) :
     func C f = true := by
-  simpa only [func, h.1] using expr_complete h.2
+  simp only [func, h.1, Bool.and_eq_true, List.all_eq_true]
+  exact ⟨h.2.1, expr_complete h.2.2⟩
 
 theorem elemMode_complete {C : Context} {t : RefType} {mode : ElemMode}
     (h : mode.Ok C t) : elemMode C t mode = true := by
@@ -54,7 +56,9 @@ theorem dataMode_complete {C : Context} {mode : DataMode} (h : mode.Ok C) :
 
 theorem exportDesc_complete {C : Context} {d : ExportDesc} (h : d.Ok C) :
     exportDesc C d = true := by
-  cases d <;> simpa [exportDesc, ExportDesc.Ok, Nat.blt_eq] using h
+  cases d with
+  | tag x => cases h
+  | _ => simpa [exportDesc, ExportDesc.Ok, Nat.blt_eq] using h
 
 theorem distinct_complete {names : List String} (h : names.Nodup) : distinct names = true := by
   induction names with
@@ -68,7 +72,7 @@ end CompletenessProof
 /-- Every raw module satisfying the reviewed typing judgment is accepted. -/
 theorem validate_complete {m : Module} (h : ModuleValid m) : validate m = true := by
   simp only [validate, Bool.and_eq_true, and_assoc, List.all_eq_true]
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨h.profile, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · simpa [Nat.ble_eq] using h.oneMemory
   · intro f hf
     simpa [Nat.blt_eq] using h.funcTypes f hf
@@ -77,8 +81,8 @@ theorem validate_complete {m : Module} (h : ModuleValid m) : validate m = true :
   · intro f hf
     obtain ⟨ft, ht⟩ := h.funcs f hf
     exact CompletenessProof.func_complete ht
-  · intro tt ht
-    exact CompletenessProof.limits_complete (h.tables tt ht)
+  · intro t ht
+    exact CompletenessProof.limits_complete (h.tables t ht)
   · intro lim hm
     exact CompletenessProof.limits_complete (h.mems lim hm)
   · intro g hg

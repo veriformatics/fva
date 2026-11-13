@@ -179,11 +179,12 @@ theorem customs_complete {c rest : List UInt8} (hc : CustomsB c) (hr : NoCustom 
 
 /-- What an optional section's content `cont` adds to the accumulator, per the spec. -/
 def IntoB : Nat → Acc → List UInt8 → Acc → Prop
-  | 1, a, cont, a' => ∃ xs, Vec FuncTypeB xs cont ∧ a' = { a with m := { a.m with types := xs } }
+  | 1, a, cont, a' => ∃ xs, Vec RecTypeB xs cont ∧ a' = { a with m := { a.m with types := xs } }
   | 2, a, cont, a' => ∃ xs, Vec ImportB xs cont ∧ a' = { a with m := { a.m with imports := xs } }
   | 3, a, cont, a' => ∃ xs, Vec IdxB xs cont ∧ a' = { a with typeIdxs := xs }
-  | 4, a, cont, a' => ∃ xs, Vec TableTypeB xs cont ∧ a' = { a with m := { a.m with tables := xs } }
+  | 4, a, cont, a' => ∃ xs, Vec TableB xs cont ∧ a' = { a with m := { a.m with tables := xs } }
   | 5, a, cont, a' => ∃ xs, Vec LimitsB xs cont ∧ a' = { a with m := { a.m with mems := xs } }
+  | 13, a, cont, a' => ∃ xs, Vec TagB xs cont ∧ a' = { a with m := { a.m with tags := xs } }
   | 6, a, cont, a' => ∃ xs, Vec GlobalB xs cont ∧ a' = { a with m := { a.m with globals := xs } }
   | 7, a, cont, a' => ∃ xs, Vec ExportB xs cont ∧ a' = { a with m := { a.m with exports := xs } }
   | 8, a, cont, a' => ∃ x, IdxB x cont ∧ a' = { a with m := { a.m with start := some x } }
@@ -219,12 +220,13 @@ theorem u32Into_parses (f : Nat → Acc) :
 theorem sectionInto_parses (a : Acc) {id : Nat} (hid : id ∈ slotIds) :
     Parses (sectionInto id a) (fun a' cont => IntoB id a cont a') := by
   simp only [slotIds, List.mem_cons, List.mem_nil_iff, or_false] at hid
-  rcases hid with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-  · exact vecInto_parses funcType_parses (fun _ _ h => FuncTypeB.ne_nil h) _
+  rcases hid with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  · exact vecInto_parses recType_parses (fun _ _ h => RecTypeB.ne_nil h) _
   · exact vecInto_parses import_parses (fun _ _ h => ImportB.ne_nil h) _
   · exact vecInto_parses u32_parses (fun _ _ h => ULeb.ne_nil h) _
-  · exact vecInto_parses tableType_parses (fun _ _ h => TableTypeB.ne_nil h) _
+  · exact vecInto_parses table_parses (fun _ _ h => TableB.ne_nil h) _
   · exact vecInto_parses limits_parses (fun _ _ h => LimitsB.ne_nil h) _
+  · exact vecInto_parses tag_parses (fun _ _ h => TagB.ne_nil h) _
   · exact vecInto_parses global_parses (fun _ _ h => GlobalB.ne_nil h) _
   · exact vecInto_parses export_parses (fun _ _ h => ExportB.ne_nil h) _
   · exact u32Into_parses _
@@ -307,7 +309,8 @@ theorem slots_absorb {cs : List UInt8} (hcs : CustomsB cs) (ids : List Nat) (a :
 
 theorem slotIds_pos {id : Nat} (h : id ∈ slotIds) : 0 < id ∧ id < 256 := by
   simp only [slotIds, List.mem_cons, List.mem_nil_iff, or_false] at h
-  rcases h with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> decide
+  rcases h with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+    decide
 
 /-- After its leading custom sections, a layout starts with a present slot's id, or is empty. -/
 theorem Layout.head : ∀ {ids : List Nat} {a : Acc} {bs : List UInt8} {a' : Acc},
@@ -415,6 +418,8 @@ theorem usesData_iff_all :
         · exact .thn h
         · exact .els h
       · intro h; cases h with | thn h => exact .inl h | els h => exact .inr h
+    | tryTable bt cs b ih =>
+      simp only [usesData, ih]; exact ⟨.tryTable, fun h => by cases h; assumption⟩
     | memoryInit x => simp only [usesData]; exact ⟨fun _ => .init x, fun _ => trivial⟩
     | dataDrop x => simp only [usesData]; exact ⟨fun _ => .drop x, fun _ => trivial⟩
     | _ => simp only [usesData]; constructor <;> intro h <;> cases h
@@ -480,12 +485,12 @@ theorem slotB_of_opt {k : Nat} {α : Type} {R : α → List UInt8 → Prop} {get
 
 theorem slot_types {a : Acc} {s : List UInt8} {a₁ : Acc} (h : SlotB 1 a s a₁)
     (h0 : a.m.types = []) :
-    ∃ x, VecSecB 1 FuncTypeB x s ∧ a₁ = { a with m := { a.m with types := x } } :=
+    ∃ x, VecSecB 1 RecTypeB x s ∧ a₁ = { a with m := { a.m with types := x } } :=
   slotB_vec (get := fun a => a.m.types)
     (set := fun a x => { a with m := { a.m with types := x } }) (fun _ _ _ => Iff.rfl)
     (fun a h => by cases a with | mk m ti cs dc => cases m; simp_all) h h0
 
-theorem slotOf_types {a : Acc} {s : List UInt8} {x} (h : VecSecB 1 FuncTypeB x s)
+theorem slotOf_types {a : Acc} {s : List UInt8} {x} (h : VecSecB 1 RecTypeB x s)
     (h0 : a.m.types = []) : SlotB 1 a s ({ a with m := { a.m with types := x } }) :=
   slotB_of_vec (get := fun a => a.m.types)
     (set := fun a x => { a with m := { a.m with types := x } }) (fun _ _ _ => Iff.rfl)
@@ -519,12 +524,12 @@ theorem slotOf_typeIdxs {a : Acc} {s : List UInt8} {x} (h : VecSecB 3 IdxB x s)
 
 theorem slot_tables {a : Acc} {s : List UInt8} {a₁ : Acc} (h : SlotB 4 a s a₁)
     (h0 : a.m.tables = []) :
-    ∃ x, VecSecB 4 TableTypeB x s ∧ a₁ = { a with m := { a.m with tables := x } } :=
+    ∃ x, VecSecB 4 TableB x s ∧ a₁ = { a with m := { a.m with tables := x } } :=
   slotB_vec (get := fun a => a.m.tables)
     (set := fun a x => { a with m := { a.m with tables := x } }) (fun _ _ _ => Iff.rfl)
     (fun a h => by cases a with | mk m ti cs dc => cases m; simp_all) h h0
 
-theorem slotOf_tables {a : Acc} {s : List UInt8} {x} (h : VecSecB 4 TableTypeB x s)
+theorem slotOf_tables {a : Acc} {s : List UInt8} {x} (h : VecSecB 4 TableB x s)
     (h0 : a.m.tables = []) : SlotB 4 a s ({ a with m := { a.m with tables := x } }) :=
   slotB_of_vec (get := fun a => a.m.tables)
     (set := fun a x => { a with m := { a.m with tables := x } }) (fun _ _ _ => Iff.rfl)
@@ -541,6 +546,19 @@ theorem slotOf_mems {a : Acc} {s : List UInt8} {x} (h : VecSecB 5 LimitsB x s)
     (h0 : a.m.mems = []) : SlotB 5 a s ({ a with m := { a.m with mems := x } }) :=
   slotB_of_vec (get := fun a => a.m.mems)
     (set := fun a x => { a with m := { a.m with mems := x } }) (fun _ _ _ => Iff.rfl)
+    (fun a h => by cases a with | mk m ti cs dc => cases m; simp_all) h h0
+
+theorem slot_tags {a : Acc} {s : List UInt8} {a₁ : Acc} (h : SlotB 13 a s a₁)
+    (h0 : a.m.tags = []) :
+    ∃ x, VecSecB 13 TagB x s ∧ a₁ = { a with m := { a.m with tags := x } } :=
+  slotB_vec (get := fun a => a.m.tags)
+    (set := fun a x => { a with m := { a.m with tags := x } }) (fun _ _ _ => Iff.rfl)
+    (fun a h => by cases a with | mk m ti cs dc => cases m; simp_all) h h0
+
+theorem slotOf_tags {a : Acc} {s : List UInt8} {x} (h : VecSecB 13 TagB x s)
+    (h0 : a.m.tags = []) : SlotB 13 a s ({ a with m := { a.m with tags := x } }) :=
+  slotB_of_vec (get := fun a => a.m.tags)
+    (set := fun a x => { a with m := { a.m with tags := x } }) (fun _ _ _ => Iff.rfl)
     (fun a h => by cases a with | mk m ti cs dc => cases m; simp_all) h h0
 
 theorem slot_globals {a : Acc} {s : List UInt8} {a₁ : Acc} (h : SlotB 6 a s a₁)
@@ -716,19 +734,19 @@ theorem decode_sound {b : List UInt8} {m : Module} (h : decode (pack b) b.length
   cases hz : Nat.beq rest.length 0
   · simp only [hz, Bool.cond_false] at k₃
     revert k₃
-    cases Nat.beq (Nat.land (pack rest) 255) 13 <;> cases Nat.blt 12 (Nat.land (pack rest) 255) <;>
-      simp
+    cases Nat.blt 13 (Nat.land (pack rest) 255) <;> simp
   simp only [hz, Bool.cond_true] at k₃
   obtain rfl : rest = [] := List.eq_nil_of_length_eq_zero (beq_true.1 hz)
   subst em4 ev4 er₁ er₂
   obtain ⟨rfl, hlen, hdc, hdc'⟩ := finish_ok k₃
-  -- unpack the twelve slots
+  -- unpack the thirteen slots
   obtain ⟨c₀, s₁, r₁, a₁, hc₀, hs₁, hl, rfl⟩ := hl
   obtain ⟨c₁, s₂, r₂, a₂, hc₁, hs₂, hl, rfl⟩ := hl
   obtain ⟨c₂, s₃, r₃, a₃, hc₂, hs₃, hl, rfl⟩ := hl
   obtain ⟨c₃, s₄, r₄, a₄, hc₃, hs₄, hl, rfl⟩ := hl
   obtain ⟨c₄, s₅, r₅, a₅, hc₄, hs₅, hl, rfl⟩ := hl
-  obtain ⟨c₅, s₆, r₆, a₆, hc₅, hs₆, hl, rfl⟩ := hl
+  obtain ⟨c₅, s₁₃, r₁₃, a₁₃, hc₅, hs₁₃, hl, rfl⟩ := hl
+  obtain ⟨c₁₃, s₆, r₆, a₆, hc₁₃, hs₆, hl, rfl⟩ := hl
   obtain ⟨c₆, s₇, r₇, a₇, hc₆, hs₇, hl, rfl⟩ := hl
   obtain ⟨c₇, s₈, r₈, a₈, hc₇, hs₈, hl, rfl⟩ := hl
   obtain ⟨c₈, s₉, r₉, a₉, hc₈, hs₉, hl, rfl⟩ := hl
@@ -740,6 +758,7 @@ theorem decode_sound {b : List UInt8} {m : Module} (h : decode (pack b) b.length
   obtain ⟨x₃, hx₃, rfl⟩ := slot_typeIdxs hs₃ rfl
   obtain ⟨x₄, hx₄, rfl⟩ := slot_tables hs₄ rfl
   obtain ⟨x₅, hx₅, rfl⟩ := slot_mems hs₅ rfl
+  obtain ⟨x₁₃, hx₁₃, rfl⟩ := slot_tags hs₁₃ rfl
   obtain ⟨x₆, hx₆, rfl⟩ := slot_globals hs₆ rfl
   obtain ⟨x₇, hx₇, rfl⟩ := slot_exports hs₇ rfl
   obtain ⟨x₈, hx₈, rfl⟩ := slot_start hs₈ rfl
@@ -747,71 +766,74 @@ theorem decode_sound {b : List UInt8} {m : Module} (h : decode (pack b) b.length
   obtain ⟨x₁₂, hx₁₂, rfl⟩ := slot_dataCount hs₁₂ rfl
   obtain ⟨x₁₀, hx₁₀, rfl⟩ := slot_codes hs₁₀ rfl
   obtain ⟨x₁₁, hx₁₁, rfl⟩ := slot_datas hs₁₁ rfl
-  refine ⟨x₃, x₁₀, x₁₂, c₀, s₁, c₁, s₂, c₂, s₃, c₃, s₄, c₄, s₅, c₅, s₆, c₆, s₇, c₇, s₈, c₈, s₉,
-    c₉, s₁₂, c₁₂, s₁₀, c₁₀, s₁₁, c₁₁, hc₀, hx₁, hc₁, hx₂, hc₂, hx₃, hc₃, hx₄, hc₄, hx₅, hc₅, hx₆,
-    hc₆, hx₇, hc₇, hx₈, hc₈, hx₉, hc₉, hx₁₂, hc₁₂, hx₁₀, hc₁₀, hx₁₁, hc₁₁, hlen, rfl, hdc, hdc', ?_⟩
+  refine ⟨x₃, x₁₀, x₁₂, c₀, s₁, c₁, s₂, c₂, s₃, c₃, s₄, c₄, s₅, c₅, s₁₃, c₁₃, s₆, c₆, s₇, c₇,
+    s₈, c₈, s₉, c₉, s₁₂, c₁₂, s₁₀, c₁₀, s₁₁, c₁₁, hc₀, hx₁, hc₁, hx₂, hc₂, hx₃, hc₃, hx₄, hc₄, hx₅,
+    hc₅, hx₁₃, hc₁₃, hx₆, hc₆, hx₇, hc₇, hx₈, hc₈, hx₉, hc₉, hx₁₂, hc₁₂, hx₁₀, hc₁₀, hx₁₁, hc₁₁,
+    hlen, rfl, hdc, hdc', ?_⟩
   simp [preamble]
 
 theorem slotIds_nodup : slotIds.Nodup := by simp [slotIds]
 
-/-- The accumulator after all twelve slots. -/
-def accOf (types : List FuncType) (imports : List Import) (typeIdxs : List Nat)
-    (tables : List TableType) (mems : List Limits) (globals : List Global) (exports : List Export)
-    (start : Option Nat) (elems : List Elem) (dataCount : Option Nat)
+/-- The accumulator after all thirteen slots. -/
+def accOf (types : List RecType) (imports : List Import) (typeIdxs : List Nat)
+    (tables : List Table) (mems : List Limits) (tags : List Tag) (globals : List Global)
+    (exports : List Export) (start : Option Nat) (elems : List Elem) (dataCount : Option Nat)
     (codes : List (List (Nat × ValType) × Expr)) (datas : List Data) : Acc :=
-  { m := { types, imports, tables, mems, globals, exports, start, elems, datas },
+  { m := { types, imports, tables, mems, tags, globals, exports, start, elems, datas },
     typeIdxs, codes, dataCount }
 
-theorem layout_of_slots {x₁ : List FuncType} {x₂ : List Import} {x₃ : List Nat}
-    {x₄ : List TableType} {x₅ : List Limits} {x₆ : List Global} {x₇ : List Export}
+theorem layout_of_slots {x₁ : List RecType} {x₂ : List Import} {x₃ : List Nat}
+    {x₄ : List Table} {x₅ : List Limits} {x₁₃ : List Tag} {x₆ : List Global} {x₇ : List Export}
     {x₈ : Option Nat} {x₉ : List Elem} {x₁₂ : Option Nat}
     {x₁₀ : List (List (Nat × ValType) × Expr)} {x₁₁ : List Data}
-    {c₀ s₁ c₁ s₂ c₂ s₃ c₃ s₄ c₄ s₅ c₅ s₆ c₆ s₇ c₇ s₈ c₈ s₉ c₉ s₁₂ c₁₂ s₁₀ c₁₀ s₁₁ c₁₁ :
+    {c₀ s₁ c₁ s₂ c₂ s₃ c₃ s₄ c₄ s₅ c₅ s₁₃ c₁₃ s₆ c₆ s₇ c₇ s₈ c₈ s₉ c₉ s₁₂ c₁₂ s₁₀ c₁₀ s₁₁ c₁₁ :
       List UInt8}
-    (hc₀ : CustomsB c₀) (hx₁ : VecSecB 1 FuncTypeB x₁ s₁) (hc₁ : CustomsB c₁)
+    (hc₀ : CustomsB c₀) (hx₁ : VecSecB 1 RecTypeB x₁ s₁) (hc₁ : CustomsB c₁)
     (hx₂ : VecSecB 2 ImportB x₂ s₂) (hc₂ : CustomsB c₂) (hx₃ : VecSecB 3 IdxB x₃ s₃)
-    (hc₃ : CustomsB c₃) (hx₄ : VecSecB 4 TableTypeB x₄ s₄) (hc₄ : CustomsB c₄)
-    (hx₅ : VecSecB 5 LimitsB x₅ s₅) (hc₅ : CustomsB c₅) (hx₆ : VecSecB 6 GlobalB x₆ s₆)
+    (hc₃ : CustomsB c₃) (hx₄ : VecSecB 4 TableB x₄ s₄) (hc₄ : CustomsB c₄)
+    (hx₅ : VecSecB 5 LimitsB x₅ s₅) (hc₅ : CustomsB c₅) (hx₁₃ : VecSecB 13 TagB x₁₃ s₁₃)
+    (hc₁₃ : CustomsB c₁₃) (hx₆ : VecSecB 6 GlobalB x₆ s₆)
     (hc₆ : CustomsB c₆) (hx₇ : VecSecB 7 ExportB x₇ s₇) (hc₇ : CustomsB c₇)
     (hx₈ : OptSecB 8 IdxB x₈ s₈) (hc₈ : CustomsB c₈) (hx₉ : VecSecB 9 ElemB x₉ s₉)
     (hc₉ : CustomsB c₉) (hx₁₂ : OptSecB 12 (ULeb 32) x₁₂ s₁₂) (hc₁₂ : CustomsB c₁₂)
     (hx₁₀ : VecSecB 10 CodeB x₁₀ s₁₀) (hc₁₀ : CustomsB c₁₀) (hx₁₁ : VecSecB 11 DataB x₁₁ s₁₁)
     (hc₁₁ : CustomsB c₁₁) :
     Layout slotIds {} (c₀ ++ s₁ ++ (c₁ ++ s₂ ++ (c₂ ++ s₃ ++ (c₃ ++ s₄ ++ (c₄ ++ s₅ ++
-      (c₅ ++ s₆ ++ (c₆ ++ s₇ ++ (c₇ ++ s₈ ++ (c₈ ++ s₉ ++ (c₉ ++ s₁₂ ++ (c₁₂ ++ s₁₀ ++
-      (c₁₀ ++ s₁₁ ++ c₁₁))))))))))))
-      (accOf x₁ x₂ x₃ x₄ x₅ x₆ x₇ x₈ x₉ x₁₂ x₁₀ x₁₁) :=
+      (c₅ ++ s₁₃ ++ (c₁₃ ++ s₆ ++ (c₆ ++ s₇ ++ (c₇ ++ s₈ ++ (c₈ ++ s₉ ++ (c₉ ++ s₁₂ ++
+      (c₁₂ ++ s₁₀ ++ (c₁₀ ++ s₁₁ ++ c₁₁)))))))))))))
+      (accOf x₁ x₂ x₃ x₄ x₅ x₁₃ x₆ x₇ x₈ x₉ x₁₂ x₁₀ x₁₁) :=
   ⟨c₀, s₁, _, _, hc₀, slotOf_types hx₁ rfl,
    ⟨c₁, s₂, _, _, hc₁, slotOf_imports hx₂ rfl,
     ⟨c₂, s₃, _, _, hc₂, slotOf_typeIdxs hx₃ rfl,
      ⟨c₃, s₄, _, _, hc₃, slotOf_tables hx₄ rfl,
       ⟨c₄, s₅, _, _, hc₄, slotOf_mems hx₅ rfl,
-       ⟨c₅, s₆, _, _, hc₅, slotOf_globals hx₆ rfl,
-        ⟨c₆, s₇, _, _, hc₆, slotOf_exports hx₇ rfl,
-         ⟨c₇, s₈, _, _, hc₇, slotOf_start hx₈ rfl,
-          ⟨c₈, s₉, _, _, hc₈, slotOf_elems hx₉ rfl,
-           ⟨c₉, s₁₂, _, _, hc₉, slotOf_dataCount hx₁₂ rfl,
-            ⟨c₁₂, s₁₀, _, _, hc₁₂, slotOf_codes hx₁₀ rfl,
-             ⟨c₁₀, s₁₁, c₁₁, _, hc₁₀, slotOf_datas hx₁₁ rfl, ⟨hc₁₁, rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩,
-                rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩
+       ⟨c₅, s₁₃, _, _, hc₅, slotOf_tags hx₁₃ rfl,
+        ⟨c₁₃, s₆, _, _, hc₁₃, slotOf_globals hx₆ rfl,
+         ⟨c₆, s₇, _, _, hc₆, slotOf_exports hx₇ rfl,
+          ⟨c₇, s₈, _, _, hc₇, slotOf_start hx₈ rfl,
+           ⟨c₈, s₉, _, _, hc₈, slotOf_elems hx₉ rfl,
+            ⟨c₉, s₁₂, _, _, hc₉, slotOf_dataCount hx₁₂ rfl,
+             ⟨c₁₂, s₁₀, _, _, hc₁₂, slotOf_codes hx₁₀ rfl,
+              ⟨c₁₀, s₁₁, c₁₁, _, hc₁₀, slotOf_datas hx₁₁ rfl, ⟨hc₁₁, rfl⟩, rfl⟩, rfl⟩, rfl⟩,
+                rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩, rfl⟩
 
 /-- T2 (completeness): every encoding of a module decodes to it. -/
 theorem decode_complete {b : List UInt8} {m : Module} (h : ModuleB m b) :
     decode (pack b) b.length = .ok m := by
-  obtain ⟨typeIdxs, codes, dataCount, c₀, s₁, c₁, s₂, c₂, s₃, c₃, s₄, c₄, s₅, c₅, s₆, c₆, s₇, c₇,
-    s₈, c₈, s₉, c₉, s₁₂, c₁₂, s₁₀, c₁₀, s₁₁, c₁₁, hc₀, hx₁, hc₁, hx₂, hc₂, hx₃, hc₃, hx₄, hc₄,
-    hx₅, hc₅, hx₆, hc₆, hx₇, hc₇, hx₈, hc₈, hx₉, hc₉, hx₁₂, hc₁₂, hx₁₀, hc₁₀, hx₁₁, hc₁₁, hlen,
-    hfuncs, hdc, hdc', hb⟩ := h
-  have hl := layout_of_slots hc₀ hx₁ hc₁ hx₂ hc₂ hx₃ hc₃ hx₄ hc₄ hx₅ hc₅ hx₆ hc₆ hx₇ hc₇ hx₈ hc₈
-    hx₉ hc₉ hx₁₂ hc₁₂ hx₁₀ hc₁₀ hx₁₁ hc₁₁
+  obtain ⟨typeIdxs, codes, dataCount, c₀, s₁, c₁, s₂, c₂, s₃, c₃, s₄, c₄, s₅, c₅, s₁₃, c₁₃, s₆,
+    c₆, s₇, c₇, s₈, c₈, s₉, c₉, s₁₂, c₁₂, s₁₀, c₁₀, s₁₁, c₁₁, hc₀, hx₁, hc₁, hx₂, hc₂, hx₃, hc₃,
+    hx₄, hc₄, hx₅, hc₅, hx₁₃, hc₁₃, hx₆, hc₆, hx₇, hc₇, hx₈, hc₈, hx₉, hc₉, hx₁₂, hc₁₂, hx₁₀,
+    hc₁₀, hx₁₁, hc₁₁, hlen, hfuncs, hdc, hdc', hb⟩ := h
+  have hl := layout_of_slots hc₀ hx₁ hc₁ hx₂ hc₂ hx₃ hc₃ hx₄ hc₄ hx₅ hc₅ hx₁₃ hc₁₃ hx₆ hc₆ hx₇
+    hc₇ hx₈ hc₈ hx₉ hc₉ hx₁₂ hc₁₂ hx₁₀ hc₁₀ hx₁₁ hc₁₁
   generalize hbody : c₀ ++ s₁ ++ (c₁ ++ s₂ ++ (c₂ ++ s₃ ++ (c₃ ++ s₄ ++ (c₄ ++ s₅ ++
-      (c₅ ++ s₆ ++ (c₆ ++ s₇ ++ (c₇ ++ s₈ ++ (c₈ ++ s₉ ++ (c₉ ++ s₁₂ ++ (c₁₂ ++ s₁₀ ++
-      (c₁₀ ++ s₁₁ ++ c₁₁))))))))))) = body at hl
+      (c₅ ++ s₁₃ ++ (c₁₃ ++ s₆ ++ (c₆ ++ s₇ ++ (c₇ ++ s₈ ++ (c₈ ++ s₉ ++ (c₉ ++ s₁₂ ++
+      (c₁₂ ++ s₁₀ ++ (c₁₀ ++ s₁₁ ++ c₁₁)))))))))))) = body at hl
   have hb' : b = [0x00, 0x61, 0x73, 0x6D] ++ ([0x01, 0x00, 0x00, 0x00] ++ body) := by
     rw [hb, ← hbody]; simp [preamble]
   subst hb'
-  generalize hacc : accOf m.types m.imports typeIdxs m.tables m.mems m.globals m.exports m.start
-    m.elems dataCount codes m.datas = a at hl
+  generalize hacc : accOf m.types m.imports typeIdxs m.tables m.mems m.tags m.globals m.exports
+    m.start m.elems dataCount codes m.datas = a at hl
   have hsl := slots_complete (fun _ h => h) slotIds_nodup hl (pre := []) .nil
   simp only [List.nil_append] at hsl
   have hfin : finish a 0 = .ok (finish.assemble a) 0 0 := by

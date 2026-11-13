@@ -1,0 +1,11 @@
+(module
+  (memory 1 2)
+  (data (i32.const 8) "abc")
+  (data $p "xyz")
+  (table 4 funcref)
+  (elem (i32.const 0) $g)
+  (global $m (mut i32) (i32.const 0))
+  (func $g (result i32) (i32.load offset=4 align=2 (i32.const 0)))
+  (func (export "bulk") (memory.init $p (i32.const 0) (i32.const 0) (i32.const 3))
+    (memory.copy (i32.const 1) (i32.const 0) (i32.const 2)) (memory.fill (i32.const 0) (i32.const 1) (i32.const 1))
+    (drop (memory.grow (i32.const 1))) (drop (memory.size)) (data.drop $p)))
