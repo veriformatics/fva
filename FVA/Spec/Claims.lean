@@ -8,23 +8,27 @@ execution allowed by `Step` (every NaN choice, growth failure and host outcome) 
 every finishing outcome satisfies the postcondition; a configuration with no successor that is
 not finished, or an execution that runs forever, refutes it. `May` = some execution finishes so;
 `PartialCorrect` = every finishing execution does. Outcomes carry the final store, so memory
-effects are part of every postcondition; a trap is an outcome, so a total claim may allow one
-explicitly. No claim mentions fuel.
+effects are part of every postcondition; a trap or an uncaught exception is an outcome, so a
+total claim may allow one explicitly. No claim mentions fuel.
 -/
 
 namespace FVA.Wasm.Exec
 
 open FVA.Wasm
 
-/-- The outcome of a finished execution: values or a trap, with the final store. -/
+/-- The outcome of a finished execution: values, a trap or an uncaught exception (3.0 result
+`(REF.EXN_ADDR a) THROW_REF`: exception address `a`), with the final store. -/
 inductive Outcome where
   | returned (s : Store) (vs : List Val)
   | trapped (s : Store)
+  | thrown (s : Store) (a : Nat)
 
-/-- `c` has finished with outcome `o`: only values remain, or only `trap`. -/
+/-- `c` has finished with outcome `o`: only values remain, only `trap`, or only a thrown
+exception. -/
 def Final (c : Config) : Outcome → Prop
   | .returned s vs => c.store = s ∧ c.instrs = vals vs
   | .trapped s => c.store = s ∧ c.instrs = [.trap]
+  | .thrown s a => c.store = s ∧ c.instrs = throwing a
 
 /-- Total correctness: from `c`, every execution finishes, with an outcome satisfying `Q`. -/
 inductive Must (H : HostSem) (Q : Outcome → Prop) : Config → Prop where
@@ -47,20 +51,22 @@ it). -/
 def invokeConfig (s : Store) (a : Nat) (args : List Val) : Config :=
   ⟨s, ⟨[], {}⟩, vals args ++ [.invoke a]⟩
 
-/-- `S ⊢ val : t` (appendix "Soundness", values): numbers by type, null at the nullable
-reference type of its heap type, a function reference to an existing function, any external
-reference. -/
+/-- `S ⊢ val : t` (appendix "Soundness", values): numbers by type, null at every nullable
+reference type (2.0's typing until U28c), a function reference to an existing function, any
+external reference, a reference to an existing exception. -/
 def Val.HasType (s : Store) : Val → ValType → Prop
   | .i32 _, .num .i32 | .i64 _, .num .i64 | .f32 _, .num .f32 | .f64 _, .num .f64 => True
-  | .ref (.null ht), .ref t => t = ⟨true, ht⟩
+  | .ref .null, .ref t => t.null = true
   | .ref (.func a), .ref .funcref => a < s.funcs.length
   | .ref (.extern _), .ref .externref => True
+  | .ref (.exn a), .ref .exnref => a < s.exns.length
   | _, _ => False
 
 /-- The invocation of `a` on `args` is defined (§4.5.5): `a` is a function address and the
 arguments match its parameter types in number and type. -/
 def InvokeOK (s : Store) (a : Nat) (args : List Val) : Prop :=
-  ∃ fi, s.funcs[a]? = some fi ∧ List.Forall₂ (Val.HasType s) args fi.type.params
+  ∃ fi ft, s.funcs[a]? = some fi ∧ fi.type.expand = some ft ∧
+    List.Forall₂ (Val.HasType s) args ft.params
 
 /-- The function address exported under `name`. -/
 def ModuleInst.exportFunc (inst : ModuleInst) (name : String) : Option Nat :=
@@ -75,19 +81,20 @@ def CallMust (H : HostSem) (s : Store) (inst : ModuleInst) (name : String) (args
     (Q : Outcome → Prop) : Prop :=
   ∃ a, inst.exportFunc name = some a ∧ InvokeOK s a args ∧ Must H Q (invokeConfig s a args)
 
-/-- The call always returns, with final store and results satisfying `P` (never traps). -/
+/-- The call always returns, with final store and results satisfying `P` (never traps, never
+throws). -/
 def CallReturns (H : HostSem) (s : Store) (inst : ModuleInst) (name : String) (args : List Val)
     (P : Store → List Val → Prop) : Prop :=
   CallMust H s inst name args fun
     | .returned s' vs => P s' vs
-    | .trapped _ => False
+    | _ => False
 
 /-- The call always traps, with a final store satisfying `P`. -/
 def CallTraps (H : HostSem) (s : Store) (inst : ModuleInst) (name : String) (args : List Val)
     (P : Store → Prop) : Prop :=
   CallMust H s inst name args fun
-    | .returned _ _ => False
     | .trapped s' => P s'
+    | _ => False
 
 /-- Some execution of the call finishes with an outcome satisfying `Q`. -/
 def CallMay (H : HostSem) (s : Store) (inst : ModuleInst) (name : String) (args : List Val)

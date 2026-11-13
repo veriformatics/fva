@@ -23,19 +23,21 @@ theorem run_succ (acc : Nat) (b : Nat → UInt8) (j : Nat) :
 theorem run_zero (acc : Nat) (b : Nat → UInt8) : run acc b 0 = acc := by simp [run]
 
 /-- The frame at the head of iteration `j`. -/
-structure Inv (ls : List Val) (inst : ModuleInst) (p lim acc : Nat) (b : Nat → UInt8) (j : Nat)
+structure Inv (ls : List (Option Val)) (inst : ModuleInst) (p lim acc : Nat) (b : Nat → UInt8)
+    (j : Nat)
     (f : Frame) : Prop where
   inst : f.inst = inst
   len : f.locals.length = ls.length
   others : ∀ i, i ≠ 2 → i ≠ 4 → i ≠ 15 → i ≠ 17 → f.locals[i]? = ls[i]?
-  l2 : f.locals[2]? = some (vI (p + j))
-  l15 : f.locals[15]? = if j = 0 then ls[15]? else some (vI (b (j - 1)).toNat)
-  l17 : f.locals[17]? = some (vI (run acc b j))
+  l2 : f.locals[2]? = some (some (vI (p + j)))
+  l15 : f.locals[15]? = if j = 0 then ls[15]? else some (some (vI (b (j - 1)).toNat))
+  l17 : f.locals[17]? = some (some (vI (run acc b j)))
   ff : ∀ i < j, b i = 255
   sums : ∀ i, i + 1 ≤ j → psum acc b i < 2 ^ 31
   bound : p + j ≤ lim
 
-variable {H : HostSem} {C : Context} {s : Store} {inst : ModuleInst} {ls : List Val} {ma : Nat}
+variable {H : HostSem} {C : Context} {s : Store} {inst : ModuleInst} {ls : List (Option Val)}
+    {ma : Nat}
   {mem : MemInst} {p lim acc : Nat}
 
 /-- The exit locals' unchanged part, from the head frame's. -/
@@ -43,22 +45,24 @@ theorem locals_of_inv {b : Nat → UInt8} {j : Nat} {f : Frame} (hi : Inv ls ins
     {l2 l4 : Nat} {v15 v17 : Option Nat} {f' : Frame}
     (hinst : f'.inst = inst) (hlen : f'.locals.length = f.locals.length)
     (hother : ∀ i, i ≠ 2 → i ≠ 4 → i ≠ 15 → i ≠ 17 → f'.locals[i]? = f.locals[i]?)
-    (h2 : f'.locals[2]? = some (vI l2)) (h4 : f'.locals[4]? = some (vI l4))
-    (h15 : f'.locals[15]? = (v15.map vI <|> ls[15]?))
-    (h17' : f'.locals[17]? = (v17.map vI <|> ls[17]?)) :
+    (h2 : f'.locals[2]? = some (some (vI l2))) (h4 : f'.locals[4]? = some (some (vI l4)))
+    (h15 : f'.locals[15]? = (v15.map (some ∘ vI) <|> ls[15]?))
+    (h17' : f'.locals[17]? = (v17.map (some ∘ vI) <|> ls[17]?)) :
     Locals ls inst f' l2 l4 v15 v17 :=
   ⟨hinst, hlen.trans hi.len, fun i h₂ h₄ h₁₅ h₁₇ => (hother i h₂ h₄ h₁₅ h₁₇).trans
     (hi.others i h₂ h₄ h₁₅ h₁₇), h2, h4, h15, h17'⟩
 
 /-- `Inv`'s local 15 as an exit local: unchanged at `j = 0`, the previous byte after. -/
 theorem l15_exit {b : Nat → UInt8} {j : Nat} {f : Frame} (hi : Inv ls inst p lim acc b j f) :
-    f.locals[15]? = ((if j = 0 then none else some (b (j - 1)).toNat).map vI <|> ls[15]?) := by
+    f.locals[15]? =
+        ((if j = 0 then none else some (b (j - 1)).toNat).map (some ∘ vI) <|> ls[15]?) := by
   rw [hi.l15]; split <;> rfl
 
 /-- `Inv`'s local 17 as an exit local. -/
 theorem l17_exit {b : Nat → UInt8} {j : Nat} {f : Frame} (hi : Inv ls inst p lim acc b j f)
-    (h17 : ls[17]? = some (vI acc)) :
-    f.locals[17]? = ((if j = 0 then none else some (psum acc b (j - 1))).map vI <|> ls[17]?) := by
+    (h17 : ls[17]? = some (some (vI acc))) :
+    f.locals[17]? =
+        ((if j = 0 then none else some (psum acc b (j - 1))).map (some ∘ vI) <|> ls[17]?) := by
   rw [hi.l17]
   split
   · subst_vars; simp [run_zero, h17]
@@ -74,9 +78,10 @@ theorem run_lt {b : Nat → UInt8} {j : Nat} {f : Frame} (hi : Inv ls inst p lim
   · rw [← psum_eq]; exact hi.sums j le_rfl
 
 /-- One iteration from the head of iteration `j`: an exit, or the head of iteration `j + 1`. -/
-theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst)
+    (ls : List (Option Val))
     (ma : Nat) (mem : MemInst) (p lim acc j : Nat) (f : Frame)
-    (h14 : ls[14]? = some (vI lim)) (h17 : ls[17]? = some (vI acc))
+    (h14 : ls[14]? = some (some (vI lim))) (h17 : ls[17]? = some (some (vI acc)))
     (hm : inst.mems[0]? = some ma) (hmem : s.mems[ma]? = some mem)
     (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size) (hacc : acc < 2 ^ 31)
     (hi : Inv ls inst p lim acc (fun i => mem.byte (p + i)) j f)
@@ -87,7 +92,7 @@ theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls
       (ExtExitB C s inst ls p lim acc fun i => mem.byte (p + i)) (head C s f) := by
   have hlen17 : 17 < ls.length := by
     have := List.getElem?_eq_some_iff.mp h17; exact this.1
-  have hf14 : f.locals[14]? = some (vI lim) := by
+  have hf14 : f.locals[14]? = some (some (vI lim)) := by
     rw [hi.others 14 (by decide) (by decide) (by decide) (by decide), h14]
   have hlenf : f.locals.length = ls.length := hi.len
   have hb0 := hi.bound
@@ -204,9 +209,10 @@ theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls
         wasm_cstepu [extBody]
         · wasm_within [extBody]
         have hinv : Inv ls inst p lim acc (fun i => mem.byte (p + i)) (j + 1)
-            ⟨(((f.locals.set 4 (vI (p + j + 1))).set 15 (vI (mem.byte (p + j)).toNat)).set 17
-              (vI (run acc (fun i => mem.byte (p + i)) j + (mem.byte (p + j)).toNat))).set 2
-              (vI (p + j + 1)), f.inst⟩ :=
+            ⟨(((f.locals.set 4 (some (vI (p + j + 1)))).set 15
+                (some (vI (mem.byte (p + j)).toNat))).set 17
+              (some (vI (run acc (fun i => mem.byte (p + i)) j + (mem.byte (p + j)).toNat)))).set 2
+              (some (vI (p + j + 1))), f.inst⟩ :=
           { inst := hi.inst
             len := by simp [hlenf]
             others := fun i h₂ h₄ h₁₅ h₁₇ => by
@@ -269,9 +275,9 @@ theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls
           rw [getElem?_set_of_ne (by decide), List.getElem?_set_self (by simp; omega), hps]; rfl
 
 /-- Every iteration, by induction on the bytes left before `lim`. -/
-theorem iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+theorem iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val))
     (ma : Nat) (mem : MemInst) (p lim acc : Nat)
-    (h14 : ls[14]? = some (vI lim)) (h17 : ls[17]? = some (vI acc))
+    (h14 : ls[14]? = some (some (vI lim))) (h17 : ls[17]? = some (some (vI acc)))
     (hm : inst.mems[0]? = some ma) (hmem : s.mems[ma]? = some mem)
     (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size) (hacc : acc < 2 ^ 31) :
     ∀ n j f, lim - (p + j) = n → Inv ls inst p lim acc (fun i => mem.byte (p + i)) j f →

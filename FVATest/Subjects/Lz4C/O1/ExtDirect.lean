@@ -11,25 +11,27 @@ open FVA.Wasm FVA.Wasm.Exec FVA.Wasm.Exec.Ref FVA.Wasm.Num Subjects.Lz4C.Direct
 set_option maxHeartbeats 4000000
 
 /-- The head frame of iteration `j`. -/
-structure Inv (ls : List Val) (inst : ModuleInst) (p lim acc : Nat) (b : Nat → UInt8) (j : Nat)
+structure Inv (ls : List (Option Val)) (inst : ModuleInst) (p lim acc : Nat) (b : Nat → UInt8)
+    (j : Nat)
     (f : Frame) : Prop where
   inst : f.inst = inst
   len : f.locals.length = ls.length
   others : ∀ i, i ≠ 3 → i ≠ 4 → i ≠ 16 → i ≠ 17 → i ≠ 18 → i ≠ 19 → i ≠ 20 →
     f.locals[i]? = ls[i]?
-  l18 : f.locals[18]? = some (vI (p + j + 1))
-  l19 : f.locals[19]? = some (vI (run acc b j))
-  l16 : f.locals[16]? = if j = 0 then ls[16]? else some (vI (p + j))
-  l17 : f.locals[17]? = if j = 0 then ls[17]? else some (vI (run acc b j))
-  l20 : f.locals[20]? = if j = 0 then ls[20]? else some (vI (b (j - 1)).toNat)
+  l18 : f.locals[18]? = some (some (vI (p + j + 1)))
+  l19 : f.locals[19]? = some (some (vI (run acc b j)))
+  l16 : f.locals[16]? = if j = 0 then ls[16]? else some (some (vI (p + j)))
+  l17 : f.locals[17]? = if j = 0 then ls[17]? else some (some (vI (run acc b j)))
+  l20 : f.locals[20]? = if j = 0 then ls[20]? else some (some (vI (b (j - 1)).toNat))
   ff : ∀ i < j, b i = 255
   sums : ∀ i, i + 1 ≤ j → psum acc b i < 2 ^ 31
   bound : p + j ≤ lim
 
 /-- One `-O1` iteration: an exit, or the head of iteration `j + 1`. -/
-theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst)
+    (ls : List (Option Val))
     (ma : Nat) (mem : MemInst) (p lim acc j : Nat) (f : Frame)
-    (h14 : ls[14]? = some (vI lim)) (hm : inst.mems[0]? = some ma)
+    (h14 : ls[14]? = some (some (vI lim))) (hm : inst.mems[0]? = some ma)
     (hmem : s.mems[ma]? = some mem) (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size)
     (h20 : 20 < ls.length) (hacc : acc < 2 ^ 31)
     (hi : Inv ls inst p lim acc (fun i => mem.byte (p + i)) j f)
@@ -44,15 +46,16 @@ theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls
     · rw [← psum_eq]; exact hi.sums j le_rfl
   obtain ⟨a, ha_def⟩ : ∃ a, a = run acc (fun i => mem.byte (p + i)) j := ⟨_, rfl⟩
   rw [← ha_def] at ha
-  have hl19 : f.locals[19]? = some (vI a) := by rw [hi.l19, ha_def]
-  have hl17 : f.locals[17]? = if j = 0 then ls[17]? else some (vI a) := by rw [hi.l17, ha_def]
+  have hl19 : f.locals[19]? = some (some (vI a)) := by rw [hi.l19, ha_def]
+  have hl17 : f.locals[17]? = if j = 0 then ls[17]? else some (some (vI a)) := by rw [hi.l17,
+      ha_def]
   have hj := hi.bound
   have hps : psum acc (fun i => mem.byte (p + i)) j = a + (mem.byte (p + j)).toNat := by
     rw [psum_eq, run_succ, ha_def]
   have hpsr : 0 < j → psum acc (fun i => mem.byte (p + i)) (j - 1) = a := fun h => by
     obtain ⟨j, rfl⟩ : ∃ k, j = k + 1 := ⟨j - 1, by omega⟩
     simp [ha_def, psum_eq]
-  have hf14 : f.locals[14]? = some (vI lim) := by
+  have hf14 : f.locals[14]? = some (some (vI lim)) := by
     rw [hi.others 14 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
       (by decide), h14]
   have hlenf : f.locals.length = ls.length := hi.len
@@ -74,7 +77,8 @@ theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls
     · wasm_within [extBody]
     wasm_cstepu [extBody]
     · wasm_within [extBody]
-    refine Until.done (Or.inr (Or.inl ⟨j, ⟨(f.locals.set 4 (vI a)).set 3 (vI (p + j + 1)), f.inst⟩,
+    refine Until.done (Or.inr (Or.inl ⟨j,
+        ⟨(f.locals.set 4 (some (vI a))).set 3 (some (vI (p + j + 1))), f.inst⟩,
       hi.ff, hb, hi.sums, ⟨hi.inst, by simp [hlenf], ?_⟩, by simp only [Context.fill]⟩))
     have hother := hi.others
     rcases Nat.eq_zero_or_pos j with rfl | hj0
@@ -115,8 +119,9 @@ theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls
       wasm_cstepu [extBody]
       · wasm_within [extBody]
       refine Until.done (Or.inr (Or.inr ⟨j,
-        ⟨(((f.locals.set 4 (vI a)).set 3 (vI (p + j + 1))).set 20
-        (vI (mem.byte (p + j)).toNat)).set 4 (vI (a + (mem.byte (p + j)).toNat)), f.inst⟩,
+        ⟨(((f.locals.set 4 (some (vI a))).set 3 (some (vI (p + j + 1)))).set 20
+        (some (vI (mem.byte (p + j)).toNat))).set 4 (some (vI (a + (mem.byte (p + j)).toNat))),
+            f.inst⟩,
         hi.ff, hle, hi.sums, by rw [hps]; exact ho, ⟨hi.inst, by simp [hlenf], ?_⟩,
         by simp only [Context.fill]⟩))
       have hother := hi.others
@@ -151,10 +156,11 @@ theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls
         · wasm_within [extBody]
         have hother := hi.others
         have hinv : Inv ls inst p lim acc (fun i => mem.byte (p + i)) (j + 1)
-            ⟨(((((((f.locals.set 4 (vI a)).set 3 (vI (p + j + 1))).set 20
-              (vI (mem.byte (p + j)).toNat)).set 4 (vI (a + (mem.byte (p + j)).toNat))).set 18
-              (vI (p + j + 1 + 1))).set 19 (vI (a + (mem.byte (p + j)).toNat))).set 16
-              (vI (p + j + 1))).set 17 (vI (a + (mem.byte (p + j)).toNat)), f.inst⟩ :=
+            ⟨(((((((f.locals.set 4 (some (vI a))).set 3 (some (vI (p + j + 1)))).set 20
+              (some (vI (mem.byte (p + j)).toNat))).set 4
+                  (some (vI (a + (mem.byte (p + j)).toNat)))).set 18
+              (some (vI (p + j + 1 + 1)))).set 19 (some (vI (a + (mem.byte (p + j)).toNat)))).set 16
+              (some (vI (p + j + 1)))).set 17 (some (vI (a + (mem.byte (p + j)).toNat))), f.inst⟩ :=
           { inst := hi.inst
             len := by simp [hlenf]
             others := fun i h₃ h₄ h₁₆ h₁₇ h₁₈ h₁₉ h₂₀ => by
@@ -197,19 +203,21 @@ theorem one_iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls
             · exact hi.sums i h
             · obtain rfl : i = j := by omega
               rw [hps]; omega, ?_, rfl⟩)
-        refine (show LocalsAt _ _ ⟨(((((((f.locals.set 4 (vI a)).set 3 (vI (p + j + 1))).set 20
-          (vI (mem.byte (p + j)).toNat)).set 4 (vI (a + (mem.byte (p + j)).toNat))).set 18
-          (vI (p + j + 1 + 1))).set 19 (vI (a + (mem.byte (p + j)).toNat))).set 16
-          (vI (p + j + 1))).set 17 (vI (a + (mem.byte (p + j)).toNat)), f.inst⟩ _ from
+        refine (show LocalsAt _ _
+            ⟨(((((((f.locals.set 4 (some (vI a))).set 3 (some (vI (p + j + 1)))).set 20
+          (some (vI (mem.byte (p + j)).toNat))).set 4
+              (some (vI (a + (mem.byte (p + j)).toNat)))).set 18
+          (some (vI (p + j + 1 + 1)))).set 19 (some (vI (a + (mem.byte (p + j)).toNat)))).set 16
+          (some (vI (p + j + 1)))).set 17 (some (vI (a + (mem.byte (p + j)).toNat))), f.inst⟩ _ from
           ⟨hi.inst, by simp [hlenf], ?_⟩)
         have hother := hi.others
         have h2 : p + j + 1 + 1 = p + j + 2 := by omega
         locals_at [hlenf, h3, h4, h16, h17, h18, h19, h20, hother, h2, hps]
 
 /-- Every `-O1` iteration, by induction on the bytes left before `lim`. -/
-theorem iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+theorem iter (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val))
     (ma : Nat) (mem : MemInst) (p lim acc : Nat)
-    (h14 : ls[14]? = some (vI lim)) (hm : inst.mems[0]? = some ma)
+    (h14 : ls[14]? = some (some (vI lim))) (hm : inst.mems[0]? = some ma)
     (hmem : s.mems[ma]? = some mem) (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size)
     (h20 : 20 < ls.length) (hacc : acc < 2 ^ 31) :
     ∀ n j f, lim - (p + j) = n → Inv ls inst p lim acc (fun i => mem.byte (p + i)) j f →

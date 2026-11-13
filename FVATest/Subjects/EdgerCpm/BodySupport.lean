@@ -50,11 +50,11 @@ theorem read64 {s : Store} {mem : MemInst} {p : Nat} {v : BitVec 64}
       Nat.pow_zero, Nat.div_one] <;> apply UInt8.toNat_inj.mp <;> simp)
   simpa only [show 256 ^ 8 = 2 ^ 64 by decide, Nat.mod_eq_of_lt v.isLt] using hr
 
-theorem cpm_type : Lifted.module.typeList.getD Lifted.func86.type ⟨[], []⟩ =
-    ⟨[.num .i32, .num .i32, .num .i32, .num .i32], []⟩ := rfl
+theorem cpm_type : Lifted.module.defTypes.getD Lifted.func86.type ⟨[], 0⟩ =
+    ⟨[⟨[.num .i32, .num .i32, .num .i32, .num .i32], []⟩], 0⟩ := by kernel_rfl
 
-theorem row_type : Lifted.module.typeList.getD Lifted.func133.type ⟨[], []⟩ =
-    ⟨[.num .i32, .num .i32, .num .i32], []⟩ := rfl
+theorem row_type : Lifted.module.defTypes.getD Lifted.func133.type ⟨[], 0⟩ =
+    ⟨[⟨[.num .i32, .num .i32, .num .i32], []⟩], 0⟩ := by kernel_rfl
 
 structure Allocated (heap : Nat → Prop) (blocks : Store → List (Nat × Nat))
     (ready : Nat → Store → Prop) (k z : Nat) (s s' : Store) (p : BitVec 32) : Prop where
@@ -90,12 +90,12 @@ theorem must_alloc {H : HostSem} {Q : Outcome → Prop} {alloc free cap k a : Na
     {s : Store} {f : Frame} {es : List AInstr} {n sz : BitVec 32}
     (hA : Allocator H alloc free heap cap blocks ready) (hr : ready (k + 1) s)
     (hz : 0 < n.toNat * sz.toNat) (hc : n.toNat * sz.toNat ≤ cap)
-    (hf : s.funcs[a]? = some (.host ⟨[.num .i32, .num .i32], [.num .i32]⟩ alloc))
+    (hf : s.funcs[a]? = some (.host ⟨[⟨[.num .i32, .num .i32], [.num .i32]⟩], 0⟩ alloc))
     (hfocus : seqFocus (HostAt a 2 [.i32 n, .i32 sz]) [] es)
     (hk : ∀ s' p, Allocated heap blocks ready k (n.toNat * sz.toNat) s s' p →
       Must H Q ⟨s', f, seqPlug 2 (vals [.i32 p]) [] es⟩) : Must H Q ⟨s, f, es⟩ := by
   obtain ⟨hex, hall⟩ := alloc_result hA hr hz hc
-  apply must_host_focus hf hfocus
+  apply must_host_focus hf rfl hfocus
   · obtain ⟨s', p, hp⟩ := hex
     exact ⟨s', [.i32 p], hp⟩
   · intro o ho

@@ -26,8 +26,8 @@ overlap. -/
 def move (mem : MemInst) (d s n : Nat) : MemInst :=
   { mem with byte := fun a => if d ≤ a ∧ a < d + n then mem.byte (s + (a - d)) else mem.byte a }
 
-/-- The type of `memcpy` and `memmove`: `(i32, i32, i32) → i32`. -/
-def copyType : FuncType := ⟨[.num .i32, .num .i32, .num .i32], [.num .i32]⟩
+/-- The defined type of `memcpy` and `memmove`: `(i32, i32, i32) → i32`, a one-member group. -/
+def copyType : DefType := ⟨[⟨[.num .i32, .num .i32, .num .i32], [.num .i32]⟩], 0⟩
 
 /-- Byte `x` of memory `m` lies in `[p, p + n)` of memory `ma`. -/
 def Span (ma p n : Nat) (m x : Nat) : Prop := m = ma ∧ p ≤ x ∧ x < p + n
@@ -86,16 +86,18 @@ def chunks (p e : Nat) : Nat := max 1 ((e - p + 7) / 8)
 `memcpy(q + 8j, m + 8j, 8)`, so memory = `fwdCopy mem q m (8k)`, the pointers end at `q + 8k`,
 `m + 8k`, every other local unchanged. -/
 def WildLoop (dl sl el : Nat) (entry exit : Store → Frame → Config) : Prop :=
-  ∀ (H : HostSem) (st : Store) (inst : ModuleInst) (ls : List Val) (a ma : Nat) (mem : MemInst)
+  ∀ (H : HostSem) (st : Store) (inst : ModuleInst) (ls : List (Option Val)) (a ma : Nat)
+      (mem : MemInst)
     (q m e : Nat),
-    ls[dl]? = some (vI q) → ls[sl]? = some (vI m) → ls[el]? = some (vI e) →
+    ls[dl]? = some (some (vI q)) → ls[sl]? = some (some (vI m)) → ls[el]? = some (some (vI e)) →
     inst.funcs[3]? = some a → st.funcs[a]? = some (.wasm copyType inst Lifted.func3) →
     inst.mems[0]? = some ma → st.mems[ma]? = some mem →
     q ≤ e → q + 8 * chunks q e ≤ mem.size → m + 8 * chunks q e ≤ mem.size →
     mem.size < 2 ^ 32 →
     Until H (Within (Span ma m (8 * chunks q e)) (Span ma q (8 * chunks q e)))
       (fun c => c = exit (st.setMem ma (fwdCopy mem q m (8 * chunks q e)))
-        ⟨(ls.set dl (vI (q + 8 * chunks q e))).set sl (vI (m + 8 * chunks q e)), inst⟩)
+        ⟨(ls.set dl (some (vI (q + 8 * chunks q e)))).set sl (some (vI (m + 8 * chunks q e))),
+            inst⟩)
       (entry st ⟨ls, inst⟩)
 
 /-- S3: the literal wildcopy loop (locals 3 = `op`, 4 = `ip`, 17 = `cpy`), from the loop to the

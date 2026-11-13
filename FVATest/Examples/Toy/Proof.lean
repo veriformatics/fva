@@ -10,16 +10,16 @@ open FVA.Wasm FVA.Wasm.Num FVA.Wasm.Exec FVA.Wasm.Exec.Ref
 
 theorem clamp_holds : clamp := by
   intro x lo hi
-  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl, ?_⟩
+  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl rfl, ?_⟩
   intro H s inst h
-  have ha := instance_alloc rfl rfl rfl rfl h
-  have hf : s.funcs[0]? = some (.wasm ⟨[.num .i32, .num .i32, .num .i32], [.num .i32]⟩ inst
-      Lifted.func0) := by
+  have ha := instance_alloc rfl rfl rfl rfl rfl h
+  have hf : s.funcs[0]? = some (.wasm ⟨[⟨[.num .i32, .num .i32, .num .i32], [.num .i32]⟩],
+      0⟩ inst Lifted.func0) := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   have he : inst.exportFunc "clamp" = some 0 := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   clear ha h
-  refine ⟨0, he, ⟨_, hf, by simp [Val.HasType, FuncInst.type]⟩, ?_⟩
+  refine ⟨0, he, ⟨_, _, hf, rfl, by simp [Val.HasType, FuncType.mapHeap, ValType.mapHeap]⟩, ?_⟩
   -- the select chain as compiled: `x <s lo ? lo : (x <s hi ? x : hi)`
   let r := if iltS x lo = 0#32 then (if iltS x hi = 0#32 then hi else x) else lo
   have hr : runDet 40 (invokeConfig s 0 [.i32 x, .i32 lo, .i32 hi]) =
@@ -86,15 +86,15 @@ theorem sumTo_value (n : BitVec 32) (hn : n ≠ 0) :
 
 theorem sumTo_holds : sumTo := by
   intro n
-  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl, ?_⟩
+  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl rfl, ?_⟩
   intro H s inst h
-  have ha := instance_alloc rfl rfl rfl rfl h
-  have hf : s.funcs[2]? = some (.wasm ⟨[.num .i32], [.num .i32]⟩ inst Lifted.func2) := by
+  have ha := instance_alloc rfl rfl rfl rfl rfl h
+  have hf : s.funcs[2]? = some (.wasm ⟨[⟨[.num .i32], [.num .i32]⟩], 0⟩ inst Lifted.func2) := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   have he : inst.exportFunc "sum_to" = some 2 := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   clear ha h
-  refine ⟨2, he, ⟨_, hf, by simp [Val.HasType, FuncInst.type]⟩, ?_⟩
+  refine ⟨2, he, ⟨_, _, hf, rfl, by simp [Val.HasType, FuncType.mapHeap, ValType.mapHeap]⟩, ?_⟩
   unfold invokeConfig
   by_cases hn : n = 0
   · subst hn
@@ -112,13 +112,13 @@ def gcdBody : List Instr :=
 
 /-- The configuration at the head of `gcd`'s loop with locals `a b t`. -/
 def gcdHead (s : Store) (inst : ModuleInst) (a b t : BitVec 32) : Config :=
-  ⟨s, ⟨[], {}⟩, [.frame 1 ⟨[.i32 a, .i32 b, .i32 t], inst⟩
+  ⟨s, ⟨[], {}⟩, [.frame 1 ⟨[some (.i32 a), some (.i32 b), some (.i32 t)], inst⟩
     [.label 1 [] [.label 0 [.loop .empty gcdBody] (gcdBody.map .plain), .plain (.localGet 2)]]]⟩
 
 theorem gcd_loop (H : HostSem) (s : Store) (inst : ModuleInst) :
     ∀ (k : Nat) (a b t : BitVec 32), b.toNat = k → b ≠ 0 →
       Must H (fun | .returned _ vs => vs = [.i32 (BitVec.ofNat 32 (Nat.gcd a.toNat b.toNat))]
-                  | .trapped _ => False) (gcdHead s inst a b t) := by
+                  | _ => False) (gcdHead s inst a b t) := by
   intro k
   induction k using Nat.strong_induction_on with
   | _ k ih =>
@@ -149,15 +149,16 @@ theorem gcd_loop (H : HostSem) (s : Store) (inst : ModuleInst) :
 
 theorem gcd_holds : gcd := by
   intro a b
-  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl, ?_⟩
+  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl rfl, ?_⟩
   intro H s inst h
-  have ha := instance_alloc rfl rfl rfl rfl h
-  have hf : s.funcs[1]? = some (.wasm ⟨[.num .i32, .num .i32], [.num .i32]⟩ inst Lifted.func1) := by
+  have ha := instance_alloc rfl rfl rfl rfl rfl h
+  have hf : s.funcs[1]? = some (.wasm ⟨[⟨[.num .i32, .num .i32], [.num .i32]⟩],
+      0⟩ inst Lifted.func1) := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   have he : inst.exportFunc "gcd" = some 1 := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   clear ha h
-  refine ⟨1, he, ⟨_, hf, by simp [Val.HasType, FuncInst.type]⟩, ?_⟩
+  refine ⟨1, he, ⟨_, _, hf, rfl, by simp [Val.HasType, FuncType.mapHeap, ValType.mapHeap]⟩, ?_⟩
   unfold invokeConfig
   by_cases hb : b = 0
   · subst hb

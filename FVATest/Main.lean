@@ -3,6 +3,8 @@ import FVA.Tool.Encode
 import FVATest.Numeric
 import FVATest.FloatDiff
 import FVATest.Spec
+import FVATest.P2
+import FVATest.RawExec
 import FVATest.ValidRun
 import FVATest.Valid
 import FVATest.Trust
@@ -65,6 +67,24 @@ def main : List String → IO UInt32
       return if bad then 1 else 0
     catch e =>
       IO.eprintln s!"fvatest spec: {e}"
+      return 2
+  | "p2" :: scripts => do
+    try
+      let mut bad := false
+      -- steps per command; `FVA_P2_FUEL` raises it for the million-call tail recursions
+      let fuel := ((← IO.getEnv "FVA_P2_FUEL").bind String.toNat?).getD 2000000
+      for path in scripts do
+        let p : System.FilePath := path
+        let json ← IO.ofExcept (Lean.Json.parse (← IO.FS.readFile p))
+        let t ← FVA.Test.P2.runScript (p.parent.getD ".") json fuel
+        IO.println s!"{p.fileStem.getD path} {t.pass} {t.fail} {t.skip}"
+        for f in t.failures do IO.println s!"  FAIL {f}"
+        if (← IO.getEnv "FVA_SPEC_SKIPS") == some "1" then
+          for skip in t.skips do IO.println s!"  SKIP {skip}"
+        if t.fail > 0 then bad := true
+      return if bad then 1 else 0
+    catch e =>
+      IO.eprintln s!"fvatest p2: {e}"
       return 2
   | ["floatdiff", dir, seed, nBin, nOther] => do
     FVA.Test.FloatDiff.run dir seed.toNat!.toUInt64 nBin.toNat! nOther.toNat!

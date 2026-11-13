@@ -78,13 +78,15 @@ noncomputable def dOuter (es : List AInstr) : List AInstr :=
   [.label 0 [] (.label 0 [] (.label 0 [] (.label 0 [mainLoop] es :: (body4.drop 1).map .plain) ::
     (body3.drop 1).map .plain) :: (body2.drop 1).map .plain)] ++ (body1.drop 54).map .plain
 
-def dLs (src dst n cap cpy j m o' : Nat) (mp : BitVec 32) (v16 v18 : Val) : List Val :=
-  [vI src, vI dst, .i32 mp, vI cpy, vI j, vI (dst + cap), vI (dst + cap - 32),
-    vI (src + n), vI (src + n - 16), vI (dst + cap - 5), vI (dst + cap - 7),
-    vI (src + n - 4), vI (src + n - 8), vI (dst + cap - 12), vI (src + n - 15),
-    vI m, v16, vI o', v18]
+def dLs (src dst n cap cpy j m o' : Nat) (mp : BitVec 32) (v16 : Option Val) (v18 : Val) :
+    List (Option Val) :=
+  [some (vI src), some (vI dst), some (.i32 mp), some (vI cpy), some (vI j), some (vI (dst + cap)),
+    some (vI (dst + cap - 32)), some (vI (src + n)), some (vI (src + n - 16)),
+    some (vI (dst + cap - 5)), some (vI (dst + cap - 7)), some (vI (src + n - 4)),
+    some (vI (src + n - 8)), some (vI (dst + cap - 12)), some (vI (src + n - 15)), some (vI m), v16,
+    some (vI o'), some v18]
 
-theorem d_const (src dst n cap cpy j m o' : Nat) (mp : BitVec 32) (v16 v18 : Val) :
+theorem d_const (src dst n cap cpy j m o' : Nat) (mp : BitVec 32) (v16 : Option Val) (v18 : Val) :
     ConstLocals (dLs src dst n cap cpy j m o' mp v16 v18) src dst n cap := by
   simp [ConstLocals, dLs]
 
@@ -110,7 +112,7 @@ theorem d_tables_copy {mem : MemInst} (h : TablesOK mem) {d s k : Nat} (hd : 131
   h.of_low (fun a ha => fwdCopy_outside _ _ _ _ _ (.inl (by omega)))
 
 /-- The decoder's match copies read the destination buffer, never its source buffer. -/
-theorem d_copy (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst) (ls : List Val)
+theorem d_copy (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst) (ls : List (Option Val))
     (a ma : Nat) (mem : MemInst) (src dst n cap d s k : Nat) (rest : List AInstr)
     (hcall : inst.funcs[3]? = some a)
     (hfun : st.funcs[a]? = some (.wasm copyType inst Lifted.func3))

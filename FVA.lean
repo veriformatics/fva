@@ -67,9 +67,11 @@ import FVA.Proof.Valid.Soundness
 import FVA.Proof.Valid.Instantiate
 import FVA.Proof.Valid.Corollary
 import FVA.Proof.Valid.InstantiateBounds
+import FVA.Proof.Valid.Closed
 import FVA.Proof.Lib
 import FVA.Proof.Lib.FootprintExamples
 import FVA.Proof.Lib.SysExamples
+import FVA.Proof.Lib.EHExamples
 import FVA.Explain
 import FVA.Spec.Trust
 import FVA.Trust.Verdict

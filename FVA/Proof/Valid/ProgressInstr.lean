@@ -76,7 +76,7 @@ theorem instr_progress {H : HostSem} {s : Store} {f : Frame} {C : Context}
     cases w with
     | w32 => exact .values [.f32 (BitVec.ofNatLT n h)]
     | w64 => exact .values [.f64 (BitVec.ofNatLT n h)]
-  case refNull rt => cases hargs; exact .values [.ref (.null rt)]
+  case refNull rt => cases hargs; exact .step .refNull
   case refIsNull rt =>
     obtain ⟨v, rfl, hv⟩ := one hargs
     obtain ⟨r, rfl⟩ := ref_of_type hv

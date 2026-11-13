@@ -89,13 +89,13 @@ theorem toyBody_eq {m : Module} {body : List Instr} (h : toyBody m = some body) 
 the body. -/
 def bodyConfig (s : Store) (inst : ModuleInst) (x : BitVec 32) (stack : List (BitVec 32))
     (rest : List Instr) : Config :=
-  ⟨s, ⟨[], {}⟩, [.frame 1 ⟨[.i32 x], inst⟩
+  ⟨s, ⟨[], {}⟩, [.frame 1 ⟨[some (.i32 x)], inst⟩
     [.label 1 [] (vals (stack.map Val.i32) ++ rest.map .plain)]]⟩
 
 theorem straight_line (H : HostSem) (s : Store) (inst : ModuleInst) (x : BitVec 32) :
     ∀ (body : List Instr) (st : List Arith) (t : Arith),
       toyHeight body st.length = some 1 → symRun body st = some [t] →
-      Must H (fun | .returned _ vs => vs = [.i32 (t.eval x)] | .trapped _ => False)
+      Must H (fun | .returned _ vs => vs = [.i32 (t.eval x)] | _ => False)
         (bodyConfig s inst x (st.reverse.map fun a => a.eval x) body) := by
   intro body
   induction body with
@@ -203,21 +203,21 @@ theorem straight_line (H : HostSem) (s : Store) (inst : ModuleInst) (x : BitVec 
 theorem toy_returns (body : List Instr) (t : Arith) (hv : ToyValid body)
     (hr : symRun body [] = some [t]) (x : BitVec 32) :
     Returns (toyModule body) "f" [.i32 x] [.i32 (t.eval x)] := by
-  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl, ?_⟩
+  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl rfl, ?_⟩
   intro H s inst h
-  have ha := instance_alloc rfl rfl rfl rfl h
-  have hf : s.funcs[0]? = some (.wasm ⟨[.num .i32], [.num .i32]⟩ inst ⟨0, [], body⟩) := by
+  have ha := instance_alloc rfl rfl rfl rfl rfl h
+  have hf : s.funcs[0]? = some (.wasm ⟨[⟨[.num .i32], [.num .i32]⟩], 0⟩ inst ⟨0, [], body⟩) := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   have he : inst.exportFunc "f" = some 0 := by
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj ha; rfl
   clear ha h
-  refine ⟨0, he, ⟨_, hf, by simp [Val.HasType, FuncInst.type]⟩, ?_⟩
+  refine ⟨0, he, ⟨_, ⟨[.num .i32], [.num .i32]⟩, hf, rfl, by simp [Val.HasType]⟩, ?_⟩
   unfold invokeConfig
   wasm_step1 [hf]
   have := straight_line H s inst x body [] t (by simpa [ToyValid] using hv) hr
   simp only [bodyConfig, List.reverse_nil, List.map_nil, vals, List.nil_append] at this
   refine this.mono ?_
-  rintro (_ | _) hq <;> exact hq
+  rintro (_ | _ | _) hq <;> exact hq
 
 end Impl
 

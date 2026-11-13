@@ -14,8 +14,8 @@ noncomputable def copyLoop : Instr := rowVector.getD 10 .nop
 
 noncomputable def copyHead (l : Layout) (inst : ModuleInst) (m j : Nat) (b prev : BitVec 32)
     (_caller : Frame) (tail : List AInstr) : List AInstr :=
-  .frame 0 ⟨[.i32 (.ofNat 32 l.lib), .i32 (.ofNat 32 m), .i32 b,
-    .i32 (.ofNat 32 j), .i32 prev, .i32 0], inst⟩
+  .frame 0 ⟨[some (.i32 (.ofNat 32 l.lib)), some (.i32 (.ofNat 32 m)), some (.i32 b),
+    some (.i32 (.ofNat 32 j)), some (.i32 prev), some (.i32 0)], inst⟩
     [.label 0 [] [.label 0 []
       (.label 0 [] ((copyLoop :: rowVector.drop 11).map .plain) ::
         (rowOuter.drop 1).map .plain)]] :: tail
@@ -80,7 +80,7 @@ theorem copy_start (C : Context) (H : HostSem) (Q : Outcome → Prop) (s : Store
     (m a : Nat) (b row : BitVec 32) (mem : MemInst) (hm0 : 0 < m) (hm31 : m < 2 ^ 31)
     (hl32 : l.lib < 2 ^ 32) (hm : inst.mems[0]? = some 0)
     (hmem : s.mems[0]? = some mem)
-    (hf : s.funcs[a]? = some (.wasm ⟨[.num .i32, .num .i32, .num .i32], []⟩
+    (hf : s.funcs[a]? = some (.wasm ⟨[⟨[.num .i32, .num .i32, .num .i32], []⟩], 0⟩
       inst Lifted.func133))
     (hbl : l.lib + 32 ≤ mem.size)
     (hs : mem.read (l.lib + 28) 4 = 0)
@@ -175,7 +175,7 @@ theorem get_row_type2 (C : Context) (H : HostSem) (Q : Outcome → Prop) (s : St
     (hl32 : l.lib + 32 ≤ 2 ^ 32) (hd32 : l.d + 8 * x.m ≤ 2 ^ 32)
     (hb32 : b.toNat + 8 * x.m ≤ 2 ^ 32) (hm : inst.mems[0]? = some 0)
     (hmem : s.mems[0]? = some mem) (hbmem : b.toNat + 8 * x.m ≤ mem.size)
-    (hf : s.funcs[a]? = some (.wasm ⟨[.num .i32, .num .i32, .num .i32], []⟩
+    (hf : s.funcs[a]? = some (.wasm ⟨[⟨[.num .i32, .num .i32, .num .i32], []⟩], 0⟩
       inst Lifted.func133))
     (hlib : LibData s x l) (hsep : ∀ a, l.kept x a → outsideBuffer b x.m a)
     (hk : ∀ s', Changed s s' (outsideBuffer b x.m) → Copied s' x b x.m →

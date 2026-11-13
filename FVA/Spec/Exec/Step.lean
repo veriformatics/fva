@@ -10,7 +10,13 @@ spec stays a choice here: float NaN results (`numResults` sets), `memory.grow` /
 failing (§4.4.6/§4.4.7: failure is always allowed), and host outcomes. Bulk memory and table
 instructions expand into element-wise steps exactly as the spec's equations do. `StepP H true` =
 the same rules under an embedder that grants every growth within the limits; `Step H` =
-`StepP H false`.
+`StepP H false`. Wasm 3.0 (SpecTec `859d3232` `4.3`) for profile P′: `ref.null ht` steps to the
+one null value (`Step_read/ref.null`), locals are read and written as present values
+(`$local`, `$with_local`), types compare as closed defined types, and the rules of exception
+handling (a `try_table`'s handler sits outside its result label; a thrown exception unwinds
+values, labels and frames to the nearest handler, whose clauses are tried in order by tag
+address), tail calls (the frame drops its labels and handlers before the callee's frame exists)
+and typed function references follow in 3.0's order, in this file's context style.
 -/
 
 namespace FVA.Wasm.Exec
@@ -27,14 +33,15 @@ inductive HostOutcome where
 arguments. -/
 abbrev HostSem := Nat → Store → List Val → HostOutcome → Prop
 
-/-- `expand_F(bt)` (§3.2.2): the function type of a block type. -/
+/-- `expand_F(bt)` (§3.2.2): the function type of a block type (a type index: its defined
+type's). -/
 def _root_.FVA.Wasm.BlockType.expand (f : Frame) : BlockType → Option FuncType
   | .empty => some ⟨[], []⟩
   | .val t => some ⟨[], [t]⟩
-  | .idx x => f.inst.types[x]?
+  | .idx x => f.inst.types[x]?.bind DefType.expand
 
-/-- The values a function's declared locals start with (`default_t^k`). -/
-def _root_.FVA.Wasm.Func.localDefaults (code : Func) : List Val :=
+/-- What a function's declared locals start with (`default_t^k`; unset without a default). -/
+def _root_.FVA.Wasm.Func.localDefaults (code : Func) : List (Option Val) :=
   code.locals.flatMap fun (n, t) => List.replicate n t.default
 
 /-- The instruction sequence of a numeric result: its value, or `trap`. -/
@@ -44,7 +51,7 @@ def numOut : Option Val → List AInstr
 
 /-- `ref.is_null` on a reference. -/
 def Ref.isNull : Ref → Bool
-  | .null _ => true
+  | .null => true
   | _ => false
 
 /-- The bits of a value of number type `t` (`none` for any other value). -/
@@ -89,11 +96,21 @@ def Val.intBits : Val → Width → Option Nat
 abbrev vi32 (n : Nat) : AInstr := (Val.i32 (BitVec.ofNat 32 n)).instr
 
 /-- `call_indirect x y` on index `i` finds function address `a` of the expected type
-(§4.4.8.7). -/
+(§4.4.8.7; 3.0 `ref.cast (ref null y)`: on P′'s final types without supertypes, the same defined
+type). -/
 def CallTarget (s : Store) (f : Frame) (x y : Nat) (i : BitVec 32) (a : Nat) : Prop :=
-  ∃ ta t fi ft, f.inst.tables[x]? = some ta ∧ s.tables[ta]? = some t ∧
-    t.elem[i.toNat]? = some (.func a) ∧ s.funcs[a]? = some fi ∧ f.inst.types[y]? = some ft ∧
-    fi.type = ft
+  ∃ ta t fi dt, f.inst.tables[x]? = some ta ∧ s.tables[ta]? = some t ∧
+    t.elem[i.toNat]? = some (.func a) ∧ s.funcs[a]? = some fi ∧ f.inst.types[y]? = some dt ∧
+    fi.type = dt
+
+/-- Catch clause `c` takes exception `a` (3.0 `throw_ref-handler-catch*`): a tagged clause when the
+exception's tag is the address its tag index names in frame `f`, a `catch_all*` clause always. -/
+def _root_.FVA.Wasm.Catch.Catches (s : Store) (f : Frame) (a : Nat) : Catch → Prop
+  | .tag x _ | .tagRef x _ => ∃ e, s.exns[a]? = some e ∧ f.inst.tags[x]? = some e.tag
+  | .all _ | .allRef _ => True
+
+/-- `[ref.exn a, throw_ref]`: exception `a` being thrown. -/
+abbrev throwing (a : Nat) : List AInstr := [.refExnAddr a, .plain .throwRef]
 
 /-- The store with table `ta` replaced. -/
 def Store.setTable (s : Store) (ta : Nat) (t : TableInst) : Store :=
@@ -110,6 +127,8 @@ inductive StepP (H : HostSem) (fits : Bool) : Config → Config → Prop where
       r ∈ numResults i args →
       StepP H fits ⟨s, f, vals args ++ [.plain i]⟩ ⟨s, f, numOut r⟩
   -- reference (§4.4.2)
+  | refNull {s f ht} :
+      StepP H fits ⟨s, f, [.plain (.refNull ht)]⟩ ⟨s, f, [.refNullAddr]⟩
   | refIsNull {s f} {r : Ref} :
       StepP H fits ⟨s, f, [(Val.ref r).instr, .plain .refIsNull]⟩
         ⟨s, f, [vi32 (if r.isNull then 1 else 0)]⟩
@@ -124,12 +143,12 @@ inductive StepP (H : HostSem) (fits : Bool) : Config → Config → Prop where
         ⟨s, f, [(if c ≠ 0 then v₁ else v₂).instr]⟩
   -- variable (§4.4.5)
   | localGet {s f x} {v : Val} :
-      f.locals[x]? = some v →
+      f.locals[x]? = some (some v) →
       StepP H fits ⟨s, f, [.plain (.localGet x)]⟩ ⟨s, f, [v.instr]⟩
   | localSet {s f x} {v : Val} :
       x < f.locals.length →
       StepP H fits ⟨s, f, [v.instr, .plain (.localSet x)]⟩
-        ⟨s, { f with locals := f.locals.set x v }, []⟩
+        ⟨s, { f with locals := f.locals.set x (some v) }, []⟩
   | localTee {s f x} {v : Val} :
       StepP H fits ⟨s, f, [v.instr, .plain (.localTee x)]⟩
         ⟨s, f, [v.instr, v.instr, .plain (.localSet x)]⟩
@@ -423,25 +442,25 @@ inductive StepP (H : HostSem) (fits : Bool) : Config → Config → Prop where
       (∀ a, ¬ CallTarget s f x y i a) →
       StepP H fits ⟨s, f, [(Val.i32 i).instr, .plain (.callIndirect x y)]⟩ ⟨s, f, [.trap]⟩
   -- function calls (§4.4.10)
-  | invoke {s f a ft inst code vs} :
-      s.funcs[a]? = some (.wasm ft inst code) →
+  | invoke {s f a dt ft inst code vs} :
+      s.funcs[a]? = some (.wasm dt inst code) → dt.expand = some ft →
       vs.length = ft.params.length →
       StepP H fits ⟨s, f, vals vs ++ [.invoke a]⟩
-        ⟨s, f, [.frame ft.results.length ⟨vs ++ code.localDefaults, inst⟩
+        ⟨s, f, [.frame ft.results.length ⟨vs.map some ++ code.localDefaults, inst⟩
           [.label ft.results.length [] (code.body.map .plain)]]⟩
   | frameExit {s f n f' vs} :
       vs.length = n →
       StepP H fits ⟨s, f, [.frame n f' (vals vs)]⟩ ⟨s, f, vals vs⟩
-  | invokeHost {s s' f a ft id vs res} :
-      s.funcs[a]? = some (.host ft id) →
+  | invokeHost {s s' f a dt ft id vs res} :
+      s.funcs[a]? = some (.host dt id) → dt.expand = some ft →
       vs.length = ft.params.length → H id s vs (.returned s' res) →
       StepP H fits ⟨s, f, vals vs ++ [.invoke a]⟩ ⟨s', f, vals res⟩
-  | invokeHostTrap {s s' f a ft id vs} :
-      s.funcs[a]? = some (.host ft id) →
+  | invokeHostTrap {s s' f a dt ft id vs} :
+      s.funcs[a]? = some (.host dt id) → dt.expand = some ft →
       vs.length = ft.params.length → H id s vs (.trapped s') →
       StepP H fits ⟨s, f, vals vs ++ [.invoke a]⟩ ⟨s', f, [.trap]⟩
-  | invokeHostDiverge {s f a ft id vs} :
-      s.funcs[a]? = some (.host ft id) →
+  | invokeHostDiverge {s f a dt ft id vs} :
+      s.funcs[a]? = some (.host dt id) → dt.expand = some ft →
       vs.length = ft.params.length → H id s vs .diverged →
       StepP H fits ⟨s, f, vals vs ++ [.invoke a]⟩ ⟨s, f, vals vs ++ [.invoke a]⟩
   -- contexts (§4.2.13); `seq` + `label` together give `E[es] ↪ E[es']` for every evaluation
@@ -459,6 +478,91 @@ inductive StepP (H : HostSem) (fits : Bool) : Config → Config → Prop where
       StepP H fits ⟨s, f, E.fill [.trap]⟩ ⟨s, f, [.trap]⟩
   | trapFrame {s f n fi} :
       StepP H fits ⟨s, f, [.frame n fi [.trap]]⟩ ⟨s, f, [.trap]⟩
+  -- exceptions (3.0 `4.3`: `try_table`, `throw`, `throw_ref`, the handler context)
+  | handler {s f s' f' n cs es es'} :
+      StepP H fits ⟨s, f, es⟩ ⟨s', f', es'⟩ →
+      StepP H fits ⟨s, f, [.handler n cs es]⟩ ⟨s', f', [.handler n cs es']⟩
+  | tryTable {s f bt cs body ft vs} :
+      bt.expand f = some ft → vs.length = ft.params.length →
+      StepP H fits ⟨s, f, vals vs ++ [.plain (.tryTable bt cs body)]⟩
+        ⟨s, f, [.handler ft.results.length cs
+          [.label ft.results.length [] (vals vs ++ body.map .plain)]]⟩
+  | handlerExit {s f n cs vs} :
+      StepP H fits ⟨s, f, [.handler n cs (vals vs)]⟩ ⟨s, f, vals vs⟩
+  | throw {s f x ta ti ft vs} :
+      f.inst.tags[x]? = some ta → s.tags[ta]? = some ti → ti.type.expand = some ft →
+      ft.results = [] → vs.length = ft.params.length →
+      StepP H fits ⟨s, f, vals vs ++ [.plain (.throw x)]⟩
+        ⟨{ s with exns := s.exns ++ [⟨ta, vs⟩] }, f, throwing s.exns.length⟩
+  | throwRefNull {s f} :
+      StepP H fits ⟨s, f, [.refNullAddr, .plain .throwRef]⟩ ⟨s, f, [.trap]⟩
+  | throwRefInstrs {s f a vs rest} :
+      vs ≠ [] ∨ rest ≠ [] →
+      StepP H fits ⟨s, f, vals vs ++ throwing a ++ rest⟩ ⟨s, f, throwing a⟩
+  | throwRefLabel {s f a n cont} :
+      StepP H fits ⟨s, f, [.label n cont (throwing a)]⟩ ⟨s, f, throwing a⟩
+  | throwRefFrame {s f a n fi} :
+      StepP H fits ⟨s, f, [.frame n fi (throwing a)]⟩ ⟨s, f, throwing a⟩
+  | throwRefHandlerEmpty {s f a n} :
+      StepP H fits ⟨s, f, [.handler n [] (throwing a)]⟩ ⟨s, f, throwing a⟩
+  | throwRefCatch {s f a n x l cs e} :
+      s.exns[a]? = some e → f.inst.tags[x]? = some e.tag →
+      StepP H fits ⟨s, f, [.handler n (.tag x l :: cs) (throwing a)]⟩
+        ⟨s, f, vals e.fields ++ [.plain (.br l)]⟩
+  | throwRefCatchRef {s f a n x l cs e} :
+      s.exns[a]? = some e → f.inst.tags[x]? = some e.tag →
+      StepP H fits ⟨s, f, [.handler n (.tagRef x l :: cs) (throwing a)]⟩
+        ⟨s, f, vals e.fields ++ [.refExnAddr a, .plain (.br l)]⟩
+  | throwRefCatchAll {s f a n l cs} :
+      StepP H fits ⟨s, f, [.handler n (.all l :: cs) (throwing a)]⟩ ⟨s, f, [.plain (.br l)]⟩
+  | throwRefCatchAllRef {s f a n l cs} :
+      StepP H fits ⟨s, f, [.handler n (.allRef l :: cs) (throwing a)]⟩
+        ⟨s, f, [.refExnAddr a, .plain (.br l)]⟩
+  | throwRefHandlerNext {s f a n c cs} :
+      ¬ c.Catches s f a →
+      StepP H fits ⟨s, f, [.handler n (c :: cs) (throwing a)]⟩ ⟨s, f, [.handler n cs (throwing a)]⟩
+  -- tail calls (3.0 `return_call*`): one step drops the frame's labels + handlers and the values
+  -- below the arguments, before the callee's frame exists
+  | returnCall {s f x a} :
+      f.inst.funcs[x]? = some a →
+      StepP H fits ⟨s, f, [.plain (.returnCall x)]⟩ ⟨s, f, [.returnInvoke a]⟩
+  | returnCallRef {s f y a} :
+      StepP H fits ⟨s, f, [.refFuncAddr a, .plain (.returnCallRef y)]⟩ ⟨s, f, [.returnInvoke a]⟩
+  | returnCallRefNull {s f y} :
+      StepP H fits ⟨s, f, [.refNullAddr, .plain (.returnCallRef y)]⟩ ⟨s, f, [.trap]⟩
+  | returnCallIndirect {s f x y a} {i : BitVec 32} :
+      CallTarget s f x y i a →
+      StepP H fits ⟨s, f, [(Val.i32 i).instr, .plain (.returnCallIndirect x y)]⟩
+        ⟨s, f, [.returnInvoke a]⟩
+  | returnCallIndirectTrap {s f x y} {i : BitVec 32} :
+      (∀ a, ¬ CallTarget s f x y i a) →
+      StepP H fits ⟨s, f, [(Val.i32 i).instr, .plain (.returnCallIndirect x y)]⟩ ⟨s, f, [.trap]⟩
+  | returnInvoke {s f n fi k a fn ft vs} (L : BlockCtx k) :
+      s.funcs[a]? = some fn → fn.type.expand = some ft → vs.length = ft.params.length →
+      StepP H fits ⟨s, f, [.frame n fi (L.fill (vals vs ++ [.returnInvoke a]))]⟩
+        ⟨s, f, vals vs ++ [.invoke a]⟩
+  -- typed function references (3.0 `call_ref`, `ref.as_non_null`, `br_on_null`,
+  -- `br_on_non_null`): a null traps or selects the other branch
+  | callRef {s f y a} :
+      StepP H fits ⟨s, f, [.refFuncAddr a, .plain (.callRef y)]⟩ ⟨s, f, [.invoke a]⟩
+  | callRefNull {s f y} :
+      StepP H fits ⟨s, f, [.refNullAddr, .plain (.callRef y)]⟩ ⟨s, f, [.trap]⟩
+  | refAsNonNull {s f} {r : Ref} :
+      r ≠ .null →
+      StepP H fits ⟨s, f, [(Val.ref r).instr, .plain .refAsNonNull]⟩ ⟨s, f, [(Val.ref r).instr]⟩
+  | refAsNonNullNull {s f} :
+      StepP H fits ⟨s, f, [.refNullAddr, .plain .refAsNonNull]⟩ ⟨s, f, [.trap]⟩
+  | brOnNull {s f l} :
+      StepP H fits ⟨s, f, [.refNullAddr, .plain (.brOnNull l)]⟩ ⟨s, f, [.plain (.br l)]⟩
+  | brOnNullValue {s f l} {r : Ref} :
+      r ≠ .null →
+      StepP H fits ⟨s, f, [(Val.ref r).instr, .plain (.brOnNull l)]⟩ ⟨s, f, [(Val.ref r).instr]⟩
+  | brOnNonNull {s f l} {r : Ref} :
+      r ≠ .null →
+      StepP H fits ⟨s, f, [(Val.ref r).instr, .plain (.brOnNonNull l)]⟩
+        ⟨s, f, [(Val.ref r).instr, .plain (.br l)]⟩
+  | brOnNonNullNull {s f l} :
+      StepP H fits ⟨s, f, [.refNullAddr, .plain (.brOnNonNull l)]⟩ ⟨s, f, []⟩
 
 /-- One reduction step of the spec (`StepP` with growth that may always fail). -/
 abbrev Step (H : HostSem) : Config → Config → Prop := StepP H false

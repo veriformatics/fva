@@ -1,17 +1,19 @@
 import FVA.Spec.Exec.Step
 import FVA.Spec.Exec.Instantiate
 import FVA.Impl.Numerics.Float
+import FVA.Impl.TypeEq
 
 /-!
 # Reference stepper (verified implementation)
 
 A deterministic, executable reading of `Step` on spec configurations: `seq` finds the first
-non-value of an instruction sequence (descending into labels and frames) and applies the rule
-the spec gives there. Where the spec allows a choice, the stepper picks one allowed result:
-the verified float operators (`FVA.Impl.Numerics`), growth when it fits, and no host call (a host
-call is `stuck`). Signals `br`/`ret` carry a pending branch or return up to the label or frame
-that resolves it. Structural recursion keeps it kernel-evaluable. `FVA.Proof.Exec` proves every
-`step` it returns is a `Step`.
+non-value of an instruction sequence (descending into labels, frames and handlers) and applies
+the rule the spec gives there. Where the spec allows a choice, the stepper picks one allowed
+result: the verified float operators (`FVA.Impl.Numerics`), growth when it fits, no host call (a
+host call is `stuck`), and a thrown exception unwound one enclosing layer per step. Signals
+`br`/`ret`/`retInvoke`/`thrown` carry a pending branch, return, tail call or exception up to the
+label, frame or handler that resolves it. Structural recursion keeps it kernel-evaluable.
+`FVA.Proof.Exec` proves every `step` it returns is a `Step`.
 -/
 
 namespace FVA.Wasm.Exec.Ref
@@ -24,9 +26,10 @@ def toVal : AInstr → Option Val
   | .plain (.iconst .w64 n) => bif Nat.blt n (2 ^ 64) then some (.i64 (BitVec.ofNat 64 n)) else none
   | .plain (.fconst .w32 n) => bif Nat.blt n (2 ^ 32) then some (.f32 (BitVec.ofNat 32 n)) else none
   | .plain (.fconst .w64 n) => bif Nat.blt n (2 ^ 64) then some (.f64 (BitVec.ofNat 64 n)) else none
-  | .plain (.refNull t) => some (.ref (.null t))
+  | .refNullAddr => some (.ref .null)
   | .refFuncAddr a => some (.ref (.func a))
   | .refExternAddr a => some (.ref (.extern a))
+  | .refExnAddr a => some (.ref (.exn a))
   | _ => none
 
 /-- The impl's float unary operator. -/
@@ -136,9 +139,9 @@ def tableAt (s : Store) (f : Frame) (x : Nat) : Option (Nat × TableInst) :=
 /-- `call_indirect x y` on index `i`: the callee address, if the spec's checks pass. -/
 def callTarget (s : Store) (f : Frame) (x y : Nat) (i : BitVec 32) : Option Nat :=
   match tableAt s f x, f.inst.types[y]? with
-  | some (_, t), some ft => match t.elem[i.toNat]? with
+  | some (_, t), some dt => match t.elem[i.toNat]? with
     | some (.func a) => match s.funcs[a]? with
-      | some fi => bif decide (fi.type = ft) then some a else none
+      | some fi => bif decide (fi.type = dt) then some a else none
       | none => none
     | _ => none
   | _, _ => none
@@ -162,9 +165,10 @@ def instrStep (s : Store) (f : Frame) (i : Instr) (stk : List Val) :
   | .select _, .i32 c :: v₂ :: v₁ :: stk =>
     some (s, f, stk, [(bif c == 0 then v₂ else v₁).instr])
   -- variable
-  | .localGet x, stk => (f.locals[x]?).map fun v => (s, f, stk, [v.instr])
+  | .localGet x, stk => (f.locals[x]?.join).map fun v => (s, f, stk, [v.instr])
   | .localSet x, v :: stk =>
-    bif Nat.blt x f.locals.length then some (s, { f with locals := f.locals.set x v }, stk, [])
+    bif Nat.blt x f.locals.length then
+      some (s, { f with locals := f.locals.set x (some v) }, stk, [])
     else none
   | .localTee x, v :: stk => some (s, f, stk, [v.instr, v.instr, .plain (.localSet x)])
   | .globalGet x, stk => match f.inst.globals[x]? with
@@ -301,7 +305,51 @@ def instrStep (s : Store) (f : Frame) (i : Instr) (stk : List Val) :
   | .callIndirect x y, .i32 i :: stk => some (s, f, stk, match callTarget s f x y i with
     | some a => [.invoke a]
     | none => [.trap])
+  -- last, keeping the earlier alternatives' case numbers (`fun_cases` proofs)
+  | .refNull _, stk => some (s, f, stk, [.refNullAddr])
+  -- P′: exceptions, tail calls, typed function references (3.0 `4.3`)
+  | .tryTable bt cs body, stk => (bt.expand f).bind fun ft =>
+    let m := ft.params.length
+    bif Nat.blt stk.length m then none
+    else some (s, f, stk.drop m, [.handler ft.results.length cs
+      [.label ft.results.length [] (vals (stk.take m).reverse ++ body.map .plain)]])
+  | .throw x, stk => match f.inst.tags[x]? with
+    | some ta => match s.tags[ta]? with
+      | some ti => (ti.type.expand).bind fun ft =>
+        let m := ft.params.length
+        bif !ft.results.isEmpty || Nat.blt stk.length m then none
+        else some ({ s with exns := s.exns ++ [⟨ta, (stk.take m).reverse⟩] }, f, stk.drop m,
+          throwing s.exns.length)
+      | none => none
+    | none => none
+  | .returnCall x, stk => (f.inst.funcs[x]?).map fun a => (s, f, stk, [.returnInvoke a])
+  | .returnCallRef _, .ref (.func a) :: stk => some (s, f, stk, [.returnInvoke a])
+  | .returnCallRef _, .ref .null :: stk => some (s, f, stk, [.trap])
+  | .returnCallIndirect x y, .i32 i :: stk => some (s, f, stk, match callTarget s f x y i with
+    | some a => [.returnInvoke a]
+    | none => [.trap])
+  | .callRef _, .ref (.func a) :: stk => some (s, f, stk, [.invoke a])
+  | .callRef _, .ref .null :: stk => some (s, f, stk, [.trap])
+  | .refAsNonNull, .ref r :: stk =>
+    some (s, f, stk, bif r.isNull then [.trap] else [(Val.ref r).instr])
+  | .brOnNull l, .ref r :: stk =>
+    some (s, f, stk, bif r.isNull then [.plain (.br l)] else [(Val.ref r).instr])
+  | .brOnNonNull l, .ref r :: stk =>
+    some (s, f, stk, bif r.isNull then [] else [(Val.ref r).instr, .plain (.br l)])
   | _, _ => none
+
+/-- Handler clause `c` on exception `a` (3.0 `throw_ref-handler-catch*`): the sequence replacing
+the handler, or `none` when a tagged clause does not take `a` (`throw_ref-handler-next`). -/
+def catchStep (s : Store) (f : Frame) (a : Nat) : Catch → Option (List AInstr)
+  | .tag x l => match s.exns[a]?, f.inst.tags[x]? with
+    | some e, some ta => bif ta == e.tag then some (vals e.fields ++ [.plain (.br l)]) else none
+    | _, _ => none
+  | .tagRef x l => match s.exns[a]?, f.inst.tags[x]? with
+    | some e, some ta =>
+      bif ta == e.tag then some (vals e.fields ++ [.refExnAddr a, .plain (.br l)]) else none
+    | _, _ => none
+  | .all l => some [.plain (.br l)]
+  | .allRef l => some [.refExnAddr a, .plain (.br l)]
 
 /-- The context of a host call: the values + code around it, the labels and frames it sits in
 (`fill` puts a sequence in its place). -/
@@ -310,6 +358,7 @@ inductive HCtx where
   | seq (vs : List Val) (k : HCtx) (rest : List AInstr)
   | label (n : Nat) (cont : List Instr) (k : HCtx)
   | frame (n : Nat) (fi : Frame) (k : HCtx)
+  | handler (n : Nat) (cs : List Catch) (k : HCtx)
 
 /-- The sequence with `es` in the context's hole. -/
 def HCtx.fill : HCtx → List AInstr → List AInstr
@@ -317,6 +366,7 @@ def HCtx.fill : HCtx → List AInstr → List AInstr
   | .seq vs k rest, es => vals vs ++ k.fill es ++ rest
   | .label n cont k, es => [.label n cont (k.fill es)]
   | .frame n fi k, es => [.frame n fi (k.fill es)]
+  | .handler n cs k, es => [.handler n cs (k.fill es)]
 
 /-- The store after a host call on `s` with outcome `o` (a divergent call keeps `s`). -/
 def hostStore (s : Store) : HostOutcome → Store
@@ -338,6 +388,11 @@ inductive Out where
   | br (k : Nat) (vs : List Val)
   /-- `return` is next after the values `vs` (top first): resolved by the enclosing frame. -/
   | ret (vs : List Val)
+  /-- A tail call of `a` on arguments `vs` (in order) is next: resolved by the enclosing frame. -/
+  | retInvoke (a : Nat) (vs : List Val)
+  /-- The sequence is exactly `throwing a`: resolved by the enclosing label or frame (one step
+  each) or handler (its first clause); final at the top. -/
+  | thrown (a : Nat)
   /-- Only values remain, or only `trap`. -/
   | final
   /-- `invoke a` of a host function is next, on arguments `vs` (in order), in context `k`. -/
@@ -371,6 +426,8 @@ def atInstr (s : Store) (f : Frame) (vs : List Val) (e : AInstr) (rest : List AI
       else .step s f (vals vs.reverse ++ vals (bvs.take n).reverse ++ cont.map .plain ++ rest)
     | .br (k + 1) bvs => .br k bvs
     | .ret bvs => .ret bvs
+    | .retInvoke a args => .retInvoke a args
+    | .thrown a => .step s f (vals vs.reverse ++ throwing a ++ rest)
     | .host a args k => .host a args (.seq vs.reverse (.label n cont k) rest)
     | .stuck => .stuck
   | .frame n fi body =>
@@ -381,24 +438,57 @@ def atInstr (s : Store) (f : Frame) (vs : List Val) (e : AInstr) (rest : List AI
     | .step s' fi' body' => .step s' f (vals vs.reverse ++ [.frame n fi' body'] ++ rest)
     | .ret bvs => bif Nat.blt bvs.length n then .stuck
       else .step s f (vals vs.reverse ++ vals (bvs.take n).reverse ++ rest)
+    | .retInvoke a args => .step s f (vals vs.reverse ++ vals args ++ [.invoke a] ++ rest)
+    | .thrown a => .step s f (vals vs.reverse ++ throwing a ++ rest)
     | .br _ _ => .stuck
     | .host a args k => .host a args (.seq vs.reverse (.frame n fi k) rest)
     | .stuck => .stuck
+  | .handler n cs body =>
+    match seq s f [] body with
+    | .final =>
+      .step s f (vals vs.reverse ++ (bif isTrapOnly body then [.trap] else body) ++ rest)
+    | .step s' f' body' => .step s' f' (vals vs.reverse ++ [.handler n cs body'] ++ rest)
+    | .br k bvs => .br k bvs
+    | .ret bvs => .ret bvs
+    | .retInvoke a args => .retInvoke a args
+    | .thrown a => match cs with
+      | [] => .step s f (vals vs.reverse ++ throwing a ++ rest)
+      | c :: cs' => match catchStep s f a c with
+        | some out => .step s f (vals vs.reverse ++ out ++ rest)
+        | none => .step s f (vals vs.reverse ++ [.handler n cs' (throwing a)] ++ rest)
+    | .host a args k => .host a args (.seq vs.reverse (.handler n cs k) rest)
+    | .stuck => .stuck
+  | .returnInvoke a => match s.funcs[a]? with
+    | some fn => match fn.type.expand with
+      | some ft =>
+        let m := ft.params.length
+        bif Nat.blt vs.length m then .stuck else .retInvoke a (vs.take m).reverse
+      | none => .stuck
+    | none => .stuck
   | .invoke a =>
     match s.funcs[a]? with
-    | some (.wasm ft inst code) =>
-      let m := ft.params.length
-      bif Nat.blt vs.length m then .stuck
-      else .step s f (vals (vs.drop m).reverse ++
-        [.frame ft.results.length ⟨(vs.take m).reverse ++ code.localDefaults, inst⟩
-          [.label ft.results.length [] (code.body.map .plain)]] ++ rest)
-    | some (.host ft _) =>
-      let m := ft.params.length
-      bif Nat.blt vs.length m then .stuck
-      else .host a (vs.take m).reverse (.seq (vs.drop m).reverse .hole rest)
+    | some (.wasm dt inst code) => match dt.expand with
+      | some ft =>
+        let m := ft.params.length
+        bif Nat.blt vs.length m then .stuck
+        else .step s f (vals (vs.drop m).reverse ++
+          [.frame ft.results.length ⟨(vs.take m).reverse.map some ++ code.localDefaults, inst⟩
+            [.label ft.results.length [] (code.body.map .plain)]] ++ rest)
+      | none => .stuck
+    | some (.host dt _) => match dt.expand with
+      | some ft =>
+        let m := ft.params.length
+        bif Nat.blt vs.length m then .stuck
+        else .host a (vs.take m).reverse (.seq (vs.drop m).reverse .hole rest)
+      | none => .stuck
     | none => .stuck
   | .plain (.br k) => .br k vs
   | .plain .return_ => .ret vs
+  | .plain .throwRef => match vs with
+    | .ref (.exn a) :: vs' =>
+      bif vs'.isEmpty && rest.isEmpty then .thrown a else .step s f (throwing a)
+    | .ref .null :: vs' => .step s f (vals vs'.reverse ++ [.trap] ++ rest)
+    | _ => .stuck
   | .plain i => match instrStep s f i vs with
     | some (s', f', stk, out) => .step s' f' (vals stk.reverse ++ out ++ rest)
     | none => .stuck
@@ -411,12 +501,13 @@ def step (c : Config) : Option Config :=
   | .step s f es => some ⟨s, f, es⟩
   | _ => none
 
-/-- Run up to `fuel` steps; `some c'` when a final configuration `c'` is reached. -/
+/-- Run up to `fuel` steps; `some c'` when a final configuration `c'` is reached (values, `trap`,
+or an uncaught exception). -/
 def run : Nat → Config → Option Config
   | 0, _ => none
   | n + 1, c => match seq c.store c.frame [] c.instrs with
     | .step s f es => run n ⟨s, f, es⟩
-    | .final => some c
+    | .final | .thrown _ => some c
     | _ => none
 
 end FVA.Wasm.Exec.Ref
@@ -446,23 +537,33 @@ def evalConst (fuel : Nat) (s : Store) (inst : ModuleInst) (e : Expr) : Option V
     | _ => none
   | none => none
 
+/-- Every table's initializer is a `ref.null` (every table of the 2.0 profile): instantiating a
+module without globals, segments or start function then runs nothing else. -/
+def _root_.FVA.Wasm.Module.nullTables (m : Module) : Bool :=
+  m.tables.all fun t => match t.init with
+    | [.refNull _] => true
+    | _ => false
+
 /-- Instantiate `m` in `s` with `imports` (§4.5.4) by running the initializers and the
 initialization code within `fuel` steps each: allocate with placeholder initial values, evaluate
 the initializers in that store, allocate with their values, and check the initializers give the
 same values in that final store (the spec's fixpoint; it holds for valid modules, whose
 initializers read only imports and function addresses). `none` on a failing initializer, a
-disagreement, a trap or exhausted fuel; import matching is checked separately. -/
+disagreement, a trap or exhausted fuel; import matching is checked separately. A placeholder
+is never read, so its value is arbitrary (a non-null global has no default). -/
 def instantiate (fuel : Nat) (s : Store) (m : Module) (imports : List ExternVal) :
     Option (Store × ModuleInst) := do
-  let (s₀, inst₀) := allocModule s m imports (m.globals.map fun g => g.type.val.default)
-    (m.elems.map fun _ => [])
+  let (s₀, inst₀) := allocModule s m imports (m.globals.map fun _ => .i32 0)
+    (m.tables.map fun _ => .null) (m.elems.map fun _ => [])
   let gvals ← m.globals.mapM fun g => evalConst fuel s₀ inst₀ g.init
+  let trefs ← m.tables.mapM fun t => evalConst fuel s₀ inst₀ t.init >>= asRef
   let erefs ← m.elems.mapM fun e => e.init.mapM fun ex => evalConst fuel s₀ inst₀ ex >>= asRef
-  let (s₁, inst) := allocModule s m imports gvals erefs
+  let (s₁, inst) := allocModule s m imports gvals trefs erefs
   -- the spec evaluates the initializers in the final allocation: check they agree there
   let gvals₁ ← m.globals.mapM fun g => evalConst fuel s₁ inst g.init
+  let trefs₁ ← m.tables.mapM fun t => evalConst fuel s₁ inst t.init >>= asRef
   let erefs₁ ← m.elems.mapM fun e => e.init.mapM fun ex => evalConst fuel s₁ inst ex >>= asRef
-  guard (gvals₁ == gvals && erefs₁ == erefs)
+  guard (gvals₁ == gvals && trefs₁ == trefs && erefs₁ == erefs)
   let c ← run fuel ⟨s₁, ⟨[], inst⟩, (initCode m).map .plain⟩
   match c.instrs with
   | [] => some (c.store, inst)

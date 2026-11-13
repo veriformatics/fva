@@ -135,6 +135,18 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
 @[wasm_step] theorem toVal_call {x} : toVal (.plain (.call x)) = none := id rfl
 @[wasm_step] theorem toVal_callIndirect {x} {y} :
     toVal (.plain (.callIndirect x y)) = none := id rfl
+@[wasm_step] theorem toVal_refAsNonNull : toVal (.plain .refAsNonNull) = none := id rfl
+@[wasm_step] theorem toVal_callRef {x} : toVal (.plain (.callRef x)) = none := id rfl
+@[wasm_step] theorem toVal_returnCall {x} : toVal (.plain (.returnCall x)) = none := id rfl
+@[wasm_step] theorem toVal_returnCallIndirect {x} {y} :
+    toVal (.plain (.returnCallIndirect x y)) = none := id rfl
+@[wasm_step] theorem toVal_returnCallRef {x} : toVal (.plain (.returnCallRef x)) = none := id rfl
+@[wasm_step] theorem toVal_brOnNull {l} : toVal (.plain (.brOnNull l)) = none := id rfl
+@[wasm_step] theorem toVal_brOnNonNull {l} : toVal (.plain (.brOnNonNull l)) = none := id rfl
+@[wasm_step] theorem toVal_throw {x} : toVal (.plain (.throw x)) = none := id rfl
+@[wasm_step] theorem toVal_throwRef : toVal (.plain .throwRef) = none := id rfl
+@[wasm_step] theorem toVal_tryTable {bt} {cs} {body} :
+    toVal (.plain (.tryTable bt cs body)) = none := id rfl
 
 /-- A single value is no pending trap (the value may be a symbolic `if`). -/
 @[wasm_step] theorem isTrapOnly_val (v : Val) : isTrapOnly [v.instr] = false := isTrapOnly_vals [v]
@@ -152,10 +164,15 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
   rw [seqUnique]
 @[wasm_step] theorem seqUnique_cons_none {s : Store} {f : Frame} {vs : List Val} {e : AInstr}
     (rest : List AInstr) (h : toVal e = none) :
-    seqUnique false s f vs (e :: rest) = atUnique false s f vs e := by
+    seqUnique false s f vs (e :: rest) = atUnique false s f vs e rest := by
   rw [seqUnique, h]
 @[wasm_step] theorem seqTraps_nil : seqTraps [] = false := by
   rw [seqTraps]
+@[wasm_step] theorem seqThrow_nil (vs : List Val) : seqThrow vs [] = none := by
+  rw [seqThrow]
+@[wasm_step] theorem seqThrow_cons_none {vs : List Val} {e : AInstr} (rest : List AInstr)
+    (h : toVal e = none) : seqThrow vs (e :: rest) = atThrow vs e rest := by
+  rw [seqThrow, h]
 @[wasm_step] theorem seqTraps_cons_none {e : AInstr} (rest : List AInstr) (h : toVal e = none) :
     seqTraps (e :: rest) = atTrap e := by
   rw [seqTraps, h]
@@ -172,6 +189,9 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
 @[wasm_step] theorem seqTraps_cons_val (v : Val) (rest : List AInstr) :
     seqTraps (v.instr :: rest) = seqTraps rest := by
   rw [seqTraps, toVal_instr]
+@[wasm_step] theorem seqThrow_cons_val (vs : List Val) (v : Val) (rest : List AInstr) :
+    seqThrow vs (v.instr :: rest) = seqThrow (v :: vs) rest := by
+  rw [seqThrow, toVal_instr]
 @[wasm_step] theorem seq_cons_i32 (s : Store) (f : Frame) (vs : List Val) (n : Nat)
     (rest : List AInstr) (h : n < 2 ^ 32) :
     seq s f vs (.plain (.iconst .w32 n) :: rest) =
@@ -204,30 +224,90 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
     seqTraps (.plain (.iconst .w64 n) :: rest) = seqTraps rest := by
   have : n < 18446744073709551616 := h
   rw [seqTraps]; simp [toVal, Nat.blt_eq, this]
+@[wasm_step] theorem seqThrow_cons_i32 (vs : List Val) (n : Nat) (rest : List AInstr)
+    (h : n < 2 ^ 32) :
+    seqThrow vs (.plain (.iconst .w32 n) :: rest) =
+      seqThrow (.i32 (BitVec.ofNat 32 n) :: vs) rest := by
+  have : n < 4294967296 := h
+  rw [seqThrow]; simp [toVal, Nat.blt_eq, this]
+@[wasm_step] theorem seqThrow_cons_i64 (vs : List Val) (n : Nat) (rest : List AInstr)
+    (h : n < 2 ^ 64) :
+    seqThrow vs (.plain (.iconst .w64 n) :: rest) =
+      seqThrow (.i64 (BitVec.ofNat 64 n) :: vs) rest := by
+  have : n < 18446744073709551616 := h
+  rw [seqThrow]; simp [toVal, Nat.blt_eq, this]
 
 -- the non-value cases of the mutual walkers, likewise propositional
 @[wasm_step] theorem atUnique_label (s : Store) (f : Frame) (vs : List Val) (n : Nat)
-    (cont : List Instr) (body : List AInstr) :
-    atUnique false s f vs (.label n cont body) = seqUnique false s f [] body := by
+    (cont : List Instr) (body rest : List AInstr) :
+    atUnique false s f vs (.label n cont body) rest = seqUnique false s f [] body := by
   unfold atUnique; rfl
 @[wasm_step] theorem atUnique_frame (s : Store) (f : Frame) (vs : List Val) (n : Nat) (fi : Frame)
-    (body : List AInstr) :
-    atUnique false s f vs (.frame n fi body) = seqUnique false s fi [] body := by
+    (body rest : List AInstr) :
+    atUnique false s f vs (.frame n fi body) rest = seqUnique false s fi [] body := by
   unfold atUnique; rfl
-@[wasm_step] theorem atUnique_invoke (s : Store) (f : Frame) (vs : List Val) (a : Nat) :
-    atUnique false s f vs (.invoke a) = match s.funcs[a]? with
+@[wasm_step] theorem atUnique_handler (s : Store) (f : Frame) (vs : List Val) (n : Nat)
+    (cs : List Catch) (body rest : List AInstr) :
+    atUnique false s f vs (.handler n cs body) rest = seqUnique false s f [] body := by
+  unfold atUnique; rfl
+@[wasm_step] theorem atUnique_invoke (s : Store) (f : Frame) (vs : List Val) (a : Nat)
+    (rest : List AInstr) :
+    atUnique false s f vs (.invoke a) rest = match s.funcs[a]? with
       | some (.host ..) => false
       | _ => true := by unfold atUnique; rfl
-@[wasm_step] theorem atUnique_plain (s : Store) (f : Frame) (vs : List Val) (i : Instr) :
-    atUnique false s f vs (.plain i) = instrUnique false i vs := by unfold atUnique; rfl
-@[wasm_step] theorem atUnique_trap (s : Store) (f : Frame) (vs : List Val) :
-    atUnique false s f vs .trap = false := by unfold atUnique; rfl
+@[wasm_step] theorem atUnique_returnInvoke (s : Store) (f : Frame) (vs : List Val) (a : Nat)
+    (rest : List AInstr) : atUnique false s f vs (.returnInvoke a) rest = true := by
+  unfold atUnique; rfl
+attribute [wasm_step] atUnique_plain
+@[wasm_step] theorem atUnique_throwRef (s : Store) (f : Frame) (vs : List Val)
+    (rest : List AInstr) :
+    atUnique false s f vs (.plain .throwRef) rest = match vs with
+      | .ref (.exn _) :: vs' => vs'.isEmpty && rest.isEmpty
+      | _ => true := by unfold atUnique; rfl
+@[wasm_step] theorem atUnique_trap (s : Store) (f : Frame) (vs : List Val) (rest : List AInstr) :
+    atUnique false s f vs .trap rest = false := by unfold atUnique; rfl
 @[wasm_step] theorem atTrap_trap : atTrap .trap = true := by unfold atTrap; rfl
 @[wasm_step] theorem atTrap_label (n : Nat) (cont : List Instr) (body : List AInstr) :
     atTrap (.label n cont body) = seqTraps body := by unfold atTrap; rfl
 @[wasm_step] theorem atTrap_frame (n : Nat) (fi : Frame) (body : List AInstr) :
     atTrap (.frame n fi body) = seqTraps body := by unfold atTrap; rfl
+@[wasm_step] theorem atTrap_handler (n : Nat) (cs : List Catch) (body : List AInstr) :
+    atTrap (.handler n cs body) = seqTraps body := by unfold atTrap; rfl
+@[wasm_step] theorem atTrap_returnInvoke (a : Nat) : atTrap (.returnInvoke a) = false := by
+  unfold atTrap; rfl
 @[wasm_step] theorem atTrap_plain (i : Instr) : atTrap (.plain i) = false := by unfold atTrap; rfl
+@[wasm_step] theorem atThrow_plain {vs : List Val} {i : Instr} (rest : List AInstr)
+    (h : i ≠ .throwRef) : atThrow vs (.plain i) rest = none := by
+  cases i <;> first | rfl | exact absurd rfl h
+@[wasm_step] theorem atThrow_throwRef (vs : List Val) (rest : List AInstr) :
+    atThrow vs (.plain .throwRef) rest = match vs with
+      | .ref (.exn a) :: _ => some (.inl a)
+      | _ => none := by unfold atThrow; rfl
+@[wasm_step] theorem atThrow_label (vs : List Val) (n : Nat) (cont : List Instr)
+    (body rest : List AInstr) :
+    atThrow vs (.label n cont body) rest = match seqThrow [] body with
+      | some (.inl a) => some (.inl a)
+      | some (.inr body') => some (.inr (vals vs.reverse ++ [.label n cont body'] ++ rest))
+      | none => none := by unfold atThrow; rfl
+@[wasm_step] theorem atThrow_frame (vs : List Val) (n : Nat) (fi : Frame)
+    (body rest : List AInstr) :
+    atThrow vs (.frame n fi body) rest = match seqThrow [] body with
+      | some (.inl a) => some (.inl a)
+      | some (.inr body') => some (.inr (vals vs.reverse ++ [.frame n fi body'] ++ rest))
+      | none => none := by unfold atThrow; rfl
+@[wasm_step] theorem atThrow_handler (vs : List Val) (n : Nat) (cs : List Catch)
+    (body rest : List AInstr) :
+    atThrow vs (.handler n cs body) rest = match seqThrow [] body with
+      | some (.inl a) => bif isThrowing body then none
+        else some (.inr (vals vs.reverse ++ [.handler n cs (throwing a)] ++ rest))
+      | some (.inr body') => some (.inr (vals vs.reverse ++ [.handler n cs body'] ++ rest))
+      | none => none := by unfold atThrow; rfl
+@[wasm_step] theorem atThrow_invoke (vs : List Val) (a : Nat) (rest : List AInstr) :
+    atThrow vs (.invoke a) rest = none := by unfold atThrow; rfl
+@[wasm_step] theorem atThrow_returnInvoke (vs : List Val) (a : Nat) (rest : List AInstr) :
+    atThrow vs (.returnInvoke a) rest = none := by unfold atThrow; rfl
+@[wasm_step] theorem atThrow_trap (vs : List Val) (rest : List AInstr) :
+    atThrow vs .trap rest = none := by unfold atThrow; rfl
 @[wasm_step] theorem atTrap_invoke (a : Nat) : atTrap (.invoke a) = false := by unfold atTrap; rfl
 @[wasm_step] theorem atInstr_trap (s : Store) (f : Frame) (vs : List Val) (rest : List AInstr) :
     atInstr s f vs .trap rest =
@@ -243,6 +323,8 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
         else .step s f (vals vs.reverse ++ vals (bvs.take n).reverse ++ cont.map .plain ++ rest)
       | .br (k + 1) bvs => .br k bvs
       | .ret bvs => .ret bvs
+      | .retInvoke a args => .retInvoke a args
+      | .thrown a => .step s f (vals vs.reverse ++ throwing a ++ rest)
       | .host a args k => .host a args (.seq vs.reverse (.label n cont k) rest)
       | .stuck => .stuck := by unfold atInstr; rfl
 @[wasm_step] theorem atInstr_frame (s : Store) (f : Frame) (vs : List Val) (n : Nat) (fi : Frame)
@@ -254,32 +336,69 @@ theorem must_of_walk_final {H : HostSem} {Q : Outcome → Prop} {k : Nat} {c c' 
       | .step s' fi' body' => .step s' f (vals vs.reverse ++ [.frame n fi' body'] ++ rest)
       | .ret bvs => bif Nat.blt bvs.length n then .stuck
         else .step s f (vals vs.reverse ++ vals (bvs.take n).reverse ++ rest)
+      | .retInvoke a args => .step s f (vals vs.reverse ++ vals args ++ [.invoke a] ++ rest)
+      | .thrown a => .step s f (vals vs.reverse ++ throwing a ++ rest)
       | .br _ _ => .stuck
       | .host a args k => .host a args (.seq vs.reverse (.frame n fi k) rest)
       | .stuck => .stuck := by unfold atInstr; rfl
+@[wasm_step] theorem atInstr_handler (s : Store) (f : Frame) (vs : List Val) (n : Nat)
+    (cs : List Catch) (body rest : List AInstr) :
+    atInstr s f vs (.handler n cs body) rest = match seq s f [] body with
+      | .final =>
+        .step s f (vals vs.reverse ++ (bif isTrapOnly body then [.trap] else body) ++ rest)
+      | .step s' f' body' => .step s' f' (vals vs.reverse ++ [.handler n cs body'] ++ rest)
+      | .br k bvs => .br k bvs
+      | .ret bvs => .ret bvs
+      | .retInvoke a args => .retInvoke a args
+      | .thrown a => match cs with
+        | [] => .step s f (vals vs.reverse ++ throwing a ++ rest)
+        | c :: cs' => match catchStep s f a c with
+          | some out => .step s f (vals vs.reverse ++ out ++ rest)
+          | none => .step s f (vals vs.reverse ++ [.handler n cs' (throwing a)] ++ rest)
+      | .host a args k => .host a args (.seq vs.reverse (.handler n cs k) rest)
+      | .stuck => .stuck := by unfold atInstr; rfl
+@[wasm_step] theorem atInstr_returnInvoke (s : Store) (f : Frame) (vs : List Val) (a : Nat)
+    (rest : List AInstr) :
+    atInstr s f vs (.returnInvoke a) rest = match s.funcs[a]? with
+      | some fn => match fn.type.expand with
+        | some ft => bif Nat.blt vs.length ft.params.length then .stuck
+          else .retInvoke a (vs.take ft.params.length).reverse
+        | none => .stuck
+      | none => .stuck := by unfold atInstr; rfl
+@[wasm_step] theorem atInstr_throwRef (s : Store) (f : Frame) (vs : List Val)
+    (rest : List AInstr) :
+    atInstr s f vs (.plain .throwRef) rest = match vs with
+      | .ref (.exn a) :: vs' =>
+        bif vs'.isEmpty && rest.isEmpty then .thrown a else .step s f (throwing a)
+      | .ref .null :: vs' => .step s f (vals vs'.reverse ++ [.trap] ++ rest)
+      | _ => .stuck := by unfold atInstr; rfl
 @[wasm_step] theorem atInstr_invoke (s : Store) (f : Frame) (vs : List Val) (a : Nat)
     (rest : List AInstr) :
     atInstr s f vs (.invoke a) rest = match s.funcs[a]? with
-      | some (.wasm ft inst code) =>
-        bif Nat.blt vs.length ft.params.length then .stuck
-        else .step s f (vals (vs.drop ft.params.length).reverse ++
-          [.frame ft.results.length ⟨(vs.take ft.params.length).reverse ++ code.localDefaults, inst⟩
-            [.label ft.results.length [] (code.body.map .plain)]] ++ rest)
-      | some (.host ft _) =>
-        bif Nat.blt vs.length ft.params.length then .stuck
-        else .host a (vs.take ft.params.length).reverse
-          (.seq (vs.drop ft.params.length).reverse .hole rest)
+      | some (.wasm dt inst code) => match dt.expand with
+        | some ft =>
+          bif Nat.blt vs.length ft.params.length then .stuck
+          else .step s f (vals (vs.drop ft.params.length).reverse ++
+            [.frame ft.results.length
+              ⟨(vs.take ft.params.length).reverse.map some ++ code.localDefaults, inst⟩
+              [.label ft.results.length [] (code.body.map .plain)]] ++ rest)
+        | none => .stuck
+      | some (.host dt _) => match dt.expand with
+        | some ft =>
+          bif Nat.blt vs.length ft.params.length then .stuck
+          else .host a (vs.take ft.params.length).reverse
+            (.seq (vs.drop ft.params.length).reverse .hole rest)
+        | none => .stuck
       | none => .stuck := by unfold atInstr; rfl
 @[wasm_step] theorem atInstr_br (s : Store) (f : Frame) (vs : List Val) (k : Nat)
     (rest : List AInstr) : atInstr s f vs (.plain (.br k)) rest = .br k vs := by unfold atInstr; rfl
 @[wasm_step] theorem atInstr_return (s : Store) (f : Frame) (vs : List Val) (rest : List AInstr) :
     atInstr s f vs (.plain .return_) rest = .ret vs := by unfold atInstr; rfl
 @[wasm_step] theorem atInstr_instr (s : Store) (f : Frame) (vs : List Val) {i : Instr}
-    (rest : List AInstr) (hb : ∀ k, i ≠ .br k) (hr : i ≠ .return_) :
+    (rest : List AInstr) (hb : ∀ k, i ≠ .br k) (hr : i ≠ .return_) (ht : i ≠ .throwRef) :
     atInstr s f vs (.plain i) rest = match instrStep s f i vs with
       | some (s', f', stk, out) => .step s' f' (vals stk.reverse ++ out ++ rest)
-      | none => .stuck := by
-  cases i <;> first | (exact absurd rfl (hb _)) | (exact absurd rfl hr) | (unfold atInstr; rfl)
+      | none => .stuck := atInstr_plain hb hr ht
 attribute [wasm_step] reduceCtorEq ne_eq not_false_eq_true implies_true forall_const
   Instr.br.injEq
 -- value comparisons (`select`, `br_if`, `if`): `==` as `decide`, settled by hypotheses or literals
@@ -311,8 +430,10 @@ attribute [wasm_step] eq_self List.flatMap_cons List.flatMap_nil List.replicate_
     toVal (.plain (.fconst .w64 n)) = some (.f64 (BitVec.ofNat 64 n)) := by
   have : n < 18446744073709551616 := h
   simp [toVal, Nat.blt_eq, this]
-@[wasm_step] theorem toVal_refNull (ht : HeapType) :
-    toVal (.plain (.refNull ht)) = some (.ref (.null ht)) := id rfl
+@[wasm_step] theorem toVal_refNull (ht : HeapType) : toVal (.plain (.refNull ht)) = none := id rfl
+@[wasm_step] theorem toVal_refNullAddr : toVal .refNullAddr = some (.ref .null) := id rfl
+@[wasm_step] theorem toVal_refExnAddr (a : Nat) : toVal (.refExnAddr a) = some (.ref (.exn a)) :=
+  id rfl
 
 -- `isTrapOnly` by cases, never unfolded (its catch-all match would block a symbolic value)
 @[wasm_step] theorem isTrapOnly_nil : isTrapOnly [] = false := id rfl
@@ -326,17 +447,26 @@ attribute [wasm_step] eq_self List.flatMap_cons List.flatMap_nil List.replicate_
 @[wasm_step] theorem isTrapOnly_frame (n : Nat) (f : Frame) (b : List AInstr) :
     isTrapOnly [.frame n f b] = false := id rfl
 @[wasm_step] theorem isTrapOnly_invoke (a : Nat) : isTrapOnly [.invoke a] = false := id rfl
+@[wasm_step] theorem isTrapOnly_handler (n : Nat) (cs : List Catch) (b : List AInstr) :
+    isTrapOnly [.handler n cs b] = false := id rfl
+@[wasm_step] theorem isTrapOnly_returnInvoke (a : Nat) : isTrapOnly [.returnInvoke a] = false :=
+  id rfl
 
 @[wasm_step] theorem toVal_invoke (a : Nat) : toVal (.invoke a) = none := id rfl
 @[wasm_step] theorem toVal_label (n : Nat) (c : List Instr) (b : List AInstr) :
     toVal (.label n c b) = none := id rfl
 @[wasm_step] theorem toVal_frame (n : Nat) (f : Frame) (b : List AInstr) :
     toVal (.frame n f b) = none := id rfl
+@[wasm_step] theorem toVal_handler (n : Nat) (cs : List Catch) (b : List AInstr) :
+    toVal (.handler n cs b) = none := id rfl
+@[wasm_step] theorem toVal_returnInvoke (a : Nat) : toVal (.returnInvoke a) = none := id rfl
 @[wasm_step] theorem toVal_trap : toVal .trap = none := id rfl
 
 attribute [wasm_step] walk uniqueStep instrUnique numUnique step runDet
   instrStep numStep toVal_instr isTrapOnly_vals
-attribute [wasm_step] BlockType.expand Func.localDefaults ValType.default mem0 tableAt callTarget
+attribute [wasm_step] BlockType.expand DefType.expand FuncType.mapHeap ValType.mapHeap
+  Option.join_some Option.join_none
+  Func.localDefaults ValType.default mem0 tableAt callTarget
   numOut iunop ibinop irelop NumType.val NumType.bytes PackSize.bits packedVal
 
 -- the generic rewriting a step needs, so `simp only [wasm_step]` runs without the default set
@@ -367,13 +497,14 @@ theorem must_of_seq {H : HostSem} {Q : Outcome → Prop} {s : Store} {f : Frame}
 
 open Lean Meta in
 /-- The instruction the next step of `l` (an `AInstr` list literal) executes: the first one that
-is no value, inside the innermost `label`/`frame` it opens. -/
+is no value, inside the innermost `label`/`frame`/`handler` it opens. -/
 partial def nextInstr (l : Lean.Expr) : MetaM (Option Lean.Expr) := do
   let l ← whnfD l
   let some (_, e, rest) := l.app3? ``List.cons | return none
   let e ← whnfD e
   match e.getAppFn.constName?, e.getAppArgs with
-  | some ``AInstr.label, #[_, _, body] | some ``AInstr.frame, #[_, _, body] =>
+  | some ``AInstr.label, #[_, _, body] | some ``AInstr.frame, #[_, _, body]
+  | some ``AInstr.handler, #[_, _, body] =>
     return (← nextInstr body).getD e
   | some ``AInstr.plain, #[i] =>
     let i ← whnfD i

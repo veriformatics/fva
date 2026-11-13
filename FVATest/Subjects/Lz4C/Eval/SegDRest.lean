@@ -9,7 +9,7 @@ set_option maxRecDepth 6000
 set_option linter.unusedSimpArgs false
 
 theorem d_near_tail (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (a ma : Nat)
-    (mem : MemInst) (src dst n cap o' m j p : Nat) (v16 : Val)
+    (mem : MemInst) (src dst n cap o' m j p : Nat) (v16 : Option Val)
     (hcall : inst.funcs[3]? = some a)
     (hfun : st.funcs[a]? = some (.wasm copyType inst Lifted.func3))
     (hm : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some mem)
@@ -102,7 +102,7 @@ theorem d_near_tail (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst)
       simpa only [dHeadPost, hmodel] using hc
 
 theorem d_far (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (a ma : Nat)
-    (mem : MemInst) (src dst n cap o' m j p : Nat) (v16 : Val)
+    (mem : MemInst) (src dst n cap o' m j p : Nat) (v16 : Option Val)
     (hcall : inst.funcs[3]? = some a)
     (hfun : st.funcs[a]? = some (.wasm copyType inst Lifted.func3))
     (hm : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some mem)
@@ -166,8 +166,8 @@ theorem d_far (H : HostSem) (F : Context) (st : Store) (inst : ModuleInst) (a ma
         · intro c hc
           subst c
           apply Until.done
-          refine ⟨(ls1.set 17 (vI (o' + 16 + 8 * chunks (o' + 16) (o' + m + 4)))).set 2
-            (vI (p + 8 + 8 * chunks (o' + 16) (o' + m + 4))), ?_, ?_⟩
+          refine ⟨(ls1.set 17 (some (vI (o' + 16 + 8 * chunks (o' + 16) (o' + m + 4))))).set 2
+            (some (vI (p + 8 + 8 * chunks (o' + 16) (o' + m + 4)))), ?_, ?_⟩
           · apply HeadLocals.of_const
             · exact ((d_const _ _ _ _ _ _ _ _ _ _ _).set (by omega) _).set (by omega) _
             · simp only [List.getElem?_set_ne (by decide : (2 : Nat) ≠ 3),

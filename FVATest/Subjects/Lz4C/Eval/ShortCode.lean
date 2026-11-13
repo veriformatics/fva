@@ -63,6 +63,9 @@ theorem short_ne_br (k : Nat) : mainLoop ≠ .br k := by rw [short_main_code]; i
 
 theorem short_ne_return : mainLoop ≠ .return_ := by rw [short_main_code]; intro h; cases h
 
+theorem short_ne_throwRef : mainLoop ≠ .throwRef := by
+  rw [short_main_code]; intro h; cases h
+
 theorem short_access (st : Store) (f : Frame) (vs : List Val) :
     instrAccess st f mainLoop vs = none := by rw [short_main_code]; rfl
 

@@ -123,10 +123,15 @@ def _root_.FVA.Wasm.ExportDesc.Ok (C : Context) : ExportDesc → Prop
   | .global x => x < C.globals.length
   | .tag _ => False
 
+/-- Heap types of the 2.0 profile: function and external references. -/
+def _root_.FVA.Wasm.HeapType.inP2 : HeapType → Bool
+  | .abs .func | .abs .extern => true
+  | _ => false
+
 /-- Value types of the 2.0 profile: numbers, nullable function or external references. -/
 def _root_.FVA.Wasm.ValType.inP2 : ValType → Bool
   | .num _ => true
-  | .ref t => t == .funcref || t == .externref
+  | .ref t => t.null && t.heap.inP2
 
 /-- Block types of the 2.0 profile. -/
 def _root_.FVA.Wasm.BlockType.inP2 : BlockType → Bool
@@ -137,7 +142,7 @@ mutual
 /-- An instruction of the 2.0 profile: none of P′'s additions, and every type it names (nested
 bodies included) a 2.0 type. -/
 def _root_.FVA.Wasm.Instr.inP2 : Instr → Bool
-  | .refNull ht => ht == .abs .func || ht == .abs .extern
+  | .refNull ht => ht.inP2
   | .select (some ts) => ts.all ValType.inP2
   | .block bt body | .loop bt body => bt.inP2 && instrsInP2 body
   | .if_ bt thn els => bt.inP2 && instrsInP2 thn && instrsInP2 els
@@ -162,10 +167,12 @@ def _root_.FVA.Wasm.Module.inP2 (m : Module) : Bool :=
     | .table tt => ValType.inP2 (.ref tt.elem) | .global gt => gt.val.inP2 | .tag _ => false
     | _ => true) &&
   m.tables.all (fun t => ValType.inP2 (.ref t.type.elem) &&
-    match t.init with | [.refNull ht] => ht == t.type.elem.heap | _ => false) &&
+    match t.init, t.type.elem.heap with
+    | [.refNull (.abs a)], .abs b => a == b
+    | _, _ => false) &&
   m.funcs.all (fun f => f.locals.all (fun l => l.2.inP2) && instrsInP2 f.body) &&
   m.globals.all (fun g => g.type.val.inP2 && instrsInP2 g.init) &&
-  m.elems.all (fun e => (e.type.heap == .abs .func || e.type.heap == .abs .extern) &&
+  m.elems.all (fun e => e.type.heap.inP2 &&
     e.init.all instrsInP2 &&
     -- a non-null segment: `ref.func` initializers alone (3.0 types each at the declared type)
     (e.type.null || e.init.all fun ex => match ex with | [.refFunc _] => true | _ => false) &&

@@ -69,10 +69,10 @@ theorem cleanup_returns (W : World) (t b : BitVec 32) (s : Store) (j : Nat)
       exact (W.callerSafe a ha).elim (fun hn => hn hheap) hfresh
     have hcells₂ := cells_same (same_mono hcaller₂ (fun a ha => Or.inr ha)) hcells₁
     have hkept₂ := same_trans hkept₁ (same_mono hcaller₂ (fun a ha => Or.inl ha))
-    have f13₁ : s₁.funcs[a13]? = some (.host ⟨[.num .i32], []⟩ W.free) := by
+    have f13₁ : s₁.funcs[a13]? = some (.host ⟨[⟨[.num .i32], []⟩], 0⟩ W.free) := by
       obtain ⟨fi, hfi, rfl⟩ := hf₁.ext.1 a13 _ f13
       exact hfi
-    have f13₂ : s₂.funcs[a13]? = some (.host ⟨[.num .i32], []⟩ W.free) := f13₁
+    have f13₂ : s₂.funcs[a13]? = some (.host ⟨[⟨[.num .i32], []⟩], 0⟩ W.free) := f13₁
     simp only [seqPlug, atPlug, wasm_step, vals]
     wasm_run [hm, hmem₁, hbound₁, hinc, heq1, hone, hi13, f13₁, f13₂, Val.numBits,
       Nat.add_zero, show (0#32 : BitVec 32).toNat = 0 from rfl]

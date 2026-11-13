@@ -19,6 +19,7 @@ theorem StepP.map {H H' : HostSem} {fits fits' : Bool}
     {c d : Config} (h : StepP H fits c d) : StepP H' fits' c d := by
   induction h
   case num => exact .num ‹_›
+  case refNull => exact .refNull
   case refIsNull => exact .refIsNull
   case refFunc => exact .refFunc ‹_›
   case drop => exact .drop
@@ -87,22 +88,50 @@ theorem StepP.map {H H' : HostSem} {fits fits' : Bool}
   case call => exact .call ‹_›
   case callIndirect => exact .callIndirect ‹_›
   case callIndirectTrap => exact .callIndirectTrap ‹_›
-  case invoke => exact .invoke ‹_› ‹_›
+  case invoke => exact .invoke ‹_› ‹_› ‹_›
   case frameExit => exact .frameExit ‹_›
   case invokeHost =>
-    rename_i h₁ h₂ h₃
-    exact .invokeHost h₁ h₂ (hH _ _ _ _ h₃)
+    rename_i h₀ h₁ h₂ h₃
+    exact .invokeHost h₀ h₁ h₂ (hH _ _ _ _ h₃)
   case invokeHostTrap =>
-    rename_i h₁ h₂ h₃
-    exact .invokeHostTrap h₁ h₂ (hH _ _ _ _ h₃)
+    rename_i h₀ h₁ h₂ h₃
+    exact .invokeHostTrap h₀ h₁ h₂ (hH _ _ _ _ h₃)
   case invokeHostDiverge =>
-    rename_i h₁ h₂ h₃
-    exact .invokeHostDiverge h₁ h₂ (hH _ _ _ _ h₃)
+    rename_i h₀ h₁ h₂ h₃
+    exact .invokeHostDiverge h₀ h₁ h₂ (hH _ _ _ _ h₃)
   case seq ih => exact .seq ih
   case label ih => exact .label ih
   case frame ih => exact .frame ih
   case trap => exact .trap _ ‹_›
   case trapFrame => exact .trapFrame
+  case handler ih => exact .handler ih
+  case tryTable => exact .tryTable ‹_› ‹_›
+  case handlerExit => exact .handlerExit
+  case throw => exact .throw ‹_› ‹_› ‹_› ‹_› ‹_›
+  case throwRefNull => exact .throwRefNull
+  case throwRefInstrs => exact .throwRefInstrs ‹_›
+  case throwRefLabel => exact .throwRefLabel
+  case throwRefFrame => exact .throwRefFrame
+  case throwRefHandlerEmpty => exact .throwRefHandlerEmpty
+  case throwRefCatch => exact .throwRefCatch ‹_› ‹_›
+  case throwRefCatchRef => exact .throwRefCatchRef ‹_› ‹_›
+  case throwRefCatchAll => exact .throwRefCatchAll
+  case throwRefCatchAllRef => exact .throwRefCatchAllRef
+  case throwRefHandlerNext => exact .throwRefHandlerNext ‹_›
+  case returnCall => exact .returnCall ‹_›
+  case returnCallRef => exact .returnCallRef
+  case returnCallRefNull => exact .returnCallRefNull
+  case returnCallIndirect => exact .returnCallIndirect ‹_›
+  case returnCallIndirectTrap => exact .returnCallIndirectTrap ‹_›
+  case callRef => exact .callRef
+  case callRefNull => exact .callRefNull
+  case refAsNonNull => exact .refAsNonNull ‹_›
+  case refAsNonNullNull => exact .refAsNonNullNull
+  case brOnNull => exact .brOnNull
+  case brOnNullValue => exact .brOnNullValue ‹_›
+  case brOnNonNull => exact .brOnNonNull ‹_›
+  case brOnNonNullNull => exact .brOnNonNullNull
+  case returnInvoke => exact .returnInvoke _ ‹_› ‹_› ‹_›
 
 theorem StepP.mono {H H' : HostSem} {fits : Bool}
     (hH : ∀ id s vs o, H id s vs o → H' id s vs o) {c d : Config} (h : StepP H fits c d) :
@@ -121,6 +150,7 @@ theorem StepP.fits_total {H : HostSem} {c d : Config} (h : Step H c d) :
     ∃ d', StepP H true c d' := by
   induction h
   case num => exact ⟨_, .num ‹_›⟩
+  case refNull => exact ⟨_, .refNull⟩
   case refIsNull => exact ⟨_, .refIsNull⟩
   case refFunc => exact ⟨_, .refFunc ‹_›⟩
   case drop => exact ⟨_, .drop⟩
@@ -201,17 +231,17 @@ theorem StepP.fits_total {H : HostSem} {c d : Config} (h : Step H c d) :
   case call => exact ⟨_, .call ‹_›⟩
   case callIndirect => exact ⟨_, .callIndirect ‹_›⟩
   case callIndirectTrap => exact ⟨_, .callIndirectTrap ‹_›⟩
-  case invoke => exact ⟨_, .invoke ‹_› ‹_›⟩
+  case invoke => exact ⟨_, .invoke ‹_› ‹_› ‹_›⟩
   case frameExit => exact ⟨_, .frameExit ‹_›⟩
   case invokeHost =>
-    rename_i h₁ h₂ h₃
-    exact ⟨_, .invokeHost h₁ h₂ h₃⟩
+    rename_i h₀ h₁ h₂ h₃
+    exact ⟨_, .invokeHost h₀ h₁ h₂ h₃⟩
   case invokeHostTrap =>
-    rename_i h₁ h₂ h₃
-    exact ⟨_, .invokeHostTrap h₁ h₂ h₃⟩
+    rename_i h₀ h₁ h₂ h₃
+    exact ⟨_, .invokeHostTrap h₀ h₁ h₂ h₃⟩
   case invokeHostDiverge =>
-    rename_i h₁ h₂ h₃
-    exact ⟨_, .invokeHostDiverge h₁ h₂ h₃⟩
+    rename_i h₀ h₁ h₂ h₃
+    exact ⟨_, .invokeHostDiverge h₀ h₁ h₂ h₃⟩
   case seq ih =>
     obtain ⟨⟨s', f', es'⟩, h'⟩ := ih
     exact ⟨_, .seq h'⟩
@@ -223,5 +253,35 @@ theorem StepP.fits_total {H : HostSem} {c d : Config} (h : Step H c d) :
     exact ⟨_, .frame h'⟩
   case trap => exact ⟨_, .trap _ ‹_›⟩
   case trapFrame => exact ⟨_, .trapFrame⟩
+  case handler ih =>
+    obtain ⟨⟨s', f', es'⟩, h'⟩ := ih
+    exact ⟨_, .handler h'⟩
+  case tryTable => exact ⟨_, .tryTable ‹_› ‹_›⟩
+  case handlerExit => exact ⟨_, .handlerExit⟩
+  case throw => exact ⟨_, .throw ‹_› ‹_› ‹_› ‹_› ‹_›⟩
+  case throwRefNull => exact ⟨_, .throwRefNull⟩
+  case throwRefInstrs => exact ⟨_, .throwRefInstrs ‹_›⟩
+  case throwRefLabel => exact ⟨_, .throwRefLabel⟩
+  case throwRefFrame => exact ⟨_, .throwRefFrame⟩
+  case throwRefHandlerEmpty => exact ⟨_, .throwRefHandlerEmpty⟩
+  case throwRefCatch => exact ⟨_, .throwRefCatch ‹_› ‹_›⟩
+  case throwRefCatchRef => exact ⟨_, .throwRefCatchRef ‹_› ‹_›⟩
+  case throwRefCatchAll => exact ⟨_, .throwRefCatchAll⟩
+  case throwRefCatchAllRef => exact ⟨_, .throwRefCatchAllRef⟩
+  case throwRefHandlerNext => exact ⟨_, .throwRefHandlerNext ‹_›⟩
+  case returnCall => exact ⟨_, .returnCall ‹_›⟩
+  case returnCallRef => exact ⟨_, .returnCallRef⟩
+  case returnCallRefNull => exact ⟨_, .returnCallRefNull⟩
+  case returnCallIndirect => exact ⟨_, .returnCallIndirect ‹_›⟩
+  case returnCallIndirectTrap => exact ⟨_, .returnCallIndirectTrap ‹_›⟩
+  case callRef => exact ⟨_, .callRef⟩
+  case callRefNull => exact ⟨_, .callRefNull⟩
+  case refAsNonNull => exact ⟨_, .refAsNonNull ‹_›⟩
+  case refAsNonNullNull => exact ⟨_, .refAsNonNullNull⟩
+  case brOnNull => exact ⟨_, .brOnNull⟩
+  case brOnNullValue => exact ⟨_, .brOnNullValue ‹_›⟩
+  case brOnNonNull => exact ⟨_, .brOnNonNull ‹_›⟩
+  case brOnNonNullNull => exact ⟨_, .brOnNonNullNull⟩
+  case returnInvoke => exact ⟨_, .returnInvoke _ ‹_› ‹_› ‹_›⟩
 
 end FVA.Wasm.Exec

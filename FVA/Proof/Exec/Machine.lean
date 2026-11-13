@@ -75,20 +75,21 @@ theorem stepNU_of_one {fits : Bool} {c c' : Config} (h : stepN 1 c = some c')
   exact stepNU_one hu h₁
 
 theorem uniqueStep_focus {fits : Bool} {S : Store} {f : Frame} {stk : List Val} {i : Instr}
-    {rest : List AInstr} (hv : Ref.toVal (.plain i) = none)
+    {rest : List AInstr} (hv : Ref.toVal (.plain i) = none) (ht : i ≠ .throwRef)
     (hu : Ref.instrUnique fits i stk = true) :
     Ref.uniqueStep fits ⟨S, f, vals stk.reverse ++ .plain i :: rest⟩ = true := by
   simp only [Ref.uniqueStep, Ref.seqUnique_vals, List.reverse_reverse, List.append_nil,
-    Ref.seqUnique, hv, Ref.atUnique, hu]
+    Ref.seqUnique, hv, Ref.atUnique_plain ht, hu]
 
-/-- One step at a plain instruction no policy makes a choice point (`rfl` decides both). -/
+/-- One step at a plain instruction no policy makes a choice point (`rfl` decides `hv` and `hu`,
+`nofun` the `throw_ref` exclusion). -/
 theorem stepNU_plain {fits : Bool} {S : Store} {f : Frame} {stk : List Val} {i : Instr}
     {rest : List AInstr} {c' : Config}
     (h : Ref.step ⟨S, f, vals stk.reverse ++ .plain i :: rest⟩ = some c')
-    (hv : Ref.toVal (.plain i) = none := by rfl)
+    (hv : Ref.toVal (.plain i) = none := by rfl) (ht : i ≠ .throwRef := by nofun)
     (hu : Ref.instrUnique fits i stk = true := by rfl) :
     stepNU fits 1 ⟨S, f, vals stk.reverse ++ .plain i :: rest⟩ = some c' :=
-  stepNU_one (uniqueStep_focus hv hu) h
+  stepNU_one (uniqueStep_focus hv ht hu) h
 
 /-- One control entry around instructions `es` running in frame `f`. -/
 def layer : Ctl → Frame → List AInstr → Frame × List AInstr
@@ -739,7 +740,7 @@ theorem move_byte {fits : Bool}
       .plain (.storePacked .w32 .p8 ⟨0, 0⟩)] ++ rest⟩ = true := by
     have := uniqueStep_focus (fits := fits) (S := S) (f := f) (stk := .i32 src :: .i32 dst :: stk)
       (i := .loadPacked .w32 .p8 .u ⟨0, 0⟩) (rest := .plain (.storePacked .w32 .p8 ⟨0, 0⟩) :: rest)
-      rfl rfl
+      rfl nofun rfl
     simpa [vals] using this
   rw [show (2 : Nat) = 1 + 1 by rfl, stepNU_add, stepNU_one hu1 e1, Option.bind_some,
     stepNU_plain e2, MMem.abs_write hmi.1 (by simpa using hwc)]
@@ -1337,14 +1338,15 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
     simpa [List.append_assoc] using step_instr rest hstep hv
 
 theorem step_invoke_inner {S : Store} {f : Frame} {stk : List Val} {rest : List AInstr} {a : Nat}
-    {ft : FuncType} {inst : ModuleInst} {code : Func} (hf : S.funcs[a]? = some (.wasm ft inst code))
+    {dt : DefType} {ft : FuncType} {inst : ModuleInst} {code : Func}
+    (hf : S.funcs[a]? = some (.wasm dt inst code)) (hft : dt.expand = some ft)
     (hk : ft.params.length ≤ stk.length) :
     Ref.step ⟨S, f, vals stk.reverse ++ .invoke a :: rest⟩ = some ⟨S, f,
       vals (stk.drop ft.params.length).reverse ++ [.frame ft.results.length
-        ⟨(stk.take ft.params.length).reverse ++ code.localDefaults, inst⟩
+        ⟨(stk.take ft.params.length).reverse.map some ++ code.localDefaults, inst⟩
         [.label ft.results.length [] (code.body.map .plain)]] ++ rest⟩ := by
   apply step_focus rfl
-  simp only [Ref.atInstr, hf, MMem.blt_false hk, Bool.cond_false]
+  simp only [Ref.atInstr, hf, hft, MMem.blt_false hk, Bool.cond_false]
 
 /-- Contract U26 T1: every machine step is `k` reference steps between the abstractions, and
 keeps the machine invariant. -/
@@ -1369,16 +1371,20 @@ theorem step_sim {m m' : MState} (hi : m.Inv) (h : m.step = some m') :
       | invoke a =>
         simp only [MState.step, hv, MState.invoke] at h
         split at h
-        · next ft inst fcode hf =>
-          cases hlt : Nat.blt stk.length ft.params.length
-          · simp only [hlt, Bool.cond_false, Option.some.injEq] at h
-            subst h
-            refine ⟨hi, Sim.one ?_⟩
-            rw [abs_eq_wrapC, abs_eq_wrapC]
-            apply stepN_one
-            exact step_wrap ctl (step_invoke_inner (S := st.abs) (f := f) (rest := rest) hf
-              (le_of_blt_false hlt))
-          · simp [hlt] at h
+        · next dt inst fcode hf =>
+          cases hft : dt.expand with
+          | none => simp [hft] at h
+          | some ft =>
+            simp only [hft, Option.bind_some] at h
+            cases hlt : Nat.blt stk.length ft.params.length
+            · simp only [hlt, Bool.cond_false, Option.some.injEq] at h
+              subst h
+              refine ⟨hi, Sim.one ?_⟩
+              rw [abs_eq_wrapC, abs_eq_wrapC]
+              apply stepN_one
+              exact step_wrap ctl (step_invoke_inner (S := st.abs) (f := f) (rest := rest) hf hft
+                (le_of_blt_false hlt))
+            · simp [hlt] at h
         · contradiction
       | trap =>
         simp only [MState.step, hv] at h
@@ -1482,9 +1488,11 @@ theorem abs_ofInvoke (s : MStore) (a : Nat) (args : List Val) :
   simp [MState.ofInvoke, abs_eq_wrapC, wrapC, wrap, invokeConfig]
 
 theorem alloc_abs (s : MStore) (m : Module) (imports : List ExternVal) (gvals : List Val)
-    (erefs : List (List Ref)) :
-    (s.alloc m imports gvals erefs).1.abs = (allocModule s.abs m imports gvals erefs).1 ∧
-      (s.alloc m imports gvals erefs).2 = (allocModule s.abs m imports gvals erefs).2 := by
+    (trefs : List Ref) (erefs : List (List Ref)) :
+    (s.alloc m imports gvals trefs erefs).1.abs =
+        (allocModule s.abs m imports gvals trefs erefs).1 ∧
+      (s.alloc m imports gvals trefs erefs).2 =
+        (allocModule s.abs m imports gvals trefs erefs).2 := by
   refine ⟨?_, rfl⟩
   simp only [MStore.alloc, MStore.abs, List.map_append, List.map_map]
   congr 1
@@ -1494,8 +1502,8 @@ theorem alloc_abs (s : MStore) (m : Module) (imports : List ExternVal) (gvals : 
   exact MMem.alloc_abs _ _
 
 theorem alloc_inv {s : MStore} (hi : s.Inv) {m : Module} (hm : ∀ lim ∈ m.mems, lim.min ≤ 2 ^ 16)
-    (imports : List ExternVal) (gvals : List Val) (erefs : List (List Ref)) :
-    (s.alloc m imports gvals erefs).1.Inv := by
+    (imports : List ExternVal) (gvals : List Val) (trefs : List Ref) (erefs : List (List Ref)) :
+    (s.alloc m imports gvals trefs erefs).1.Inv := by
   intro mm hmm
   simp only [MStore.alloc, List.mem_append, List.mem_map] at hmm
   rcases hmm with hmm | ⟨lim, hlim, rfl⟩
@@ -1510,19 +1518,20 @@ theorem instantiate_sound {H : HostSem} {fuel : Nat} {s s' : MStore} {m : Module
     Instantiated H m s.abs imports s'.abs inst := by
   simp only [instantiate, initRun, bind, Option.bind_eq_some_iff] at h
   rcases h with ⟨⟨m', ex⟩, hrun, hfin⟩
-  rcases hrun with ⟨gvals, hg0, erefs, he0, gvals₁, hg, erefs₁, he, u, hu, hr⟩
+  rcases hrun with ⟨gvals, hg0, trefs, ht0, erefs, he0, gvals₁, hg, trefs₁, ht, erefs₁, he, u, hu,
+    hr⟩
   cases u
   simp only [guard] at hu
   split at hu
   · rename_i heq
     simp only [Bool.and_eq_true, beq_iff_eq] at heq
-    rcases heq with ⟨hgv, her⟩
-    subst gvals₁ erefs₁
+    rcases heq with ⟨⟨hgv, htr⟩, her⟩
+    subst gvals₁ trefs₁ erefs₁
     simp only [Option.some.injEq] at hr
-    obtain ⟨hs₁, hinst⟩ := alloc_abs s m imports gvals erefs
-    set s₁ := (s.alloc m imports gvals erefs).1
-    set inst₁ := (s.alloc m imports gvals erefs).2
-    have hi₁ : s₁.Inv := alloc_inv hi hmem imports gvals erefs
+    obtain ⟨hs₁, hinst⟩ := alloc_abs s m imports gvals trefs erefs
+    set s₁ := (s.alloc m imports gvals trefs erefs).1
+    set inst₁ := (s.alloc m imports gvals trefs erefs).2
+    have hi₁ : s₁.Inv := alloc_inv hi hmem imports gvals trefs erefs
     cases ex with
     | true => simp at hfin
     | false =>
@@ -1554,10 +1563,17 @@ theorem instantiate_sound {H : HostSem} {fuel : Nat} {s s' : MStore} {m : Module
             simp only [List.length_nil, List.length_eq_zero_iff] at hl1
             simp_all
           rw [hframe] at hsteps ⊢
-          refine ⟨hm, gvals, erefs, s₁.abs, ?_, ?_, ?_, hsteps⟩
+          refine ⟨hm, gvals, trefs, erefs, s₁.abs, ?_, ?_, ?_, ?_, hsteps⟩
           · rw [hs₁, hinst]
           · apply (Ref.forall₂_mapM hg).imp
             intro g v hv
+            exact Ref.evalConst_sound hv
+          · apply (Ref.forall₂_mapM ht).imp
+            intro t r hex
+            simp only [Option.bind_eq_some_iff] at hex
+            rcases hex with ⟨v, hv, hvr⟩
+            cases v <;> simp only [Ref.asRef, reduceCtorEq, Option.some.injEq] at hvr
+            subst r
             exact Ref.evalConst_sound hv
           · apply (Ref.forall₂_mapM he).imp
             intro e rs hers

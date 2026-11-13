@@ -15,15 +15,18 @@ def wcBody (dl sl el : Nat) (tail : List Instr) : List Instr :=
 
 def wcLoop (dl sl el : Nat) (tail : List Instr) : Instr := .loop .empty (wcBody dl sl el tail)
 
-theorem local_pair_reset (ls : List Val) (dl sl : Nat) (a b c d : Val) (hne : dl ≠ sl) :
+theorem local_pair_reset (ls : List (Option Val)) (dl sl : Nat) (a b c d : Option Val)
+    (hne : dl ≠ sl) :
     ((((ls.set sl a).set dl b).set dl c).set sl d) = (ls.set dl c).set sl d := by
   rw [List.set_set, List.set_comm a c (Ne.symm hne), List.set_set]
 
 /-- One callee summary per iteration; the caller owns the terminal label's tail. -/
-theorem wc_until (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst) (ls : List Val)
+theorem wc_until (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst)
+    (ls : List (Option Val))
     (a ma : Nat) (mem : MemInst) (dl sl el q m e k : Nat) (tail : List Instr)
     (rest : List AInstr) (hds : dl ≠ sl) (hde : dl ≠ el) (hse : sl ≠ el)
-    (hdl : ls[dl]? = some (vI q)) (hsl : ls[sl]? = some (vI m)) (hel : ls[el]? = some (vI e))
+    (hdl : ls[dl]? = some (some (vI q))) (hsl : ls[sl]? = some (some (vI m)))
+        (hel : ls[el]? = some (some (vI e)))
     (hcall : inst.funcs[3]? = some a)
     (hfun : st.funcs[a]? = some (.wasm copyType inst Lifted.func3))
     (hm : inst.mems[0]? = some ma) (hmem : st.mems[ma]? = some mem)
@@ -31,7 +34,7 @@ theorem wc_until (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst) (l
     (hk : 0 < k) (hend : e ≤ q + 8 * k) (hprev : k = 1 ∨ q + 8 * (k - 1) < e) :
     Until H (Within (Span ma m (8 * k)) (Span ma q (8 * k)))
       (fun c => c = C.fill ⟨st.setMem ma (fwdCopy mem q m (8 * k)),
-        ⟨(ls.set dl (vI (q + 8 * k))).set sl (vI (m + 8 * k)), inst⟩,
+        ⟨(ls.set dl (some (vI (q + 8 * k)))).set sl (some (vI (m + 8 * k))), inst⟩,
         [.label 0 [wcLoop dl sl el tail] (tail.map .plain)] ++ rest⟩)
       (C.fill ⟨st, ⟨ls, inst⟩, [.plain (wcLoop dl sl el tail)] ++ rest⟩) := by
   induction k generalizing st ls mem q m with
@@ -62,17 +65,17 @@ theorem wc_until (H : HostSem) (C : Context) (st : Store) (inst : ModuleInst) (l
           List.getElem?_set_self, List.getElem?_set_ne]
         · simp [TraceOK, AccessOK]
         · apply Until.done
-          rw [List.set_comm (vI (m + 8)) (vI (q + 8)) (Ne.symm hds)]
+          rw [List.set_comm (some (vI (m + 8))) (some (vI (q + 8))) (Ne.symm hds)]
           rfl
       · wasm_eval 12 [block_simp, wcBody, wcLoop, hdl, hsl, hel,
           List.getElem?_set_self, List.getElem?_set_ne]
         · simp [TraceOK, AccessOK]
-        · let ls' := (ls.set sl (vI (m + 8))).set dl (vI (q + 8))
-          have hd' : ls'[dl]? = some (vI (q + 8)) := by
+        · let ls' := (ls.set sl (some (vI (m + 8)))).set dl (some (vI (q + 8)))
+          have hd' : ls'[dl]? = some (some (vI (q + 8))) := by
             exact List.getElem?_set_self (by simpa only [List.length_set] using hld)
-          have hs' : ls'[sl]? = some (vI (m + 8)) := by
+          have hs' : ls'[sl]? = some (some (vI (m + 8))) := by
             simp only [ls', List.getElem?_set_ne hds, List.getElem?_set_self hls]
-          have he' : ls'[el]? = some (vI e) := by
+          have he' : ls'[el]? = some (some (vI e)) := by
             simpa only [ls', List.getElem?_set_ne hde, List.getElem?_set_ne hse] using hel
           have hi := ih (st.setMem ma (fwdCopy mem q m 8)) ls' (fwdCopy mem q m 8)
             (q + 8) (m + 8) hd' hs' he' (by simpa only [setMem_funcs] using hfun)

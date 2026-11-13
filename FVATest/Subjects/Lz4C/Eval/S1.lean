@@ -14,8 +14,10 @@ theorem cp1_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleInst) 
     (hd : d + r ≤ mem.size) (hs : s + r ≤ mem.size) (hsize : mem.size < 2 ^ 32) (hr : 0 < r) :
     Until H (Within (Span ma s r) (Span ma d r))
       (fun c => c = C.fill ⟨st.setMem ma (fwdCopy mem d s r),
-        ⟨[u0, u1, vI (s + r), vI 0, vI (d + r), u5, u6], inst⟩, rest⟩)
-      (C.fill ⟨st, ⟨[u0, u1, vI s, vI r, vI d, u5, u6], inst⟩,
+        ⟨[some u0, some u1, some (vI (s + r)), some (vI 0), some (vI (d + r)), some u5, some u6],
+            inst⟩, rest⟩)
+      (C.fill ⟨st,
+          ⟨[some u0, some u1, some (vI s), some (vI r), some (vI d), some u5, some u6], inst⟩,
         [.plain (.loop .empty cp1)] ++ rest⟩) := by
   induction r generalizing st mem d s with
   | zero => omega
@@ -53,8 +55,11 @@ theorem cp4_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleInst) 
     (he : e = i + 4 * k) (hk : 0 < k) :
     Until H (Within (Span ma (s + i) (4 * k)) (Span ma (d + i) (4 * k)))
       (fun c => c = C.fill ⟨st.setMem ma (fwdCopy mem (d + i) (s + i) (4 * k)),
-        ⟨[vI d, vI s, vI (d + e - 4), vI r, vI e, vI e, vI (s + e - 4)], inst⟩, rest⟩)
-      (C.fill ⟨st, ⟨[vI d, vI s, u2, vI r, vI i, vI e, u6], inst⟩,
+        ⟨[some (vI d), some (vI s), some (vI (d + e - 4)), some (vI r), some (vI e), some (vI e),
+            some (vI (s + e - 4))], inst⟩, rest⟩)
+      (C.fill ⟨st,
+          ⟨[some (vI d), some (vI s), some u2, some (vI r), some (vI i), some (vI e), some u6],
+          inst⟩,
         [.plain (.loop .empty cp4)] ++ rest⟩) := by
   induction k generalizing st mem i u2 u6 with
   | zero => omega
@@ -105,7 +110,9 @@ theorem cp4_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleInst) 
 
 def CpPost (C : BContext) (st : Store) (inst : ModuleInst) (d s : Nat) (c : Config) : Prop :=
   ∃ u2 u3 u4 u5 u6 : Val,
-    c = C.fill ⟨st, ⟨[vI d, vI s, u2, u3, u4, u5, u6], inst⟩, vals [vI d]⟩
+    c = C.fill ⟨st,
+        ⟨[some (vI d), some (vI s), some u2, some u3, some u4, some u5, some u6],
+        inst⟩, vals [vI d]⟩
 
 /-- Enter the tail with an already-processed prefix of length `i`. -/
 theorem cp_tail_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleInst) (ma : Nat)
@@ -116,7 +123,8 @@ theorem cp_tail_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleIn
     Until H (Within (Span ma (s + i) r) (Span ma (d + i) r))
       (CpPost C (st.setMem ma (fwdCopy mem (d + i) (s + i) r)) inst d s)
       ((BContext.label [] 0 [] [.plain (.localGet 0)] C).fill
-        ⟨st, ⟨[vI d, vI s, u2, vI r, vI i, u5, u6], inst⟩, (cpOuter.drop 10).map .plain⟩) := by
+        ⟨st, ⟨[some (vI d), some (vI s), some u2, some (vI r), some (vI i), some u5, some u6],
+            inst⟩, (cpOuter.drop 10).map .plain⟩) := by
   wasm_eval 8 [block_simp, cpOuter, hm, hmem]
   · simp [TraceOK, AccessOK]
   · apply (cp1_until H (BContext.label [] 0 [] [.plain (.localGet 0)] C) st inst ma mem
@@ -135,7 +143,9 @@ theorem cp_body_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleIn
     (hd : d + n ≤ mem.size) (hs : s + n ≤ mem.size) (hsize : mem.size < 2 ^ 32) :
     Until H (Within (Span ma s n) (Span ma d n))
       (CpPost C (st.setMem ma (fwdCopy mem d s n)) inst d s)
-      (C.fill ⟨st, ⟨[vI d, vI s, vI n, vI 0, vI 0, vI 0, vI 0], inst⟩,
+      (C.fill ⟨st,
+          ⟨[some (vI d), some (vI s), some (vI n), some (vI 0), some (vI 0), some (vI 0),
+          some (vI 0)], inst⟩,
         cpBody.map .plain⟩) := by
   by_cases hn : n = 0
   · subst n
@@ -149,7 +159,8 @@ theorem cp_body_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleIn
     · wasm_eval 13 [block_simp, cpBody, cpOuter, cpBlock, hm, hmem, hn, hn4]
       · simp [TraceOK, AccessOK]
       · change Until H _ _ ((BContext.label [] 0 [] [.plain (.localGet 0)] C).fill
-          ⟨st, ⟨[vI d, vI s, vI n, vI (n % 4), vI 0, vI 0, vI 0], inst⟩,
+          ⟨st, ⟨[some (vI d), some (vI s), some (vI n), some (vI (n % 4)), some (vI 0),
+              some (vI 0), some (vI 0)], inst⟩,
             (cpOuter.drop 10).map .plain⟩)
         have hr : n % 4 = n := Nat.mod_eq_of_lt hn4
         simpa only [hr, Nat.add_zero] using
@@ -160,7 +171,8 @@ theorem cp_body_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleIn
       · let C1 := BContext.label [] 0 [] [.plain (.localGet 0)] C
         let C2 := BContext.label [] 0 [] ((cpOuter.drop 10).map .plain) C1
         change Until H _ _ (C2.fill
-          ⟨st, ⟨[vI d, vI s, vI n, vI (n % 4), vI 0, vI (4 * (n / 4)), vI 0], inst⟩,
+          ⟨st, ⟨[some (vI d), some (vI s), some (vI n), some (vI (n % 4)), some (vI 0),
+              some (vI (4 * (n / 4))), some (vI 0)], inst⟩,
             [.plain (.loop .empty cp4)] ++ [.plain (.localGet 3), .plain (.itestEqz .w32),
               .plain (.brIf 1)]⟩)
         apply (cp4_until H C2 st inst ma mem d s 0 (4 * (n / 4)) (n % 4) (n / 4)
@@ -215,12 +227,14 @@ theorem s1 : MemcpyS1 := by
   · simp [TraceOK, AccessOK]
   · let B := BContext.label [] 1 [] [] (BContext.frame vs 1 f rest (.base C))
     change Until H _ _ (B.fill ⟨st,
-      ⟨[vI d, vI s, vI n, vI 0, vI 0, vI 0, vI 0], inst⟩, cpBody.map .plain⟩)
+      ⟨[some (vI d), some (vI s), some (vI n), some (vI 0), some (vI 0), some (vI 0), some (vI 0)],
+          inst⟩, cpBody.map .plain⟩)
     apply (cp_body_until H B st inst ma mem d s n hm hmem hd hs hsize).trans
     intro c hc
     obtain ⟨u2, u3, u4, u5, u6, rfl⟩ := hc
     change Until H _ _ (C.fill ⟨_, f, vals vs ++
-      (.frame 1 ⟨[vI d, vI s, u2, u3, u4, u5, u6], inst⟩ [.label 1 [] (vals [vI d])] :: rest)⟩)
+      (.frame 1 ⟨[some (vI d), some (vI s), some u2, some u3, some u4, some u5, some u6],
+          inst⟩ [.label 1 [] (vals [vI d])] :: rest)⟩)
     wasm_eval 2 [block_simp]
     · simp [TraceOK, AccessOK]
     · apply Until.done

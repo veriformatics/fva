@@ -104,23 +104,27 @@ theorem matched_prep : (store0.prep matched.prep).isSome := by decide +kernel
 theorem malformed_prep : (store0.prep malformed.prep).isSome := by decide +kernel
 
 theorem literal_invoke : InvokeOK literal.store 2 literal.args := by
-  refine ⟨.wasm ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩
-    alloc.2 Lifted.func2, by kernel_rfl, ?_⟩
+  refine ⟨.wasm ⟨[⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩], 0⟩
+    alloc.2 Lifted.func2, ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩,
+    by kernel_rfl, rfl, ?_⟩
   exact .cons trivial (.cons trivial (.cons trivial (.cons trivial .nil)))
 
 theorem empty_invoke : InvokeOK empty.store 2 empty.args := by
-  refine ⟨.wasm ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩
-    alloc.2 Lifted.func2, by kernel_rfl, ?_⟩
+  refine ⟨.wasm ⟨[⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩], 0⟩
+    alloc.2 Lifted.func2, ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩,
+    by kernel_rfl, rfl, ?_⟩
   exact .cons trivial (.cons trivial (.cons trivial (.cons trivial .nil)))
 
 theorem matched_invoke : InvokeOK matched.store 2 matched.args := by
-  refine ⟨.wasm ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩
-    alloc.2 Lifted.func2, by kernel_rfl, ?_⟩
+  refine ⟨.wasm ⟨[⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩], 0⟩
+    alloc.2 Lifted.func2, ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩,
+    by kernel_rfl, rfl, ?_⟩
   exact .cons trivial (.cons trivial (.cons trivial (.cons trivial .nil)))
 
 theorem malformed_invoke : InvokeOK malformed.store 2 malformed.args := by
-  refine ⟨.wasm ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩
-    alloc.2 Lifted.func2, by kernel_rfl, ?_⟩
+  refine ⟨.wasm ⟨[⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩], 0⟩
+    alloc.2 Lifted.func2, ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩,
+    by kernel_rfl, rfl, ?_⟩
   exact .cons trivial (.cons trivial (.cons trivial (.cons trivial .nil)))
 
 theorem literal_run : (runDet 1000 literal.config).isSome := by decide +kernel
@@ -200,9 +204,9 @@ theorem malformed_r1 {H : HostSem} {s : Store} {inst : ModuleInst}
   refine ⟨2, by decide +kernel, malformed_invoke, ?_⟩
   exact (must_returned_of_runDet_get (P := fun _ _ => True)
     malformed_run malformed_result trivial).mono (by
-      rintro (⟨s', vs⟩ | s') h
+      rintro (⟨s', vs⟩ | s' | ⟨s', a⟩) h
       · exact ⟨-2, h.1⟩
-      · exact h)
+      all_goals exact h)
 
 /-! ## The domain's empty-buffer cases (consultant-10): an empty buffer strictly inside the other,
 where ordered separation fails and `Buffers` holds. -/
@@ -229,13 +233,15 @@ theorem insideDst_prep : (store0.prep insideDst.prep).isSome := by decide +kerne
 theorem insideSrc_prep : (store0.prep insideSrc.prep).isSome := by decide +kernel
 
 theorem insideDst_invoke : InvokeOK insideDst.store 2 insideDst.args := by
-  refine ⟨.wasm ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩
-    alloc.2 Lifted.func2, by kernel_rfl, ?_⟩
+  refine ⟨.wasm ⟨[⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩], 0⟩
+    alloc.2 Lifted.func2, ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩,
+    by kernel_rfl, rfl, ?_⟩
   exact .cons trivial (.cons trivial (.cons trivial (.cons trivial .nil)))
 
 theorem insideSrc_invoke : InvokeOK insideSrc.store 2 insideSrc.args := by
-  refine ⟨.wasm ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩
-    alloc.2 Lifted.func2, by kernel_rfl, ?_⟩
+  refine ⟨.wasm ⟨[⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩], 0⟩
+    alloc.2 Lifted.func2, ⟨[.num .i32, .num .i32, .num .i32, .num .i32], [.num .i32]⟩,
+    by kernel_rfl, rfl, ?_⟩
   exact .cons trivial (.cons trivial (.cons trivial (.cons trivial .nil)))
 
 theorem insideDst_run : (runDet 1000 insideDst.config).isSome := by decide +kernel
@@ -255,9 +261,9 @@ theorem insideDst_r1 {H : HostSem} {s : Store} {inst : ModuleInst}
   refine ⟨2, by decide +kernel, insideDst_invoke, ?_⟩
   exact (must_returned_of_runDet_get (P := fun _ _ => True)
     insideDst_run insideDst_result trivial).mono (by
-      rintro (⟨s', vs⟩ | s') h
+      rintro (⟨s', vs⟩ | s' | ⟨s', a⟩) h
       · exact ⟨-1, h.1⟩
-      · exact h)
+      all_goals exact h)
 
 /-- R1's one-i32 total-return conclusion with an empty destination inside the input. -/
 theorem insideSrc_r1 {H : HostSem} {s : Store} {inst : ModuleInst}
@@ -268,8 +274,8 @@ theorem insideSrc_r1 {H : HostSem} {s : Store} {inst : ModuleInst}
   refine ⟨2, by decide +kernel, insideSrc_invoke, ?_⟩
   exact (must_returned_of_runDet_get (P := fun _ _ => True)
     insideSrc_run insideSrc_result trivial).mono (by
-      rintro (⟨s', vs⟩ | s') h
+      rintro (⟨s', vs⟩ | s' | ⟨s', a⟩) h
       · exact ⟨-1, h.1⟩
-      · exact h)
+      all_goals exact h)
 
 end Subjects.Lz4C.Accept

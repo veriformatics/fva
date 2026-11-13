@@ -35,18 +35,18 @@ def InstantiationOK : Prop :=
 /-- S3 Invocation: calling a function with arguments of its parameter types from a valid store
 is a configuration of its result type. -/
 def InvocationOK : Prop :=
-  ∀ (s : Store) (a : Nat) (fi : FuncInst) (args : List Val), StoreOK s → s.funcs[a]? = some fi →
-    List.Forall₂ (Val.HasType s) args fi.type.params →
-      ConfigOK (invokeConfig s a args) fi.type.results
+  ∀ (s : Store) (a : Nat) (fi : FuncInst) (ft : FuncType) (args : List Val), StoreOK s →
+    s.funcs[a]? = some fi → fi.type.expand = some ft →
+    List.Forall₂ (Val.HasType s) args ft.params → ConfigOK (invokeConfig s a args) ft.results
 
 /-- S4 Validated modules never get stuck: every configuration reachable from a well-typed call
 of an export of a module the validator accepts is well typed and final or steps. -/
 def NeverStuck (validate : Module → Bool) : Prop :=
   ∀ (H : HostSem) (m : Module) (s s' : Store) (imports : List ExternVal) (inst : ModuleInst)
-    (name : String) (a : Nat) (fi : FuncInst) (args : List Val) (c : Config),
+    (name : String) (a : Nat) (fi : FuncInst) (ft : FuncType) (args : List Val) (c : Config),
     validate m = true → TypeSoundHost H → StoreOK s → Instantiated H m s imports s' inst →
-      inst.exportFunc name = some a → s'.funcs[a]? = some fi →
-      List.Forall₂ (Val.HasType s') args fi.type.params → Steps H (invokeConfig s' a args) c →
-        ConfigOK c fi.type.results ∧ ((∃ o, Final c o) ∨ ∃ c', Step H c c')
+      inst.exportFunc name = some a → s'.funcs[a]? = some fi → fi.type.expand = some ft →
+      List.Forall₂ (Val.HasType s') args ft.params → Steps H (invokeConfig s' a args) c →
+        ConfigOK c ft.results ∧ ((∃ o, Final c o) ∨ ∃ c', Step H c c')
 
 end FVA.Wasm.Valid

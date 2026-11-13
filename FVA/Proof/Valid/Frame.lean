@@ -43,11 +43,11 @@ theorem extendStore {s s' : Store} {f : Frame} {C : Context} (hf : FrameCtx s f 
 theorem blockType {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
     (bt : BlockType) : C.blockType bt = bt.expand f := by
   obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, _, rfl⟩, rfl⟩ := h
-  cases bt <;> simp only [Context.blockType, BlockType.expand, hi.types]
+  cases bt <;> simp only [Context.blockType, BlockType.expand, forall₂_expand_getElem? hi.types]
 
 theorem funcs {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
     {x : Nat} {ft : FuncType} (hx : C.funcs[x]? = some ft) :
-    ∃ a fi, f.inst.funcs[x]? = some a ∧ s.funcs[a]? = some fi ∧ fi.type = ft := by
+    ∃ a fi, f.inst.funcs[x]? = some a ∧ s.funcs[a]? = some fi ∧ fi.type.expand = some ft := by
   obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, _, rfl⟩, rfl⟩ := h
   obtain ⟨a, ha, fi, hfi, hft⟩ := forall₂_lookup_right hi.funcs hx
   exact ⟨a, fi, ha, hfi, hft⟩
@@ -69,7 +69,7 @@ theorem mems {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
 
 theorem globals {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
     {x : Nat} {gt : GlobalType} (hx : C.globals[x]? = some gt) :
-    ∃ a gi, f.inst.globals[x]? = some a ∧ s.globals[a]? = some gi ∧ gi.type = gt := by
+    ∃ a gi, f.inst.globals[x]? = some a ∧ s.globals[a]? = some gi ∧ gi.type.Sub gt := by
   obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, _, rfl⟩, rfl⟩ := h
   obtain ⟨a, ha, gi, hgi, hgt⟩ := forall₂_lookup_right hi.globals hx
   exact ⟨a, gi, ha, hgi, hgt⟩
@@ -105,8 +105,10 @@ theorem localAt_singletons (ts : List ValType) (x : Nat) :
 
 theorem FrameCtx.locals {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
     {x : Nat} {t : ValType} (hx : localAt C.locals x = some t) :
-    ∃ v, f.locals[x]? = some v ∧ v.HasType s t := by
+    ∃ v, f.locals[x]? = some (some v) ∧ v.HasType s t := by
   obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, hvs, rfl⟩, rfl⟩ := h
-  exact forall₂_lookup_right hvs ((localAt_singletons ts x).symm.trans hx)
+  obtain ⟨ov, hov, v, rfl, hv⟩ :=
+    forall₂_lookup_right hvs ((localAt_singletons ts x).symm.trans hx)
+  exact ⟨v, hov, hv⟩
 
 end FVA.Wasm.Valid

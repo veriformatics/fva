@@ -33,16 +33,45 @@ def numType : NumType → String
 /-- Abstract heap types. -/
 def absHeapType : AbsHeapType → String
   | .func => "AbsHeapType.func" | .extern => "AbsHeapType.extern" | .exn => "AbsHeapType.exn"
-/-- Heap types. -/
+mutual
+/-- Heap types (a decoded module never holds a closed form; printed for totality). -/
 def heapType : HeapType → String
-  | .abs a => app "HeapType.abs" [absHeapType a] | .idx x => app "HeapType.idx" [toString x]
+  | .abs a => app "HeapType.abs" [absHeapType a]
+  | .idx x => app "HeapType.idx" [toString x]
+  | .def_ d => app "HeapType.def_" [defType d]
+  | .rec_ i => app "HeapType.rec_" [toString i]
+  termination_by structural h => h
 /-- Reference types (the 2.0 abbreviations where one applies). -/
 def refType : RefType → String
-  | .funcref => "RefType.funcref" | .externref => "RefType.externref"
-  | .exnref => "RefType.exnref" | t => app "RefType.mk" [toString t.null, heapType t.heap]
+  | ⟨true, .abs .func⟩ => "RefType.funcref"
+  | ⟨true, .abs .extern⟩ => "RefType.externref"
+  | ⟨true, .abs .exn⟩ => "RefType.exnref"
+  | ⟨n, h⟩ => app "RefType.mk" [toString n, heapType h]
+  termination_by structural t => t
 /-- Value types. -/
 def valType : ValType → String
-  | .num t => app "ValType.num" [numType t] | .ref t => app "ValType.ref" [refType t]
+  | .num t => app "ValType.num" [numType t]
+  | .ref t => app "ValType.ref" [refType t]
+  termination_by structural t => t
+/-- Value types, one rendered entry each. -/
+def valTypes : List ValType → List String
+  | [] => []
+  | t :: ts => valType t :: valTypes ts
+  termination_by structural ts => ts
+/-- Function types. -/
+def funcType : FuncType → String
+  | ⟨ps, rs⟩ => app "FuncType.mk" [list (valTypes ps), list (valTypes rs)]
+  termination_by structural f => f
+/-- Function types, one rendered entry each. -/
+def funcTypes : List FuncType → List String
+  | [] => []
+  | f :: fs => funcType f :: funcTypes fs
+  termination_by structural fs => fs
+/-- Defined types. -/
+def defType : DefType → String
+  | ⟨g, i⟩ => app "DefType.mk" [list (funcTypes g), toString i]
+  termination_by structural d => d
+end
 /-- Block types. -/
 def blockType : BlockType → String
   | .empty => "BlockType.empty" | .val t => app "BlockType.val" [valType t]
@@ -166,9 +195,6 @@ def limits (l : Limits) : String :=
 def globalType (g : GlobalType) : String :=
   app "GlobalType.mk" [match g.mutability with | .const => "Mut.const" | .var => "Mut.var",
     valType g.val]
-/-- Function types. -/
-def funcType (f : FuncType) : String :=
-  app "FuncType.mk" [list (f.params.map valType), list (f.results.map valType)]
 /-- Table types. -/
 def tableType (t : TableType) : String := app "TableType.mk" [limits t.limits, refType t.elem]
 /-- Import descriptions. -/

@@ -18,10 +18,10 @@ theorem neverStuck_of (validate : Module → Bool)
     (sound : ∀ m, validate m = true → ModuleValid m)
     (pres : Preservation) (prog : Progress) (init : InstantiationOK) :
     NeverStuck validate := by
-  intro H m s s' imports inst name a fi args c hv hh hs hi _ha hf hargs steps
+  intro H m s s' imports inst name a fi ft args c hv hh hs hi _ha hf hft hargs steps
   have hs' := (init H m s s' imports inst (sound m hv) hh hs hi).1
-  have hc := preservation_steps pres hh (invocationOK s' a fi args hs' hf hargs) steps
-  exact ⟨hc, prog H c fi.type.results hh.1 hc⟩
+  have hc := preservation_steps pres hh (invocationOK s' a fi ft args hs' hf hft hargs) steps
+  exact ⟨hc, prog H c ft.results hh.1 hc⟩
 
 /-- The concrete validator's accepted artifacts inherit the runtime soundness theorems. -/
 theorem validated_neverStuck (pres : Preservation) (prog : Progress) (init : InstantiationOK) :

@@ -33,12 +33,12 @@ theorem must_free {H : HostSem} {Q : Outcome → Prop} {alloc free cap k a z : N
     {s : Store} {f : Frame} {es : List AInstr} {p : BitVec 32}
     (hA : Allocator H alloc free heap cap blocks ready) (hr : ready k s)
     (hp : (p.toNat, z) ∈ blocks s)
-    (hf : s.funcs[a]? = some (.host ⟨[.num .i32], []⟩ free))
+    (hf : s.funcs[a]? = some (.host ⟨[⟨[.num .i32], []⟩], 0⟩ free))
     (hfocus : seqFocus (HostAt a 1 [.i32 p]) [] es)
     (hk : ∀ s', Freed heap blocks ready k s s' p →
       Must H Q ⟨s', f, seqPlug 1 [] [] es⟩) : Must H Q ⟨s, f, es⟩ := by
   obtain ⟨hex, hall⟩ := free_result hA hr hp
-  apply must_host_focus hf hfocus
+  apply must_host_focus hf rfl hfocus
   · obtain ⟨s', hs'⟩ := hex
     exact ⟨s', [], hs'⟩
   · intro o ho
@@ -85,6 +85,6 @@ def post (W : World) : Outcome → Prop
   | .returned s vs => vs = [] ∧
     (∀ i < W.x.n, ∀ j < W.x.m, ∃ out, Holds s (W.l.cell W.x i j) (le64 out) ∧
       CpmElem (W.x.count i j) (W.x.libSize j) out) ∧ SameOn W.initial s (W.l.kept W.x)
-  | .trapped _ => False
+  | _ => False
 
 end Subjects.EdgerCpm.Body

@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P) || exit 2
+checker=${1:-$root/scripts/test-p2exec}
+work=$(mktemp -d) || exit 2
+trap 'rm -rf -- "$work"' EXIT
+mkdir -p "$work/scripts" "$work/.tools/bin" "$work/FVATest/P2" || exit 2
+cp -- "$checker" "$work/scripts/test-p2exec" || exit 2
+chmod +x "$work/scripts/test-p2exec"
+printf '(module)\n(action)\n(assert_invalid)\n' >"$work/FVATest/P2/fixture.wast"
+printf 'script\tline\ttype\tc2\trows\nfixture.wast\t1\tmodule\tpass\t-\nfixture.wast\t2\taction\tpass\t-\nfixture.wast\t3\tassert_invalid\tskip: P′ validation = U28c\t-\n' \
+	>"$work/FVATest/P2/commands.tsv"
+
+cat >"$work/.tools/bin/wasmtime" <<'SH'
+#!/usr/bin/env bash
+case ${P2_CASE:-ok} in
+  oracle-fail) exit 1 ;;
+  oracle-setup) exit 127 ;;
+  oracle-crash) exit 139 ;;
+esac
+exit 0
+SH
+cat >"$work/.tools/bin/wasm-tools" <<'SH'
+#!/usr/bin/env bash
+[[ ${P2_CASE:-ok} != json-setup ]] || exit 2
+while (($#)); do
+  if [[ $1 == -o ]]; then
+    shift
+    printf '{"commands":[{"line":1,"type":"module"},{"line":2,"type":"action"},{"line":3,"type":"assert_invalid"}]}\n' >"$1"
+    exit 0
+  fi
+  shift
+done
+exit 2
+SH
+cat >"$work/runner" <<'SH'
+#!/usr/bin/env bash
+if [[ $1 == profile ]]; then
+  printf '{"wasmtimeFlags":"-W exceptions=y,tail-call=y,function-references=y,gc=y"}\n'
+  exit 0
+fi
+case ${P2_CASE:-ok} in
+  runner-setup) exit 2 ;;
+  runner-crash) exit 139 ;;
+  no-outcomes) exit 0 ;;
+esac
+{
+  printf '1\tmodule\tpass\n'
+  case ${P2_CASE:-ok} in
+    missing) ;;
+    failure) printf '2\taction\tfail: planted\n' ;;
+    wrong-type) printf '2\tassert_return\tpass\n' ;;
+    wrong-class) printf '2\taction\tskip: unavailable action\n' ;;
+    malformed) printf '2\taction\tpass\textra\n' ;;
+    *) printf '2\taction\tpass\n' ;;
+  esac
+  case ${P2_CASE:-ok} in
+    wrong-reason) printf '3\tassert_invalid\tskip: outside P′\n' ;;
+    *) printf '3\tassert_invalid\tskip: P′ validation = U28c: fixture detail\n' ;;
+  esac
+  case ${P2_CASE:-ok} in
+    duplicate) printf '2\taction\tpass\n' ;;
+    extra) printf '4\taction\tpass\n' ;;
+  esac
+} >>"$FVA_SPEC_OUTCOMES"
+[[ ${P2_CASE:-ok} != runner-fail ]] || exit 1
+exit 0
+SH
+chmod +x "$work/.tools/bin/wasmtime" "$work/.tools/bin/wasm-tools" "$work/runner"
+
+ok=0
+bad=0
+run() {
+	local name=$1 want=$2 rc
+	P2_CASE=$name FVA_P2_BIN="$work/runner" "$work/scripts/test-p2exec" >"$work/run.log" 2>&1
+	rc=$?
+	if ((rc == want)); then
+		printf 'ok p2exec-driver %s rc=%s\n' "$name" "$rc"
+		ok=$((ok + 1))
+	else
+		printf 'FAIL p2exec-driver %s expected=%s actual=%s\n' "$name" "$want" "$rc"
+		tail -n 20 "$work/run.log"
+		bad=$((bad + 1))
+	fi
+}
+run ok 0
+for mode in failure missing duplicate extra wrong-type wrong-class wrong-reason malformed \
+	no-outcomes runner-fail oracle-fail; do
+	run "$mode" 1
+done
+for mode in runner-setup oracle-setup json-setup; do run "$mode" 2; done
+for mode in runner-crash oracle-crash; do run "$mode" 3; done
+printf 'fixture.wast\t2\taction\tpass\t-\n' >>"$work/FVATest/P2/commands.tsv"
+run duplicate-inventory 2
+command sed -i '$d' "$work/FVATest/P2/commands.tsv"
+printf '(module)\n' >"$work/FVATest/P2/extra.wast"
+run extra-script 1
+rm -- "$work/FVATest/P2/extra.wast"
+command sed -i 's/fixture.wast\t2\taction/fixture.wast\t4\taction/' "$work/FVATest/P2/commands.tsv"
+run wrong-json-identity 1
+printf 'p2exec-driver: passed=%s failed=%s\n' "$ok" "$bad"
+((bad == 0))

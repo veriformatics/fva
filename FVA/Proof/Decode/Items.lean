@@ -76,6 +76,8 @@ theorem funcTypeBody_parses : Parses funcTypeBody
   · rintro ft _ rest ⟨b₁, b₂, hp, hr, rfl⟩
     simp only [funcTypeBody, List.append_assoc]
     rw [hv.complete (b₂ ++ rest) hp, Res.bind_ok, hv.complete rest hr, Res.bind_ok]
+    -- a structure of the mutual type family has no definitional eta
+    cases ft; rfl
 
 /-- `vec(B)` with no elements: the count 0. -/
 theorem vec_nil_iff {α : Type} {R : α → List UInt8 → Prop} {bs : List UInt8} :

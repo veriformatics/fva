@@ -33,10 +33,10 @@ def printTypes : List (String × List ValType) :=
 
 /-- The reference interpreter's `spectest` store (float constants are IEEE bit patterns). -/
 def spectestStore : Store :=
-  { funcs := printTypes.map fun (_, ps) => .wasm ⟨ps, []⟩ {} ⟨0, [], []⟩,
+  { funcs := printTypes.map fun (_, ps) => .wasm ⟨[⟨ps, []⟩], 0⟩ {} ⟨0, [], []⟩,
     globals := [⟨⟨.const, .num .i32⟩, .i32 666⟩, ⟨⟨.const, .num .i64⟩, .i64 666⟩,
       ⟨⟨.const, .num .f32⟩, .f32 0x4426a666⟩, ⟨⟨.const, .num .f64⟩, .f64 0x4084d4cccccccccd⟩],
-    tables := [⟨⟨⟨10, some 20⟩, .funcref⟩, List.replicate 10 (.null (.abs .func))⟩],
+    tables := [⟨⟨⟨10, some 20⟩, .funcref⟩, List.replicate 10 .null⟩],
     mems := [⟨1, some 2, fun _ => 0⟩] }
 
 /-- Exports of the fixture module; its store addresses are independent of tested modules. -/
@@ -75,10 +75,11 @@ inductive Resolution where
   /-- An import names a module FVA rejected: its exports are unknown here. -/
   | unavailable
 
-/-- Resolve imports against the registered instances; one rejected dependency makes the result
+/-- Resolve imports against registered instances; one rejected dependency makes the result
 `unavailable` (the link outcome depends on a module FVA never instantiated). -/
-def resolveImports (s : State) (m : FVA.Wasm.Module) : Resolution :=
-  let found := m.imports.map fun im => match s.registered.lookup im.module with
+def resolveIn (registered : List (String × Option ModuleInst)) (m : FVA.Wasm.Module) :
+    Resolution :=
+  let found := m.imports.map fun im => match registered.lookup im.module with
     | none => Except.error (some s!"unknown module {im.module}")
     | some none => .error none
     | some (some inst) => match exported inst im.name with
@@ -88,6 +89,9 @@ def resolveImports (s : State) (m : FVA.Wasm.Module) : Resolution :=
   else match found.mapM id with
     | .ok evs => .linked evs
     | .error why => .unknown (why.getD "unknown import")
+
+/-- `resolveIn` over the script's registrations. -/
+def resolveImports (s : State) (m : FVA.Wasm.Module) : Resolution := resolveIn s.registered m
 
 /-- Translate a numeric runner value to an execution value. -/
 def fromNumeric : Numeric.Value → Val
@@ -103,35 +107,36 @@ def parseValue (inst : ModuleInst) (j : Json) : Except String (Option Val) := do
   let ty ← j.getObjValAs? String "type"
   let v ← j.getObjValAs? String "value"
   match ty, v with
-  | "funcref", "null" => return some (.ref (.null (.abs .func)))
-  | "externref", "null" => return some (.ref (.null (.abs .extern)))
-  | "exnref", "null" => return some (.ref (.null (.abs .exn)))
+  | "funcref", "null" | "externref", "null" | "exnref", "null" => return some (.ref .null)
   | "funcref", n => return (n.toNat? >>= fun i => inst.funcs[i]?).map (.ref ∘ .func)
   | "externref", n => return n.toNat?.map (.ref ∘ .extern)
   | _, _ => return (← Numeric.parseValue j).map fromNumeric
 
-/-- The JSON value type, including reference types (P′'s defined types are function types). -/
+/-- The JSON value type of a non-null value (a null carries no type: `meets` matches it
+first). -/
 def valueType : Val → String
   | .i32 _ => "i32" | .i64 _ => "i64" | .f32 _ => "f32" | .f64 _ => "f64"
-  | .ref (.null (.abs .func)) | .ref (.null (.idx _)) | .ref (.func _) => "funcref"
-  | .ref (.null (.abs .extern)) | .ref (.extern _) => "externref"
-  | .ref (.null (.abs .exn)) => "exnref"
+  | .ref (.func _) => "funcref" | .ref (.extern _) => "externref" | .ref (.exn _) => "exnref"
+  | .ref .null => "null"
 
 /-- Equality of exact expected values, including reference identity. -/
 def sameValue : Val → Val → Bool
   | .i32 a, .i32 b => a == b | .i64 a, .i64 b => a == b
   | .f32 a, .f32 b => a == b | .f64 a, .f64 b => a == b
-  | .ref (.null a), .ref (.null b) => decide (a = b)
-  | .ref (.func a), .ref (.func b) | .ref (.extern a), .ref (.extern b) => a == b
+  | .ref .null, .ref .null => true
+  | .ref (.func a), .ref (.func b) | .ref (.extern a), .ref (.extern b)
+  | .ref (.exn a), .ref (.exn b) => a == b
   | _, _ => false
 
 /-- Match a JSON expectation: exact identity, typed NaN class, or a non-null reference. -/
 def meets (inst : ModuleInst) (v : Val) (j : Json) : Except String Bool := do
   let ty ← j.getObjValAs? String "type"
-  if ty == "refnull" then return match v with | .ref (.null _) => true | _ => false
-  if ty == "nullfuncref" then return sameValue v (.ref (.null (.abs .func)))
-  if ty == "nullexternref" then return sameValue v (.ref (.null (.abs .extern)))
-  if ty != valueType v then return false
+  -- 3.0's one null value (`REF.NULL_ADDR`) meets every null expectation, as in the reference
+  -- interpreter's script runner (runner.ml:476)
+  let nullExpected := ty == "refnull" || ty == "nullfuncref" || ty == "nullexternref" ||
+    (j.getObjValAs? String "value").toOption == some "null"
+  if let .ref .null := v then return nullExpected
+  if nullExpected || ty != valueType v then return false
   if let some n := toNumeric v then
     let some e ← Numeric.parseExpect j | throw s!"unsupported expectation {j.compress}"
     return Numeric.meets n e
@@ -145,9 +150,8 @@ def meets (inst : ModuleInst) (v : Val) (j : Json) : Except String Bool := do
 def showValue : Val → String
   | .i32 b => s!"i32:{b.toNat}" | .i64 b => s!"i64:{b.toNat}"
   | .f32 b => s!"f32:{b.toNat}" | .f64 b => s!"f64:{b.toNat}"
-  | .ref (.null (.abs .func)) => "funcref:null" | .ref (.null (.abs .extern)) => "externref:null"
-  | .ref (.null (.abs .exn)) => "exnref:null" | .ref (.null (.idx x)) => s!"ref {x}:null"
-  | .ref (.func a) => s!"funcref:@{a}" | .ref (.extern a) => s!"externref:{a}"
+  | .ref .null => "ref:null" | .ref (.func a) => s!"funcref:@{a}"
+  | .ref (.extern a) => s!"externref:{a}" | .ref (.exn a) => s!"exnref:@{a}"
 
 /-- The action outcome; a missing/rejected module is explicitly outside this runner's reach. -/
 inductive Result where
@@ -259,12 +263,13 @@ def checkAction (fuel : Nat) (s : State) (ty : String) (c : Json) :
 Successful `module` commands use `Machine.instantiate`; this exposes its failed-init outcome. -/
 def runInit (fuel : Nat) (s : Machine.MStore) (m : FVA.Wasm.Module) (imports : List ExternVal) :
     Option (Machine.MState × Result) := do
-  let (s₀, inst₀) := s.alloc m imports (m.globals.map fun g => g.type.val.default)
-    (m.elems.map fun _ => [])
+  let (s₀, inst₀) := s.alloc m imports (m.globals.map fun _ => .i32 0)
+    (m.tables.map fun _ => .null) (m.elems.map fun _ => [])
   let gvals ← m.globals.mapM fun g => Ref.evalConst fuel s₀.abs inst₀ g.init
+  let trefs ← m.tables.mapM fun t => Ref.evalConst fuel s₀.abs inst₀ t.init >>= Ref.asRef
   let erefs ← m.elems.mapM fun e =>
     e.init.mapM fun ex => Ref.evalConst fuel s₀.abs inst₀ ex >>= Ref.asRef
-  let (s₁, inst) := s.alloc m imports gvals erefs
+  let (s₁, inst) := s.alloc m imports gvals trefs erefs
   some (runMachine fuel
     { store := s₁, frame := ⟨[], inst⟩, stack := [], code := (initCode m).map .plain, ctl := [] })
 

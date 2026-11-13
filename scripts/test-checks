@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Planted-bad inputs for the purpose-built checks (check-format, check-pins, the mutation check via
 # scripts/test-mutation-fixture, the subject matrix via scripts/test-subject-matrix, the
-# characterization comparator + trace join via scripts/test-char-fixture): each must fail.
+# characterization comparator + trace join via scripts/test-char-fixture, the P′ suite driver via
+# FVATest/P2/check-driver): each must fail.
 # Also the gate's step ledger (scripts/gate-ledger): a red step's row, its classification, the summary;
 # and the full gate's CI-group coverage, over a stubbed copy of scripts/gate; and test-subjects'
 # shard map (the subjects CI fan-out).
@@ -233,8 +234,8 @@ expect_fail "gate-ledger unknown class" . env FVA_GATE_LEDGER="$d/l" scripts/gat
 d=$tmp/ci-groups && mkdir -p "$d/scripts" "$d/.agent" "$d/.tools/bin" "$d/.github/workflows" &&
 	cp scripts/gate "$d/" || exit 2
 for s in $({
-	grep -oE 'scripts/[A-Za-z-]+|\.agent/spec-lint' scripts/gate | grep -vx scripts/gate
-	grep -v '^[[:space:]]*#' scripts/gate | grep -oE '\brun [a-z-]+ [^ ;&/]+( |$)' | awk '{ print ".tools/bin/" $3 }'
+	grep -oE 'scripts/[A-Za-z0-9-]+|\.agent/spec-lint' scripts/gate | grep -vx scripts/gate
+	grep -v '^[[:space:]]*#' scripts/gate | grep -oE '\brun [a-z0-9-]+ [^ ;&/]+( |$)' | awk '{ print ".tools/bin/" $3 }'
 } | sort -u); do
 	printf '#!/bin/sh\nexit 0\n' >"$d/$s" && chmod +x "$d/$s" || exit 2
 done
@@ -435,7 +436,31 @@ if ((rc != 0)); then
 	echo "test-checks: runner on true link-error + malformed assertions → rc $rc, want 0"
 	fail=1
 fi
+# null expectations (U28b N1, reference interpreter runner.ml:476): an expected null matches the
+# one runtime null whatever either heap type (rc 0); a non-null reference never matches it (rc 1)
+runner null-cross '(module (func (export "f") (result funcref) ref.null func))
+(assert_return (invoke "f") (ref.null extern))'
+rc=$?
+if ((rc != 0)); then
+	echo "test-checks: runner on a null under another heap's null expectation → rc $rc, want 0"
+	fail=1
+fi
+# shellcheck disable=SC2016 # WAT identifiers, not shell expansions
+runner null-nonnull '(module (func $g) (elem declare func $g)
+  (func (export "f") (result funcref) ref.func $g))
+(assert_return (invoke "f") (ref.null func))'
+rc=$?
+if ((rc != 1)); then
+	echo "test-checks: runner on a non-null reference under a null expectation → rc $rc, want 1"
+	fail=1
+fi
 scripts/test-mutation-fixture || fail=1
 scripts/test-subject-matrix || fail=1
 scripts/test-char-fixture || fail=1
+# U28b E3: tester-3's driver battery over scripts/test-p2exec (20 stubbed cases)
+if ! FVATest/P2/check-driver >"$tmp/p2-driver.log" 2>&1; then
+	echo "test-checks: p2exec driver battery failed"
+	tail -20 "$tmp/p2-driver.log"
+	fail=1
+fi
 exit "$fail"

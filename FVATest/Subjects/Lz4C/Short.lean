@@ -17,14 +17,14 @@ open FVA.Wasm FVA.Wasm.Exec FVA.Wasm.Exec.Ref
 
 /-- The main loop's locals for a block of `n` bytes at `src` and room `cap` at `dst`, with the
 read position `ip` and the write position `op`. -/
-def HeadLocals (ls : List Val) (src dst n cap op ip : Nat) : Prop :=
-  ls.length = 19 ∧ ls[0]? = some (vI src) ∧ ls[1]? = some (vI dst) ∧
-  ls[3]? = some (vI op) ∧ ls[4]? = some (vI ip) ∧
-  ls[5]? = some (vI (dst + cap)) ∧ ls[6]? = some (vI (dst + cap - 32)) ∧
-  ls[7]? = some (vI (src + n)) ∧ ls[8]? = some (vI (src + n - 16)) ∧
-  ls[9]? = some (vI (dst + cap - 5)) ∧ ls[10]? = some (vI (dst + cap - 7)) ∧
-  ls[11]? = some (vI (src + n - 4)) ∧ ls[12]? = some (vI (src + n - 8)) ∧
-  ls[13]? = some (vI (dst + cap - 12)) ∧ ls[14]? = some (vI (src + n - 15))
+def HeadLocals (ls : List (Option Val)) (src dst n cap op ip : Nat) : Prop :=
+  ls.length = 19 ∧ ls[0]? = some (some (vI src)) ∧ ls[1]? = some (some (vI dst)) ∧
+  ls[3]? = some (some (vI op)) ∧ ls[4]? = some (some (vI ip)) ∧
+  ls[5]? = some (some (vI (dst + cap))) ∧ ls[6]? = some (some (vI (dst + cap - 32))) ∧
+  ls[7]? = some (some (vI (src + n))) ∧ ls[8]? = some (some (vI (src + n - 16))) ∧
+  ls[9]? = some (some (vI (dst + cap - 5))) ∧ ls[10]? = some (some (vI (dst + cap - 7))) ∧
+  ls[11]? = some (some (vI (src + n - 4))) ∧ ls[12]? = some (some (vI (src + n - 8))) ∧
+  ls[13]? = some (some (vI (dst + cap - 12))) ∧ ls[14]? = some (some (vI (src + n - 15)))
 
 /-- The labels `@6 … @3` around a statement of block `@6`'s body. -/
 noncomputable def ctx6 (C : Ref.Context) : Ref.Context :=
@@ -38,21 +38,24 @@ literals, `op' = op + ll`, `m = op' − off` (as `i32`):
 * `ml = 15` or `off < 8`: the match code (after `@7`, in `@6`), 16 literal bytes copied;
 * `m` before `dst`: the offset check (after `@6`, in `@5`), 16 literal bytes copied;
 * the shortcut: the next head, 16 + 18 bytes copied. -/
-def ShortExit (C : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List Val) (ma : Nat)
+def ShortExit (C : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List (Option Val)) (ma : Nat)
     (mem : MemInst) (dst cap n src op ip : Nat) (c : Config) : Prop :=
   let t := (mem.byte ip).toNat
   let ll := t / 16
   let ml := t % 16
   let off := (mem.byte (ip + 1 + ll)).toNat + 256 * (mem.byte (ip + 2 + ll)).toNat
   let m : Val := .i32 (BitVec.ofNat 32 (op + ll) - BitVec.ofNat 32 off)
-  let short := ((((((ls.set 15 (vI ml)).set 16 (vI t)).set 2 m).set 17 (vI (op + ll))).set 3
-    (vI (ip + 1 + ll))).set 18 (vI off)).set 4 (vI (ip + 3 + ll))
+  let short :=
+      ((((((ls.set 15 (some (vI ml))).set 16 (some (vI t))).set 2 m).set 17
+      (some (vI (op + ll)))).set 3
+    (some (vI (ip + 1 + ll)))).set 18 (some (vI off))).set 4 (some (vI (ip + 3 + ll)))
   let st16 := st.setMem ma (fwdCopy mem op (ip + 1) 16)
   (ll = 15 ∧ c = (ctx8 C).fill
-    ⟨st, ⟨((ls.set 15 (vI (ip + 1))).set 16 (vI t)).set 2 (vI 15), inst⟩,
+    ⟨st, ⟨((ls.set 15 (some (vI (ip + 1)))).set 16 (some (vI t))).set 2 (some (vI 15)), inst⟩,
       (body8.drop 1).map .plain⟩) ∨
   (ll < 15 ∧ ¬ (ip + 1 + 16 < src + n ∧ op + 32 ≤ dst + cap) ∧ c = (ctx7 C).fill
-    ⟨st, ⟨(((ls.set 15 (vI (ip + 1))).set 16 (vI t)).set 2 (vI ll)).set 4 (vI (ip + 1)), inst⟩,
+    ⟨st, ⟨(((ls.set 15 (some (vI (ip + 1)))).set 16 (some (vI t))).set 2 (some (vI ll))).set 4
+        (some (vI (ip + 1))), inst⟩,
       (body7.drop 1).map .plain⟩) ∨
   (ll < 15 ∧ ip + 1 + 16 < src + n ∧ op + 32 ≤ dst + cap ∧ (ml = 15 ∨ off < 8) ∧
     c = (ctx6 C).fill ⟨st16, ⟨short, inst⟩, (body6.drop 1).map .plain⟩) ∨
@@ -61,14 +64,15 @@ def ShortExit (C : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List Val)
   (ll < 15 ∧ ip + 1 + 16 < src + n ∧ op + 32 ≤ dst + cap ∧ ml < 15 ∧ 8 ≤ off ∧
     dst + off ≤ op + ll ∧ c = (ctx4 C).fill
       ⟨st.setMem ma (fwdCopy (fwdCopy mem op (ip + 1) 16) (op + ll) (op + ll - off) 18),
-        ⟨(short.set 2 (vI (op + ll - off))).set 3 (vI (op + ll + ml + 4)), inst⟩,
+        ⟨(short.set 2 (some (vI (op + ll - off)))).set 3 (some (vI (op + ll + ml + 4))), inst⟩,
         [.plain mainLoop]⟩)
 
 /-- S5: the shortcut block from the main loop's head, every branch: each execution reaches one
 of `ShortExit`'s five exits, reading only the source and destination buffers and writing only the
 destination buffer before it. -/
 def ShortcutS5 : Prop :=
-  ∀ (H : HostSem) (C : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List Val) (a ma : Nat)
+  ∀ (H : HostSem) (C : Ref.Context) (st : Store) (inst : ModuleInst) (ls : List (Option Val))
+      (a ma : Nat)
     (mem : MemInst) (src dst n cap op ip : Nat),
     HeadLocals ls src dst n cap op ip →
     inst.funcs[3]? = some a → st.funcs[a]? = some (.wasm copyType inst Lifted.func3) →

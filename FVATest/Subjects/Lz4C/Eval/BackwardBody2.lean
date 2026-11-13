@@ -10,7 +10,8 @@ set_option linter.unusedSimpArgs false
 
 def MvPost (C : BContext) (st : Store) (inst : ModuleInst) (d : Nat) (c : Config) : Prop :=
   ∃ u1 u2 u3 u4 u5 u6 : Val,
-    c = C.fill ⟨st, ⟨[vI d, u1, u2, u3, u4, u5, u6], inst⟩, vals [vI d]⟩
+    c = C.fill ⟨st, ⟨[some (vI d), some u1, some u2, some u3, some u4, some u5, some u6], inst⟩,
+        vals [vI d]⟩
 
 /-- The backward path after its high-byte remainder. -/
 theorem mb_rest_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleInst) (ma : Nat)
@@ -19,7 +20,9 @@ theorem mb_rest_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleIn
     (hd : d + n ≤ mem.size) (hs : s + n ≤ mem.size) (hsize : mem.size < 2 ^ 32) :
     Until H (Within (Span ma s n) (Span ma d n))
       (MvPost C (st.setMem ma (backCopy mem d s (4 * (n / 4)))) inst d)
-      (C.fill ⟨st, ⟨[vI d, vI s, vI n, vI (4 * (n / 4)), u4, u5, u6], inst⟩,
+      (C.fill ⟨st,
+          ⟨[some (vI d), some (vI s), some (vI n), some (vI (4 * (n / 4))), some u4, some u5,
+          some u6], inst⟩,
         [.label 0 [] (.label 0 [] ((mbInner.drop 10).map .plain) :: mpForward.map .plain),
           .plain (.localGet 0)]⟩) := by
   by_cases hn4 : n < 4
@@ -35,8 +38,9 @@ theorem mb_rest_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleIn
     · let C1 := BContext.label [] 0 [] [.plain (.localGet 0)] C
       let C2 := BContext.label [] 0 [] (mpForward.map .plain) C1
       change Until H _ _ (C2.fill ⟨st,
-        ⟨[vI d, .i32 (BitVec.ofNat 32 d - BitVec.ofNat 32 4), vI n, vI (4 * (n / 4)), u4, u5,
-          .i32 (BitVec.ofNat 32 s - BitVec.ofNat 32 4)], inst⟩, [.plain (.loop .empty mb4)]⟩)
+        ⟨[some (vI d), some (.i32 (BitVec.ofNat 32 d - BitVec.ofNat 32 4)), some (vI n),
+            some (vI (4 * (n / 4))), some u4, some u5,
+          some (.i32 (BitVec.ofNat 32 s - BitVec.ofNat 32 4))], inst⟩, [.plain (.loop .empty mb4)]⟩)
       apply (mb4_until H C2 st inst ma mem d s (n / 4) (vI n) u4 u5
         (BitVec.ofNat 32 d - BitVec.ofNat 32 4) (BitVec.ofNat 32 s - BitVec.ofNat 32 4) [] hm hmem
         (by omega) (by omega) hsize (by omega)
@@ -64,7 +68,9 @@ theorem mb_path_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleIn
     (hd : d + n ≤ mem.size) (hs : s + n ≤ mem.size) (hsize : mem.size < 2 ^ 32) :
     Until H (Within (Span ma s n) (Span ma d n))
       (MvPost C (st.setMem ma (backCopy mem d s n)) inst d)
-      (C.fill ⟨st, ⟨[vI d, vI s, vI n, vI 0, vI 0, vI 0, vI 0], inst⟩,
+      (C.fill ⟨st,
+          ⟨[some (vI d), some (vI s), some (vI n), some (vI 0), some (vI 0), some (vI 0),
+          some (vI 0)], inst⟩,
         [.label 0 [] (.label 0 [] ((mbInner.drop 4).map .plain) :: mpForward.map .plain),
           .plain (.localGet 0)]⟩) := by
   by_cases hn : n = 0
@@ -88,8 +94,10 @@ theorem mb_path_until (H : HostSem) (C : BContext) (st : Store) (inst : ModuleIn
         let C2 := BContext.label [] 0 [] (mpForward.map .plain) C1
         let C3 := BContext.label [] 0 [] ((mbInner.drop 10).map .plain) C2
         change Until H _ _ (C3.fill ⟨st,
-          ⟨[vI d, vI s, vI n, vI n, vI (n % 4), .i32 (BitVec.ofNat 32 s - BitVec.ofNat 32 1),
-            .i32 (BitVec.ofNat 32 d - BitVec.ofNat 32 1)], inst⟩, [.plain (.loop .empty mb1)]⟩)
+          ⟨[some (vI d), some (vI s), some (vI n), some (vI n), some (vI (n % 4)),
+              some (.i32 (BitVec.ofNat 32 s - BitVec.ofNat 32 1)),
+            some (.i32 (BitVec.ofNat 32 d - BitVec.ofNat 32 1))], inst⟩,
+                [.plain (.loop .empty mb1)]⟩)
         have hdecomp : 4 * (n / 4) + n % 4 = n := by omega
         have hpre := (mb1_until H C3 st inst ma mem d s (4 * (n / 4)) (n % 4)
           (vI d) (vI s) (vI n) (BitVec.ofNat 32 d - BitVec.ofNat 32 1)

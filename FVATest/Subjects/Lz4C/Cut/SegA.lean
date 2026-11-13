@@ -126,10 +126,12 @@ theorem extM_overflow_exit {mem : MemInst} {lim : Nat} : ∀ (k p acc fuel : Nat
 
 /-- After the extension bytes (local 17 = `acc`, 4 = `q`): `len = acc + 15`, both overflow
 guards pass, block `@8` ends at X2. -/
-theorem tail_X2 {H : HostSem} {F : Context} {st : Store} {inst : ModuleInst} {ls : List Val}
+theorem tail_X2 {H : HostSem} {F : Context} {st : Store} {inst : ModuleInst}
+    {ls : List (Option Val)}
     {R W : Nat → Nat → Prop} {src dst n cap op q t acc : Nat}
-    (hcl : ConstLocals ls src dst n cap) (h3 : ls[3]? = some (vI op)) (h4 : ls[4]? = some (vI q))
-    (h16 : ls[16]? = some (vI t)) (h17 : ls[17]? = some (vI acc))
+    (hcl : ConstLocals ls src dst n cap) (h3 : ls[3]? = some (some (vI op)))
+        (h4 : ls[4]? = some (some (vI q)))
+    (h16 : ls[16]? = some (some (vI t))) (h17 : ls[17]? = some (some (vI acc)))
     (hb1 : acc + 15 + op < 2 ^ 32) (hb2 : acc + 15 + q < 2 ^ 32) :
     Until H (Within R W) (AtX2 F st inst src dst n cap op q (15 + acc) t)
       ((ctx8 (ctx2 F)).fill ⟨st, ⟨ls, inst⟩, (body8.drop 4).map .plain⟩) := by
@@ -155,9 +157,10 @@ theorem tail_X2 {H : HostSem} {F : Context} {st : Store} {inst : ModuleInst} {ls
 
 /-- The error tail after block `@3` (local 2 = `w`): `local 4 ← w + 1`, block `@2` ends at the
 epilogue. -/
-theorem tail_err {H : HostSem} {F : Context} {st : Store} {inst : ModuleInst} {ls : List Val}
+theorem tail_err {H : HostSem} {F : Context} {st : Store} {inst : ModuleInst}
+    {ls : List (Option Val)}
     {R W : Nat → Nat → Prop} {src dst n cap w : Nat}
-    (hcl : ConstLocals ls src dst n cap) (h2 : ls[2]? = some (vI w))
+    (hcl : ConstLocals ls src dst n cap) (h2 : ls[2]? = some (some (vI w)))
     (hlo : src ≤ w + 1) (hhi : w + 1 ≤ src + n + 1) :
     Until H (Within R W) (Err F st inst src dst n cap)
       ((ctx2 F).fill ⟨st, ⟨ls, inst⟩, (body2.drop 1).map .plain⟩) := by
@@ -177,7 +180,7 @@ theorem frame_eta {f : Frame} {inst : ModuleInst} (h : f.inst = inst) : f = ⟨f
   cases f; cases h; rfl
 
 /-- `Locals` keeps the constant locals (none of them is 2, 4, 15, 17). -/
-theorem Locals.const {ls : List Val} {inst : ModuleInst} {f' : Frame} {l2 l4 : Nat}
+theorem Locals.const {ls : List (Option Val)} {inst : ModuleInst} {f' : Frame} {l2 l4 : Nat}
     {l15 l17 : Option Nat} {src dst n cap : Nat} (hl : Locals ls inst f' l2 l4 l15 l17)
     (hc : ConstLocals ls src dst n cap) : ConstLocals f'.locals src dst n cap := by
   obtain ⟨-, hlen, hoth, -⟩ := hl
@@ -234,7 +237,7 @@ theorem segA_of (hL : ExtL1B) : SegA := by
   · wasm_within [hm, hmem, hsrc1, hblt, PackSize.bits, Nat.add_zero]
     exact ⟨fun x h₁ h₂ => ⟨trivial, Or.inl ⟨rfl, by omega, by omega⟩⟩, by simp⟩
   have hb0 := (mem.byte (ip + 1)).toNat_lt
-  have hlen2 : (ls.set 2 (vI (ip + 2))).length = 19 := by simp [hln]
+  have hlen2 : (ls.set 2 (some (vI (ip + 2)))).length = 19 := by simp [hln]
   by_cases h255 : (mem.byte (ip + 1)).toNat = 255
   swap
   · -- the first byte ends the extension: `acc = b0`, `q = ip + 2`
@@ -242,8 +245,8 @@ theorem segA_of (hL : ExtL1B) : SegA := by
     repeat (wasm_cstepu [heq, hne, bool_false, zero_eq, show 17 < 19 by omega, hlen2,
               getElem?_set_of_ne (show (17 : Nat) ≠ 2 by decide),
               List.getElem?_set_self (show 2 < ls.length by omega),
-              show 4 < ((ls.set 2 (vI (ip + 2))).set 17
-                (.i32 (BitVec.ofNat 32 (mem.byte (ip + 1)).toNat))).length by simp [hln]]
+              show 4 < ((ls.set 2 (some (vI (ip + 2)))).set 17
+                (some (.i32 (BitVec.ofNat 32 (mem.byte (ip + 1)).toNat)))).length by simp [hln]]
             · wasm_within [])
     have hsome :
         extM mem (src + n - 15) n (ip + 1) 0 = some ((mem.byte (ip + 1)).toNat, ip + 2) := by
@@ -267,10 +270,12 @@ theorem segA_of (hL : ExtL1B) : SegA := by
           · wasm_within [])
   have hls := (((hcl.set (i := 2) (by omega) (vI (ip + 2))).set (i := 17) (by omega)
     (.i32 (BitVec.ofNat 32 (mem.byte (ip + 1)).toNat))).set (i := 17) (by omega) (vI 255))
-  change Until H _ _ ((ctx9 (ctx2 F)).fill ⟨st, ⟨((ls.set 2 (vI (ip + 2))).set 17
-    (.i32 (BitVec.ofNat 32 (mem.byte (ip + 1)).toNat))).set 17 (vI 255), inst⟩, [.plain extLoop]⟩)
-  have hloop := hL H (ctx2 F) st inst (((ls.set 2 (vI (ip + 2))).set 17
-    (.i32 (BitVec.ofNat 32 (mem.byte (ip + 1)).toNat))).set 17 (vI 255)) ma mem (ip + 2)
+  change Until H _ _ ((ctx9 (ctx2 F)).fill ⟨st, ⟨((ls.set 2 (some (vI (ip + 2)))).set 17
+    (some (.i32 (BitVec.ofNat 32 (mem.byte (ip + 1)).toNat)))).set 17 (some (vI 255)), inst⟩,
+        [.plain extLoop]⟩)
+  have hloop := hL H (ctx2 F) st inst (((ls.set 2 (some (vI (ip + 2)))).set 17
+    (some (.i32 (BitVec.ofNat 32 (mem.byte (ip + 1)).toNat)))).set 17 (some (vI 255))) ma mem
+        (ip + 2)
     (src + n - 15) 255
     (by rw [getElem?_set_of_ne (by decide), getElem?_set_of_ne (by decide),
       List.getElem?_set_self (by omega)])

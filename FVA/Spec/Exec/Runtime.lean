@@ -1,26 +1,30 @@
-import FVA.Spec.Syntax
+import FVA.Spec.Types
 
 /-!
 # Runtime structure (reviewed spec)
 
-Transcribes WebAssembly 2.0 §4.2 for FVA's profile: values, the store and its instances, module
-instances, frames, administrative instructions, block contexts and configurations, plus the
-memory/table growth of §4.5.3. A memory is extensional: a page count, an optional maximum and a
-byte function; growth appends zero bytes, so bytes from `pages · 65536` on are never observed
-before they are written. Addresses and indices are `Nat`. Constant instructions are values
-(§4.2.1); decoded constants carry canonical bits (`< 2^N`), the form `Val.instr` produces.
+Transcribes WebAssembly 2.0 §4.2 for FVA's profile, with Wasm 3.0's runtime structure
+(SpecTec `859d3232` `4.0`/`4.1`) for profile P′: values (a payload-free null, exception
+references), the store and its instances (tags, exceptions; every stored type closed), module
+instances, frames (a local is unset until written when its type has no default), administrative
+instructions, block contexts and configurations, plus the memory/table growth of §4.5.3. A
+memory is extensional: a page count, an optional maximum and a byte function; growth appends zero
+bytes, so bytes from `pages · 65536` on are never observed before they are written. Addresses
+and indices are `Nat`. Numeric constants are values (§4.2.1); decoded constants carry canonical
+bits (`< 2^N`), the form `Val.instr` produces.
 -/
 
 namespace FVA.Wasm.Exec
 
 open FVA.Wasm
 
-/-- Reference values (§4.2.1): null of a heap type (the `ref.null ht` constant), a function
-address, an external address. -/
+/-- Reference values (3.0 `ref`): null (`REF.NULL_ADDR`: one null for every type), a function
+address, an external address, an exception address. -/
 inductive Ref where
-  | null (ht : HeapType)
+  | null
   | func (a : Nat)
   | extern (a : Nat)
+  | exn (a : Nat)
   deriving DecidableEq
 
 /-- Values (§4.2.1); floats as their bit patterns (§4.3.1). -/
@@ -32,20 +36,22 @@ inductive Val where
   | ref (r : Ref)
   deriving DecidableEq
 
-/-- `default_t` (§4.2.1): zero bits, or null. -/
-def _root_.FVA.Wasm.ValType.default : ValType → Val
-  | .num .i32 => .i32 0
-  | .num .i64 => .i64 0
-  | .num .f32 => .f32 0
-  | .num .f64 => .f64 0
-  | .ref t => .ref (.null t.heap)
+/-- `$default_` (3.0 `4.1`): zero bits, null for a nullable reference type, none for a non-null
+one (such a local starts unset). -/
+def _root_.FVA.Wasm.ValType.default : ValType → Option Val
+  | .num .i32 => some (.i32 0)
+  | .num .i64 => some (.i64 0)
+  | .num .f32 => some (.f32 0)
+  | .num .f64 => some (.f64 0)
+  | .ref t => if t.null then some (.ref .null) else none
 
-/-- External values (§4.2.11). -/
+/-- External values (§4.2.11, 3.0 tags). -/
 inductive ExternVal where
   | func (a : Nat)
   | table (a : Nat)
   | mem (a : Nat)
   | global (a : Nat)
+  | tag (a : Nat)
 
 /-- Export instances (§4.2.10). -/
 structure ExportInst where
@@ -54,10 +60,13 @@ structure ExportInst where
   /-- Exported value. -/
   value : ExternVal
 
-/-- Module instances (§4.2.5): the module's types and the store address of every entity. -/
+/-- Module instances (§4.2.5): the module's closed defined types and the store address of every
+entity. -/
 structure ModuleInst where
-  /-- Function types. -/
-  types : List FuncType := []
+  /-- Defined types (`Module.defTypes`). -/
+  types : List DefType := []
+  /-- Tag addresses (imports first). -/
+  tags : List Nat := []
   /-- Function addresses (imports first). -/
   funcs : List Nat := []
   /-- Table addresses. -/
@@ -76,11 +85,11 @@ structure ModuleInst where
 /-- Function instances (§4.2.6): module code closed over its instance, or a host function named
 by a `HostId` whose behavior is the host relation's (`Step`). -/
 inductive FuncInst where
-  | wasm (type : FuncType) (inst : ModuleInst) (code : Func)
-  | host (type : FuncType) (id : Nat)
+  | wasm (type : DefType) (inst : ModuleInst) (code : Func)
+  | host (type : DefType) (id : Nat)
 
-/-- The type of a function instance. -/
-def FuncInst.type : FuncInst → FuncType
+/-- The defined type of a function instance. -/
+def FuncInst.type : FuncInst → DefType
   | .wasm t _ _ | .host t _ => t
 
 /-- Table instances (§4.2.7). -/
@@ -118,8 +127,22 @@ structure DataInst where
   /-- Bytes. -/
   data : List UInt8
 
-/-- The store (§4.2.3). -/
+/-- Tag instances (3.0 `taginst`). -/
+structure TagInst where
+  /-- The tag's defined type (a function type with no results). -/
+  type : DefType
+
+/-- Exception instances (3.0 `exninst`): the tag address and the fields, in operand order. -/
+structure ExnInst where
+  /-- Tag address. -/
+  tag : Nat
+  /-- Fields. -/
+  fields : List Val
+
+/-- The store (§4.2.3, 3.0 tags + exceptions). -/
 structure Store where
+  /-- Tag instances. -/
+  tags : List TagInst := []
   /-- Function instances. -/
   funcs : List FuncInst := []
   /-- Table instances. -/
@@ -132,11 +155,14 @@ structure Store where
   elems : List ElemInst := []
   /-- Data instances. -/
   datas : List DataInst := []
+  /-- Exception instances. -/
+  exns : List ExnInst := []
 
-/-- Frames (§4.2.12, activations): locals and the instance of the running function. -/
+/-- Frames (§4.2.12, 3.0 `LOCALS (val?)*`): locals and the instance of the running function. -/
 structure Frame where
-  /-- Local variables (parameters first). -/
-  locals : List Val
+  /-- Local variables (parameters first); `none` = unset (a non-null local before its first
+  write). -/
+  locals : List (Option Val)
   /-- Module instance. -/
   inst : ModuleInst
 
@@ -148,6 +174,10 @@ inductive AInstr where
   | refFuncAddr (a : Nat)
   /-- `ref.extern a`: an external reference value. -/
   | refExternAddr (a : Nat)
+  /-- The null reference value (3.0 `REF.NULL_ADDR`; `ref.null ht` steps to it). -/
+  | refNullAddr
+  /-- `ref.exn a`: an exception reference value. -/
+  | refExnAddr (a : Nat)
   /-- `trap`. -/
   | trap
   /-- `invoke a`. -/
@@ -156,6 +186,12 @@ inductive AInstr where
   | label (n : Nat) (cont : List Instr) (body : List AInstr)
   /-- `frame_n{f} body end`. -/
   | frame (n : Nat) (f : Frame) (body : List AInstr)
+  /-- `handler_n{catch*} body end` (3.0 `HANDLER_`): a `try_table`'s catch clauses, outside its
+  result label. -/
+  | handler (n : Nat) (cs : List Catch) (body : List AInstr)
+  /-- A tail call of function address `a` (3.0 `(REF.FUNC_ADDR a) (RETURN_CALL_REF yy)`: the
+  callee instance's type gives the arity). -/
+  | returnInvoke (a : Nat)
 
 /-- The constant instruction denoting a value (§4.2.1: values are constants). -/
 def Val.instr : Val → AInstr
@@ -163,35 +199,43 @@ def Val.instr : Val → AInstr
   | .i64 v => .plain (.iconst .w64 v.toNat)
   | .f32 v => .plain (.fconst .w32 v.toNat)
   | .f64 v => .plain (.fconst .w64 v.toNat)
-  | .ref (.null t) => .plain (.refNull t)
+  | .ref .null => .refNullAddr
   | .ref (.func a) => .refFuncAddr a
   | .ref (.extern a) => .refExternAddr a
+  | .ref (.exn a) => .refExnAddr a
 
 /-- A sequence of values as instructions (stack bottom first). -/
 abbrev vals (vs : List Val) : List AInstr := vs.map Val.instr
 
-/-- Block contexts `B^k` (§4.2.13): `val* [_] instr*` nested under `k` labels, never frames. -/
+/-- Block contexts `B^k` (§4.2.13): `val* [_] instr*` nested under `k` labels and any number of
+handlers (3.0 `br-handler`, `return-handler`: a handler is no branch target), never frames. -/
 inductive BlockCtx : Nat → Type where
   | base (vs : List Val) (rest : List AInstr) : BlockCtx 0
   | label {k : Nat} (vs : List Val) (n : Nat) (cont : List Instr) (inner : BlockCtx k)
       (rest : List AInstr) : BlockCtx (k + 1)
+  | handler {k : Nat} (vs : List Val) (n : Nat) (cs : List Catch) (inner : BlockCtx k)
+      (rest : List AInstr) : BlockCtx k
 
 /-- `B^k[es]`. -/
 def BlockCtx.fill : {k : Nat} → BlockCtx k → List AInstr → List AInstr
   | _, .base vs rest, es => vals vs ++ es ++ rest
   | _, .label vs n cont inner rest, es => vals vs ++ [.label n cont (inner.fill es)] ++ rest
+  | _, .handler vs n cs inner rest, es => vals vs ++ [.handler n cs (inner.fill es)] ++ rest
 
-/-- Evaluation contexts `E` (§4.2.13): `[_]`, `val* E instr*`, `label_n{instr*} E end`. -/
+/-- Evaluation contexts `E` (§4.2.13): `[_]`, `val* E instr*`, `label_n{instr*} E end`,
+`handler_n{catch*} E end` (3.0 `trap-handler`: a trap passes every handler). -/
 inductive EvalCtx where
   | hole
   | seq (vs : List Val) (inner : EvalCtx) (rest : List AInstr)
   | label (n : Nat) (cont : List Instr) (inner : EvalCtx)
+  | handler (n : Nat) (cs : List Catch) (inner : EvalCtx)
 
 /-- `E[es]`. -/
 def EvalCtx.fill : EvalCtx → List AInstr → List AInstr
   | .hole, es => es
   | .seq vs inner rest, es => vals vs ++ inner.fill es ++ rest
   | .label n cont inner, es => [.label n cont (inner.fill es)]
+  | .handler n cs inner, es => [.handler n cs (inner.fill es)]
 
 /-- Configurations (§4.2.14): store, current frame, instruction sequence. -/
 structure Config where

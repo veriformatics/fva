@@ -23,6 +23,7 @@ def surround {k : Nat} (L : BlockCtx k) (pre : List Val) (post : List AInstr) : 
   match L with
   | .base vs rest => .base (pre ++ vs) (rest ++ post)
   | .label vs n cont inner rest => .label (pre ++ vs) n cont inner (rest ++ post)
+  | .handler vs n cs inner rest => .handler (pre ++ vs) n cs inner (rest ++ post)
 
 theorem surround_fill {k : Nat} (L : BlockCtx k) (pre : List Val) (post es : List AInstr) :
     (surround L pre post).fill es = vals pre ++ L.fill es ++ post := by

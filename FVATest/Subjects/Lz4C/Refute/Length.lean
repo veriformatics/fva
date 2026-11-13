@@ -41,7 +41,7 @@ theorem refuted : ¬ Mutant := by
   have ha2 : a = 2 := Option.some.inj (ha.symm.trans he)
   subst a
   have hs : Steps H literal.config literalFinal :=
-    steps_of_runDet (Option.some_get literal_run).symm literal_result
+    runDet_steps (Option.some_get literal_run).symm
   have ho := hm.outcome hs (o := .returned literalFinal.store [.i32 1]) ⟨rfl, literal_result⟩
   exact (by decide : ([Val.i32 1] : List Val) ≠ [.i32 2]) ho.1
 

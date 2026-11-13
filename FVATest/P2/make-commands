@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+suite=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+root=$(cd -- "$suite/../.." && pwd -P)
+export PATH="$root/.tools/bin:$PATH"
+work=$(mktemp -d)
+trap 'rm -rf -- "$work"' EXIT
+printf 'script\tline\ttype\tc2\trows\n'
+for script in "$suite"/*.wast; do
+	name=${script##*/}
+	mkdir "$work/${name%.wast}"
+	wasm-tools json-from-wast "$script" -o "$work/$name.json" \
+		--wasm-dir "$work/${name%.wast}"
+	jq -r '.commands[] | [.line, .type] | @tsv' "$work/$name.json" >"$work/ids"
+	awk -F '\t' -v script="$name" '
+    function emit(last, i, mark, rows) {
+      rows = ""
+      for (i = line; i <= last; i++) if (i in covers) {
+        mark = covers[i]
+        rows = rows == "" ? mark : rows "," mark
+      }
+      print script "\t" line "\t" kind "\tpass\t" (rows == "" ? "-" : rows)
+    }
+    NR == FNR {
+      if (match($0, /;; @covers /)) covers[FNR] = substr($0, RSTART + RLENGTH)
+      lines = FNR
+      next
+    }
+    { if (line) emit($1 - 1); line = $1; kind = $2 }
+    END { if (line) emit(lines) }
+  ' "$script" "$work/ids"
+done

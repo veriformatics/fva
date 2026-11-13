@@ -17,7 +17,7 @@ theorem s5 : ShortcutS5 := by
   have hmlrange : t % 16 < 16 := by omega
   by_cases hll : (mem.byte ip).toNat / 16 = 15
   · wasm_eval 18 [block_simp, ↓ short_instr_step, ↓ short_toVal, ↓ short_unique, ↓ short_access,
-      short_ne_br, short_ne_return, short_body5, short_body6, short_body7,
+      short_ne_br, short_ne_return, short_ne_throwRef, short_body5, short_body6, short_body7,
       short_body8, shortCode, hm, hmem, hll]
     · simp [TraceOK, AccessOK, Span]
       intro x hlo hhi
@@ -30,7 +30,7 @@ theorem s5 : ShortcutS5 := by
         shortRest6, shortRest7, shortRest8, main_tail]
   · have hlllt : t / 16 < 15 := by omega
     wasm_eval 17 [block_simp, ↓ short_instr_step, ↓ short_toVal, ↓ short_unique, ↓ short_access,
-      short_ne_br, short_ne_return, short_body5, short_body6, short_body7,
+      short_ne_br, short_ne_return, short_ne_throwRef, short_body5, short_body6, short_body7,
       short_body8, shortCode, hm, hmem, hll]
     · simp [TraceOK, AccessOK, Span]
       intro x hlo hhi

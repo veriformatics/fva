@@ -8,7 +8,8 @@ allows, never one fixed state. `seqFocus P` says the redex `seq` reaches (after 
 it, through labels and frames) satisfies `P`; `seqPlug k out` replaces that redex and its top `k`
 operands by `out`. `step_focus_host`: every step from a configuration whose focus is a host invoke
 keeps the frame and is the plug of a returned, trapped or diverged host outcome, so a proof
-quantifies over every allowed outcome at the call (`must_host_focus`).
+quantifies over every allowed outcome at the call (`must_host_focus`). Handlers are contexts like
+labels: the focus descends into their bodies.
 -/
 
 namespace FVA.Wasm.Exec.Ref
@@ -27,6 +28,7 @@ def seqFocus (P : List Val → AInstr → Prop) : List Val → List AInstr → P
 def atFocus (P : List Val → AInstr → Prop) (vs : List Val) : AInstr → Prop
   | .label _ _ body => seqFocus P [] body
   | .frame _ _ body => seqFocus P [] body
+  | .handler _ _ body => seqFocus P [] body
   | e => P vs e
 end
 
@@ -39,12 +41,14 @@ def seqPlug (k : Nat) (out : List AInstr) : List Val → List AInstr → List AI
     | some v => seqPlug k out (v :: vs) rest
     | none => atPlug k out vs e rest
 
-/-- `atPlug` at the non-value `e`: descend into a label or frame, else replace the redex. -/
+/-- `atPlug` at the non-value `e`: descend into a label, frame or handler, else replace the
+redex. -/
 def atPlug (k : Nat) (out : List AInstr) (vs : List Val) (e : AInstr) (rest : List AInstr) :
     List AInstr :=
   match e with
   | .label n cont body => vals vs.reverse ++ [.label n cont (seqPlug k out [] body)] ++ rest
   | .frame n fi body => vals vs.reverse ++ [.frame n fi (seqPlug k out [] body)] ++ rest
+  | .handler n cs body => vals vs.reverse ++ [.handler n cs (seqPlug k out [] body)] ++ rest
   | _ => vals (vs.drop k).reverse ++ out ++ rest
 end
 
@@ -95,18 +99,23 @@ theorem seqFocus_eval_trap {P : List Val → AInstr → Prop} (hP : ∀ vs, ¬ P
     intro stk rest h
     simp only [EvalCtx.fill, List.singleton_append, seqFocus, toVal, atFocus] at h
     exact ih [] [] (by simpa only [List.append_nil] using h)
+  | handler n cs inner ih =>
+    intro stk rest h
+    simp only [EvalCtx.fill, List.singleton_append, seqFocus, toVal, atFocus] at h
+    exact ih [] [] (by simpa only [List.append_nil] using h)
 
 /-- The focus of a filled block context is the non-value `x` it surrounds (for `x` neither a
-label nor a frame). -/
+label, a frame nor a handler). -/
 theorem seqFocus_block {P : List Val → AInstr → Prop} {x : AInstr} (hx : toVal x = none)
     (hl : ∀ n cont body, x ≠ .label n cont body) (hfr : ∀ n fi body, x ≠ .frame n fi body)
-    {k : Nat} (L : BlockCtx k) (vs : List Val) :
+    (hh : ∀ n cs body, x ≠ .handler n cs body) {k : Nat} (L : BlockCtx k) (vs : List Val) :
     ∀ stk rest, seqFocus P stk (L.fill (vals vs ++ [x]) ++ rest) → ∃ st, P st x := by
   have hat : ∀ st, atFocus P st x = P st x := by
     intro st
     cases x with
     | label n cont body => exact absurd rfl (hl n cont body)
     | frame n fi body => exact absurd rfl (hfr n fi body)
+    | handler n cs body => exact absurd rfl (hh n cs body)
     | _ => rfl
   induction L with
   | base vs₀ rest₀ =>
@@ -114,7 +123,7 @@ theorem seqFocus_block {P : List Val → AInstr → Prop} {x : AInstr} (hx : toV
     simp only [BlockCtx.fill, List.append_assoc, seqFocus_vals,
       List.cons_append, seqFocus, hx, hat] at h
     exact ⟨_, h⟩
-  | label vs₀ n cont inner rest₀ ih =>
+  | label vs₀ n cont inner rest₀ ih | handler vs₀ n cs inner rest₀ ih =>
     intro stk rest h
     simp only [BlockCtx.fill, List.append_assoc, seqFocus_vals,
       List.cons_append, seqFocus, toVal, atFocus] at h
@@ -125,7 +134,8 @@ set_option maxHeartbeats 1000000 in
 type `ft`, arguments `args`) keeps the frame and replaces that redex and its operands by a
 returned, trapped or diverged outcome of `H id`. -/
 theorem step_focus_host {H : HostSem} {c c' : Config} (h : Step H c c') {a id : Nat}
-    {ft : FuncType} {args : List Val} (hf : c.store.funcs[a]? = some (.host ft id)) :
+    {dt : DefType} {ft : FuncType} {args : List Val} (hf : c.store.funcs[a]? = some (.host dt id))
+    (hft : dt.expand = some ft) :
     ∀ (stk : List Val) (rest : List AInstr),
       seqFocus (HostAt a ft.params.length args) stk (c.instrs ++ rest) →
       c'.frame = c.frame ∧
@@ -140,12 +150,13 @@ theorem step_focus_host {H : HostSem} {c c' : Config} (h : Step H c c') {a id : 
     intro i st hh; cases hh.1
   induction h
   all_goals intro stk rest hfoc
-  case invokeHost s s' f a' ft' id' vs res hf' hlen hH =>
+  case invokeHost s s' f a' dt' ft' id' vs res hf' hft' hlen hH =>
     simp only [List.append_assoc, seqFocus_vals, List.singleton_append, seqFocus, toVal,
       atFocus, HostAt, AInstr.invoke.injEq] at hfoc
     obtain ⟨rfl, -, hargs⟩ := hfoc
     simp only [hf, Option.some.injEq, FuncInst.host.injEq] at hf'
     obtain ⟨rfl, rfl⟩ := hf'
+    obtain rfl : ft = ft' := Option.some.inj (hft.symm.trans hft')
     have hv : ((vs.reverse ++ stk).take ft.params.length).reverse = vs := by
       rw [← hlen, List.take_append_of_le_length (by simp),
         List.take_of_length_le (by simp), List.reverse_reverse]
@@ -155,12 +166,13 @@ theorem step_focus_host {H : HostSem} {c c' : Config} (h : Step H c c') {a id : 
     simp only [List.append_assoc, seqPlug_vals, List.singleton_append, seqPlug, toVal, atPlug]
     rw [← hlen, List.drop_append_of_le_length (by simp), List.drop_eq_nil_of_le (by simp),
       List.nil_append]
-  case invokeHostTrap s s' f a' ft' id' vs hf' hlen hH =>
+  case invokeHostTrap s s' f a' dt' ft' id' vs hf' hft' hlen hH =>
     simp only [List.append_assoc, seqFocus_vals, List.singleton_append, seqFocus, toVal,
       atFocus, HostAt, AInstr.invoke.injEq] at hfoc
     obtain ⟨rfl, -, hargs⟩ := hfoc
     simp only [hf, Option.some.injEq, FuncInst.host.injEq] at hf'
     obtain ⟨rfl, rfl⟩ := hf'
+    obtain rfl : ft = ft' := Option.some.inj (hft.symm.trans hft')
     have hv : ((vs.reverse ++ stk).take ft.params.length).reverse = vs := by
       rw [← hlen, List.take_append_of_le_length (by simp),
         List.take_of_length_le (by simp), List.reverse_reverse]
@@ -170,19 +182,20 @@ theorem step_focus_host {H : HostSem} {c c' : Config} (h : Step H c c') {a id : 
     simp only [List.append_assoc, seqPlug_vals, List.singleton_append, seqPlug, toVal, atPlug]
     rw [← hlen, List.drop_append_of_le_length (by simp), List.drop_eq_nil_of_le (by simp),
       List.nil_append]
-  case invokeHostDiverge s f a' ft' id' vs hf' hlen hH =>
+  case invokeHostDiverge s f a' dt' ft' id' vs hf' hft' hlen hH =>
     simp only [List.append_assoc, seqFocus_vals, List.singleton_append, seqFocus, toVal,
       atFocus, HostAt, AInstr.invoke.injEq] at hfoc
     obtain ⟨rfl, -, hargs⟩ := hfoc
     simp only [hf, Option.some.injEq, FuncInst.host.injEq] at hf'
     obtain ⟨rfl, rfl⟩ := hf'
+    obtain rfl : ft = ft' := Option.some.inj (hft.symm.trans hft')
     have hv : ((vs.reverse ++ stk).take ft.params.length).reverse = vs := by
       rw [← hlen, List.take_append_of_le_length (by simp),
         List.take_of_length_le (by simp), List.reverse_reverse]
     rw [hv] at hargs
     subst hargs
     exact ⟨rfl, Or.inr (Or.inr ⟨hH, rfl⟩)⟩
-  case invoke s f a' ft' inst code vs hf' hlen =>
+  case invoke s f a' dt' ft' inst code vs hf' hft' hlen =>
     simp only [List.append_assoc, seqFocus_vals, List.singleton_append, seqFocus, toVal,
       atFocus, HostAt, AInstr.invoke.injEq] at hfoc
     obtain ⟨rfl, -⟩ := hfoc
@@ -228,13 +241,15 @@ theorem step_focus_host {H : HostSem} {c c' : Config} (h : Step H c c') {a id : 
   case br s f n cont l vs L hlen =>
     simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
     obtain ⟨st, hst⟩ := seqFocus_block (P := HostAt a ft.params.length args)
-      (x := .plain (.br l)) rfl (fun _ _ _ => nofun) (fun _ _ _ => nofun) L vs [] []
+      (x := .plain (.br l)) rfl (fun _ _ _ => nofun) (fun _ _ _ => nofun) (fun _ _ _ => nofun)
+      L vs [] []
       (by simpa only [List.append_nil] using hfoc)
     exact absurd hst (hnot _ st)
   case return_ s f n f' k vs L hlen =>
     simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
     obtain ⟨st, hst⟩ := seqFocus_block (P := HostAt a ft.params.length args)
-      (x := .plain .return_) rfl (fun _ _ _ => nofun) (fun _ _ _ => nofun) L vs [] []
+      (x := .plain .return_) rfl (fun _ _ _ => nofun) (fun _ _ _ => nofun) (fun _ _ _ => nofun)
+      L vs [] []
       (by simpa only [List.append_nil] using hfoc)
     exact absurd hst (hnot _ st)
   case labelExit s f n cont vs =>
@@ -251,17 +266,41 @@ theorem step_focus_host {H : HostSem} {c c' : Config} (h : Step H c c') {a id : 
     simp only [List.append_assoc, seqFocus_vals, List.singleton_append, seqFocus, hn,
       atFocus] at hfoc
     exact absurd hfoc (hnot i _)
+  case handler s f s' f' n cs es es' hs ih =>
+    simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
+    obtain ⟨hfr, hc⟩ := ih hf [] [] (by simpa only [List.append_nil] using hfoc)
+    refine ⟨hfr, ?_⟩
+    simp only [List.reverse_nil, vals, List.map_nil, List.nil_append, List.append_nil] at hc
+    rcases hc with ⟨res, hH, he⟩ | ⟨hH, he⟩ | ⟨hH, he⟩
+    · exact Or.inl ⟨res, hH, by simp [seqPlug, toVal, atPlug, he, vals]⟩
+    · exact Or.inr (Or.inl ⟨hH, by simp [seqPlug, toVal, atPlug, he, vals]⟩)
+    · simp only [Config.mk.injEq] at he
+      obtain ⟨rfl, rfl, rfl⟩ := he
+      exact Or.inr (Or.inr ⟨hH, rfl⟩)
+  case handlerExit s f n cs vs =>
+    simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
+    exact absurd hfoc (not_seqFocus_vals _ _)
+  case throwRefLabel | throwRefFrame | throwRefHandlerEmpty | throwRefCatch | throwRefCatchRef
+      | throwRefCatchAll | throwRefCatchAllRef | throwRefHandlerNext =>
+    simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
+    exact absurd hfoc (hnot _ _)
+  case returnInvoke s f n fi k a' fn ft' vs L hfn hft' hlen =>
+    simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
+    obtain ⟨st, hst⟩ := seqFocus_block (P := HostAt a ft.params.length args)
+      (x := .returnInvoke a') rfl (fun _ _ _ => nofun) (fun _ _ _ => nofun) (fun _ _ _ => nofun)
+      L vs [] [] (by simpa only [List.append_nil] using hfoc)
+    exact absurd hst.1 (by simp)
   all_goals
     simp only [List.append_assoc, seqFocus_vals, List.cons_append,
-      List.nil_append, seqFocus, toVal_instr] at hfoc
+      List.nil_append, seqFocus, toVal_instr, throwing] at hfoc
     simp only [toVal, atFocus] at hfoc
     exact absurd hfoc (hnot _ _)
 
 mutual
 /-- A host invoke at the focus steps to the plug of each returned outcome its host allows. -/
 theorem step_plug_host_seq {H : HostSem} {s s' : Store} {f : Frame} {a id : Nat}
-    {ft : FuncType} {args res : List Val} (hf : s.funcs[a]? = some (.host ft id))
-    (hH : H id s args (.returned s' res)) :
+    {dt : DefType} {ft : FuncType} {args res : List Val} (hf : s.funcs[a]? = some (.host dt id))
+    (hft : dt.expand = some ft) (hH : H id s args (.returned s' res)) :
     ∀ (stk : List Val) (es : List AInstr), seqFocus (HostAt a ft.params.length args) stk es →
       Step H ⟨s, f, vals stk.reverse ++ es⟩ ⟨s', f, seqPlug ft.params.length (vals res) stk es⟩
   | _, [], h => by simp [seqFocus] at h
@@ -269,7 +308,7 @@ theorem step_plug_host_seq {H : HostSem} {s s' : Store} {f : Frame} {a id : Nat}
     cases hv : toVal e with
     | some v =>
       simp only [seqFocus, hv] at h
-      have hs := step_plug_host_seq (f := f) hf hH (v :: stk) rest h
+      have hs := step_plug_host_seq (f := f) hf hft hH (v :: stk) rest h
       have he := eq_instr_of_toVal hv
       subst he
       simp only [seqPlug, toVal_instr]
@@ -278,25 +317,31 @@ theorem step_plug_host_seq {H : HostSem} {s s' : Store} {f : Frame} {a id : Nat}
     | none =>
       simp only [seqFocus, hv] at h
       simp only [seqPlug, hv]
-      exact step_plug_host_at hf hH stk e rest h
+      exact step_plug_host_at hf hft hH stk e rest h
 
 /-- `step_plug_host_seq` at the non-value `e`. -/
 theorem step_plug_host_at {H : HostSem} {s s' : Store} {f : Frame} {a id : Nat}
-    {ft : FuncType} {args res : List Val} (hf : s.funcs[a]? = some (.host ft id))
-    (hH : H id s args (.returned s' res)) (stk : List Val) (e : AInstr) (rest : List AInstr)
+    {dt : DefType} {ft : FuncType} {args res : List Val} (hf : s.funcs[a]? = some (.host dt id))
+    (hft : dt.expand = some ft) (hH : H id s args (.returned s' res)) (stk : List Val) (e : AInstr)
+    (rest : List AInstr)
     (h : atFocus (HostAt a ft.params.length args) stk e) :
     Step H ⟨s, f, vals stk.reverse ++ e :: rest⟩
       ⟨s', f, atPlug ft.params.length (vals res) stk e rest⟩ := by
   cases e with
   | label n cont body =>
-    have hb := step_plug_host_seq (f := f) hf hH [] body h
+    have hb := step_plug_host_seq (f := f) hf hft hH [] body h
     rw [List.reverse_nil, show vals ([] : List Val) = [] from rfl, List.nil_append] at hb
     have hs := StepP.seq (vs := stk.reverse) (rest := rest) (StepP.label (n := n) (cont := cont) hb)
     simpa only [atPlug, List.append_assoc, List.singleton_append] using hs
   | frame n fi body =>
-    have hb := step_plug_host_seq (f := fi) hf hH [] body h
+    have hb := step_plug_host_seq (f := fi) hf hft hH [] body h
     rw [List.reverse_nil, show vals ([] : List Val) = [] from rfl, List.nil_append] at hb
     have hs := StepP.seq (vs := stk.reverse) (rest := rest) (StepP.frame (f := f) (n := n) hb)
+    simpa only [atPlug, List.append_assoc, List.singleton_append] using hs
+  | handler n cs body =>
+    have hb := step_plug_host_seq (f := f) hf hft hH [] body h
+    rw [List.reverse_nil, show vals ([] : List Val) = [] from rfl, List.nil_append] at hb
+    have hs := StepP.seq (vs := stk.reverse) (rest := rest) (StepP.handler (n := n) (cs := cs) hb)
     simpa only [atPlug, List.append_assoc, List.singleton_append] using hs
   | invoke b =>
     obtain ⟨hb, hm, hargs⟩ := h
@@ -307,13 +352,16 @@ theorem step_plug_host_at {H : HostSem} {s s' : Store} {f : Frame} {a id : Nat}
     have hsplit : stk.reverse = (stk.drop ft.params.length).reverse ++ args := by
       rw [← hargs, ← List.reverse_append, List.take_append_drop]
     have hstep := StepP.seq (vs := (stk.drop ft.params.length).reverse) (rest := rest)
-      (StepP.invokeHost (fits := false) (f := f) hf hlen hH)
+      (StepP.invokeHost (fits := false) (f := f) hf hft hlen hH)
     simp only [atPlug]
     rw [hsplit]
     simpa only [vals, List.map_append, List.append_assoc, List.singleton_append] using hstep
   | plain i => exact absurd h.1 (by simp)
   | refFuncAddr x => exact absurd h.1 (by simp)
   | refExternAddr x => exact absurd h.1 (by simp)
+  | refNullAddr => exact absurd h.1 (by simp)
+  | refExnAddr x => exact absurd h.1 (by simp)
+  | returnInvoke x => exact absurd h.1 (by simp)
   | trap => exact absurd h.1 (by simp)
 end
 
@@ -321,8 +369,8 @@ end
 nothing but returns, and every returned outcome's plugged configuration satisfies `Must`, so does
 the configuration before the call. -/
 theorem must_host_focus {H : HostSem} {Q : Outcome → Prop} {s : Store} {f : Frame}
-    {es : List AInstr} {a id : Nat} {ft : FuncType} {args : List Val}
-    (hf : s.funcs[a]? = some (.host ft id))
+    {es : List AInstr} {a id : Nat} {dt : DefType} {ft : FuncType} {args : List Val}
+    (hf : s.funcs[a]? = some (.host dt id)) (hft : dt.expand = some ft)
     (hfoc : seqFocus (HostAt a ft.params.length args) [] es)
     (hex : ∃ s' res, H id s args (.returned s' res))
     (honly : ∀ o, H id s args o → ∃ s' res, o = .returned s' res)
@@ -330,9 +378,9 @@ theorem must_host_focus {H : HostSem} {Q : Outcome → Prop} {s : Store} {f : Fr
       Must H Q ⟨s', f, seqPlug ft.params.length (vals res) [] es⟩) :
     Must H Q ⟨s, f, es⟩ := by
   obtain ⟨s₀, res₀, h₀⟩ := hex
-  refine Must.next ⟨_, by simpa using step_plug_host_seq (f := f) hf h₀ [] es hfoc⟩ ?_
+  refine Must.next ⟨_, by simpa using step_plug_host_seq (f := f) hf hft h₀ [] es hfoc⟩ ?_
   intro c' hs
-  obtain ⟨hfr, hc⟩ := step_focus_host hs hf [] [] (by simpa using hfoc)
+  obtain ⟨hfr, hc⟩ := step_focus_host hs hf hft [] [] (by simpa using hfoc)
   simp only at hfr
   rcases hc with ⟨res, hH, he⟩ | ⟨hH, -⟩ | ⟨hH, -⟩
   · simp only [List.reverse_nil, vals, List.map_nil, List.nil_append, List.append_nil] at he
@@ -410,13 +458,15 @@ theorem step_focus_fbinop {H : HostSem} {c c' : Config} (h : Step H c c') {w : W
   case br s f n cont l vs L hlen =>
     simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
     obtain ⟨st, hst⟩ := seqFocus_block (P := NumAt (.fbinop w op) 2 args)
-      (x := .plain (.br l)) rfl (fun _ _ _ => nofun) (fun _ _ _ => nofun) L vs [] []
+      (x := .plain (.br l)) rfl (fun _ _ _ => nofun) (fun _ _ _ => nofun) (fun _ _ _ => nofun)
+      L vs [] []
       (by simpa only [List.append_nil] using hfoc)
     exact absurd hst.1 (by simp)
   case return_ s f n f' k vs L hlen =>
     simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
     obtain ⟨st, hst⟩ := seqFocus_block (P := NumAt (.fbinop w op) 2 args)
-      (x := .plain .return_) rfl (fun _ _ _ => nofun) (fun _ _ _ => nofun) L vs [] []
+      (x := .plain .return_) rfl (fun _ _ _ => nofun) (fun _ _ _ => nofun) (fun _ _ _ => nofun)
+      L vs [] []
       (by simpa only [List.append_nil] using hfoc)
     exact absurd hst.1 (by simp)
   case labelExit s f n cont vs =>
@@ -428,9 +478,28 @@ theorem step_focus_fbinop {H : HostSem} {c c' : Config} (h : Step H c c') {w : W
   case trapFrame s f n fi =>
     simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
     exact absurd hfoc.1 (by simp)
+  case handler s f s' f' n cs es es' hs ih =>
+    simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
+    obtain ⟨hst, hfr, r, hr, he⟩ := ih [] [] (by simpa only [List.append_nil] using hfoc)
+    refine ⟨hst, hfr, r, hr, ?_⟩
+    simp only [List.reverse_nil, vals, List.map_nil, List.nil_append, List.append_nil] at he
+    simp [seqPlug, toVal, atPlug, he, vals]
+  case handlerExit s f n cs vs =>
+    simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
+    exact absurd hfoc (not_seqFocus_vals _ _)
+  case throwRefLabel | throwRefFrame | throwRefHandlerEmpty | throwRefCatch | throwRefCatchRef
+      | throwRefCatchAll | throwRefCatchAllRef | throwRefHandlerNext =>
+    simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
+    exact absurd hfoc.1 (by simp)
+  case returnInvoke s f n fi k a' fn ft' vs L hfn hft' hlen =>
+    simp only [List.singleton_append, seqFocus, toVal, atFocus] at hfoc
+    obtain ⟨st, hst⟩ := seqFocus_block (P := NumAt (.fbinop w op) 2 args)
+      (x := .returnInvoke a') rfl (fun _ _ _ => nofun) (fun _ _ _ => nofun) (fun _ _ _ => nofun)
+      L vs [] [] (by simpa only [List.append_nil] using hfoc)
+    exact absurd hst.1 (by simp)
   all_goals
     simp only [List.append_assoc, seqFocus_vals, List.cons_append,
-      List.nil_append, seqFocus, toVal_instr] at hfoc
+      List.nil_append, seqFocus, toVal_instr, throwing] at hfoc
     simp only [toVal, atFocus] at hfoc
     exact absurd hfoc.1 (by simp)
 
@@ -473,6 +542,11 @@ theorem step_plug_fbinop_at {H : HostSem} {s : Store} {f : Frame} {w : Width} {o
     rw [List.reverse_nil, show vals ([] : List Val) = [] from rfl, List.nil_append] at hb
     have hs := StepP.seq (vs := stk.reverse) (rest := rest) (StepP.frame (f := f) (n := n) hb)
     simpa only [atPlug, List.append_assoc, List.singleton_append] using hs
+  | handler n cs body =>
+    have hb := step_plug_fbinop_seq (H := H) (s := s) (f := f) hr [] body h
+    rw [List.reverse_nil, show vals ([] : List Val) = [] from rfl, List.nil_append] at hb
+    have hs := StepP.seq (vs := stk.reverse) (rest := rest) (StepP.handler (n := n) (cs := cs) hb)
+    simpa only [atPlug, List.append_assoc, List.singleton_append] using hs
   | plain i =>
     obtain ⟨hi, hm, hargs⟩ := h
     simp only [AInstr.plain.injEq] at hi
@@ -489,6 +563,9 @@ theorem step_plug_fbinop_at {H : HostSem} {s : Store} {f : Frame} {w : Width} {o
   | invoke b => exact absurd h.1 (by simp)
   | refFuncAddr x => exact absurd h.1 (by simp)
   | refExternAddr x => exact absurd h.1 (by simp)
+  | refNullAddr => exact absurd h.1 (by simp)
+  | refExnAddr x => exact absurd h.1 (by simp)
+  | returnInvoke x => exact absurd h.1 (by simp)
   | trap => exact absurd h.1 (by simp)
 end
 

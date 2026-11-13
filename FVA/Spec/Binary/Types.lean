@@ -59,6 +59,7 @@ def absHeapOps : List (UInt8 × AbsHeapType) := [(0x70, .func), (0x6F, .extern),
 def HeapTypeB : HeapType → List UInt8 → Prop
   | .abs a, bs => ∃ b, (b, a) ∈ absHeapOps ∧ bs = [b]
   | .idx x, bs => SLeb 33 x bs
+  | .def_ _, _ | .rec_ _, _ => False  -- closed forms (A2) have no binary spelling
 
 /-- Reference types (`Breftype`): `0x63 ht` (nullable), `0x64 ht` (non-null), or an abstract
 heap type's byte alone (nullable). -/

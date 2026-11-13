@@ -12,19 +12,20 @@ set_option maxHeartbeats 4000000
 
 /-- The head frame of iteration `j` holds the model's state: `q = p + j + 1`, accumulator `a`,
 and the previous iteration's pointer, sum and byte (entry values at `j = 0`). -/
-structure Sim (ls : List Val) (inst : ModuleInst) (p : Nat) (j a : Nat) (f : Frame) : Prop where
+structure Sim (ls : List (Option Val)) (inst : ModuleInst) (p : Nat) (j a : Nat)
+    (f : Frame) : Prop where
   inst : f.inst = inst
   len : f.locals.length = ls.length
   others : ∀ i, i ≠ 3 → i ≠ 4 → i ≠ 16 → i ≠ 17 → i ≠ 18 → i ≠ 19 → i ≠ 20 →
     f.locals[i]? = ls[i]?
-  l18 : f.locals[18]? = some (vI (p + j + 1))
-  l19 : f.locals[19]? = some (vI a)
-  l16 : f.locals[16]? = if j = 0 then ls[16]? else some (vI (p + j))
-  l17 : f.locals[17]? = if j = 0 then ls[17]? else some (vI a)
-  l20 : f.locals[20]? = if j = 0 then ls[20]? else some (vI 255)
+  l18 : f.locals[18]? = some (some (vI (p + j + 1)))
+  l19 : f.locals[19]? = some (some (vI a))
+  l16 : f.locals[16]? = if j = 0 then ls[16]? else some (some (vI (p + j)))
+  l17 : f.locals[17]? = if j = 0 then ls[17]? else some (some (vI a))
+  l20 : f.locals[20]? = if j = 0 then ls[20]? else some (some (vI 255))
 
 /-- The `-O1` configuration of each model exit. -/
-def SimExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p : Nat) :
+def SimExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val)) (p : Nat) :
     Exit → Config → Prop
   | .normal k a byte, c => ∃ f', LocalsAt ls inst f' [(18, some (p + k + 2)), (19, some a),
       (4, some a), (3, some (p + k + 1)), (20, some byte), (16, some (p + k + 1)), (17, some a)] ∧
@@ -39,9 +40,9 @@ def SimExit (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val) (p : N
       c = (Context.label 0 [] ((b11.drop 2).map .plain) C).fill ⟨s, f', (b12.drop 19).map .plain⟩
 
 /-- One `-O1` iteration simulates one model step. -/
-theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val))
     (ma : Nat) (mem : MemInst) (p lim j a : Nat) (f : Frame)
-    (h14 : ls[14]? = some (vI lim)) (hm : inst.mems[0]? = some ma)
+    (h14 : ls[14]? = some (some (vI lim))) (hm : inst.mems[0]? = some ma)
     (hmem : s.mems[ma]? = some mem) (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size)
     (h20 : 20 < ls.length) (hj : p + j ≤ lim) (ha : a < 2 ^ 31) (hi : Sim ls inst p j a f)
     (hk : p + j + 1 ≤ lim → a + (mem.byte (p + j)).toNat < 2 ^ 31 → ∀ f',
@@ -51,7 +52,7 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
           (a + (mem.byte (p + j)).toNat))) (head C s f')) :
     Until H (Within (fun m x => m = ma ∧ p ≤ x ∧ x < lim) (fun _ _ => False))
       (SimExit C s inst ls p (extModel (fun i => mem.byte (p + i)) p lim j a)) (head C s f) := by
-  have hf14 : f.locals[14]? = some (vI lim) := by
+  have hf14 : f.locals[14]? = some (some (vI lim)) := by
     rw [hi.others 14 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
       (by decide), h14]
   have hlenf : f.locals.length = ls.length := hi.len
@@ -75,7 +76,7 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
     wasm_cstepu [extBody]
     · wasm_within [extBody]
     simp only [hb, ite_true]
-    refine Until.done ⟨⟨(f.locals.set 4 (vI a)).set 3 (vI (p + j + 1)), f.inst⟩,
+    refine Until.done ⟨⟨(f.locals.set 4 (some (vI a))).set 3 (some (vI (p + j + 1))), f.inst⟩,
       ⟨hi.inst, by simp [hlenf], ?_⟩, by simp only [Context.fill]⟩
     have hother := hi.others
     rcases Nat.eq_zero_or_pos j with rfl | hj0
@@ -115,8 +116,9 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
       wasm_cstepu [extBody]
       · wasm_within [extBody]
       simp only [hb, ite_false, ho, ite_true]
-      refine Until.done ⟨⟨(((f.locals.set 4 (vI a)).set 3 (vI (p + j + 1))).set 20
-        (vI (mem.byte (p + j)).toNat)).set 4 (vI (a + (mem.byte (p + j)).toNat)), f.inst⟩,
+      refine Until.done ⟨⟨(((f.locals.set 4 (some (vI a))).set 3 (some (vI (p + j + 1)))).set 20
+        (some (vI (mem.byte (p + j)).toNat))).set 4 (some (vI (a + (mem.byte (p + j)).toNat))),
+            f.inst⟩,
         ⟨hi.inst, by simp [hlenf], ?_⟩, by simp only [Context.fill]⟩
       have hother := hi.others
       have hsub : a + (mem.byte (p + j)).toNat - (mem.byte (p + j)).toNat = a := by omega
@@ -152,10 +154,11 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
         · contradiction
         have hother := hi.others
         have hsim : Sim ls inst p (j + 1) (a + (mem.byte (p + j)).toNat)
-            ⟨(((((((f.locals.set 4 (vI a)).set 3 (vI (p + j + 1))).set 20
-              (vI (mem.byte (p + j)).toNat)).set 4 (vI (a + (mem.byte (p + j)).toNat))).set 18
-              (vI (p + j + 1 + 1))).set 19 (vI (a + (mem.byte (p + j)).toNat))).set 16
-              (vI (p + j + 1))).set 17 (vI (a + (mem.byte (p + j)).toNat)), f.inst⟩ :=
+            ⟨(((((((f.locals.set 4 (some (vI a))).set 3 (some (vI (p + j + 1)))).set 20
+              (some (vI (mem.byte (p + j)).toNat))).set 4
+                  (some (vI (a + (mem.byte (p + j)).toNat)))).set 18
+              (some (vI (p + j + 1 + 1)))).set 19 (some (vI (a + (mem.byte (p + j)).toNat)))).set 16
+              (some (vI (p + j + 1)))).set 17 (some (vI (a + (mem.byte (p + j)).toNat))), f.inst⟩ :=
           { inst := hi.inst
             len := by simp [hlenf]
             others := fun i h₃ h₄ h₁₆ h₁₇ h₁₈ h₁₉ h₂₀ => by
@@ -186,19 +189,21 @@ theorem sim_one (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls 
         simp only [hb, ite_false, ho]
         split
         · contradiction
-        refine Until.done ⟨⟨(((((((f.locals.set 4 (vI a)).set 3 (vI (p + j + 1))).set 20
-          (vI (mem.byte (p + j)).toNat)).set 4 (vI (a + (mem.byte (p + j)).toNat))).set 18
-          (vI (p + j + 1 + 1))).set 19 (vI (a + (mem.byte (p + j)).toNat))).set 16
-          (vI (p + j + 1))).set 17 (vI (a + (mem.byte (p + j)).toNat)), f.inst⟩,
+        refine Until.done
+            ⟨⟨(((((((f.locals.set 4 (some (vI a))).set 3 (some (vI (p + j + 1)))).set 20
+          (some (vI (mem.byte (p + j)).toNat))).set 4
+              (some (vI (a + (mem.byte (p + j)).toNat)))).set 18
+          (some (vI (p + j + 1 + 1)))).set 19 (some (vI (a + (mem.byte (p + j)).toNat)))).set 16
+          (some (vI (p + j + 1)))).set 17 (some (vI (a + (mem.byte (p + j)).toNat))), f.inst⟩,
           ⟨hi.inst, by simp [hlenf], ?_⟩, rfl⟩
         have hother := hi.others
         have h2 : p + j + 1 + 1 = p + j + 2 := by omega
         locals_at [hlenf, h3, h4, h16, h17, h18, h19, h20, hother, h2]
 
 /-- The `-O1` loop simulates the model from every head. -/
-theorem sim (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List Val)
+theorem sim (H : HostSem) (C : Context) (s : Store) (inst : ModuleInst) (ls : List (Option Val))
     (ma : Nat) (mem : MemInst) (p lim : Nat)
-    (h14 : ls[14]? = some (vI lim)) (hm : inst.mems[0]? = some ma)
+    (h14 : ls[14]? = some (some (vI lim))) (hm : inst.mems[0]? = some ma)
     (hmem : s.mems[ma]? = some mem) (hlim : lim + 1 < 2 ^ 32) (hsize : lim ≤ mem.size)
     (h20 : 20 < ls.length) :
     ∀ n j a f, lim - (p + j) = n → p + j ≤ lim → a < 2 ^ 31 → Sim ls inst p j a f →

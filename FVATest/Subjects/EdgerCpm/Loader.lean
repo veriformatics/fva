@@ -24,11 +24,12 @@ theorem initFinal_frame : initFinal.frame = ⟨[], allocation.2⟩ := by kernel_
 
 theorem initialized (H : HostSem) :
     Instantiated H Lifted.module env imports initFinal.store allocation.2 := by
-  refine ⟨env_matches, globalValues, elementValues, allocation.1, ?_, ?_, ?_, ?_⟩
+  refine ⟨env_matches, globalValues, [], elementValues, allocation.1, ?_, ?_, ?_, ?_, ?_⟩
   · kernel_rfl
   · apply (forall₂_mapM globals_eq).imp
     intro g v hv
     exact evalConst_sound hv
+  · exact .nil
   · apply (forall₂_mapM elements_eq).imp
     intro e rs hers
     apply (forall₂_mapM hers).imp

@@ -14,7 +14,7 @@ noncomputable def firstAlloc (x : Input) (l : Layout) (inst : ModuleInst) (a12 :
 theorem entry_firstAlloc (x : Input) (l : Layout) (s : Store) (inst : ModuleInst)
     (a160 a12 : Nat) (nth : BitVec 32) (H : HostSem) (Q : Outcome → Prop)
     (hf : s.funcs[a160]? = some (.wasm
-      ⟨[.num .i32, .num .i32, .num .i32, .num .i32], []⟩ inst Lifted.func86))
+      ⟨[⟨[.num .i32, .num .i32, .num .i32, .num .i32], []⟩], 0⟩ inst Lifted.func86))
     (hi : inst.funcs[12]? = some a12) (hm : inst.mems[0]? = some 0)
     (hd : Data s x l) (hy : l.y + 16 ≤ 2 ^ 32)
     (hk : Must H Q ⟨s, ⟨[], {}⟩, firstAlloc x l inst a12⟩) :
@@ -45,7 +45,7 @@ theorem firstAlloc_returns (x : Input) (l : Layout) (s : Store) (inst : ModuleIn
     (blocks : Store → List (Nat × Nat)) (ready : Nat → Store → Prop)
     (hD : Domain x) (hA : Allocator H alloc free heap (8 * x.m) blocks ready)
     (hr : ready 2 s)
-    (hf : s.funcs[a12]? = some (.host ⟨[.num .i32, .num .i32], [.num .i32]⟩ alloc))
+    (hf : s.funcs[a12]? = some (.host ⟨[⟨[.num .i32, .num .i32], [.num .i32]⟩], 0⟩ alloc))
     (hk : ∀ s' t, Allocated heap blocks ready 1 4 s s' t →
       Must H Q ⟨s', ⟨[], {}⟩, afterFirst x l inst t⟩) :
     Must H Q ⟨s, ⟨[], {}⟩, firstAlloc x l inst a12⟩ := by
@@ -96,7 +96,7 @@ theorem secondAlloc_returns (x : Input) (l : Layout) (s : Store) (inst : ModuleI
     (heap : Nat → Prop) (blocks : Store → List (Nat × Nat)) (ready : Nat → Store → Prop)
     (hD : Domain x) (hA : Allocator H alloc free heap (8 * x.m) blocks ready)
     (hr : ready 1 s)
-    (hf : s.funcs[a12]? = some (.host ⟨[.num .i32, .num .i32], [.num .i32]⟩ alloc))
+    (hf : s.funcs[a12]? = some (.host ⟨[⟨[.num .i32, .num .i32], [.num .i32]⟩], 0⟩ alloc))
     (hk : ∀ s' b, Allocated heap blocks ready 0 (8 * x.m) s s' b →
       Must H Q ⟨s', ⟨[], {}⟩, afterSecond x l inst t b⟩) :
     Must H Q ⟨s, ⟨[], {}⟩, secondAlloc x l inst t a12⟩ := by
@@ -152,12 +152,13 @@ theorem allocation_prefix (x : Input) (l : Layout) (s : Store) (inst : ModuleIns
   have hlink : Linked s inst alloc free :=
     ⟨hm, a160, a207, a12, a13, hi207, hi12, hi13, hex, f160, f207, f12, f13⟩
   rw [cpm_type] at f160
-  refine ⟨a160, hex, ⟨_, f160, by simp [Val.HasType, FuncInst.type]⟩, ?_⟩
+  refine ⟨a160, hex,
+    ⟨_, _, f160, rfl, by simp [Val.HasType, FuncType.mapHeap, ValType.mapHeap]⟩, ?_⟩
   apply entry_firstAlloc x l s inst a160 a12 nth H Q f160 hi12 hm hd hy
   apply firstAlloc_returns x l s inst a12 alloc free H Q heap blocks ready hD hA hr f12
   intro s₁ t ht
   apply afterFirst_secondAlloc x l s₁ inst t a12 H Q hi12
-  have f12' : s₁.funcs[a12]? = some (.host ⟨[.num .i32, .num .i32], [.num .i32]⟩ alloc) := by
+  have f12' : s₁.funcs[a12]? = some (.host ⟨[⟨[.num .i32, .num .i32], [.num .i32]⟩], 0⟩ alloc) := by
     obtain ⟨fi, hfi, rfl⟩ := ht.ext.1 a12 _ f12
     exact hfi
   apply secondAlloc_returns x l s₁ inst t a12 alloc free H Q heap blocks ready hD hA

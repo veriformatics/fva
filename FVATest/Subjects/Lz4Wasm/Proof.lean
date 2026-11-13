@@ -35,7 +35,7 @@ theorem encode_not_valid : ∀ c, ¬ Lz4.Valid encBlock c := by
 
 /-! ## Binary side: kernel runs of the reference interpreter on the lifted bytes -/
 
-noncomputable def alloc : Store × ModuleInst := allocModule {} Lifted.module [] [] []
+noncomputable def alloc : Store × ModuleInst := allocModule {} Lifted.module [] [] [] []
 
 -- The prepared store for the encoder run.
 theorem encPrepSome : (alloc.1.prep encPrep).isSome := by decide +kernel
@@ -60,13 +60,13 @@ theorem encFinal_holds : Holds encFinal.store (inputAddr + 13) encBlock :=
   ⟨encFinalMem, encFinalMem_eq, by decide +kernel, by decide +kernel⟩
 
 theorem encode_breaks_r1_holds : Subjects.Lz4Wasm.encode_breaks_r1 := by
-  refine ⟨⟨fun H => ⟨encStore, alloc.2, ⟨alloc.1, instance_alloc_self H rfl rfl rfl rfl rfl,
+  refine ⟨⟨fun H => ⟨encStore, alloc.2, ⟨alloc.1, instance_alloc_self H rfl rfl rfl rfl rfl rfl,
     encStore_eq⟩, encMem, encMem_eq, by decide +kernel⟩, ?_⟩, encode_not_valid⟩
   rintro H s inst ⟨s₀, hinst, hprep⟩ -
-  obtain ⟨h1, h2⟩ := Prod.mk.inj (instance_alloc rfl rfl rfl rfl hinst)
+  obtain ⟨h1, h2⟩ := Prod.mk.inj (instance_alloc rfl rfl rfl rfl rfl hinst)
   subst h1; subst h2
   obtain rfl : s = encStore := Option.some.inj (hprep.symm.trans encStore_eq)
-  refine ⟨2, by decide +kernel, ⟨_, rfl, ?_⟩, ?_⟩
+  refine ⟨2, by decide +kernel, ⟨_, _, rfl, rfl, ?_⟩, ?_⟩
   · refine .cons ?_ (.cons ?_ (.cons ?_ .nil)) <;> exact ⟨⟩
   · exact must_returned_of_runDet_get (P := fun s' _ => Holds s' (inputAddr + 13) encBlock)
       (n := 600) encRunSome (by kernel_rfl) encFinal_holds
@@ -83,12 +83,12 @@ theorem decRunSome : (runDet 200 decCfg).isSome := by decide +kernel
 
 theorem decode_traps_valid_holds : Subjects.Lz4Wasm.decode_traps_valid := by
   refine ⟨empty_block_valid, fun H => ⟨decStore, alloc.2, alloc.1,
-    instance_alloc_self H rfl rfl rfl rfl rfl, decStore_eq⟩, ?_⟩
+    instance_alloc_self H rfl rfl rfl rfl rfl rfl, decStore_eq⟩, ?_⟩
   rintro H s inst ⟨s₀, hinst, hprep⟩
-  obtain ⟨h1, h2⟩ := Prod.mk.inj (instance_alloc rfl rfl rfl rfl hinst)
+  obtain ⟨h1, h2⟩ := Prod.mk.inj (instance_alloc rfl rfl rfl rfl rfl hinst)
   subst h1; subst h2
   obtain rfl : s = decStore := Option.some.inj (hprep.symm.trans decStore_eq)
-  refine ⟨3, by decide +kernel, ⟨_, rfl, ?_⟩, ?_⟩
+  refine ⟨3, by decide +kernel, ⟨_, _, rfl, rfl, ?_⟩, ?_⟩
   · refine .cons ?_ (.cons ?_ (.cons ?_ .nil)) <;> exact ⟨⟩
   · exact must_trapped_of_runDet_get (n := 200) decRunSome (by kernel_rfl) trivial
 

@@ -9,15 +9,15 @@ open FVA.Wasm FVA.Wasm.Exec
 
 set_option maxRecDepth 100000 in
 theorem iroundBelowHalf_holds : iroundBelowHalf := by
-  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl, ?_⟩
+  refine ⟨instantiable_alloc rfl rfl rfl rfl rfl rfl, ?_⟩
   rintro H s inst hinst
-  obtain ⟨h1, h2⟩ := Prod.mk.inj (instance_alloc rfl rfl rfl rfl hinst)
+  obtain ⟨h1, h2⟩ := Prod.mk.inj (instance_alloc rfl rfl rfl rfl rfl hinst)
   subst h1; subst h2
-  refine ⟨0, by decide +kernel, ⟨_, rfl, .cons ⟨⟩ (.nil)⟩, ?_⟩
+  refine ⟨0, by decide +kernel, ⟨_, _, rfl, rfl, .cons ⟨⟩ (.nil)⟩, ?_⟩
   refine (must_returned_of_runDet_get (P := fun _ _ => True) (vs := [.i32 0x00000001])
     (n := 7) (by decide +kernel) (by kernel_rfl) trivial).mono ?_
-  rintro (⟨s', vs⟩ | s') h
+  rintro (⟨s', vs⟩ | s' | ⟨s', a⟩) h
   · exact h.1
-  · exact h
+  all_goals exact h
 
 end Subjects.GlmCall

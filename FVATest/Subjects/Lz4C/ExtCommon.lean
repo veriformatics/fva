@@ -12,7 +12,7 @@ open FVA.Wasm FVA.Wasm.Exec FVA.Wasm.Exec.Ref FVA.Wasm.Num
 noncomputable def head (C : Context) (s : Store) (f : Frame) : Config :=
   (ctx9 C).fill ⟨s, f, [.label 0 [.loop .empty extBody] (extBody.map .plain)]⟩
 
-theorem getElem?_set_of_ne {l : List Val} {i k : Nat} {v : Val} (h : k ≠ i) :
+theorem getElem?_set_of_ne {α : Type} {l : List α} {i k : Nat} {v : α} (h : k ≠ i) :
     (l.set k v)[i]? = l[i]? := List.getElem?_set_ne h
 
 end Subjects.Lz4C

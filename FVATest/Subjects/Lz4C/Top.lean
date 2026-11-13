@@ -185,7 +185,7 @@ theorem returns_of_until {H : HostSem} {s : Store} {args : List Val} {R W : Nat 
 theorem invoke_ok (src dst : Nat) (input initDst : List UInt8) :
     InvokeOK (prepped src dst input initDst) 2
       [vI src, vI dst, vI input.length, vI initDst.length] :=
-  ⟨_, store0_f2, .cons trivial (.cons trivial (.cons trivial (.cons trivial .nil)))⟩
+  ⟨_, _, store0_f2, rfl, .cons trivial (.cons trivial (.cons trivial (.cons trivial .nil)))⟩
 
 /-- R1 from the cutpoint statements. -/
 theorem r1_of (hE : Entry) (hS5 : ShortcutS5) (hA : SegA) (hB : SegB) (hC : SegC) (hD : SegD)

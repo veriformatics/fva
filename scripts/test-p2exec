@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P) || exit 2
+suite="$root/FVATest/P2"
+bin=${FVA_P2_BIN:-$root/.lake/build/bin/fvatest}
+export PATH="$root/.tools/bin:$PATH"
+
+setup() {
+	printf 'p2exec: setup: %s\n' "$*" >&2
+	exit 2
+}
+for tool in wasmtime wasm-tools jq awk cat cut diff mkdir mktemp rm sort wc; do
+	command -v "$tool" >/dev/null || setup "missing $tool"
+done
+[[ -x $bin ]] || setup "missing runner $bin"
+[[ -s $suite/commands.tsv ]] || setup 'missing command inventory'
+work=$(mktemp -d) || setup 'mktemp failed'
+trap 'rm -rf -- "$work"' EXIT
+
+"$bin" profile >"$work/profile.json" 2>"$work/profile.log"
+rc=$?
+if ((rc)); then
+	cat "$work/profile.log" >&2
+	((rc > 128)) && exit 3
+	setup "profile rc $rc"
+fi
+jq -e '.wasmtimeFlags | type == "string" and length > 0' \
+	"$work/profile.json" >/dev/null || setup 'invalid profile wasmtimeFlags'
+read -r -a flags <<<"$(jq -r '.wasmtimeFlags' "$work/profile.json")"
+((${#flags[@]})) || setup 'empty profile wasmtimeFlags'
+
+awk -F '\t' '
+  NR == 1 {
+    if ($0 != "script\tline\ttype\tc2\trows") bad = 1
+    next
+  }
+  NF != 5 || $1 !~ /^[[:alnum:]_-]+[.]wast$/ || $2 !~ /^[1-9][0-9]*$/ ||
+    ($4 != "pass" && $4 !~ /^skip: .+/) || $5 == "" {
+    print "p2exec: malformed inventory row " NR > "/dev/stderr"; bad = 1
+  }
+  seen[$1 SUBSEP $2 SUBSEP $3]++ {
+    print "p2exec: duplicate inventory row " NR > "/dev/stderr"; bad = 1
+  }
+  END { if (NR < 2) bad = 1; exit bad }
+' "$suite/commands.tsv" || setup 'invalid command inventory'
+
+shopt -s nullglob
+scripts=("$suite"/*.wast)
+((${#scripts[@]})) || setup 'no WAST scripts'
+printf '%s\n' "${scripts[@]##*/}" | sort >"$work/scripts"
+awk -F '\t' 'NR > 1 { print $1 }' "$suite/commands.tsv" | sort -u >"$work/inventory-scripts"
+if ! diff -u "$work/inventory-scripts" "$work/scripts"; then
+	printf 'p2exec: script inventory mismatch\n' >&2
+	exit 1
+fi
+
+status=0
+matched_total=0
+command_total=0
+for script in "${scripts[@]}"; do
+	name=${script##*/}
+	dir="$work/${name%.wast}"
+	mkdir -p -- "$dir" || setup 'mkdir failed'
+	awk -F '\t' -v s="$name" 'NR > 1 && $1 == s { print $2 "\t" $3 "\t" $4 }' \
+		"$suite/commands.tsv" >"$dir/expected"
+	count=$(wc -l <"$dir/expected")
+	command_total=$((command_total + count))
+
+	wasmtime wast "${flags[@]}" "$script" >"$dir/wasmtime.log" 2>&1
+	oracle_rc=$?
+	if ((oracle_rc)); then
+		cat "$dir/wasmtime.log"
+		printf 'p2exec: %s wasmtime=FAIL rc=%s\n' "$name" "$oracle_rc"
+		((oracle_rc > 128)) && exit 3
+		((oracle_rc == 126 || oracle_rc == 127)) && exit 2
+		status=1
+		continue
+	fi
+	wasm-tools json-from-wast "$script" -o "$dir/script.json" --wasm-dir "$dir" \
+		>"$dir/json.log" 2>&1
+	rc=$?
+	if ((rc)); then
+		cat "$dir/json.log" >&2
+		((rc > 128)) && exit 3
+		setup "$name json-from-wast rc $rc"
+	fi
+	jq -er '.commands[] | [.line, .type] | @tsv' "$dir/script.json" >"$dir/identities" ||
+		setup "$name has invalid JSON commands"
+	cut -f1,2 "$dir/expected" >"$dir/pinned-identities"
+	if ! diff -u "$dir/pinned-identities" "$dir/identities"; then
+		printf 'p2exec: %s JSON command inventory mismatch\n' "$name"
+		status=1
+		continue
+	fi
+
+	: >"$dir/outcomes"
+	FVA_SPEC_OUTCOMES="$dir/outcomes" FVA_SPEC_SKIPS=1 \
+		"$bin" p2 "$dir/script.json" >"$dir/fva.log" 2>&1
+	runner_rc=$?
+	if ((runner_rc > 128 || runner_rc == 3)); then
+		cat "$dir/fva.log"
+		printf 'p2exec: %s runner crashed rc=%s\n' "$name" "$runner_rc"
+		exit 3
+	fi
+	if ((runner_rc != 0 && runner_rc != 1)); then
+		cat "$dir/fva.log" >&2
+		setup "$name runner rc $runner_rc"
+	fi
+	((runner_rc)) && cat "$dir/fva.log"
+	awk -F '\t' -v name="$name" '
+    NR == FNR { expected[$1 SUBSEP $2] = $3; next }
+    {
+      key = $1 SUBSEP $2
+      got = $3
+      if (NF != 3 || (got != "pass" && got !~ /^(fail|skip): /)) {
+        print "p2exec: " name " malformed outcome: " $0; bad++; next
+      }
+      if (!(key in expected) || seen[key]++) {
+        print "p2exec: " name " extra/duplicate outcome: " $0; bad++; next
+      }
+      want = expected[key]
+      if ((want == "pass" && got == "pass") ||
+          (want ~ /^skip: / && index(got, want) == 1)) ok++
+      else {
+        print "p2exec: " name ":" $1 " " $2 " expected [" want "] got [" got "]"
+        bad++
+      }
+    }
+    END {
+      for (key in expected) if (!(key in seen)) {
+        split(key, id, SUBSEP)
+        print "p2exec: " name ":" id[1] " " id[2] " missing outcome"; bad++
+      }
+      print ok + 0 > matched
+      exit (bad != 0)
+    }
+  ' matched="$dir/matched" "$dir/expected" "$dir/outcomes"
+	compare_rc=$?
+	matched=$(<"$dir/matched")
+	matched_total=$((matched_total + matched))
+	if ((runner_rc || compare_rc)); then status=1; fi
+	printf 'p2exec: %s wasmtime=pass commands=%s matched=%s runner_rc=%s compare_rc=%s\n' \
+		"$name" "$count" "$matched" "$runner_rc" "$compare_rc"
+done
+printf 'p2exec: total scripts=%s commands=%s matched=%s rc=%s\n' \
+	"${#scripts[@]}" "$command_total" "$matched_total" "$status"
+exit "$status"
