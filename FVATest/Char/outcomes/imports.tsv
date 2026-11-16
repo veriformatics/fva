@@ -1,4 +1,4 @@
-3	module	skip:outside-profile	invalid
+3	module	skip:outside-profile	valid
 19	register	skip:register rejected module	-
 21	module	pass	valid
 22	register	pass	-
@@ -8,7 +8,7 @@
 27	register	pass	-
 28	module	pass	valid
 29	register	pass	-
-35	module	skip:outside-profile	invalid
+35	module	skip:outside-profile	valid
 97	assert_return	skip:missing/rejected module	-
 98	assert_return	skip:missing/rejected module	-
 101	assert_invalid	pass	invalid
@@ -48,11 +48,11 @@
 227	assert_unlinkable	pass	valid
 231	assert_unlinkable	pass	valid
 235	assert_unlinkable	pass	valid
-240	assert_unlinkable	skip:outside-profile	invalid
-244	assert_unlinkable	skip:outside-profile	invalid
-248	assert_unlinkable	skip:outside-profile	invalid
-252	assert_unlinkable	skip:outside-profile	invalid
-256	assert_unlinkable	skip:outside-profile	invalid
+240	assert_unlinkable	skip:outside-profile	valid
+244	assert_unlinkable	skip:outside-profile	valid
+248	assert_unlinkable	skip:outside-profile	valid
+252	assert_unlinkable	skip:outside-profile	valid
+256	assert_unlinkable	skip:outside-profile	valid
 263	module	pass	valid
 283	assert_return	pass	-
 284	assert_return	pass	-

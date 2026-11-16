@@ -75,10 +75,14 @@ theorem ModuleInstT.extends {s s' : Store} {inst : ModuleInst} {C : Context}
       exact ⟨⟨mi'.pages, mi'.max⟩, ⟨mi', hmi', rfl⟩, trivial⟩)
   let D : Context := { C with tables := tts, mems := mls }
   refine ⟨D, ?_, ?_⟩
-  · refine ⟨hi.types, ?_, htts, hmls, ?_, ?_, ?_, ?_, hi.exportNames,
-      hi.refs, hi.noLocals, hi.noLabels, hi.noReturn⟩
+  · refine ⟨hi.types, hi.typesOk, ?_, ?_, htts, hmls, ?_, ?_, ?_, ?_, hi.exportNames,
+      hi.refs, hi.noLocals, hi.noSets, hi.noDead, hi.noLabels, hi.noReturn⟩
+    · apply List.Forall₂.imp _ hi.tags
+      rintro a dt ⟨ti, hti, rfl⟩
+      obtain ⟨ti', hti', rfl⟩ := h.2.2.2.2.2.2.1 _ _ hti
+      exact ⟨_, hti', rfl⟩
     · apply List.Forall₂.imp _ hi.funcs
-      rintro a ft ⟨fi, hfi, hft⟩
+      rintro a dt ⟨fi, hfi, hft⟩
       obtain ⟨fi', hfi', rfl⟩ := h.1 _ _ hfi
       exact ⟨_, hfi', hft⟩
     · apply List.Forall₂.imp _ hi.globals
@@ -92,36 +96,53 @@ theorem ModuleInstT.extends {s s' : Store} {inst : ModuleInst} {C : Context}
     · exact ⟨hi.datas.1, fun a ha =>
         Nat.lt_of_lt_of_le (hi.datas.2 a ha) (listExtends_length h.2.2.2.2.2.1)⟩
     · exact fun ex hex => ExternValT.extends h (hi.exports ex hex)
-  · refine ⟨rfl, rfl, ?_, ?_, rfl, rfl, Nat.le_refl _, fun _ => rfl,
-      rfl, rfl, fun _ hx => hx⟩
+  · refine ⟨rfl, rfl, rfl, ?_, ?_, rfl, rfl, Nat.le_refl _,
+      fun _ lt hx => ⟨lt, hx, rfl, id⟩, rfl, rfl, fun _ hx => hx, id⟩
     · intro x tt hx
       exact forall₂_lookup_left htts' hx
     · intro x lim hx
       obtain ⟨lim', hl, _⟩ := forall₂_lookup_left hmls' hx
       exact ⟨lim', hl⟩
 
+theorem LocalOK.extends {s s' : Store} (h : s.Extends s') {ov : Option Val} {lt : LocalType}
+    (hl : LocalOK s ov lt) : LocalOK s' ov lt := by
+  cases ov with
+  | none => exact hl
+  | some v => exact ⟨hl.1, hl.2.1, h.value hl.2.2⟩
+
 theorem FrameT.extends {s s' : Store} {f : Frame} {C : Context}
     (hf : FrameT s f C) (h : s.Extends s') : ∃ D, FrameT s' f D ∧ C.Entails D := by
-  obtain ⟨C₀, ts, hi, hvs, rfl⟩ := hf
+  obtain ⟨C₀, lts, hi, hvs, rfl⟩ := hf
   obtain ⟨D₀, hi', he⟩ := hi.extends h
-  exact ⟨{ D₀ with locals := ts.map (1, ·) },
-    ⟨D₀, ts, hi', hvs.imp fun _ _ ⟨v, hv, ht⟩ => ⟨v, hv, h.value ht⟩, rfl⟩, he.withLocals _⟩
+  refine ⟨{ D₀ with locals := lts.map (1, ·) },
+    ⟨D₀, lts, hi', hvs.imp fun _ _ hl => hl.extends h, rfl⟩, ?_⟩
+  have := he.withBody (by simp [hi.noSets]) (lts.map (1, ·)) C₀.labels C₀.return_
+  have hC : ({ C₀ with locals := lts.map (1, ·), labels := C₀.labels, return_ := C₀.return_ } :
+      Context) = { C₀ with locals := lts.map (1, ·) } := rfl
+  have hD : ({ D₀ with locals := lts.map (1, ·), labels := C₀.labels, return_ := C₀.return_ } :
+      Context) = { D₀ with locals := lts.map (1, ·) } := by
+    rw [← he.labels, ← he.return_]
+  rw [hC, hD] at this
+  exact this
 
-theorem FuncT.transport {C D : Context} {f : Func} {ft : FuncType}
-    (hf : FuncT C f ft) (h : C.Entails D) : FuncT D f ft := by
-  refine ⟨by simpa only [← h.types] using hf.1, hf.2.1, ?_⟩
-  obtain ⟨ts, hs, hm⟩ := hf.2.2
-  exact ⟨ts, hs.transport ((h.withLocals (ft.params.map (1, ·) ++ f.locals)).withControl
-    [ft.results] (some ft.results)), hm⟩
+theorem FuncT.transport {C D : Context} {f : Func} {dt : DefType}
+    (hf : FuncT C f dt) (h : C.Entails D) (hs : ∀ x ∈ C.sets, x ∈ D.sets) : FuncT D f dt := by
+  obtain ⟨hdt, ft, he, hl, ts, hb, hm⟩ := hf
+  refine ⟨by simpa only [← h.types] using hdt, ft, he, by simpa only [← h.types] using hl, ts,
+    ?_, hm⟩
+  have := hb.transport (h.withBody hs
+    (ft.params.map (1, ⟨true, ·⟩) ++ f.locals.map fun l => (l.1, ⟨l.2.defaultable, C.close l.2⟩))
+    [ft.results] (some ft.results))
+  simpa only [Context.close, h.types] using this
 
 theorem FuncInstOK.extends {s s' : Store} {fi : FuncInst}
     (hf : FuncInstOK s fi) (h : s.Extends s') : FuncInstOK s' fi := by
   cases fi with
-  | host dt id => trivial
+  | host dt id => exact hf
   | wasm dt inst code =>
-    obtain ⟨C, ft, hft, hi, hc⟩ := hf
+    obtain ⟨hdt, C, hi, hc⟩ := hf
     obtain ⟨D, hi', he⟩ := hi.extends h
-    exact ⟨D, ft, hft, hi', hc.transport he⟩
+    exact ⟨hdt, D, hi', hc.transport he (by simp [hi.noSets])⟩
 
 theorem AInstrT.transport {s s' : Store} {C D : Context} {i : AInstr} {st : StackType}
     (hi : AInstrT s C i st) (he : s.Extends s') (hc : C.Entails D) : AInstrT s' D i st := by
@@ -129,22 +150,23 @@ theorem AInstrT.transport {s s' : Store} {C D : Context} {i : AInstr} {st : Stac
     (motive_2 := fun C es st _ => ∀ {s' D}, s.Extends s' → C.Entails D → ASeqT s' D es st)
     generalizing s' D with
   | plain hi => exact .plain (hi.transport hc)
-  | refFuncAddr ha => exact .refFuncAddr (Nat.lt_of_lt_of_le ha he.funcs_length)
+  | refFuncAddr ha => exact .refFuncAddr (he.funcs_get ha)
   | refExternAddr => exact .refExternAddr
   | refNullAddr => exact .refNullAddr
   | refExnAddr ha => exact .refExnAddr (Nat.lt_of_lt_of_le ha he.exns_length)
   | trap => exact .trap
-  | invoke hi hft =>
-    obtain ⟨fi', hi', rfl⟩ := he.1 _ _ hi
-    exact .invoke hi' hft
+  | invoke hi hft => exact .invoke (he.funcs_get hi) hft
   | label hn hcont hb ih => exact .label hn (hcont.transport hc) (ih he (hc.withLabel _))
   | frame hn hf hb ih =>
     obtain ⟨D', hf', hc'⟩ := hf.extends he
     exact .frame hn hf' (ih he (hc'.withReturn _))
+  | handler hcs hb ih => exact .handler (fun c h' => hc.catchOK (hcs c h')) (ih he hc)
+  | returnInvoke hi hft hr hs =>
+    exact .returnInvoke (he.funcs_get hi) hft (by simpa only [← hc.return_] using hr) hs
   | nil => exact .nil
   | snoc hs hm hi ihs ihi =>
     rename_i s' D he hc
-    exact .snoc (ihs he hc) hm (ihi he hc)
+    exact .snoc (ihs he hc) hm (ihi he (hc.after _))
   | sub hs hm ih =>
     rename_i s' D he hc
     exact .sub (ih he hc) hm
@@ -156,6 +178,6 @@ theorem ASeqT.transport {s s' : Store} {C D : Context} {es : List AInstr} {st : 
   | nil => exact ASeqT.nil_iff.mpr (ASeqT.nil_iff.mp hs)
   | append_singleton es e ih =>
     obtain ⟨p, x, y, z, hout, hs, hm, hi⟩ := ASeqT.snoc_iff.mp hs
-    exact .sub (.snoc (ih _ hs) hm (hi.transport he hc)) hout
+    exact .sub (.snoc (ih _ hs) hm (hi.transport he (hc.after _))) hout
 
 end FVA.Wasm.Valid

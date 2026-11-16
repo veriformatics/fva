@@ -54,6 +54,13 @@ theorem numResults_typed {s : Store} {C : Context} {i : Instr} {st : StackType}
     | intro v hv; cases hv; exact ⟨_, rfl, trivial⟩
 
 set_option maxHeartbeats 1000000 in
+/-- Numeric instructions initialize no local and continue their sequence. -/
+theorem numResults_pure {i : Instr} {args : List Val} {r : Option Val}
+    (hr : r ∈ numResults i args) : i.sets = [] ∧ (AInstr.plain i).dead = false := by
+  fun_cases numResults i args <;> simp only [numResults, Set.mem_empty_iff_false] at hr
+  all_goals exact ⟨rfl, rfl⟩
+
+set_option maxHeartbeats 1000000 in
 theorem numResults_arity {C : Context} {i : Instr} {st : StackType}
     {args : List Val} {r : Option Val} (hi : InstrT C i st) (hr : r ∈ numResults i args) :
     args.length = st.ins.length := by
@@ -66,12 +73,12 @@ theorem ResultTyped.output {s : Store} {C : Context} {r : Option Val} {ts : List
   | none => exact .single .trap
   | some v =>
     obtain ⟨t, rfl, hv⟩ := h v rfl
-    exact .single (.value hv)
+    exact AInstrT.value hv
 
 /-- Runtime operands inhabit concrete types; bottom has no runtime inhabitant. -/
 def HasOpType (s : Store) (v : Val) : OpType → Prop
   | .val t => v.HasType s t
-  | .bot => False
+  | .bot | .refBot => False
 
 @[simp] theorem hasOp_i32 {s : Store} {v : Val} :
     HasOpType s v (int .w32) ↔ ∃ b, v = .i32 b := by

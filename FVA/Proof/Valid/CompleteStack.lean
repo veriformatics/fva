@@ -1,5 +1,5 @@
 import FVA.Proof.Valid.Validator
-import FVA.Proof.Valid.Sequence
+import FVA.Proof.Valid.Seq
 
 namespace FVA.Wasm.Valid
 
@@ -50,8 +50,53 @@ theorem conforms_pop {s : Stack} {ts : List OpType} {t : OpType}
     obtain ⟨hrest, ha⟩ := matches_snoc hm'
     exact ⟨a, ⟨as, u⟩, rfl, ha, pre ++ as.reverse, ⟨pre, hu, rfl⟩, hrest⟩
 
+theorem defFunc_complete {d : DefType} : defFunc (.def_ d) (.abs .func) = true := rfl
+
+theorem subType_complete {t u : ValType} (h : t.Sub u) : subType t u = true := by
+  cases t with
+  | num a =>
+    cases u with
+    | num b =>
+      simp only [ValType.Sub] at h
+      simp [subType, h]
+    | ref _ => exact h.elim
+  | ref r =>
+    cases u with
+    | num _ => exact h.elim
+    | ref r' =>
+      rcases r with ⟨n₁, h₁⟩
+      rcases r' with ⟨n₂, h₂⟩
+      obtain ⟨hn, hh⟩ := h
+      simp only [subType, Bool.and_eq_true, Bool.or_eq_true]
+      refine ⟨by cases n₁ <;> cases n₂ <;> simp_all, ?_⟩
+      rcases hh with he | ⟨d, hd, hf⟩
+      · simp only at he
+        subst he
+        exact .inl (HeapType.beq_refl _)
+      · simp only at hd hf
+        subst hd hf
+        exact .inr rfl
+
+theorem subTypes_complete {ts us : List ValType} (h : ResultSub ts us) : subTypes ts us = true := by
+  induction h with
+  | nil => rfl
+  | cons h _ ih => simp [subTypes, subType_complete h, ih]
+
 theorem matchType_complete {a b : OpType} (h : a.Matches b) : matchType a b = true := by
-  cases a <;> cases b <;> simp_all [matchType, OpType.Matches]
+  cases a with
+  | bot => rfl
+  | refBot =>
+    cases b with
+    | bot => exact h.elim
+    | refBot => rfl
+    | val u =>
+      cases u with
+      | num _ => exact h.elim
+      | ref _ => rfl
+  | val t =>
+    cases b with
+    | val u => exact subType_complete h
+    | _ => exact h.elim
 
 theorem matchTypeList_complete {as bs : List OpType} (h : Matches as bs) :
     matchTypeList as bs = true := by

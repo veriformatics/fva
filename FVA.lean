@@ -61,6 +61,7 @@ import FVA.Proof.Exec.Machine
 import FVA.Proof.Exec.MachineSys
 import FVA.Proof.Pin.Decode
 import FVA.Proof.Pin.Exec
+import FVA.Proof.Pin.Valid
 import FVA.Proof.Valid.Validator
 import FVA.Proof.Valid.Complete
 import FVA.Proof.Valid.Soundness

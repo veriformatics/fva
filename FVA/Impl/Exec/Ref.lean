@@ -544,26 +544,46 @@ def _root_.FVA.Wasm.Module.nullTables (m : Module) : Bool :=
     | [.refNull _] => true
     | _ => false
 
+/-- Candidate initial values (R1 = B, 3.0 `Globals_ok`): the globals' initializers in order, each
+evaluated in the allocation that holds the values found so far and a placeholder for the rest (it
+reads imported and earlier globals alone, so it never reads a placeholder); then the tables' and
+element segments' initializers in the allocation that holds every global. A non-null global has no
+default, so a placeholder's value is arbitrary. -/
+def initCandidates (fuel : Nat) (s : Store) (m : Module) (imports : List ExternVal) :
+    Option (List Val × List Ref × List (List Ref)) := do
+  -- one allocation (the instance depends on the counts alone); each value found is written into
+  -- its global, no re-allocation per global (kernel evaluation retains every allocation)
+  let (s₀, inst) := allocModule s m imports (m.globals.map fun _ => .i32 0)
+    (m.tables.map fun _ => .null) (m.elems.map fun _ => [])
+  let (gvals, sg) ← m.globals.foldlM (init := (([] : List Val), s₀)) fun (acc, st) g => do
+    let v ← evalConst fuel st inst g.init
+    let a := s.globals.length + acc.length
+    pure (acc ++ [v], match st.globals[a]? with
+      | some gi => { st with globals := st.globals.set a { gi with value := v } }
+      | none => st)
+  let trefs ← m.tables.mapM fun t => evalConst fuel sg inst t.init >>= asRef
+  let erefs ← m.elems.mapM fun e => e.init.mapM fun ex => evalConst fuel sg inst ex >>= asRef
+  pure (gvals, trefs, erefs)
+
+/-- The candidates hold when the initializers give them again in their own allocation (the
+spec's fixpoint: `Instantiated` evaluates every initializer in the final store). -/
+def initAgrees (fuel : Nat) (s : Store) (m : Module) (imports : List ExternVal)
+    (gvals : List Val) (trefs : List Ref) (erefs : List (List Ref)) : Bool :=
+  let (s₁, inst) := allocModule s m imports gvals trefs erefs
+  (m.globals.mapM fun g => evalConst fuel s₁ inst g.init) == some gvals &&
+  (m.tables.mapM fun t => evalConst fuel s₁ inst t.init >>= asRef) == some trefs &&
+  (m.elems.mapM fun e => e.init.mapM fun ex => evalConst fuel s₁ inst ex >>= asRef) == some erefs
+
 /-- Instantiate `m` in `s` with `imports` (§4.5.4) by running the initializers and the
-initialization code within `fuel` steps each: allocate with placeholder initial values, evaluate
-the initializers in that store, allocate with their values, and check the initializers give the
-same values in that final store (the spec's fixpoint; it holds for valid modules, whose
-initializers read only imports and function addresses). `none` on a failing initializer, a
-disagreement, a trap or exhausted fuel; import matching is checked separately. A placeholder
-is never read, so its value is arbitrary (a non-null global has no default). -/
+initialization code within `fuel` steps each: candidate initial values (`initCandidates`),
+allocation with them, the check that the initializers give them again in that allocation
+(`initAgrees`), then the initialization code. `none` on a failing initializer, a disagreement, a
+trap or exhausted fuel; import matching is checked separately. -/
 def instantiate (fuel : Nat) (s : Store) (m : Module) (imports : List ExternVal) :
     Option (Store × ModuleInst) := do
-  let (s₀, inst₀) := allocModule s m imports (m.globals.map fun _ => .i32 0)
-    (m.tables.map fun _ => .null) (m.elems.map fun _ => [])
-  let gvals ← m.globals.mapM fun g => evalConst fuel s₀ inst₀ g.init
-  let trefs ← m.tables.mapM fun t => evalConst fuel s₀ inst₀ t.init >>= asRef
-  let erefs ← m.elems.mapM fun e => e.init.mapM fun ex => evalConst fuel s₀ inst₀ ex >>= asRef
+  let (gvals, trefs, erefs) ← initCandidates fuel s m imports
+  guard (initAgrees fuel s m imports gvals trefs erefs)
   let (s₁, inst) := allocModule s m imports gvals trefs erefs
-  -- the spec evaluates the initializers in the final allocation: check they agree there
-  let gvals₁ ← m.globals.mapM fun g => evalConst fuel s₁ inst g.init
-  let trefs₁ ← m.tables.mapM fun t => evalConst fuel s₁ inst t.init >>= asRef
-  let erefs₁ ← m.elems.mapM fun e => e.init.mapM fun ex => evalConst fuel s₁ inst ex >>= asRef
-  guard (gvals₁ == gvals && trefs₁ == trefs && erefs₁ == erefs)
   let c ← run fuel ⟨s₁, ⟨[], inst⟩, (initCode m).map .plain⟩
   match c.instrs with
   | [] => some (c.store, inst)

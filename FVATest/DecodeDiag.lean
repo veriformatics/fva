@@ -1,5 +1,4 @@
 import FVA.Impl.Decode.Module
-import FVA.Spec.Valid.Module
 
 /-!
 # Decoder rejection verdicts (U28a mutation survivors, classifier-1)
@@ -8,10 +7,9 @@ The decoder's theorems (`decode_sound`/`decode_complete`, T1–T3) cover success
 Its rejections are specified too: each `unsupported` verdict names its `FVA.Profile.Excluded`
 class (U28a I1, line 8) and every failure carries the bytes left at its point (U2 I1). These
 checks pin the verdicts the survivors of U28a's mutation update changed: a class, a bytes-left
-count, the interim 2.0 profile's membership. The module sits in `FVATest.Certs`' import closure:
-that proof root is built for every decoder mutant (`FVATest/Mutate/config.json`), and outside the
-test executables' closures, so adding it re-keys survivors alone (`docs/contracts/U12-mutation.md`
-R2).
+count. The module sits in `FVATest.Certs`' import closure: that proof root is built for every
+decoder mutant (`FVATest/Mutate/config.json`), and outside the test executables' closures, so
+adding it re-keys survivors alone (`docs/contracts/U12-mutation.md` R2).
 -/
 
 namespace FVA.Test.DecodeDiag
@@ -60,21 +58,5 @@ example : (subType 0x005F004F 4 : Res FuncType) = .unsup 2 "gc-types: struct or 
 -- empty input: bytes left 0
 example : (recType 0 0 : Res RecType) = .bad 0 "unexpected end" := rfl
 example : (table 0 0 : Res Table) = .bad 0 "unexpected end" := rfl
-
--- the interim 2.0 validation profile (`Module.inP2`, until U28c): an `exnref` global, and an
--- active segment's offset holding a P′-only `ref.null exn`, leave it
-/-- An immutable `exnref` global. -/
-def gExn : Global := { type := { mutability := .const, val := .ref .exnref }, init := [] }
-
-/-- An offset holding a P′-only `ref.null exn`. -/
-def offExn : Expr := [.refNull (.abs .exn)]
-
-example : ({ globals := [gExn] } : Module).inP2 = false := by decide
-/-- A function-reference element segment, active at `offExn`. -/
-def eExn : Elem := { type := .funcref, init := [], mode := .active 0 offExn }
-
-example : ({ elems := [eExn] } : Module).inP2 = false := by decide
-example : ({ datas := [{ init := [], mode := .active 0 offExn }] } : Module).inP2 = false := by
-  decide
 
 end FVA.Test.DecodeDiag

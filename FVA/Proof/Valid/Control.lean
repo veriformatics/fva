@@ -4,17 +4,17 @@ namespace FVA.Wasm.Valid
 
 open FVA.Wasm FVA.Wasm.Exec
 
-theorem Matches.ops_eq {ts us : List ValType} (h : Matches (ops ts) (ops us)) : ts = us := by
+theorem Matches.ops_sub {ts us : List ValType} (h : Matches (ops ts) (ops us)) :
+    ResultSub ts us := by
   induction ts generalizing us with
   | nil => cases us with
-    | nil => rfl
+    | nil => exact .nil
     | cons u us => cases h
   | cons t ts ih =>
     cases us with
     | nil => cases h
     | cons u us =>
-      cases h with | cons ht hs =>
-        exact congrArg₂ List.cons ht (ih hs)
+      cases h with | cons ht hs => exact .cons ht (ih hs)
 
 theorem hasOp_ops_iff {s : Store} {vs : List Val} {ts : List ValType} :
     List.Forall₂ (HasOpType s) vs (ops ts) ↔ List.Forall₂ (Val.HasType s) vs ts :=
@@ -67,16 +67,18 @@ theorem ASeqT.block {s : Store} {f : Frame} {C : Context} {bt : BlockType}
   · intro x y hi
     cases hi with | plain hi =>
       cases hi with | block hb hs =>
-        have heq := Option.some.inj (hb.symm.trans ((hf.blockType bt).trans hbt))
-        subst heq
-        simpa only [ops, List.length_map] using hlen
+        obtain ⟨ft', hft', hp, -⟩ := hf.blockType hb
+        rw [hbt] at hft'
+        cases hft'
+        simpa only [ops, List.length_map, ← hp] using hlen
   · intro x y hi hvs
     cases hi with | plain hi =>
       cases hi with | block hb hs =>
-        have heq := Option.some.inj (hb.symm.trans ((hf.blockType bt).trans hbt))
-        subst heq
-        exact .single (.label rfl .nil
-          ((ASeqT.values (hasOp_ops_iff.mp hvs)).append (ASeqT.plain hs)))
+        obtain ⟨ft', hft', -, hr⟩ := hf.blockType hb
+        rw [hbt] at hft'
+        cases hft'
+        exact .single (.label hr.symm .nil
+          ((ASeqT.values (hasOp_ops_iff.mp hvs)).append_pure (ASeqT.plain hs)))
 
 theorem ASeqT.loop {s : Store} {f : Frame} {C : Context} {bt : BlockType}
     {body : List Instr} {ft : FuncType} {vs : List Val} {a b : List OpType}
@@ -88,16 +90,18 @@ theorem ASeqT.loop {s : Store} {f : Frame} {C : Context} {bt : BlockType}
   · intro x y hi
     cases hi with | plain hi =>
       cases hi with | loop hb hs =>
-        have heq := Option.some.inj (hb.symm.trans ((hf.blockType bt).trans hbt))
-        subst heq
-        simpa only [ops, List.length_map] using hlen
+        obtain ⟨ft', hft', hp, -⟩ := hf.blockType hb
+        rw [hbt] at hft'
+        cases hft'
+        simpa only [ops, List.length_map, ← hp] using hlen
   · intro x y hi hvs
     cases hi with | plain hi =>
       cases hi with | loop hb hs =>
-        have heq := Option.some.inj (hb.symm.trans ((hf.blockType bt).trans hbt))
-        subst heq
-        exact .single (.label rfl (SeqT.single (.loop hb hs))
-          ((ASeqT.values (hasOp_ops_iff.mp hvs)).append (ASeqT.plain hs)))
+        obtain ⟨ft', hft', hp, -⟩ := hf.blockType hb
+        rw [hbt] at hft'
+        cases hft'
+        exact .single (.label hp.symm (SeqT.single (.loop hb hs))
+          ((ASeqT.values (hasOp_ops_iff.mp hvs)).append_pure (ASeqT.plain hs)))
 
 theorem ASeqT.ifTrue {s : Store} {C : Context} {bt : BlockType} {thn els : List Instr}
     {v : BitVec 32} {a b : List OpType}
@@ -155,7 +159,7 @@ theorem ASeqT.call {s : Store} {f : Frame} {C : Context} {x addr : Nat}
   obtain ⟨p, x, y, z, hin, hout, hm, hi⟩ := ASeqT.single_iff.mp h
   cases hi with | plain hi =>
     cases hi with | call hx =>
-      obtain ⟨addr', fi, ha', hfi, ht⟩ := hf.funcs hx
+      obtain ⟨addr', fi, ha', hfi, ht⟩ := hf.funcType hx
       have heq := Option.some.inj (ha'.symm.trans ha)
       subst addr'
       apply ASeqT.single_iff.mpr
@@ -170,8 +174,8 @@ theorem ASeqT.callIndirect {s : Store} {f : Frame} {C : Context} {x y addr : Nat
   cases hi with | plain hi =>
     cases hi with | callIndirect _ _ hy =>
       obtain ⟨ta, ti, fi, dt, _, _, _, hfi, hdt, he⟩ := htarget
-      have hb := hf.blockType (.idx y)
-      simp only [Context.blockType, BlockType.expand, hdt, Option.bind_some] at hb
-      exact ⟨_, rfl, .single (AInstrT.invoke (C := C) hfi (by rw [he]; exact hb.symm.trans hy))⟩
+      have hb := hy
+      rw [Context.typeAt, hf.types, hdt, Option.bind_some] at hb
+      exact ⟨_, rfl, .single (AInstrT.invoke (C := C) hfi (by rw [he]; exact hb))⟩
 
 end FVA.Wasm.Valid

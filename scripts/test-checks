@@ -463,4 +463,12 @@ if ! FVATest/P2/check-driver >"$tmp/p2-driver.log" 2>&1; then
 	tail -20 "$tmp/p2-driver.log"
 	fail=1
 fi
+# U28c E3: tester-4's driver controls over scripts/test-p2valid (26 cases; the count pinned, so a
+# neutered self-test cannot pass)
+if ! scripts/test-p2valid --self-test >"$tmp/p2valid-driver.log" 2>&1 ||
+	! grep -qx 'test-p2valid driver: 26 pass; 0 FAIL' "$tmp/p2valid-driver.log"; then
+	echo "test-checks: p2valid driver battery failed"
+	tail -20 "$tmp/p2valid-driver.log"
+	fail=1
+fi
 exit "$fail"

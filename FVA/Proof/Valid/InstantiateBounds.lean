@@ -20,7 +20,7 @@ theorem untypable (C : Context) (st : StackType) (n : Nat) (hn : 2 ^ 32 ≤ n) :
   intro h
   have hm : Instr.iconst .w32 n ∈ initCode (module n) := by
     simp [module, initCode, runData]
-  obtain ⟨_, hi⟩ := InitProof.seq_member h _ hm
+  obtain ⟨_, _, hi⟩ := InitProof.seq_member h _ hm
   cases hi with
   | iconst hb => exact Nat.not_lt.mpr hn hb
 

@@ -90,14 +90,14 @@ theorem instr_progress {H : HostSem} {s : Store} {f : Frame} {C : Context}
     obtain ⟨v₁, v₂, v₃, rfl, _, _, h₃⟩ := three hargs
     obtain ⟨c, rfl⟩ := hasOp_i32.mp h₃
     exact .step .select
-  case localGet x t hx =>
+  case localGet x t hx hs =>
     cases hargs
-    obtain ⟨v, hv, _⟩ := hf.locals hx
+    obtain ⟨v, hv, _⟩ := hf.locals hx hs
     exact .step (.localGet hv)
   case localSet x t hx =>
     obtain ⟨v, rfl, _⟩ := one hargs
-    obtain ⟨v', hv, _⟩ := hf.locals hx
-    exact .step (.localSet (List.getElem?_eq_some_iff.mp hv).1)
+    obtain ⟨ov, hov, _⟩ := hf.local hx
+    exact .step (.localSet (List.getElem?_eq_some_iff.mp hov).1)
   case localTee x t hx => obtain ⟨v, rfl, _⟩ := one hargs; exact .step .localTee
   case globalGet x gt hx =>
     cases hargs
@@ -256,11 +256,11 @@ theorem instr_progress {H : HostSem} {s : Store} {f : Frame} {C : Context}
     simpa only [List.append_nil] using FragmentProgress.step (C := C)
       (StepP.seq (H := H) (s := s) (f := f) (vs := args) (rest := []) StepP.unreachable)
   case block bt body ft hb hs =>
-    exact .step (.block ((hf.blockType bt).symm.trans hb)
-      (by simpa only [ops, List.length_map] using hargs.length_eq))
+    obtain ⟨ft', hft', hp, -⟩ := hf.blockType hb
+    exact .step (.block hft' (by simpa only [ops, List.length_map, hp] using hargs.length_eq))
   case loop bt body ft hb hs =>
-    exact .step (.loop ((hf.blockType bt).symm.trans hb)
-      (by simpa only [ops, List.length_map] using hargs.length_eq))
+    obtain ⟨ft', hft', hp, -⟩ := hf.blockType hb
+    exact .step (.loop hft' (by simpa only [ops, List.length_map, hp] using hargs.length_eq))
   case if_ bt thn els ft hb ht he =>
     obtain ⟨pre, args, rfl, _, hlast⟩ := typed_split hargs
     obtain ⟨v, rfl⟩ := one_i32 hlast
@@ -301,7 +301,7 @@ theorem instr_progress {H : HostSem} {s : Store} {f : Frame} {C : Context}
     simpa only [BlockCtx.fill, List.map_append, List.append_assoc, List.append_nil] using
       FragmentProgress.return_ (H := H) (s := s) (f := f) (BlockCtx.base pre []) ht hl
   case call x ft hx =>
-    obtain ⟨addr, fi, ha, _, _⟩ := hf.funcs hx
+    obtain ⟨addr, fi, ha, _, _⟩ := hf.funcType hx
     simpa only [List.append_nil] using FragmentProgress.step (C := C)
       (StepP.seq (H := H) (s := s) (f := f) (vs := args) (rest := []) (StepP.call ha))
   case callIndirect x y tt ft hx he hy =>
@@ -313,5 +313,98 @@ theorem instr_progress {H : HostSem} {s : Store} {f : Frame} {C : Context}
       · exact .step (.callIndirectTrap (by simpa only [not_exists] using ht))
     simpa only [List.map_append, List.append_assoc, List.map_cons, List.map_nil,
       List.cons_append, List.nil_append] using hstep.prepend pre
+  case refAsNonNull h =>
+    obtain ⟨v, rfl, hv⟩ := one hargs
+    cases h with
+    | none => exact hv.elim
+    | some h =>
+      obtain ⟨r, rfl⟩ := ref_of_type hv
+      by_cases hr : r = .null
+      · subst r; exact .step .refAsNonNullNull
+      · exact .step (.refAsNonNull hr)
+  case brOnNull l ts h hl =>
+    obtain ⟨pre, args, rfl, _, hlast⟩ := typed_split hargs
+    obtain ⟨v, rfl, hv⟩ := one hlast
+    cases h with
+    | none => exact hv.elim
+    | some h =>
+      obtain ⟨r, rfl⟩ := ref_of_type hv
+      have hstep : FragmentProgress H s f C [(Val.ref r).instr, .plain (.brOnNull l)] := by
+        by_cases hr : r = .null
+        · subst r; exact .step .brOnNull
+        · exact .step (.brOnNullValue hr)
+      simpa only [List.map_append, List.append_assoc, List.map_cons, List.map_nil,
+        List.cons_append, List.nil_append] using hstep.prepend pre
+  case brOnNonNull l ts n h hl =>
+    obtain ⟨pre, args, rfl, _, hlast⟩ := typed_split hargs
+    obtain ⟨v, rfl, hv⟩ := one hlast
+    obtain ⟨r, rfl⟩ := ref_of_type hv
+    have hstep : FragmentProgress H s f C [(Val.ref r).instr, .plain (.brOnNonNull l)] := by
+      by_cases hr : r = .null
+      · subst r; exact .step .brOnNonNullNull
+      · exact .step (.brOnNonNull hr)
+    simpa only [List.map_append, List.append_assoc, List.map_cons, List.map_nil,
+      List.cons_append, List.nil_append] using hstep.prepend pre
+  case callRef y dt ft hy he =>
+    obtain ⟨pre, args, rfl, _, hlast⟩ := typed_split hargs
+    obtain ⟨v, rfl, hv⟩ := one hlast
+    obtain ⟨r, rfl⟩ := ref_of_type hv
+    have hstep : FragmentProgress H s f C [(Val.ref r).instr, .plain (.callRef y)] := by
+      cases r with
+      | null => exact .step .callRefNull
+      | func a => exact .step .callRef
+      | extern a => simp [HasOpType, Val.HasType] at hv
+      | exn a => simp [HasOpType, Val.HasType] at hv
+    simpa only [List.map_append, List.append_assoc, List.map_cons, List.map_nil,
+      List.cons_append, List.nil_append] using hstep.prepend pre
+  case returnCall =>
+    obtain ⟨addr, fi, ha, _, _⟩ := hf.funcType (by assumption)
+    simpa only [List.append_nil] using FragmentProgress.step (C := C)
+      (StepP.seq (H := H) (s := s) (f := f) (vs := args) (rest := []) (StepP.returnCall ha))
+  case returnCallRef y dt ft rs t₃ t₄ hy he hr hs =>
+    obtain ⟨pre, args, rfl, _, hlast⟩ := typed_split hargs
+    obtain ⟨v, rfl, hv⟩ := one hlast
+    obtain ⟨r, rfl⟩ := ref_of_type hv
+    have hstep : FragmentProgress H s f C [(Val.ref r).instr, .plain (.returnCallRef y)] := by
+      cases r with
+      | null => exact .step .returnCallRefNull
+      | func a => exact .step .returnCallRef
+      | extern a => simp [HasOpType, Val.HasType] at hv
+      | exn a => simp [HasOpType, Val.HasType] at hv
+    simpa only [List.map_append, List.append_assoc, List.map_cons, List.map_nil,
+      List.cons_append, List.nil_append] using hstep.prepend pre
+  case returnCallIndirect x y tt ft rs t₃ t₄ ht he hy hr hs =>
+    obtain ⟨pre, args, rfl, _, hlast⟩ := typed_split hargs
+    obtain ⟨v, rfl⟩ := one_i32 hlast
+    have hstep : FragmentProgress H s f C
+        [(Val.i32 v).instr, .plain (.returnCallIndirect x y)] := by
+      by_cases ht : ∃ addr, CallTarget s f x y v addr
+      · obtain ⟨addr, ht⟩ := ht; exact .step (.returnCallIndirect ht)
+      · exact .step (.returnCallIndirectTrap (by simpa only [not_exists] using ht))
+    simpa only [List.map_append, List.append_assoc, List.map_cons, List.map_nil,
+      List.cons_append, List.nil_append] using hstep.prepend pre
+  case throw x ts t₁ t₂ h =>
+    obtain ⟨ta, ti, hta, hti, hte⟩ := hf.tagType h
+    obtain ⟨pre, args, rfl, _, hlast⟩ := typed_split hargs
+    have hl : args.length = ts.length := by
+      simpa only [ops, List.length_map] using hlast.length_eq
+    have hstep : FragmentProgress H s f C (vals args ++ [.plain (.throw x)]) :=
+      .step (.throw hta hti hte rfl hl)
+    simpa only [List.map_append, List.append_assoc] using hstep.prepend pre
+  case throwRef t₁ t₂ =>
+    obtain ⟨pre, args, rfl, _, hlast⟩ := typed_split hargs
+    obtain ⟨v, rfl, hv⟩ := one hlast
+    obtain ⟨r, rfl⟩ := ref_of_type hv
+    have hstep : FragmentProgress H s f C [(Val.ref r).instr, .plain .throwRef] := by
+      cases r with
+      | null => exact .step .throwRefNull
+      | exn a => exact .throwing a
+      | func a => simp [HasOpType, Val.HasType, ValType.Sub] at hv
+      | extern a => simp [HasOpType, Val.HasType] at hv
+    simpa only [List.map_append, List.append_assoc, List.map_cons, List.map_nil,
+      List.cons_append, List.nil_append] using hstep.prepend pre
+  case tryTable bt cs body ft hb hs hc =>
+    obtain ⟨ft', hft', hp, -⟩ := hf.blockType hb
+    exact .step (.tryTable hft' (by simpa only [ops, List.length_map, hp] using hargs.length_eq))
 
 end FVA.Wasm.Valid

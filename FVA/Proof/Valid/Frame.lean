@@ -21,6 +21,11 @@ theorem FrameT.noReturn {s : Store} {f : Frame} {C : Context} (h : FrameT s f C)
   obtain ⟨C₀, ts, hi, _, rfl⟩ := h
   exact hi.noReturn
 
+theorem FrameT.noSets {s : Store} {f : Frame} {C : Context} (h : FrameT s f C) :
+    C.sets = [] := by
+  obtain ⟨C₀, ts, hi, _, rfl⟩ := h
+  exact hi.noSets
+
 namespace FrameCtx
 
 theorem withLabel {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
@@ -40,17 +45,57 @@ theorem extendStore {s s' : Store} {f : Frame} {C : Context} (hf : FrameCtx s f 
   exact ⟨{ D₀ with labels := ls, return_ := ret }, ⟨D₀, ls, ret, hf', rfl⟩,
     he.withControl ls ret⟩
 
-theorem blockType {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
-    (bt : BlockType) : C.blockType bt = bt.expand f := by
+theorem noSets {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C) : C.sets = [] := by
+  obtain ⟨C₀, ls, ret, hf, rfl⟩ := h
+  exact hf.noSets
+
+theorem noDead {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C) : C.dead = false := by
   obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, _, rfl⟩, rfl⟩ := h
-  cases bt <;> simp only [Context.blockType, BlockType.expand, forall₂_expand_getElem? hi.types]
+  exact hi.noDead
+
+theorem types {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C) :
+    C.types = f.inst.types := by
+  obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, _, rfl⟩, rfl⟩ := h
+  exact hi.types
+
+/-- The runtime's block type has the context's arities (the runtime leaves a value type
+unclosed: only lengths reach execution). -/
+theorem blockType {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
+    {bt : BlockType} {ft : FuncType} (hb : C.blockType bt = some ft) :
+    ∃ ft', bt.expand f = some ft' ∧ ft'.params.length = ft.params.length ∧
+      ft'.results.length = ft.results.length := by
+  cases bt with
+  | empty => cases hb; exact ⟨_, rfl, rfl, rfl⟩
+  | val t =>
+    simp only [Context.blockType] at hb
+    split at hb
+    · cases hb; exact ⟨_, rfl, rfl, rfl⟩
+    · cases hb
+  | idx x =>
+    simp only [Context.blockType, Context.typeAt, h.types] at hb
+    exact ⟨ft, hb, rfl, rfl⟩
 
 theorem funcs {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
-    {x : Nat} {ft : FuncType} (hx : C.funcs[x]? = some ft) :
-    ∃ a fi, f.inst.funcs[x]? = some a ∧ s.funcs[a]? = some fi ∧ fi.type.expand = some ft := by
+    {x : Nat} {dt : DefType} (hx : C.funcs[x]? = some dt) :
+    ∃ a fi, f.inst.funcs[x]? = some a ∧ s.funcs[a]? = some fi ∧ fi.type = dt := by
   obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, _, rfl⟩, rfl⟩ := h
   obtain ⟨a, ha, fi, hfi, hft⟩ := forall₂_lookup_right hi.funcs hx
   exact ⟨a, fi, ha, hfi, hft⟩
+
+theorem funcType {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
+    {x : Nat} {ft : FuncType} (hx : C.funcType x = some ft) :
+    ∃ a fi, f.inst.funcs[x]? = some a ∧ s.funcs[a]? = some fi ∧ fi.type.expand = some ft := by
+  simp only [Context.funcType, Option.bind_eq_some_iff] at hx
+  obtain ⟨dt, hdt, he⟩ := hx
+  obtain ⟨a, fi, ha, hfi, rfl⟩ := h.funcs hdt
+  exact ⟨a, fi, ha, hfi, he⟩
+
+theorem tags {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
+    {x : Nat} {dt : DefType} (hx : C.tags[x]? = some dt) :
+    ∃ a ti, f.inst.tags[x]? = some a ∧ s.tags[a]? = some ti ∧ ti.type = dt := by
+  obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, _, rfl⟩, rfl⟩ := h
+  obtain ⟨a, ha, ti, hti, htt⟩ := forall₂_lookup_right hi.tags hx
+  exact ⟨a, ti, ha, hti, htt⟩
 
 theorem tables {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
     {x : Nat} {tt : TableType} (hx : C.tables[x]? = some tt) :
@@ -92,9 +137,9 @@ theorem datas {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
 
 end FrameCtx
 
-theorem localAt_singletons (ts : List ValType) (x : Nat) :
-    localAt (ts.map (1, ·)) x = ts[x]? := by
-  induction ts generalizing x with
+theorem localAt_singletons (lts : List LocalType) (x : Nat) :
+    localAt (lts.map (1, ·)) x = lts[x]? := by
+  induction lts generalizing x with
   | nil => rfl
   | cons t ts ih =>
     cases x with
@@ -103,12 +148,22 @@ theorem localAt_singletons (ts : List ValType) (x : Nat) :
         Nat.lt_one_iff, Nat.succ_ne_zero, ↓reduceIte, Nat.add_sub_cancel,
         List.getElem?_cons_succ] using ih x
 
+theorem FrameCtx.local {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
+    {x : Nat} {lt : LocalType} (hx : localAt C.locals x = some lt) :
+    ∃ ov, f.locals[x]? = some ov ∧ LocalOK s ov lt := by
+  obtain ⟨C₀, ls, ret, ⟨C₁, lts, hi, hvs, rfl⟩, rfl⟩ := h
+  exact forall₂_lookup_right hvs ((localAt_singletons lts x).symm.trans hx)
+
+/-- A readable local holds a value of its type (a frame context initializes by flags alone). -/
 theorem FrameCtx.locals {s : Store} {f : Frame} {C : Context} (h : FrameCtx s f C)
-    {x : Nat} {t : ValType} (hx : localAt C.locals x = some t) :
-    ∃ v, f.locals[x]? = some (some v) ∧ v.HasType s t := by
-  obtain ⟨C₀, ls, ret, ⟨C₁, ts, hi, hvs, rfl⟩, rfl⟩ := h
-  obtain ⟨ov, hov, v, rfl, hv⟩ :=
-    forall₂_lookup_right hvs ((localAt_singletons ts x).symm.trans hx)
-  exact ⟨v, hov, hv⟩
+    {x : Nat} {lt : LocalType} (hx : localAt C.locals x = some lt)
+    (hr : lt.set = true ∨ x ∈ C.sets ∨ C.dead = true) :
+    ∃ v, f.locals[x]? = some (some v) ∧ v.HasType s lt.type := by
+  obtain ⟨ov, hov, hl⟩ := h.local hx
+  rw [h.noSets, h.noDead] at hr
+  simp only [List.not_mem_nil, Bool.false_eq_true, or_false] at hr
+  cases ov with
+  | some v => exact ⟨v, hov, hl.2.2⟩
+  | none => rw [hl.1] at hr; cases hr
 
 end FVA.Wasm.Valid

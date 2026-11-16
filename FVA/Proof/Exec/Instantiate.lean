@@ -158,53 +158,76 @@ theorem evalConst_sound {H : HostSem} {fuel : Nat} {s : Store} {inst : ModuleIns
     exact hc ▸ (run_sound (H := H) hr).1
   · contradiction
 
+/-- The candidates `initAgrees` accepts are values the initializers reduce to in their own
+allocation. -/
+theorem initAgrees_sound {H : HostSem} {fuel : Nat} {s : Store} {m : Module}
+    {imports : List ExternVal} {gvals : List Val} {trefs : List Ref} {erefs : List (List Ref)}
+    (h : initAgrees fuel s m imports gvals trefs erefs = true) :
+    List.Forall₂ (fun g v => Steps H
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, g.init.map .plain⟩
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, [v.instr]⟩) m.globals gvals ∧
+    List.Forall₂ (fun t r => Steps H
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, t.init.map .plain⟩
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, [(Val.ref r).instr]⟩)
+      m.tables trefs ∧
+    List.Forall₂ (fun e rs => List.Forall₂ (fun ex r => Steps H
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, ex.map .plain⟩
+      ⟨(allocModule s m imports gvals trefs erefs).1,
+        ⟨[], (allocModule s m imports gvals trefs erefs).2⟩, [(Val.ref r).instr]⟩) e.init rs)
+      m.elems erefs := by
+  simp only [initAgrees, Bool.and_eq_true, beq_iff_eq] at h
+  obtain ⟨⟨hg, ht⟩, he⟩ := h
+  refine ⟨?_, ?_, ?_⟩
+  · apply (forall₂_mapM hg).imp
+    intro g v hv
+    exact evalConst_sound hv
+  · apply (forall₂_mapM ht).imp
+    intro t r hex
+    simp only [bind, Option.bind_eq_some_iff] at hex
+    rcases hex with ⟨v, hv, hvr⟩
+    cases v <;> simp only [asRef, reduceCtorEq, Option.some.injEq] at hvr
+    subst r
+    exact evalConst_sound hv
+  · apply (forall₂_mapM he).imp
+    intro e rs hers
+    apply (forall₂_mapM hers).imp
+    intro ex r hex
+    simp only [bind, Option.bind_eq_some_iff] at hex
+    rcases hex with ⟨v, hv, hvr⟩
+    cases v <;> simp only [asRef, reduceCtorEq, Option.some.injEq] at hvr
+    subst r
+    exact evalConst_sound hv
+
 theorem instantiate_sound {H : HostSem} {fuel : Nat} {s s' : Store} {m : Module}
     {imports : List ExternVal} {inst : ModuleInst} (hm : ImportsMatch s m imports)
     (h : instantiate fuel s m imports = some (s', inst)) :
     Instantiated H m s imports s' inst := by
   simp only [instantiate, bind, Option.bind_eq_some_iff] at h
-  rcases h with ⟨gvals, _, trefs, _, erefs, _, gvals₁, hg, trefs₁, ht, erefs₁, he, u, hu, c, hr,
-    hc⟩
+  obtain ⟨⟨gvals, trefs, erefs⟩, -, u, hu, c, hr, hc⟩ := h
   cases u
   simp only [guard] at hu
   split at hu
-  · rename_i heq
-    simp only [Bool.and_eq_true, beq_iff_eq] at heq
-    rcases heq with ⟨⟨hgv, htr⟩, her⟩
-    subst gvals₁ trefs₁ erefs₁
+  · rename_i hagree
+    obtain ⟨hg, ht, he⟩ := initAgrees_sound (H := H) hagree
     rcases c with ⟨sf, ff, es⟩
     cases es with
     | nil =>
       simp only [Option.some.injEq, Prod.mk.injEq] at hc
       rcases hc with ⟨rfl, rfl⟩
-      refine ⟨hm, gvals, trefs, erefs, (allocModule s m imports gvals trefs erefs).1, rfl, ?_, ?_,
-        ?_, ?_⟩
-      · apply (forall₂_mapM hg).imp
-        intro g v hv
-        exact evalConst_sound hv
-      · apply (forall₂_mapM ht).imp
-        intro t r hex
-        simp only [Option.bind_eq_some_iff] at hex
-        rcases hex with ⟨v, hv, hvr⟩
-        cases v <;> simp only [asRef, reduceCtorEq, Option.some.injEq] at hvr
-        subst r
-        exact evalConst_sound hv
-      · apply (forall₂_mapM he).imp
-        intro e rs hers
-        apply (forall₂_mapM hers).imp
-        intro ex r hex
-        simp only [Option.bind_eq_some_iff] at hex
-        rcases hex with ⟨v, hv, hvr⟩
-        cases v <;> simp only [asRef, reduceCtorEq, Option.some.injEq] at hvr
-        subst r
-        exact evalConst_sound hv
-      · have hs := (run_sound (H := H) hr).1
-        rcases steps_frame_shape hs with ⟨hi, hl⟩
-        have hloc : ff.locals = [] := by simpa using hl
-        have hf : ff = ⟨[], (allocModule s m imports gvals trefs erefs).2⟩ := by
-          cases ff
-          simp_all
-        simpa only [hf] using hs
+      refine ⟨hm, gvals, trefs, erefs, (allocModule s m imports gvals trefs erefs).1, rfl, hg,
+        ht, he, ?_⟩
+      have hs := (run_sound (H := H) hr).1
+      rcases steps_frame_shape hs with ⟨hi, hl⟩
+      have hloc : ff.locals = [] := by simpa using hl
+      have hf : ff = ⟨[], (allocModule s m imports gvals trefs erefs).2⟩ := by
+        cases ff
+        simp_all
+      simpa only [hf] using hs
     | cons e es => contradiction
   · contradiction
 

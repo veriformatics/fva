@@ -324,12 +324,6 @@ def validatePayload (dir : System.FilePath) (c : Json) (kind : String) (line : N
       else .error s!"{kind}: positive module is undecodable: {why}"
     return (tally t line result, none)
   | .ok m =>
-    -- P′ decodes, validation keeps the 2.0 profile until U28c: rejecting a P′ module there
-    -- never reaches the typing rule the assertion is about
-    if kind == "assert_invalid" && !m.inP2 then
-      let t := { t with validation.outside := t.validation.outside + 1 }
-      return (tally t line (.ok (some "outside the 2.0 validation profile: P′ typing = U28c")),
-        none)
     let t := { t with validation := t.validation.checked kind }
     let accepted := FVA.Wasm.Valid.validate m
     if kind == "assert_invalid" then

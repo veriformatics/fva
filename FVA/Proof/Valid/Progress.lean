@@ -4,6 +4,20 @@ namespace FVA.Wasm.Valid
 
 open FVA.Wasm FVA.Wasm.Exec
 
+/-- A handler around an exception in flight: the first clause takes it or passes it on. -/
+theorem handler_throwing_progress {H : HostSem} {s : Store} {f : Frame} {C : Context}
+    {n a : Nat} (cs : List Catch) : FragmentProgress H s f C [.handler n cs (throwing a)] := by
+  cases cs with
+  | nil => exact .step .throwRefHandlerEmpty
+  | cons c cs =>
+    by_cases hc : c.Catches s f a
+    · cases c with
+      | tag x l => obtain ⟨e, he, hx⟩ := hc; exact .step (.throwRefCatch he hx)
+      | tagRef x l => obtain ⟨e, he, hx⟩ := hc; exact .step (.throwRefCatchRef he hx)
+      | all l => exact .step .throwRefCatchAll
+      | allRef l => exact .step .throwRefCatchAllRef
+    · exact .step (.throwRefHandlerNext hc)
+
 theorem ASeqT.values_length {s : Store} {C : Context} {vs : List Val} {ts : List ValType}
     (h : ASeqT s C (vals vs) ⟨[], ops ts⟩) : vs.length = ts.length := by
   simpa only [ops, List.length_map] using h.values_typed.length_eq
@@ -58,6 +72,11 @@ theorem ainstr_progress {H : HostSem} (hH : ValidHost H) {s : Store} {C : Contex
       simpa only [BlockCtx.fill, List.map_nil, List.nil_append, List.append_nil] using
         FragmentProgress.return_ (H := H) (s := s) (f := f) (C := C)
           (BlockCtx.label [] n cont L []) ht hlen
+    | returnInvoke L ht hfn hft hlen =>
+      simpa only [BlockCtx.fill, List.map_nil, List.nil_append, List.append_nil] using
+        FragmentProgress.returnInvoke (H := H) (s := s) (f := f) (C := C)
+          (BlockCtx.label [] n cont L []) ht hfn hft hlen
+    | throwing a => exact .step .throwRefLabel
     | step hs => exact .step (.label hs)
   case frame C Cinner n fi body ts hn hinner hb ih =>
     cases hargs
@@ -74,13 +93,43 @@ theorem ainstr_progress {H : HostSem} (hH : ValidHost H) {s : Store} {C : Contex
       have heq : ts = rts := Option.some.inj ht
       subst rts
       exact .step (.return_ L (hlen.trans hn))
+    | returnInvoke L ht hfn hft hlen => exact .step (.returnInvoke L hfn hft hlen)
+    | throwing a => exact .step .throwRefFrame
     | step hs => exact .step (.frame hs)
+  case handler C n cs body ts hcs hb ih =>
+    cases hargs
+    have hp := ih f [] hf .nil
+    simp only [List.map_nil, List.nil_append] at hp
+    cases hp with
+    | values vs => exact .step .handlerExit
+    | trap => exact .step (StepP.trap (.handler n cs .hole) (by simp [EvalCtx.fill]))
+    | branch L ht hlen =>
+      simpa only [BlockCtx.fill, List.map_nil, List.nil_append, List.append_nil] using
+        FragmentProgress.branch (H := H) (s := s) (f := f) (C := C)
+          (BlockCtx.handler [] n cs L []) ht hlen
+    | return_ L ht hlen =>
+      simpa only [BlockCtx.fill, List.map_nil, List.nil_append, List.append_nil] using
+        FragmentProgress.return_ (H := H) (s := s) (f := f) (C := C)
+          (BlockCtx.handler [] n cs L []) ht hlen
+    | returnInvoke L ht hfn hft hlen =>
+      simpa only [BlockCtx.fill, List.map_nil, List.nil_append, List.append_nil] using
+        FragmentProgress.returnInvoke (H := H) (s := s) (f := f) (C := C)
+          (BlockCtx.handler [] n cs L []) ht hfn hft hlen
+    | throwing a => exact handler_throwing_progress cs
+    | step hs => exact .step (.handler hs)
+  case returnInvoke C a fi ft rs t₃ t₄ hfi hft hr hs =>
+    obtain ⟨pre, args, rfl, _, hlast⟩ := typed_split hargs
+    have hl : args.length = ft.params.length := by
+      simpa only [ops, List.length_map] using hlast.length_eq
+    simpa only [BlockCtx.fill, List.map_append, List.append_assoc, List.append_nil] using
+      FragmentProgress.returnInvoke (H := H) (s := s) (f := f) (C := C)
+        (BlockCtx.base pre []) hr hfi hft hl
   case nil =>
     rename_i f args hf hargs
     simpa only [List.append_nil] using FragmentProgress.values (H := H)
       (s := s) (f := f) (C := _) args
   case snoc hs hm hi ihs ihi f args hf hargs =>
-    exact progress_snoc hs hm hargs (ihs f args hf hargs) (fun vs hvs => ihi f vs hf hvs)
+    exact progress_snoc hf hs hm hargs (ihs f args hf hargs) (fun hf' vs hvs => ihi f vs hf' hvs)
   case sub hs hm ih f args hf hargs => exact ih f args hf hargs
 
 theorem aseq_progress {H : HostSem} (hH : ValidHost H) {s : Store} {C : Context}
@@ -93,8 +142,8 @@ theorem aseq_progress {H : HostSem} (hH : ValidHost H) {s : Store} {C : Context}
       (s := s) (f := f) (C := C) args
   | append_singleton es e ih =>
     obtain ⟨p, x, y, z, hout, hpre, hm, hi⟩ := ASeqT.snoc_iff.mp hs
-    exact progress_snoc hpre hm hargs (ih hpre)
-      (fun vs hvs => ainstr_progress hH hi f vs hf hvs)
+    exact progress_snoc hf hpre hm hargs (ih hpre)
+      (fun hf' vs hvs => ainstr_progress hH hi f vs hf' hvs)
 
 theorem progress : Progress := by
   intro H c ts hH hok
@@ -111,6 +160,10 @@ theorem progress : Progress := by
   | @return_ k vs rts L hret hlen =>
     rw [hf.noReturn] at hret
     cases hret
+  | returnInvoke L hret hfn hft hlen =>
+    rw [hf.noReturn] at hret
+    cases hret
+  | throwing a => exact .inl ⟨.thrown s a, rfl, rfl⟩
   | step hs => exact .inr ⟨_, hs⟩
 
 end FVA.Wasm.Valid

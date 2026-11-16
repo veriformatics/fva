@@ -4,9 +4,14 @@ import FVA.Impl.TypeEq
 /-!
 # WebAssembly validator
 
-The appendix operand/control-stack algorithm over the nested AST. Each recursive body owns
-its operand stack; the enclosing context supplies its labels. An unreachable empty stack pops
-bottom, but explicit operands still undergo every type check. Local declarations stay as runs.
+The appendix operand/control-stack algorithm over the nested AST, for profile P′. Each recursive
+body owns its operand stack; the enclosing context supplies its labels and its view of the
+initialized locals. An unreachable empty stack pops bottom, and a reference popped as bottom
+becomes the bottom reference (`pop_ref`); explicit operands still undergo every type check.
+Typed calls pop the reference first, then the parameters (SpecTec `2.3`; the appendix sketch
+reverses them). Local declarations stay as runs; `local.set`/`local.tee` cons their local onto
+the context's initialized set (`Context.addSets`), and `local.get` consults it only for a local
+its declaration leaves unset.
 -/
 
 namespace FVA.Wasm.Valid
@@ -25,11 +30,48 @@ structure Stack where
   unreachable : Bool := false
   deriving DecidableEq
 
-/-- Boolean operand matching; a bottom operand matches every expected type. -/
+/-- A source heap type naming one of the first `k` defined types (`HeapType.Src`). -/
+def heapSrc (k : Nat) : HeapType → Bool
+  | .abs _ => true
+  | .idx y => Nat.blt y k
+  | _ => false
+
+/-- A source value type naming one of the first `k` defined types (`ValType.Src`). -/
+def valSrc (k : Nat) : ValType → Bool
+  | .num _ => true
+  | .ref t => heapSrc k t.heap
+
+/-- Sequentially valid recursive groups (`TypesSeq`). -/
+def typesSeq : List RecType → Nat → Bool
+  | [], _ => true
+  | g :: gs, x => g.all (fun f => f.params.all (valSrc (x + g.length)) &&
+      f.results.all (valSrc (x + g.length))) && typesSeq gs (x + g.length)
+
+/-- A defined heap type below `func` (`Heaptype_sub/func`). -/
+def defFunc : HeapType → HeapType → Bool
+  | .def_ _, .abs .func => true
+  | _, _ => false
+
+/-- Boolean `ValType.Sub`. -/
+def subType : ValType → ValType → Bool
+  | .num a, .num b => a == b
+  | .ref ⟨n₁, h₁⟩, .ref ⟨n₂, h₂⟩ => (!n₁ || n₂) && (HeapType.beq h₁ h₂ || defFunc h₁ h₂)
+  | _, _ => false
+
+/-- Boolean `ResultSub`: equal lengths, pointwise subtyping. -/
+def subTypes : List ValType → List ValType → Bool
+  | [], [] => true
+  | t :: ts, u :: us => subType t u && subTypes ts us
+  | _, _ => false
+
+/-- Boolean operand matching; a bottom operand matches every expected type, the bottom reference
+every reference type. -/
 def matchType : OpType → OpType → Bool
   | .bot, _ => true
-  | .val t, .val u => decide (t = u)
-  | .val _, .bot => false
+  | .refBot, .refBot => true
+  | .refBot, .val (.ref _) => true
+  | .val t, .val u => subType t u
+  | _, _ => false
 
 /-- Pointwise operand matching; lengths must agree. -/
 def matchTypeList : List OpType → List OpType → Bool
@@ -71,9 +113,15 @@ def finish (ts : List ValType) (s : Stack) : Bool :=
   | some (_, rest) => rest.types.isEmpty
 
 /-- Kernel-cheap lookup through compressed local runs. -/
-def lookupLocal : List (Nat × ValType) → Nat → Option ValType
+def lookupLocal : List (Nat × LocalType) → Nat → Option LocalType
   | [], _ => none
   | (n, t) :: rest, x => bif Nat.blt x n then some t else lookupLocal rest (Nat.sub x n)
+
+/-- The heap type of a reference operand (`pop_ref`): `none` = bottom. -/
+def refHeap : OpType → Option (Option HeapType)
+  | .bot | .refBot => some none
+  | .val (.ref ⟨_, h⟩) => some (some h)
+  | _ => none
 
 /-- Representable integer unary operators. -/
 def unary : Width → IUnOp → Bool
@@ -89,6 +137,27 @@ def packed : Width → PackSize → Bool
 def memArg (m : MemArg) (bytes : Nat) : Bool :=
   Nat.ble m.align 3 && Nat.ble (Nat.pow 2 m.align) bytes && Nat.blt m.offset (Nat.pow 2 32)
 
+/-- Block types, closing a valid value type. -/
+def blockType (C : Context) : BlockType → Option FuncType
+  | .empty => some ⟨[], []⟩
+  | .val t => bif valSrc C.types.length t then some ⟨[], [C.close t]⟩ else none
+  | .idx x => C.typeAt x
+
+/-- A catch clause's values against its label (`Catch_ok`). -/
+def catchOk (C : Context) : Catch → Bool
+  | .tag x l => match C.tagType x, C.labels[l]? with
+    | some ⟨ts, []⟩, some lts => subTypes ts lts
+    | _, _ => false
+  | .tagRef x l => match C.tagType x, C.labels[l]? with
+    | some ⟨ts, []⟩, some lts => subTypes (ts ++ [exnNonNull]) lts
+    | _, _ => false
+  | .all l => match C.labels[l]? with
+    | some [] => true
+    | _ => false
+  | .allRef l => match C.labels[l]? with
+    | some lts => subTypes [exnNonNull] lts
+    | none => false
+
 /-- Fixed-signature instructions, with all context and representation checks. -/
 def fixed (C : Context) : Instr → Option StackType
   | .iconst w n => bif Nat.blt n (Nat.pow 2 w.bits) then some ⟨[], [int w]⟩ else none
@@ -101,16 +170,22 @@ def fixed (C : Context) : Instr → Option StackType
   | .fbinop w _ => some ⟨[flt w, flt w], [flt w]⟩
   | .frelop w _ => some ⟨[flt w, flt w], [i32]⟩
   | .cvtop op => some ⟨[.val (.num op.types.1)], [.val (.num op.types.2)]⟩
-  | .refNull ht => some ⟨[], [.val (.ref ⟨true, ht⟩)]⟩
+  | .refNull ht => bif heapSrc C.types.length ht then
+      some ⟨[], [.val (.ref ⟨true, closeHeap C.types ht⟩)]⟩ else none
   | .refFunc x => match C.funcs[x]? with
     | none => none
-    | some _ => bif C.refs.any (Nat.beq x) then some ⟨[], [.val (.ref .funcref)]⟩ else none
+    | some dt => bif C.refs.any (Nat.beq x) then some ⟨[], [.val (.ref ⟨false, .def_ dt⟩)]⟩
+      else none
   | .select ts => match ts with
-    | some [t] => some ⟨[.val t, .val t, i32], [.val t]⟩
+    | some [t] => bif valSrc C.types.length t then
+        some ⟨[.val (C.close t), .val (C.close t), i32], [.val (C.close t)]⟩ else none
     | _ => none
-  | .localGet x => (lookupLocal C.locals x).map fun t => ⟨[], [.val t]⟩
-  | .localSet x => (lookupLocal C.locals x).map fun t => ⟨[.val t], []⟩
-  | .localTee x => (lookupLocal C.locals x).map fun t => ⟨[.val t], [.val t]⟩
+  | .localGet x => match lookupLocal C.locals x with
+    | none => none
+    | some lt => bif lt.set || C.dead || C.sets.any (Nat.beq x) then some ⟨[], [.val lt.type]⟩
+      else none
+  | .localSet x => (lookupLocal C.locals x).map fun lt => ⟨[.val lt.type], []⟩
+  | .localTee x => (lookupLocal C.locals x).map fun lt => ⟨[.val lt.type], [.val lt.type]⟩
   | .globalGet x => (C.globals[x]?).map fun gt => ⟨[], [.val gt.val]⟩
   | .globalSet x => match C.globals[x]? with
     | some ⟨.var, t⟩ => some ⟨[.val t], []⟩
@@ -121,11 +196,12 @@ def fixed (C : Context) : Instr → Option StackType
   | .tableGrow x => (C.tables[x]?).map fun tt => ⟨[.val (.ref tt.elem), i32], [i32]⟩
   | .tableFill x => (C.tables[x]?).map fun tt => ⟨[i32, .val (.ref tt.elem), i32], []⟩
   | .tableCopy x y => match C.tables[x]?, C.tables[y]? with
-    | some tx, some ty => bif decide (tx.elem = ty.elem) then
+    | some tx, some ty => bif subType (.ref ty.elem) (.ref tx.elem) then
         some ⟨[i32, i32, i32], []⟩ else none
     | _, _ => none
   | .tableInit x y => match C.tables[x]?, C.elems[y]? with
-    | some tt, some rt => bif decide (tt.elem = rt) then some ⟨[i32, i32, i32], []⟩ else none
+    | some tt, some rt => bif subType (.ref rt) (.ref tt.elem) then
+        some ⟨[i32, i32, i32], []⟩ else none
     | _, _ => none
   | .elemDrop x => (C.elems[x]?).map fun _ => ⟨[], []⟩
   | .load t m => match C.mems[0]? with
@@ -151,10 +227,20 @@ def fixed (C : Context) : Instr → Option StackType
   | .dataDrop x => bif Nat.blt x C.datas then some ⟨[], []⟩ else none
   | .nop => some ⟨[], []⟩
   | .brIf l => (C.labels[l]?).map fun ts => ⟨ops ts ++ [i32], ops ts⟩
-  | .call x => (C.funcs[x]?).map fun ft => ⟨ops ft.params, ops ft.results⟩
-  | .callIndirect x y => match C.tables[x]?, C.types[y]? with
-    | some ⟨_, .funcref⟩, some ft => some ⟨ops ft.params ++ [i32], ops ft.results⟩
+  | .brOnNonNull l => match C.labels[l]? with
+    | some lts => match lts.getLast? with
+      | some (.ref ⟨_, h⟩) => some ⟨ops lts.dropLast ++ [.val (.ref ⟨true, h⟩)], ops lts.dropLast⟩
+      | _ => none
+    | none => none
+  | .call x => (C.funcType x).map fun ft => ⟨ops ft.params, ops ft.results⟩
+  | .callIndirect x y => match C.tables[x]?, C.typeAt y with
+    | some tt, some ft => bif subType (.ref tt.elem) (.ref .funcref) then
+        some ⟨ops ft.params ++ [i32], ops ft.results⟩ else none
     | _, _ => none
+  | .callRef y => match C.types[y]? with
+    | none => none
+    | some dt => dt.expand.map fun ft =>
+        ⟨ops ft.params ++ [.val (.ref ⟨true, .def_ dt⟩)], ops ft.results⟩
   | _ => none
 
 /-- Untyped select merges numeric or bottom operands; references require typed select. -/
@@ -177,6 +263,13 @@ def targets (C : Context) (as : List OpType) (ls : List Nat) : Bool :=
     | none => false
     | some ts => matchTypeList as (ops ts).reverse
 
+/-- A tail call: the callee's results below the caller's, then its operands as a transfer. -/
+def tailCall (C : Context) (ft : FuncType) (operands : List ValType) (s : Stack) :
+    Option Stack :=
+  match C.return_ with
+  | none => none
+  | some rs => bif subTypes ft.results rs then branch operands s else none
+
 mutual
 
 /-- One instruction; nested bodies start their own operand stack and control frame. -/
@@ -185,8 +278,14 @@ def instr (C : Context) (i : Instr) (s : Stack) : Option Stack :=
   | .unreachable => some ⟨[], true⟩
   | .drop => (pop s).map fun (_, rest) => rest
   | .refIsNull => match pop s with
-    | some (.bot, rest) | some (.val (.ref _), rest) => some (push [i32] rest)
+    | some (.bot, rest) | some (.refBot, rest) | some (.val (.ref _), rest) =>
+      some (push [i32] rest)
     | _ => none
+  | .refAsNonNull => match pop s with
+    | some (a, _) => match refHeap a with
+      | some h => apply ⟨[refOp true h], [refOp false h]⟩ s
+      | none => none
+    | none => none
   | .select none => match pops [i32] s with
     | none => none
     | some (_, rest) => match pop rest with
@@ -194,19 +293,19 @@ def instr (C : Context) (i : Instr) (s : Stack) : Option Stack :=
       | some (t, rest') => match pop rest' with
         | none => none
         | some (u, rest'') => (selectType t u).map fun v => push [v] rest''
-  | .block bt body => match C.blockType bt with
+  | .block bt body => match blockType C bt with
     | none => none
     | some ft => match seq (C.withLabel ft.results) body ⟨(ops ft.params).reverse, false⟩ with
       | none => none
       | some out => bif finish ft.results out then apply ⟨ops ft.params, ops ft.results⟩ s
         else none
-  | .loop bt body => match C.blockType bt with
+  | .loop bt body => match blockType C bt with
     | none => none
     | some ft => match seq (C.withLabel ft.params) body ⟨(ops ft.params).reverse, false⟩ with
       | none => none
       | some out => bif finish ft.results out then apply ⟨ops ft.params, ops ft.results⟩ s
         else none
-  | .if_ bt thn els => match C.blockType bt with
+  | .if_ bt thn els => match blockType C bt with
     | none => none
     | some ft =>
       match seq (C.withLabel ft.results) thn ⟨(ops ft.params).reverse, false⟩,
@@ -214,6 +313,12 @@ def instr (C : Context) (i : Instr) (s : Stack) : Option Stack :=
       | some out₁, some out₂ => bif finish ft.results out₁ && finish ft.results out₂ then
           apply ⟨ops ft.params ++ [i32], ops ft.results⟩ s else none
       | _, _ => none
+  | .tryTable bt cs body => match blockType C bt with
+    | none => none
+    | some ft => match seq (C.withLabel ft.results) body ⟨(ops ft.params).reverse, false⟩ with
+      | none => none
+      | some out => bif finish ft.results out && cs.all (catchOk C) then
+          apply ⟨ops ft.params, ops ft.results⟩ s else none
   | .br l => match C.labels[l]? with | none => none | some ts => branch ts s
   | .return_ => match C.return_ with | none => none | some ts => branch ts s
   | .brTable ls l => match C.labels[l]?, pops [i32] s with
@@ -221,12 +326,34 @@ def instr (C : Context) (i : Instr) (s : Stack) : Option Stack :=
       | some (as, _) => bif targets C as ls then some ⟨[], true⟩ else none
       | none => none
     | _, _ => none
+  | .brOnNull l => match C.labels[l]?, pop s with
+    | some ts, some (a, _) => match refHeap a with
+      | some h => apply ⟨ops ts ++ [refOp true h], ops ts ++ [refOp false h]⟩ s
+      | none => none
+    | _, _ => none
+  | .returnCall x => match C.funcType x with
+    | none => none
+    | some ft => tailCall C ft ft.params s
+  | .returnCallIndirect x y => match C.tables[x]?, C.typeAt y with
+    | some tt, some ft => bif subType (.ref tt.elem) (.ref .funcref) then
+        tailCall C ft (ft.params ++ [.num .i32]) s else none
+    | _, _ => none
+  | .returnCallRef y => match C.types[y]? with
+    | none => none
+    | some dt => match dt.expand with
+      | none => none
+      | some ft => tailCall C ft (ft.params ++ [.ref ⟨true, .def_ dt⟩]) s
+  | .throw x => match C.tagType x with
+    | some ⟨ts, []⟩ => branch ts s
+    | _ => none
+  | .throwRef => branch [.ref .exnref] s
   | _ => match fixed C i with | none => none | some st => apply st s
 
-/-- Sequential structural recursion, without flattening nested bodies. -/
+/-- Sequential structural recursion, without flattening nested bodies; each instruction sees
+the locals its predecessors initialized. -/
 def seq (C : Context) : List Instr → Stack → Option Stack
   | [], s => some s
-  | i :: is, s => match instr C i s with | none => none | some s' => seq C is s'
+  | i :: is, s => match instr C i s with | none => none | some s' => seq (C.addSets i.sets) is s'
 
 end
 
@@ -234,7 +361,7 @@ end
 def expr (C : Context) (e : Expr) (ts : List ValType) : Bool :=
   match seq C e {} with | none => false | some s => finish ts s
 
-/-- Constant expressions use only the restricted initializer context. -/
+/-- Constant expressions read the context's immutable globals alone. -/
 def constant (C : Context) : Instr → Bool
   | .iconst _ _ | .fconst _ _ | .refNull _ | .refFunc _ => true
   | .globalGet x => match C.globals[x]? with | some ⟨.const, _⟩ => true | _ => false
@@ -250,21 +377,34 @@ def limits (k : Nat) (l : Limits) : Bool :=
     | none => true
     | some mx => Nat.ble l.min mx && Nat.ble mx k
 
-/-- Import description checks, before index spaces are used. -/
+/-- A tag's type: a function type without results. -/
+def tagType (C : Context) (x : Nat) : Bool :=
+  match C.typeAt x with
+  | some ⟨_, []⟩ => true
+  | _ => false
+
+/-- Import description checks, under the defined types. -/
 def importDesc (C : Context) : ImportDesc → Bool
-  | .func x => Nat.blt x C.types.length
-  | .table tt => limits (2 ^ 32 - 1) tt.limits
+  | .func x => (C.typeAt x).isSome
+  | .table tt => limits (2 ^ 32 - 1) tt.limits && heapSrc C.types.length tt.elem.heap
   | .mem lim => limits (2 ^ 16) lim
-  | .global _ => true
-  | .tag _ => false
+  | .global gt => valSrc C.types.length gt.val
+  | .tag x => tagType C x
+
+/-- Defined globals in order, each under the globals before it (`C` holds the imported ones). -/
+def globals (C : Context) (dts : List DefType) : List Global → Bool
+  | [] => true
+  | g :: gs => valSrc dts.length g.type.val &&
+      constExpr C g.init [(g.type.close dts).val] &&
+      globals { C with globals := C.globals ++ [g.type.close dts] } dts gs
 
 /-- Function body validation; local declarations stay in compressed runs. -/
 def func (C : Context) (f : Func) : Bool :=
-  match C.types[f.type]? with
+  match C.typeAt f.type with
   | none => false
-  | some ft =>
-    f.locals.all (fun l => l.2.defaultable) && expr { C with
-      locals := ft.params.map (1, ·) ++ f.locals
+  | some ft => f.locals.all (fun l => valSrc C.types.length l.2) && expr { C with
+      locals := ft.params.map (1, ⟨true, ·⟩) ++
+        f.locals.map fun l => (l.1, ⟨l.2.defaultable, C.close l.2⟩)
       labels := [ft.results]
       return_ := some ft.results } f.body ft.results
 
@@ -273,7 +413,7 @@ def elemMode (C : Context) (t : RefType) : ElemMode → Bool
   | .passive | .declarative => true
   | .active x off => match C.tables[x]? with
     | none => false
-    | some tt => decide (tt.elem = t) && constExpr C off [.num .i32]
+    | some tt => subType (.ref t) (.ref tt.elem) && constExpr C off [.num .i32]
 
 /-- A data segment's mode. -/
 def dataMode (C : Context) : DataMode → Bool
@@ -288,7 +428,7 @@ def exportDesc (C : Context) : ExportDesc → Bool
   | .table x => Nat.blt x C.tables.length
   | .mem x => Nat.blt x C.mems.length
   | .global x => Nat.blt x C.globals.length
-  | .tag _ => false
+  | .tag x => Nat.blt x C.tags.length
 
 /-- Distinct names, without a hash-table trusted implementation. -/
 def distinct : List String → Bool
@@ -299,23 +439,27 @@ end Check
 
 /-- Validate an arbitrary module AST; decoding is not a premise. -/
 def validate (m : Module) : Bool :=
+  let dts := m.defTypes
   let C := moduleContext m
-  let C' := { C with globals := importGlobals m.imports }
-  m.inP2 && Nat.ble C.mems.length 1 &&
-  m.funcs.all (fun f => Nat.blt f.type m.typeList.length) &&
+  let C' := { C with globals := importGlobals dts m.imports }
+  Check.typesSeq m.types 0 && Nat.ble C.mems.length 1 &&
   m.imports.all (fun im => Check.importDesc C im.desc) &&
-  m.funcs.all (Check.func C) &&
-  m.tables.all (fun t => Check.limits (2 ^ 32 - 1) t.type.limits) &&
+  m.tags.all (fun t => Check.tagType C t.type) &&
+  Check.globals C' dts m.globals &&
   m.mems.all (Check.limits (2 ^ 16)) &&
-  m.globals.all (fun g => Check.constExpr C' g.init [g.type.val]) &&
-  m.elems.all (fun e => e.init.all (fun ex => Check.constExpr C' ex [.ref e.type.nullable]) &&
-    Check.elemMode C' e.type.nullable e.mode) &&
-  m.datas.all (fun d => Check.dataMode C' d.mode) &&
+  m.tables.all (fun t => Check.limits (2 ^ 32 - 1) t.type.limits &&
+    Check.heapSrc dts.length t.type.elem.heap &&
+    Check.constExpr C' t.init [.ref (t.type.elem.close dts)]) &&
+  m.funcs.all (Check.func C) &&
+  m.elems.all (fun e => Check.heapSrc dts.length e.type.heap &&
+    e.init.all (fun ex => Check.constExpr C ex [.ref (e.type.close dts)]) &&
+    Check.elemMode C (e.type.close dts) e.mode) &&
+  m.datas.all (fun d => Check.dataMode C d.mode) &&
   m.elems.all (fun e => Nat.blt e.init.length (2 ^ 32)) &&
   m.datas.all (fun d => Nat.blt d.init.length (2 ^ 32)) &&
   (match m.start with
     | none => true
-    | some x => match C.funcs[x]? with
+    | some x => match C.funcType x with
       | some ⟨[], []⟩ => true
       | _ => false) &&
   m.exports.all (fun ex => Check.exportDesc C ex.desc) &&

@@ -108,8 +108,10 @@ theorem alloc_extends (s : Store) (m : Module) (imports : List ExternVal) (gvals
     extends_append _ _ (fun _ => rfl),
     fun _ x hx => ⟨x, hx, rfl⟩⟩
 
+/-- Each member of a typed sequence is typed in the context after the locals its prefix
+initialized. -/
 theorem seq_member {C : Context} {es : List Instr} {st : StackType} (h : SeqT C es st) :
-    ∀ i ∈ es, ∃ st, InstrT C i st := by
+    ∀ i ∈ es, ∃ xs st, InstrT (C.addSets xs) i st := by
   induction h using SeqT.rec (motive_1 := fun _ _ _ _ => True) with
   | nil => simp
   | snoc hs hm hi ih _ =>
@@ -118,7 +120,7 @@ theorem seq_member {C : Context} {es : List Instr} {st : StackType} (h : SeqT C 
     · exact ih i hm
     · simp only [List.mem_singleton] at hm
       subst i
-      exact ⟨_, hi⟩
+      exact ⟨_, _, hi⟩
   | sub hs hm ih => exact ih
   | _ => trivial
 
@@ -129,7 +131,7 @@ theorem refFunc_bound {C : Context} {e : Expr} {ts : List ValType} (he : ExprT C
   cases i with
   | refFunc y =>
     cases heq
-    obtain ⟨st, ht⟩ := seq_member hs (.refFunc x) hi
+    obtain ⟨xs, st, ht⟩ := seq_member hs (.refFunc x) hi
     cases ht with
     | refFunc hf hr => exact lookup_lt hf
   | _ => cases heq

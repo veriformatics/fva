@@ -1518,15 +1518,12 @@ theorem instantiate_sound {H : HostSem} {fuel : Nat} {s s' : MStore} {m : Module
     Instantiated H m s.abs imports s'.abs inst := by
   simp only [instantiate, initRun, bind, Option.bind_eq_some_iff] at h
   rcases h with ⟨⟨m', ex⟩, hrun, hfin⟩
-  rcases hrun with ⟨gvals, hg0, trefs, ht0, erefs, he0, gvals₁, hg, trefs₁, ht, erefs₁, he, u, hu,
-    hr⟩
+  rcases hrun with ⟨⟨gvals, trefs, erefs⟩, -, u, hu, hr⟩
   cases u
   simp only [guard] at hu
   split at hu
-  · rename_i heq
-    simp only [Bool.and_eq_true, beq_iff_eq] at heq
-    rcases heq with ⟨⟨hgv, htr⟩, her⟩
-    subst gvals₁ trefs₁ erefs₁
+  · rename_i hagree
+    obtain ⟨hg, ht, he⟩ := Ref.initAgrees_sound (H := H) hagree
     simp only [Option.some.injEq] at hr
     obtain ⟨hs₁, hinst⟩ := alloc_abs s m imports gvals trefs erefs
     set s₁ := (s.alloc m imports gvals trefs erefs).1
@@ -1565,25 +1562,9 @@ theorem instantiate_sound {H : HostSem} {fuel : Nat} {s s' : MStore} {m : Module
           rw [hframe] at hsteps ⊢
           refine ⟨hm, gvals, trefs, erefs, s₁.abs, ?_, ?_, ?_, ?_, hsteps⟩
           · rw [hs₁, hinst]
-          · apply (Ref.forall₂_mapM hg).imp
-            intro g v hv
-            exact Ref.evalConst_sound hv
-          · apply (Ref.forall₂_mapM ht).imp
-            intro t r hex
-            simp only [Option.bind_eq_some_iff] at hex
-            rcases hex with ⟨v, hv, hvr⟩
-            cases v <;> simp only [Ref.asRef, reduceCtorEq, Option.some.injEq] at hvr
-            subst r
-            exact Ref.evalConst_sound hv
-          · apply (Ref.forall₂_mapM he).imp
-            intro e rs hers
-            apply (Ref.forall₂_mapM hers).imp
-            intro ex r hex
-            simp only [Option.bind_eq_some_iff] at hex
-            rcases hex with ⟨v, hv, hvr⟩
-            cases v <;> simp only [Ref.asRef, reduceCtorEq, Option.some.injEq] at hvr
-            subst r
-            exact Ref.evalConst_sound hv
+          · rw [hs₁, hinst]; exact hg
+          · rw [hs₁, hinst]; exact ht
+          · rw [hs₁, hinst]; exact he
         · contradiction
         · contradiction
       · contradiction

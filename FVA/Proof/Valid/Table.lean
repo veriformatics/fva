@@ -36,8 +36,8 @@ theorem ASeqT.tableGet {s : Store} {f : Frame} {C : Context} {x addr : Nat} {ti 
     cases hi with | plain hi =>
       cases hi with | tableGet hx =>
         have ht := hf.tableType hx ha hti
-        have hv := (hok.tables ti (List.mem_of_getElem? hti)).2.2 r (List.mem_of_getElem? hr)
-        exact .single (.value (by simpa only [ht] using hv))
+        have hv := (hok.tables ti (List.mem_of_getElem? hti)).2.2.2 r (List.mem_of_getElem? hr)
+        exact (AInstrT.value (by simpa only [ht] using hv))
 
 theorem ASeqT.tableSet {s : Store} {f : Frame} {C : Context} {x addr : Nat} {ti : TableInst}
     {i : BitVec 32} {r : Ref} {a b : List OpType} (hf : FrameCtx s f C)
@@ -61,7 +61,7 @@ theorem ASeqT.tableSize {s : Store} {C : Context} {x : Nat} {a b : List OpType}
   · intro x y hi
     cases hi with | plain hi => cases hi; rfl
   · intro x y hi _
-    cases hi with | plain hi => cases hi; exact .single (.value trivial)
+    cases hi with | plain hi => cases hi; exact (AInstrT.value trivial)
 
 theorem ASeqT.tableGrow_ref {s : Store} {f : Frame} {C : Context} {x addr : Nat}
     {ti : TableInst} {n : BitVec 32} {r : Ref} {a b : List OpType} (hf : FrameCtx s f C)
@@ -84,7 +84,7 @@ theorem ASeqT.tableGrow {s : Store} {C : Context} {x : Nat} {n : BitVec 32} {r :
   · intro x y hi
     cases hi with | plain hi => cases hi; rfl
   · intro x y hi _
-    cases hi with | plain hi => cases hi; exact .single (.value trivial)
+    cases hi with | plain hi => cases hi; exact (AInstrT.value trivial)
 
 theorem ASeqT.tableFillZero {s : Store} {C : Context} {x : Nat} {i n : BitVec 32} {r : Ref}
     {a b : List OpType}
@@ -121,7 +121,7 @@ theorem ASeqT.tableFill {s : Store} {C : Context} {x : Nat} {i n : BitVec 32} {r
                 (ts := [.num .i32, .ref tt.elem, .num .i32])
                 (.cons trivial (.cons hv (.cons trivial .nil))))
               (Matches.refl _) (.plain (.tableFill hx))
-            exact h₁.append h₂
+            exact h₁.append_pure h₂
 
 theorem ASeqT.tableCopyZero {s : Store} {C : Context} {x y : Nat} {d src n : BitVec 32}
     {a b : List OpType}
@@ -134,20 +134,20 @@ theorem ASeqT.tableCopyZero {s : Store} {C : Context} {x y : Nat} {d src n : Bit
     cases hi with | plain hi => cases hi; exact .nil
 
 private theorem table_copy_chunk {s : Store} {C : Context} {x y : Nat} {tx ty : TableType}
-    (hx : C.tables[x]? = some tx) (hy : C.tables[y]? = some ty) (he : tx.elem = ty.elem)
-    (d src : BitVec 32) :
+    (hx : C.tables[x]? = some tx) (hy : C.tables[y]? = some ty)
+    (he : ValType.Sub (.ref ty.elem) (.ref tx.elem)) (d src : BitVec 32) :
     ASeqT s C [(Val.i32 d).instr, (Val.i32 src).instr, .plain (.tableGet y),
       .plain (.tableSet x)] ⟨[], []⟩ := by
   have h₀ := ASeqT.values (s := s) (C := C) (vs := [.i32 d, .i32 src])
     (ts := [.num .i32, .num .i32]) (.cons trivial (.cons trivial .nil))
   have h₁ := ASeqT.snoc (t₀ := [i32]) h₀ (Matches.refl _) (.plain (.tableGet hy))
   have hm : Matches [i32, .val (.ref ty.elem)] [i32, .val (.ref tx.elem)] :=
-    .cons rfl (.cons (congrArg ValType.ref he.symm) .nil)
+    .cons rfl (.cons he .nil)
   exact .snoc (t₀ := []) h₁ hm (.plain (.tableSet hx))
 
 private theorem table_copy_again {s : Store} {C : Context} {x y : Nat} {tx ty : TableType}
-    (hx : C.tables[x]? = some tx) (hy : C.tables[y]? = some ty) (he : tx.elem = ty.elem)
-    (d src n : BitVec 32) :
+    (hx : C.tables[x]? = some tx) (hy : C.tables[y]? = some ty)
+    (he : ValType.Sub (.ref ty.elem) (.ref tx.elem)) (d src n : BitVec 32) :
     ASeqT s C [(Val.i32 d).instr, (Val.i32 src).instr, (Val.i32 n).instr,
       .plain (.tableCopy x y)] ⟨[], []⟩ :=
   .snoc (t₀ := []) (.values (vs := [.i32 d, .i32 src, .i32 n])
@@ -168,7 +168,7 @@ theorem ASeqT.tableCopyUp {s : Store} {C : Context} {x y : Nat} {d src n : BitVe
   · intro x y hi _
     cases hi with | plain hi =>
       cases hi with | tableCopy hx hy he =>
-        exact (table_copy_chunk hx hy he d src).append
+        exact (table_copy_chunk hx hy he d src).append_pure
           (table_copy_again hx hy he (BitVec.ofNat 32 (d.toNat + 1))
             (BitVec.ofNat 32 (src.toNat + 1)) (BitVec.ofNat 32 (n.toNat - 1)))
 
@@ -186,7 +186,7 @@ theorem ASeqT.tableCopyDown {s : Store} {C : Context} {x y : Nat} {d src n : Bit
     cases hi with | plain hi =>
       cases hi with | tableCopy hx hy he =>
         exact (table_copy_chunk hx hy he (BitVec.ofNat 32 (d.toNat + n.toNat - 1))
-          (BitVec.ofNat 32 (src.toNat + n.toNat - 1))).append
+          (BitVec.ofNat 32 (src.toNat + n.toNat - 1))).append_pure
           (table_copy_again hx hy he d src (BitVec.ofNat 32 (n.toNat - 1)))
 
 theorem ASeqT.tableInitZero {s : Store} {C : Context} {x y : Nat} {d src n : BitVec 32}
@@ -216,8 +216,9 @@ theorem ASeqT.tableInit {s : Store} {f : Frame} {C : Context} {x y addr : Nat}
     cases hi with | plain hi =>
       cases hi with | @tableInit _ _ _ tt rt hx hy he =>
         have hv : Val.HasType s (.ref r) (.ref tt.elem) := by
-          simpa only [hf.elemType hy ha hei, he] using
-            hok.elems ei (List.mem_of_getElem? hei) r (List.mem_of_getElem? hr)
+          have hv₀ := (hok.elems ei (List.mem_of_getElem? hei)).2 r (List.mem_of_getElem? hr)
+          rw [hf.elemType hy ha hei] at hv₀
+          exact hv₀.sub he
         have h₁ := ASeqT.snoc (s := s) (C := C) (t₀ := [])
           (ASeqT.values (vs := [.i32 d, .ref r]) (ts := [.num .i32, .ref tt.elem])
             (.cons trivial (.cons hv .nil)))
@@ -228,7 +229,7 @@ theorem ASeqT.tableInit {s : Store} {f : Frame} {C : Context} {x y addr : Nat}
             (ts := [.num .i32, .num .i32, .num .i32])
             (.cons trivial (.cons trivial (.cons trivial .nil))))
           (Matches.refl _) (.plain (.tableInit hx hy he))
-        exact h₁.append h₂
+        exact h₁.append_pure h₂
 
 theorem ASeqT.elemDrop {s : Store} {C : Context} {idx : Nat} {a b : List OpType}
     (h : ASeqT s C [.plain (.elemDrop idx)] ⟨a, b⟩) : Matches a b := by

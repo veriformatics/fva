@@ -5,7 +5,7 @@ FVA/Spec/Binary/Types.lean	59
 FVA/Spec/CAbi.lean	64
 FVA/Spec/Cert.lean	9
 FVA/Spec/ClaimAttr.lean	5
-FVA/Spec/Claims.lean	52
+FVA/Spec/Claims.lean	53
 FVA/Spec/Exec/Access.lean	42
 FVA/Spec/Exec/Host.lean	32
 FVA/Spec/Exec/Instantiate.lean	105
@@ -20,9 +20,9 @@ FVA/Spec/Rel/Sort.lean	7
 FVA/Spec/Rel/Text.lean	6
 FVA/Spec/Syntax.lean	219
 FVA/Spec/Trust.lean	101
-FVA/Spec/Types.lean	29
-FVA/Spec/Valid/Instr.lean	184
-FVA/Spec/Valid/Module.lean	133
-FVA/Spec/Valid/Runtime.lean	89
+FVA/Spec/Types.lean	83
+FVA/Spec/Valid/Instr.lean	249
+FVA/Spec/Valid/Module.lean	106
+FVA/Spec/Valid/Runtime.lean	115
 FVA/Spec/Valid/Soundness.lean	27
-total	2643
+total	2762
