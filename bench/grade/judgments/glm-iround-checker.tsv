@@ -9,7 +9,7 @@ fva-glm-iround-1	VERIFICATION.md	85-86,96-115	bench/runs/fva-glm-iround-1/work/V
 fva-glm-iround-2	VERIFICATION.md	73-74,85-102	bench/runs/fva-glm-iround-2/work/VERIFICATION.md:84	e2a1a237ae8aee51e3e9a85d32bc4a255e2cf87226b7e91ef40e5e5ed80aca1f	The report-only build/hash and external-checker shell/Python recipe supply the documented check.
 fva-glm-iround-3	VERIFICATION.md	87-88,100-123	bench/runs/fva-glm-iround-3/work/VERIFICATION.md:99	b9e6beae60e458d55dba61bda5a134d739099dc7173f83f61f046152a7121340	The report-only build/hash and external-checker shell/Python recipe supply the documented check.
 fva-glm-iround-4	-	-	-	-	The documented one-command check is already implemented in the archived verify.sh.
-fva-glm-iround-5	VERIFICATION.md	84-85,96-101	bench/runs/fva-glm-iround-5/work/VERIFICATION.md:95	f92a6163943918cf6d0b172e608dea5cbc1c30dfb15af566ddfb4ad358970633	The report-only build/hash and external-checker shell recipe supply the documented check.
+fva-glm-iround-5	VERIFICATION.md	84-85,96-101	bench/runs/fva-glm-iround-5/work/VERIFICATION.md:95	eb7db2c522fab3f0588b76a274dddec1d85c34a0a59c9ccd55a6383b63f0e618	The report-only build/hash and external-checker shell recipe supply the documented check.
 prompted-glm-iround-1	-	-	-	-	The complete documented check is already implemented by the archived shell/Python scripts.
 prompted-glm-iround-2	-	-	-	-	The complete documented check is already implemented by the archived shell/Python scripts.
 prompted-glm-iround-3	-	-	-	-	The complete documented check is already implemented by the archived shell/Python scripts.
