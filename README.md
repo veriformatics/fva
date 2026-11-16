@@ -126,3 +126,5 @@ The third-party binaries that these results are about are not in this repository
 ## License
 
 Apache-2.0 (`LICENSE`).
+
+The benchmark archive is a privacy edition. It removes personal machine labels, including labels inside compressed event logs. Scientific source files, license notices, and numeric results are unchanged. Historical machine paths remain nonportable. This export is not a new benchmark run.

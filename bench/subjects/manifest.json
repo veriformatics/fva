@@ -230,10 +230,10 @@
   ],
   "archives": [
     {
-      "id": "bench-runs-v2",
+      "id": "bench-runs-v2-redacted-v1",
       "file": "bench-runs.tar.xz",
-      "sha256": "30b019f7bd92f75be17739a89220df91d0a7e6d8dc1ee314f6e5ab1ad783abc8",
-      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/bench-runs-v2/bench-runs.tar.xz",
+      "sha256": "d967b443835a323c0b994e631cc8ae5f49f8d4ffd4ecbe98043a799f32a49942",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/bench-runs-v2-redacted-v1/bench-runs.tar.xz",
       "contents": "bench/runs/ (bench/fetch-runs unpacks it)"
     }
   ]

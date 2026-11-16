@@ -18,3 +18,11 @@ Tier = data: every consumer re-validates at use (sha256 pin per fetched file, `f
 - P4 race fix: `scripts/gate` fetches the corpus once before its parallel lanes; two concurrent `fetch-corpus` runs into an empty corpus (red on the old gate path: `sha256 mismatch` on the other run's `.part`) are no longer reachable from the gate.
 - P5 a fresh clone runs: CI (`ci/u33`) green on every group, its runners holding no prior cache of the moved files.
 - P6 docs: README, `bench/README.md`, `bench/results.md`, `.claude/rules/fva-checks.md` name where each moved file lives + how it is fetched.
+
+## Privacy edition amendment
+
+- Active archive = `bench-runs-v2-redacted-v1`; original archive = private offline evidence. Historical M1 receipt above describes the original bytes, not this export.
+- Export removes personal machine labels from text and nested compressed logs; preserve member order/modes/owners/mtime, license notices, all scientific source/input bytes, event structure and non-string JSON values. Historical paths remain nonportable; no benchmark/proof replay.
+- Migrate only the GLM judgment document SHA after its path-label edit; keep selected ranges, row counts, rationale and M5 results identical. Every other receipt remains unchanged.
+- Check entry points = `bench/fetch-runs`, `bench/grade/check-drivers`, `bench/grade/judged glm-iround`; anonymous fetch must match the pinned archive SHA.
+- Original source, deterministic exporter, redaction tests/fuzz corpus and original→export digest records are retained together in the private identity-migration backup. Public consumers require only the pinned immutable release.
