@@ -9,10 +9,11 @@ read -r dbl slow crashy hungry infra <<<"$out"
 [[ $crashy == 3 ]] && exit 3
 # 512 MiB read in one call, then held by a write blocked on a pipe nobody reads: ≈ 0.05 s CPU
 # per 256 MiB, so a starved worker still passes the 256 MiB cap far inside the 10 s stage limit
-# (a bash string grown to the cap costs seconds of CPU); a runner ignoring its memory cap times out
+# (a bash string grown to the cap costs seconds of CPU); a runner ignoring its memory cap times out.
+# Under a test's own `timeout` (as scripts/test-spec runs fvatest): GNU timeout moves its command
+# into a process group of its own, outside the cap's sample, unless scripts/mutation-bin wraps it
 if [[ $hungry == 3 ]]; then
-	# shellcheck disable=SC2216 # sleep never reads: dd blocks on its write, holding the buffer
-	dd if=/dev/zero bs=512M count=1 status=none | sleep 600
+	timeout 60 bash -c 'dd if=/dev/zero bs=512M count=1 status=none | sleep 600'
 fi
 [[ $infra == 5 ]] && exit 2
 [[ $dbl == 6 && $slow == 1 && $crashy == 2 && $hungry == 2 && $infra == 4 ]] || exit 1

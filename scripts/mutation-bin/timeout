@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# `timeout` for fvamut runs: scripts/test-mutation + scripts/test-mutation-fixture put this
+# directory first on fvamut's PATH. fvamut's memory cap (K7) samples the process group its own
+# `timeout` leads (FVAMUT_GROUP_LEADER=1 in fvamut's environment: plain call, unchanged); GNU
+# `timeout` moves its command into a group of its own, out of that sample, so a nested call (a
+# stage runs under `env -i`, which drops the marker) runs `--foreground`: its command stays in the
+# capped group.
+here=$(cd "$(dirname "$0")" && pwd -P) || exit 125
+IFS=: read -ra dirs <<<"$PATH"
+real=
+for d in "${dirs[@]}"; do
+	if [[ -x $d/timeout && $(cd "$d" 2>/dev/null && pwd -P) != "$here" ]]; then
+		real=$d/timeout
+		break
+	fi
+done
+[[ -n $real ]] || {
+	echo "timeout: no other timeout on PATH than $here" >&2
+	exit 125
+}
+[[ ${FVAMUT_GROUP_LEADER-} == 1 ]] && exec "$real" "$@"
+exec "$real" --foreground "$@"

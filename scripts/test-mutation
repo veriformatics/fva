@@ -24,4 +24,7 @@ fresh | list | check | update)
 esac
 # one run per tree: runs share .cache/mutate/run (snapshot + workers)
 mkdir -p .cache/mutate
+# K7 caps the process group fvamut's own `timeout` leads (FVAMUT_GROUP_LEADER marks that call);
+# scripts/mutation-bin keeps a stage's nested `timeout` command inside the group
+export PATH="$PWD/scripts/mutation-bin:$PATH" FVAMUT_GROUP_LEADER=1
 exec flock .cache/mutate/lock lake env .lake/build/bin/fvamut "$mode" "$@"

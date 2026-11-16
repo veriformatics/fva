@@ -5,6 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 fvamut=$PWD/.lake/build/bin/fvamut
+bin=$PWD/scripts/mutation-bin
 [[ -x $fvamut ]] || {
 	echo "test-mutation-fixture: $fvamut is not built"
 	exit 1
@@ -28,10 +29,11 @@ variant() { # name group...
 	git -C "$d" add v.json && git -C "$d" -c user.email=f@f -c user.name=f commit -qm v
 	echo "$d"
 }
-run() { # dir log args... → rc
+run() { # dir log args... → rc (fvamut as scripts/test-mutation runs it)
 	local d=$1 log=$2
 	shift 2
-	(cd "$d" && lake env "$fvamut" "$@" --config v.json >"$log" 2>&1)
+	(cd "$d" && PATH="$bin:$PATH" FVAMUT_GROUP_LEADER=1 lake env "$fvamut" "$@" --config v.json \
+		>"$log" 2>&1)
 }
 fail=0
 bad() {
