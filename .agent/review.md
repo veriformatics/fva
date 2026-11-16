@@ -101,7 +101,7 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | S5–S15 | the lens's other rows | no finding | accepted |
 | P2 | second pass (slices 2–3) | findings | accepted → fixed: claims detected through `whnf`, byte-identical re-lift, `[syntax]` on declared subjects, a missing source → `[surface]`, report text sanitized, `--subject` declarations (spec module refused); cheats LinkExtra + Syntax-as-subject |
 | A1–A6 | advisor pass | findings | accepted → fixed: relative project dir absolutized; every lifted module's `decode_eq` replayed by the run-set kernels (lz4-wasm ≤ 4 s each); canary timeouts uncached + undecided in `Pass.checker` (planted slow-kernel case; kernel hash = the binary run); spec module refused as `--subject`; known-acceptance file in the report; lean4lean `unknown constant` = decline |
-| E4 | verdict-module mutation (ad hoc, stages module + proofs: 110 mutants, 76 killed, 1 unviable, 33 survived: report wording `Status.name`, `Link.problems`, `standardAxioms`) | pass | the phase run with the trust group in scope (adca285): `FVA/Trust/Verdict.lean` 112 killed + 1 unviable, 0 survivors (the `FVATest/Trust.lean` guards kill the wording mutants) ⇒ nothing left to rule |
+| E4 | verdict-module mutation (ad hoc, stages module + proofs: 110 mutants, 76 killed, 1 unviable, 33 survived: report wording `Status.name`, `Link.problems`, `standardAxioms`) | pass | the phase run with the trust group in scope (ccc8b57): `FVA/Trust/Verdict.lean` 112 killed + 1 unviable, 0 survivors (the `FVATest/Trust.lean` guards kill the wording mutants) ⇒ nothing left to rule |
 
 ## U8 C1 vocabulary audit (reviewer-6, check set V1–V8 + R1, target wt/u8 overlay on a5da228)
 
@@ -129,7 +129,7 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 | R1 (register) | wg-2.0 declarative boundary rules lack the bottom-result matching its algorithm allows | note | accepted: recorded in the `SeqT` docstring |
 | S2 (prover-2) | module validity vs §2.2.5 vector bounds | finding (a valid module with a 2^32-byte data segment had untypable `initCode`; kernel witness) | accepted → fixed: `ModuleValid.elemLengths`/`dataLengths`; `InstantiateBounds.lean` proves the witness invalid |
 
-## U12 joined-groups survivors (reviewer-9, check set = per-mutant observable equivalence + governing-contract coverage + evidence integrity, target b42f4cb)
+## U12 joined-groups survivors (reviewer-9, check set = per-mutant observable equivalence + governing-contract coverage + evidence integrity, target 491f6a2)
 
 | row | check | verdict | ruling |
 |---|---|---|---|
@@ -167,27 +167,27 @@ Rows stay until ruled; the phase closes with no open row. Verdict source = the f
 |---|---|---|---|
 | SEC-1 | Mathlib origin trusts a pinned checkout's contents by `.git/HEAD` text alone (U7 F2): an in-place definition edit with rebuilt `.olean`s stays `mathlib`, outside the surface | register (inside F2 as written) | deferred D48 with its acceptance check |
 | SEC-2 | FVA base classified by *source* sha256 while replay reads the `.olean`s the project's own build wrote (D12 class) | register | deferred D49 with its acceptance check |
-| SEC-3 | users were not told that `fva trust` / `fva explain` build + run the project's code (D12 tracks the sandbox) | finding (docs) | accepted → fixed: README Limits line (9477294) |
+| SEC-3 | users were not told that `fva trust` / `fva explain` build + run the project's code (D12 tracks the sandbox) | finding (docs) | accepted → fixed: README Limits line (9e9c64d) |
 | SEC-4 | `codex app-server` thread = `sandbox: read-only`: the model can still run read-only shell commands over the whole disk, and project text (identifiers, literals, claim docstrings) reaches its prompt ⇒ an injected instruction can copy local files into the saved `fva-explain.json` | finding | accepted → fixed: `serverArgs` = `--disable shell_tool --disable unified_exec --disable view_image -c mcp_servers={}` (unknown feature names fail closed); `FVATest.Explain` guards red on the extracted unfixed args, green after; probe: shell present → planted file leaked 2/4, disabled → 0/4 |
 | L1 | bench tooling since U14 (`inject` two-component match, `Surface.lean` data heuristic, `archive` WP-cache prune, `inject-tool` Verus mode, D41 harness) | pass | self-reviewed per lens at each commit; checks in the commit bodies |
-| L2 | bench grading tooling in session 12 (`inject`: docstring walk-back 3aa5658, indented theorem 138300f; `check-lean` forbidden-construct pattern 232e7b5; grading rulings in `bench/grade/README.md`) | pass | self-reviewed per lens at each commit: each fix tested on the input that broke it (planted file builds; indented declaration planted; planted `.extern`/`@[extern]`/`sorry`/`native_decide`/`skipKernelTC` lines), shellcheck + shfmt rc 0, every task's C3 logs scanned for injection syntax errors (174 dirs, one case, rerun) |
+| L2 | bench grading tooling in session 12 (`inject`: docstring walk-back aa08bc2, indented theorem 7f5f796; `check-lean` forbidden-construct pattern 7b48eb9; grading rulings in `bench/grade/README.md`) | pass | self-reviewed per lens at each commit: each fix tested on the input that broke it (planted file builds; indented declaration planted; planted `.extern`/`@[extern]`/`sorry`/`native_decide`/`skipKernelTC` lines), shellcheck + shfmt rc 0, every task's C3 logs scanned for injection syntax errors (174 dirs, one case, rerun) |
 
-## U19c2/U20 composition units (MAIN-led, build in context; target main 10e9ea4 … 594ef18; lenses Correctness, Cleanup, Altitude)
+## U19c2/U20 composition units (MAIN-led, build in context; target main 94e4a64 … b769f25; lenses Correctness, Cleanup, Altitude)
 
 Check set fixed before reading: K1 `Spec.lean` R1–R3 = U19 contract Checkpoint 2 + the domain ruling; K2 every claim-side vocabulary used is reviewed (CAbi, Lz4.Format, Lz4.Any); K3 cutpoint statements true on their whole premise domain (proof-side: a false one blocks, never unsounds); K4 proof modules standard axioms + no `sorry` (`--wfail`) + roots in `scripts/test-subjects`; K5 duplicates + dead code; K6 shared-mechanism fixes over special cases.
 
 | row | check | verdict | ruling |
 |---|---|---|---|
-| K1 | R1–R3 vs contract Checkpoint 2 | pass (MAIN at merge 10e9ea4; reviewer-1, reviewer, on the factored `Spec` + `Call`: C1–C7 pass — R1–R3 = the contract, `Buffers` = the domain ruling, `OnCall` = the prepared call, docstrings faithful after F1, premises satisfiable incl. both empty-buffer cases, `SpecEq`'s unfactored bodies byte-identical to 27a2d5e's `Spec`, hygiene) | accepted; F1 (R3's docstring dropped "every call terminates with one `i32` result") fixed + re-reviewed; contract domain clause synced |
+| K1 | R1–R3 vs contract Checkpoint 2 | pass (MAIN at merge 94e4a64; reviewer-1, reviewer, on the factored `Spec` + `Call`: C1–C7 pass — R1–R3 = the contract, `Buffers` = the domain ruling, `OnCall` = the prepared call, docstrings faithful after F1, premises satisfiable incl. both empty-buffer cases, `SpecEq`'s unfactored bodies byte-identical to c8ea051's `Spec`, hygiene) | accepted; F1 (R3's docstring dropped "every call terminates with one `i32` result") fixed + re-reviewed; contract domain clause synced |
 | K2 | claim vocabulary reviewed | pass: `fva trust` probe = surface 88 lines (Spec 56 + Lz4.Format 26 + Lz4.Any 6), CAbi = FVA base | accepted |
-| K3 | cutpoint statements | finding: SegA–SegD claimed exits false for memories near 2^32 (overflow guards fire, i32 sums wrap) | accepted → fixed 1e7fbbd + 594ef18 (premise mem.size ≤ 2097152; every use has 2 MiB); remaining statements re-checked by their proofs |
+| K3 | cutpoint statements | finding: SegA–SegD claimed exits false for memories near 2^32 (overflow guards fire, i32 sums wrap) | accepted → fixed 77404d6 + b769f25 (premise mem.size ≤ 2097152; every use has 2 MiB); remaining statements re-checked by their proofs |
 | K4 | axioms / sorry / roots | pass: r1_of r2_of r3_of entry errRet match_holds = {propext, Classical.choice, Quot.sound}; roots listed | accepted |
-| K5 | duplicates + dead code | finding: R1-only loop proof superseded by Sim (Loop.lean 400 → 186, 700ef98); instance lemmas deduped (10e9ea4); numeric helpers spread over Match (toNat_sub_ofNat, mod_pos/neg), Cut/Entry (ofNat_wrap, iadd_neg), Sim (ofNat_toInt) + engine C's BlockNumeric/BlockFacts | accepted → deferred D60 (proof-side only; every proof builds and replays) |
+| K5 | duplicates + dead code | finding: R1-only loop proof superseded by Sim (Loop.lean 400 → 186, f7e6307); instance lemmas deduped (94e4a64); numeric helpers spread over Match (toNat_sub_ofNat, mod_pos/neg), Cut/Entry (ofNat_wrap, iadd_neg), Sim (ofNat_toInt) + engine C's BlockNumeric/BlockFacts | accepted → deferred D60 (proof-side only; every proof builds and replays) |
 | K6 | mechanism over special case | note: hand stepping's two failure classes (deep kernel term at ≈ 70 steps; `wasm_within` on `x + c`, c near 2^32) handled per proof (segments, iadd_neg) — mechanism-level fix belongs to the chosen engine | closed: engine C batches a block into one evaluator equation and rewrites `x + (2^32 − k)` to `x − k` at `block_simp` priority 2000 (`iadd_mask1/4`); `.claude/rules/fva-eval.md` records the normal forms |
 
 ## IMPLEMENT close — lz4 C decoder proof (U19 checkpoint 2, U20–U25), MAIN-led
 
-Check set fixed before reading the phase diff (c736868…HEAD): L1 correctness of the trusted and gate-side changes (`FVA/Trust/Replay.lean`, `scripts/subject-matrix`, `scripts/test-subjects`, `scripts/test-checks`, `Spec.lean`, `Call.lean`); L2 cleanup (duplicates, dead code, scaffolding left); L3 altitude (a special case on shared infrastructure); L4 `CLAUDE.md` conformance (commits, Tasks, teammates, cleanup); L5 security (MAIN only: inputs, injection, verdict spoofing).
+Check set fixed before reading the phase diff (25fd7b4…HEAD): L1 correctness of the trusted and gate-side changes (`FVA/Trust/Replay.lean`, `scripts/subject-matrix`, `scripts/test-subjects`, `scripts/test-checks`, `Spec.lean`, `Call.lean`); L2 cleanup (duplicates, dead code, scaffolding left); L3 altitude (a special case on shared infrastructure); L4 `CLAUDE.md` conformance (commits, Tasks, teammates, cleanup); L5 security (MAIN only: inputs, injection, verdict spoofing).
 
 | row | lens | verdict | ruling |
 |---|---|---|---|

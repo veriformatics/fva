@@ -1,6 +1,6 @@
 # navigator-2 — independent IMPLEMENT interpretation: U19 checkpoint 2
 
-Scope = current working-tree `.agent/spec.md` (base `e5de229`; Phase body uncommitted), contract + sources named in brief. Repo read-only; this file alone writable. Evidence = source inspection, not a new build/replay. No `lake`/`lean` run. Historical approval provenance beyond the current quoted Phase body = unconfirmed; a `(user ruling)` label alone is not a transcript. Snapshot SHA256: spec `fb2eb444a3eca84d0acfacc0057c566a8c9cba6efa88594dc949dae6e3607794`; contract `cd8e762bf20aebfd4736b0e9d77a8b1f41a254be3de2e3fe6704417a58abc94e`.
+Scope = current working-tree `.agent/spec.md` (base `79f7058`; Phase body uncommitted), contract + sources named in brief. Repo read-only; this file alone writable. Evidence = source inspection, not a new build/replay. No `lake`/`lean` run. Historical approval provenance beyond the current quoted Phase body = unconfirmed; a `(user ruling)` label alone is not a transcript. Snapshot SHA256: spec `fb2eb444a3eca84d0acfacc0057c566a8c9cba6efa88594dc949dae6e3607794`; contract `cd8e762bf20aebfd4736b0e9d77a8b1f41a254be3de2e3fe6704417a58abc94e`.
 
 ## Read-first verdict
 | ids | verdict | lead attention |

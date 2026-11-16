@@ -2,7 +2,7 @@
 
 Result = **5/5 frozen roots proven**, standard axioms only. Final code = `ce5c7397787ab6bb09e5ccd42893886400dbec00`; independent-checker eligibility remains MAIN's measurement. Instruction/spec edits = none.
 
-Arm start = 2026-11-01T10:50:43+09:00; deadline = 2026-11-01T18:50:43+09:00. Base = c736868; branch = wt/spike-c. Lean LSP unavailable; `lake build` supplies elaboration diagnostics.
+Arm start = 2026-11-01T10:50:43+09:00; deadline = 2026-11-01T18:50:43+09:00. Base = 25fd7b4; branch = wt/spike-c. Lean LSP unavailable; `lake build` supplies elaboration diagnostics.
 
 ## Per statement
 | stmt | status (proved / not completed) | theorem name | start (ISO time) | end (ISO time) | build iterations / M0 tool calls | statement-specific code lines | infrastructure lines used (new / reused) | `#print axioms` | failure class if not completed + last failed obligation + command/rc |

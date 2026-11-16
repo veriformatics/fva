@@ -104,7 +104,7 @@ Verdict cells adjudicated with quoted evidence (`file:line` + exact words). Vali
 
 ### Read state + checks
 
-- State read: HEAD `e5de229`; working `.agent/spec.md` contains the new verbatim Phase request. Current contract, README, Format, CAbi/Access/Claims, Ext and named archives read in full; C source read at decoder region + table declarations; WAT func 2 + funcs 3/4 + header/data inspected. Other researchers'/navigators' reports were not read.
+- State read: HEAD `79f7058`; working `.agent/spec.md` contains the new verbatim Phase request. Current contract, README, Format, CAbi/Access/Claims, Ext and named archives read in full; C source read at decoder region + table declarations; WAT func 2 + funcs 3/4 + header/data inspected. Other researchers'/navigators' reports were not read.
 - Artifact identity: `sha256sum` on `bench/subjects/wasm/lz4-c.wasm` and `FVATest/Subjects/Lz4C/lz4-c.wasm` = identical expected digest above; `cmp` rc 0. `wasm-tools print FVATest/Subjects/Lz4C/lz4-c.wasm | cmp - .scratch/u19c2/lz4-c.wat` rc 0. Thus WAT evidence is checked against the actual pinned bytes, not assumed to correspond.
 - Data-segment count: positive expectation = two 8-entry i32 tables = 64 bytes; WAT data byte-escape count = 64, rc 0. Instance comment discrepancy is F15 only.
 - Current absence of decoder claims: `Spec.lean` file-presence probe rc 1; `Ext.lean` positive-control probe rc 0. Existing `scripts/test-subjects` has only Lz4C proof-only roots, not a Lz4C claim/surface row (`:14–26`). This is expected open work, not drift.

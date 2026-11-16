@@ -1,6 +1,6 @@
 # spike-d — U20 arm d report
 
-Arm start = 2026-11-01T10:50:05+09:00. Deadline = 2026-11-01T18:50:05+09:00. Base = c736868; branch = wt/spike-d. Raw build observations = builds.tsv + build-*.log. S1 interval includes orientation + shared infrastructure.
+Arm start = 2026-11-01T10:50:05+09:00. Deadline = 2026-11-01T18:50:05+09:00. Base = 25fd7b4; branch = wt/spike-d. Raw build observations = builds.tsv + build-*.log. S1 interval includes orientation + shared infrastructure.
 
 Status `proved` = the theorem's frozen type accepted by Lean + its axiom audit. Independent default-checker replay, M2 controlled runs, M3 exports and the repository gate = not run by this arm; MAIN performs them after harvest. Frozen Copy.lean + Short.lean SHA-256 = the U20 contract's exact hashes (2 files, hash command rc 0).
 
@@ -198,7 +198,7 @@ For the next function: its agent supplies code slices, head-local facts and bran
 - Measurement-only scratch support = `build` (shell logger), `Metrics.lean` (`FVA.Trust.codeLines` driver), `metrics-S*.tsv`, `declarations-S*.txt`, `tool-counts.tsv`; excluded from the committed prover-source M1 cells. Raw attempts, including failed/killed builds, remain in `builds.tsv`, `build-starts.tsv`, `build-*.log`. Metrics regeneration: run `lake env lean --run <report-dir>/Metrics.lean <module-files…>` inside this worktree. Tool counts use this arm's `agent-aspike-d-cca29b1740841bc8.jsonl`, not the parent transcript.
 - Protocol source check: 23 owned Lean files selected from the base diff (expected 23, rc 0); prohibited-token positive control = 1 / rc 0, source matches = 0 / rc 1. Closing axiom-log positive control = 5 standard-only root lines / rc 0; `sorryAx` matches = 0 / rc 1. `git diff --cached --check` → rc 0.
 - Report validator: 149 retained source-declaration rows, expected 149 / rc 0; planted placeholder cell → 1 cell / rejection rc 1; final report → 0 placeholder cells / rc 0. Source-level declarations are counted once; Lean-generated recursors, projections and elaboration auxiliaries are not separate source rows.
-- One fresh sol author context from c736868, no successor or nested agents, no other arm's work read. Public checkpoint-1 machinery = the supplied baseline. All 73 logged build invocations sum to 2,841.11 s wall time, waits included; exact CPU-vs-idle/provider compute split = not measured (logs hold elapsed/RSS, not that split). Measurement-only source footprint, outside committed M1: Lean driver 30 code lines, shell logger 16 nonblank lines.
+- One fresh sol author context from 25fd7b4, no successor or nested agents, no other arm's work read. Public checkpoint-1 machinery = the supplied baseline. All 73 logged build invocations sum to 2,841.11 s wall time, waits included; exact CPU-vs-idle/provider compute split = not measured (logs hold elapsed/RSS, not that split). Measurement-only source footprint, outside committed M1: Lean driver 30 code lines, shell logger 16 nonblank lines.
 - Not run here: independent checker export/replay, full repository gate, mutation suite, controlled timing repetitions. No claim of eligibility or method superiority before MAIN's checks.
 
 ## Statement issues (a frozen statement that looked false or ill-posed: what, where, evidence)

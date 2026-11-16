@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Blind acceptance of .agent/spec.md 3ed6b36: Language + Wasm reach.
+# Blind acceptance of .agent/spec.md bd00b00: Language + Wasm reach.
 # rc 0 all pass / 1 assertion or pending / 2 setup / 3 crash.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2

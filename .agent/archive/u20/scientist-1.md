@@ -23,7 +23,7 @@ Validator: `grep -c "| unknown |"` on this file → 1 (this preamble alone). Tab
 
 ## Scope, evidence pins, and limits
 
-Root = `/home/developer/Projects/fva/`; base commit from the brief = `e5de229`. Read the current U20 contract, Copy/Short/Model, U19 contract and E1 appraisal/results, all four U19c2 research reports, func-2 AST paths, complete func-2/3/4 WAT, differential generators/checker/mutation list, copy sanity source, Context/Until/codeLines definitions, and the initial ModelProof extension lemmas. MAIN is still changing ModelProof; this report does not grade its eventual completion. The current Phase request explicitly asks first-use/reuse, export/replay **growth**, theorem coverage, and I7 alongside I4.
+Root = `/home/developer/Projects/fva/`; base commit from the brief = `79f7058`. Read the current U20 contract, Copy/Short/Model, U19 contract and E1 appraisal/results, all four U19c2 research reports, func-2 AST paths, complete func-2/3/4 WAT, differential generators/checker/mutation list, copy sanity source, Context/Until/codeLines definitions, and the initial ModelProof extension lemmas. MAIN is still changing ModelProof; this report does not grade its eventual completion. The current Phase request explicitly asks first-use/reuse, export/replay **growth**, theorem coverage, and I7 alongside I4.
 
 Pinned appraisal inputs:
 

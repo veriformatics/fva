@@ -98,7 +98,7 @@ Agreement is label compatibility under this fixed, coarse mapping, not semantic 
         1000000
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-edger-cpm-2/R1
 
@@ -157,7 +157,7 @@ Proofs.artifact_arithmetic ∧
       FVA.Wasm.Instr.store FVA.Wasm.NumType.f64 { align := 3, offset := 0 }]
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-edger-cpm-3/R1
 
@@ -233,7 +233,7 @@ FVA.Wasm.Num.ofBits FVA.Wasm.Num.f64fmt 9214364837600034816 = FVA.Wasm.Num.FVal.
           "calc_cpm_raw" Proofs.fixtureArgs fun s vs => vs = [] ∧ Proofs.outputBits s = 9218868437227405312
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-edger-cpm-5/R1
 
@@ -289,7 +289,7 @@ Proofs.artifact_binding ∧
     FVA.Wasm.Exec.Must H (Proofs.wrote 9218868437227405312) (Proofs.cellStart 9214364837600034816 9214364837600034816)
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-glm-iround-5/R1
 
@@ -314,7 +314,7 @@ x.IsNum ∧
           FVA.Wasm.Exec.Returns Proofs.Lifted.module "iround" [FVA.Wasm.Exec.Val.f64 bits] [FVA.Wasm.Exec.Val.i32 1]
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-lz4-c-1/R1
 
@@ -642,7 +642,7 @@ Ruling (MAIN): shipped M3 `weaker` stands. The claims prove the requirement's ow
     vs = [FVA.Wasm.Exec.Val.i32 1] ∧ Proofs.bytesAt s 0 13 = some (65 :: List.replicate 12 0)
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-lz4-wasm-3/R2
 
@@ -682,7 +682,7 @@ Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-che
     vs = [FVA.Wasm.Exec.Val.i32 1] ∧ Proofs.bytesAt s 0 13 = some (65 :: List.replicate 12 0)
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-lz4-wasm-4/R1
 
@@ -701,7 +701,7 @@ Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-che
     vs = [FVA.Wasm.Exec.Val.i32 13] ∧ Proofs.bytesAt s 262208 13 = Proofs.badBlock
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-lz4-wasm-4/R2
 
@@ -732,7 +732,7 @@ Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-che
     vs = [FVA.Wasm.Exec.Val.i32 1] ∧ Proofs.bytesAt s 0 17 = 97 :: List.replicate 16 0
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-lz4-wasm-5/R2
 
@@ -774,7 +774,7 @@ Proofs.Format.decode Proofs.validBlock = some Proofs.decodedBlock ∧
         vs = [FVA.Wasm.Exec.Val.i32 1] ∧ Proofs.bytesAt s 0 13 = some (65 :: List.replicate 12 0)
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-lz4-wasm-6/R1
 
@@ -803,7 +803,7 @@ Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-che
   ¬Proofs.endConditions 13 5 4
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-lz4-wasm-6/R2
 
@@ -845,7 +845,7 @@ Proofs.shortValid Proofs.validBlock Proofs.decodedContent ∧
         vs = [FVA.Wasm.Exec.Val.i32 1] ∧ Proofs.bytesAt s 0 [65, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-lz4-wasm-7/R2
 
@@ -864,7 +864,7 @@ Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-che
     vs = [FVA.Wasm.Exec.Val.i32 1] ∧ Proofs.memoryBytes s 32 13 = [65, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-tmm-1/R1
 
@@ -1002,7 +1002,7 @@ Ruling (MAIN): shipped M3 `faithful` stands. The claims bind the shipped output 
             Proofs.reference xs = 3 ∧ ↑(Proofs.decimalValue (ds[2]?.getD (0, 0))) + 1 / 100 < Proofs.factor xs 2
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-tmm-3/R2
 
@@ -1024,7 +1024,7 @@ Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-che
             Proofs.reference xs = 3 ∧ ↑(Proofs.decimalValue (ds[2]?.getD (0, 0))) + 1 / 100 < Proofs.factor xs 2
 ```
 
-Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (d8cbbb3) still had. Explain error.
+Ruling (MAIN): shipped M3 stands. The run refutes the requirement (a machine-checked counterexample: a sound refutation = `not proven, reported`, grading ruling); its claims state a result the requirement rules out, which D64's definitions label `different`; explain's `weaker` is the pre-D64 label confusion these prompts (518427e) still had. Explain error.
 
 ### fva-tmm-4/R1
 
@@ -1144,7 +1144,7 @@ Ruling (MAIN): shipped M3 `faithful` stands. The claims bind the shipped output 
 - MAIN-approved proof compatibility: exactly one body-only name replacement in each of `fva-lz4-c-2/Proofs/Startup.lean` and `fva-lz4-rust-1/Proofs/Execution.lean`, `FVA.Wasm.Valid.InitProof.steps_values` → `FVA.Wasm.Exec.Ref.steps_values`. Every spec and theorem statement stays byte-identical (apart from spec claim marks/import); every other archived Lean file stays byte-identical. Exact diffs = `out/<run>.proof-api.diff`; original/migrated SHA + replacement counts = `out/proof-api-migrations.json`. The validator permits those two exact replacements alone, and fresh `fva trust` checks the migrated proofs.
 - `fva-lz4-rust-5` retried unchanged after other modules cached, under the same 20 GiB/no-swap cap: build and explanation completed, all three labels are comparable, but fresh trust is FAIL (`con-leche timed out the export`; `no kernel outside Lean's own lineage accepted the export`). Its mapped 3/3 is not a fresh proof PASS. Sequence = `out/current.log`, `out/retry-rust5.log`, then the two API reruns in `out/api-reruns.log`.
 - Runtime-example coverage: the clean worktree has no `.tools/`, hence no `.tools/bin/wasmtime` (`binaryValue` calls this exact path). No binary-output validation is claimed. The requirement comparison uses the claim statements and generated explanations; rendered example status alone is not evidence that the shipped binary traps. This limit does not justify rerunning the language-model judgments.
-- Reported comparison batch = clean revision `d8cbbb324e46f8f435ea842bbf129f0008cbb68e`; private detached worktree `.scratch/worktrees/explainer-d56`; binary sha256 `4a7e0f4324e27c0ff59e682221d343f3c7fe28ddf1f5a5ad017b109de545b0d2`. `lake build fva` and `scripts/fetch-canaries` passed there; build log = `out/prepare-clean.log`. Every run uses this worktree's binary; MAIN's mutable working binary is excluded. Model/effort = shipped defaults (`gpt-6-luna`, `medium`).
+- Reported comparison batch = clean revision `518427e05e93853bc46d5a28a150ebffa10ef62f`; private detached worktree `.scratch/worktrees/explainer-d56`; binary sha256 `4a7e0f4324e27c0ff59e682221d343f3c7fe28ddf1f5a5ad017b109de545b0d2`. `lake build fva` and `scripts/fetch-canaries` passed there; build log = `out/prepare-clean.log`. Every run uses this worktree's binary; MAIN's mutable working binary is excluded. Model/effort = shipped defaults (`gpt-6-luna`, `medium`).
 - Sandbox-compatible dependencies = one owned, clean-revision `fva init` package at `build/clean-package/fva`, with a private copy of the benchmark's pinned package store under its `.lake/packages`. Each scratch project points `fva/` there and rewrites only `packagesDir` in its manifest/lakefile to `fva/.lake/packages`. Per-run patches + dependency provenance = `out/<run>.package.diff` and `out/<run>.package.json`. Spec text stays unchanged except the explicit claim marks/import; proof edits are limited to the two body-only qualified names above.
 - Superseded dirty-snapshot diagnostics = `out/diagnostic-dirty-snapshot/` (two completed explanations, then the batch stopped with rc 143). Those outputs and saved texts are excluded from the reported comparison. All thirty clean-revision attempts start without a saved explanation; a diagnostic error is not counted unless the clean batch reproduces it.
 - Original pass: 30/30 archives rebuilt by `bench/grade/rebuild`; 30/30 current `fva explain … --requirements … --json` invocations attempted serially under a 20 GiB memory cap. Every invocation exited 2 before a model call: `fva explain: fva trust gave no report (rc 1)`. Empty stdout `.json` files are retained as raw command output, not represented as valid JSON. Stderr, rc, command metadata and rebuild logs = `out/original/`; sequence = `out/baseline.log`.

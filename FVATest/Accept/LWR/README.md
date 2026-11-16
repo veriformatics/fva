@@ -1,6 +1,6 @@
 # Language + Wasm reach acceptance
 
-Contract = `.agent/spec.md` at `3ed6b3612c38f6165ed0b3393f0d07199cc58bed`, Intent + Decisions,
+Contract = `.agent/spec.md` at `bd00b005c87af8e087f7f524d3ba80686c578aa4`, Intent + Decisions,
 Language + Wasm reach, plus MAIN's public outcome-protocol and claim-dependency rulings below.
 FVA implementation unread. Runner interface = `wasm-tools json-from-wast` →
 `.lake/build/bin/fvatest spec <json>`; `FVA_SPEC_OUTCOMES` records one tally row per command.
@@ -56,7 +56,7 @@ rc 1 because it expects `instruction requires [i32] but stack has []` while Wasm
 
 ### U25 — each input's baseline output
 
-`p/f/s` = the runner's pass/fail/skip row. All rows below were observed on FVA `3ed6b36`.
+`p/f/s` = the runner's pass/fail/skip row. All rows below were observed on FVA `bd00b00`.
 A green baseline control is not a mutation-qualified new test.
 
 | Check | File relative to this directory (`R(F)`) | Commands | Oracle rc | Baseline p/f/s; rc | State |
@@ -86,7 +86,7 @@ in for a decoder rejection. The validating false assertion belongs to U25. Since
 (`assert_malformed: module decodes`), and the check is merged.
 
 `U25.outcome-protocol` repeats the four-command matching-import case and requires a complete
-trace. On `3ed6b36`, the aggregate is `4 0 0`, rc 0, but the trace is empty. Its checker prints
+trace. On `bd00b00`, the aggregate is `4 0 0`, rc 0, but the trace is empty. Its checker prints
 `outcome rows 0 != commands 4`, rc 1. That is a red-first check of the new public interface.
 
 ### D30 / U26 — machine properties
@@ -189,7 +189,7 @@ part stays pending U27+U29b: the selected system claim uses `SysMust` under the 
 profile E. The current import-free `Returns` draft is non-binding and must be replaced once
 MAIN supplies the exact public system vocabulary. The stock SDK runtime remains unchanged.
 
-| Check | Command / observable output on 3ed6b36 | State |
+| Check | Command / observable output on bd00b00 | State |
 | --- | --- | --- |
 | D29.cpp-build | `FVATest/Subjects/CppEH/build TMP/eh.wasm`; rc 0, `cmp` with shipped 44,913-byte artifact equal | green |
 | D29.cpp-oracle | `wasmtime run -W exceptions=y,tail-call=y,function-references=y,gc=y --invoke eh eh.wasm X`; all eight calls rc 0 | green |
@@ -276,7 +276,7 @@ success or nixbox measurements. The rulings add two outcome checks and move one 
 case from FAIL to pending U28a; the original fixture bytes and required behavior are unchanged.
 
 Current committed-run command = `scripts/test-accept-lwr --record .scratch/lwr/final-commit`,
-under `offload run --local -- nice -n 10`. FVA implementation stays `3ed6b36`, unread.
+under `offload run --local -- nice -n 10`. FVA implementation stays `bd00b00`, unread.
 Raw final output = `.scratch/lwr/final-commit-suite.log`; commands/output/rc/walls/traces =
 `.scratch/lwr/final-commit/`. These are local evidence, not required suite inputs.
 The suite returns rc 3 because `D30.large-copy` reaches its 180 s execution limit.

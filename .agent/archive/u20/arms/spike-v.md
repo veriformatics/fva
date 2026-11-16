@@ -2,7 +2,7 @@
 
 S1–S5 = Lean-checked, standard axioms only; five ordered stage commits. Default independent replay + fixed-CPU cost measurements = MAIN-owned, not run by this arm. No method-superiority claim.
 
-- Worktree: `/home/developer/Projects/fva/.scratch/worktrees/spike-v` (`wt/spike-v`); base `c736868`; final `14f50a9`; working tree clean.
+- Worktree: `/home/developer/Projects/fva/.scratch/worktrees/spike-v` (`wt/spike-v`); base `25fd7b4`; final `14f50a9`; working tree clean.
 - Start: 2026-11-01T10:50:24+09:00; budget deadline: 2026-11-01T18:50:24+09:00. Last frozen-root first success: 2026-11-01T14:55:50+09:00; final commit: 2026-11-01T15:00:36+09:00.
 - File paths in the declaration table are relative to the worktree above.
 

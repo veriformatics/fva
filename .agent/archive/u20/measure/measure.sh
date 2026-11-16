@@ -13,7 +13,7 @@
 set -uo pipefail
 root=/home/developer/Projects/fva
 out=$root/.scratch/u19c2/measure
-base=c736868
+base=25fd7b4
 cpu=${CPU:-7}
 arms=(d v c)
 declare -A wt=([d]=$root/.scratch/worktrees/spike-d [v]=$root/.scratch/worktrees/spike-v

@@ -1,6 +1,6 @@
 # consultant-4 — U20 method ruling
 
-Scope = independent decision review; frozen arm evidence C `13431b9`, D+ `d511763`, V `14f50a9`. Main source = `2865183`. Read-only source/data inspection; no builds, Lean, replay or full gate rerun. Post-cutoff production work excluded.
+Scope = independent decision review; frozen arm evidence C `13431b9`, D+ `d511763`, V `14f50a9`. Main source = `8c25b00`. Read-only source/data inspection; no builds, Lean, replay or full gate rerun. Post-cutoff production work excluded.
 
 **Headline:** provisional C is justified as a local policy choice, not an empirical method winner. Main open dimension = final-closure/paranoid/all-subject operability. Recommended change = bring production-kernel replay forward to U21.
 

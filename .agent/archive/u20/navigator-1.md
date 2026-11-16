@@ -1,6 +1,6 @@
 # navigator-1 — IMPLEMENT orientation interpretation (scope: U19 checkpoint 2, lz4 C decoder proof)
 
-Scope = independent reading of HEAD `e5de229ded1e512e7da5996a5d4f0cb782b8a9a6` + the live `.agent/spec.md` request. Evidence = exact source quotes + line anchors. Finish validator = the brief's exact unknown-cell matcher yields count 0 (the seed's self-matching command text is removed). No Lean builds/replays or state-changing git commands run.
+Scope = independent reading of HEAD `79f7058eefbfe4b63313039246a9e1a5262e7d27` + the live `.agent/spec.md` request. Evidence = exact source quotes + line anchors. Finish validator = the brief's exact unknown-cell matcher yields count 0 (the seed's self-matching command text is removed). No Lean builds/replays or state-changing git commands run.
 
 ## A. Intent clauses (`.agent/spec.md` Intent) bearing on this scope → testable reading for THIS scope
 | id | clause (quote) | testable reading here | ambiguous? (readings) | honored / drifted / open by the plan + contract |
@@ -131,7 +131,7 @@ The source declares the expected roots (`FVATest/Subjects/Lz4C/ExtDirect.lean:29
 
 | item | result |
 |---|---|
-| baseline | HEAD `e5de229ded1e512e7da5996a5d4f0cb782b8a9a6`; tracked status initially `M .agent/spec.md` only; no state-changing git command |
+| baseline | HEAD `79f7058eefbfe4b63313039246a9e1a5262e7d27`; tracked status initially `M .agent/spec.md` only; no state-changing git command |
 | live spec hash | `.agent/spec.md` sha256 `fb2eb444a3eca84d0acfacc0057c566a8c9cba6efa88594dc949dae6e3607794` |
 | contract hash | `docs/contracts/U19-decoder-spike.md` sha256 `cd8e762bf20aebfd4736b0e9d77a8b1f41a254be3de2e3fe6704417a58abc94e` |
 | format hash | `FVATest/Subjects/Lz4/Format.lean` sha256 `348f2a9fa8f927aa119bd7830ade23f0d7eec05386d3efafddd7a518e3b581b6` |

@@ -21,7 +21,7 @@ instance) = third arm.
 - I7 fit neutralized: `Sim.lean` consumes the frozen cutpoint statements for any engine
   (scientist-2 C5: neutralizes interface compatibility, not the cost of reaching the interface).
 - Proven by MAIN with the checkpoint-1 machinery (`wasm_cstepu`/`wasm_within`): Entry, ErrRet,
-  SegA (`Cut/ExtB`, 448f18e: ExtL1B = checkpoint 1's route-D loop proof with the bound exit kept);
+  SegA (`Cut/ExtB`, 0fe008c: ExtL1B = checkpoint 1's route-D loop proof with the bound exit kept);
   composition R1–R3 ⇐ cutpoints (`Top.lean`, `Sim.lean`). Open for the engine: SegB, SegD (+ the
   winner's S1–S5 + SegC merged).
 - Engines are untrusted tooling: kernel-checked, zero review surface, zero trusted base.
@@ -59,7 +59,7 @@ warnings under `--wfail`). All three arms eligible (rule 1 + 4).
   the S3 wildcopy, the offset read), SegD (offset check, prologue: 8-byte `memcpy` or the offset < 8
   tables + byte copies, matchRest: S4 far from the end, near it a third wildcopy to `oend − 7` + the
   byte loop I3).
-- ExtL1B (done, 448f18e) ≠ a SegC transfer (scientist-3 phase A, `Cut/SegA.lean:145–154`): it keeps
+- ExtL1B (done, 0fe008c) ≠ a SegC transfer (scientist-3 phase A, `Cut/SegA.lean:145–154`): it keeps
   checkpoint 1's generic premises (any `acc < 2^31`, `lim ≤ mem.size`, no 2 MiB cap) and its
   reachable overflow exit; both SegC proofs used the 2 MiB profile to rule the overflow guards out.
   Proven engine-neutrally by checkpoint 1's route-D proof with the bound exit kept (`Cut/ExtB`).

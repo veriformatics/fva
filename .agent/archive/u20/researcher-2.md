@@ -16,7 +16,7 @@ Completed cells = evidence + limits; no unresolved seed cells. Each number/quote
 
 Scope = gap-filling: functional/exact-memory model boundary; overlap + wild-copy refinement; measured reuse/effort; totality + access preservation. Prior results remain baselines, not fresh evidence. Upstream proof code will be read, not built/replayed.
 
-Prior survey = `.agent/archive/u19/researcher-{1,2,3}.md`; its HOL4/seL4/CompCert/s2n/LNSym/Talos/Aeneas overview is not repeated. Local baseline = `.agent/archive/u19/e1.md`, not a new experiment. Local source revision read = `e5de229ded1e512e7da5996a5d4f0cb782b8a9a6`.
+Prior survey = `.agent/archive/u19/researcher-{1,2,3}.md`; its HOL4/seL4/CompCert/s2n/LNSym/Talos/Aeneas overview is not repeated. Local baseline = `.agent/archive/u19/e1.md`, not a new experiment. Local source revision read = `79f7058eefbfe4b63313039246a9e1a5262e7d27`.
 
 ## R2.1 — relation + granularity: what is factored out
 
