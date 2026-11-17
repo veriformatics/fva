@@ -36,14 +36,17 @@ NativeDecide axiom,replay
 Vacuous vacuous
 Syntax syntax
 Syntax syntax --subject FVATest.Cheats.Syntax.Vocab
+MetaCmd syntax
+MetaExit syntax
+MetaInit syntax
 SubjectInstance subject --subject FVATest.Cheats.SubjectInstance.Impl
 SubjectArg PASS --subject FVATest.Cheats.SubjectArg.Impl
 Layout layout
 LinkSource link
 LinkMissing link
 LinkEscape link
-LinkNoDecodeEq link,vacuous
-LinkOtherNumeral link,vacuous
+LinkNoDecodeEq link,syntax,vacuous
+LinkOtherNumeral link,syntax,vacuous
 LinkExtra link,syntax
 Prelude prelude
 Override override
@@ -148,6 +151,13 @@ job relative relative
 # the spec module declared a subject (which would leave the review surface) = usage error
 job usage "$fva" trust . --spec-module FVATest.Cheats.Clean.Spec \
 	--root-module FVATest.Cheats.Clean --subject FVATest.Cheats.Clean.Spec
+# shellcheck disable=SC2329 # run through job
+trust_json() { # CHEAT → its `--json` report alone (notes on stderr dropped)
+	"$fva" trust . --spec-module "FVATest.Cheats.$1.Spec" --root-module "FVATest.Cheats.$1" \
+		--json 2>/dev/null
+}
+job json.Clean trust_json Clean
+job json.MetaCmd trust_json MetaCmd
 wait
 runs=$(find "$tmp" -maxdepth 1 -name '*.sec' | wc -l)
 slowest=$(for f in "$tmp"/*.sec; do printf '%s %s\n' "$(<"$f")" "$(basename "$f" .sec)"; done |
@@ -170,8 +180,11 @@ while read -r c want args; do
 	n=$((n + 1))
 	got=$(tags "cheat.$n")
 	[[ -z $got ]] && grep -q '^fva trust: PASS' "$tmp/cheat.$n.log" && got=PASS
-	if [[ $got != "$want" ]]; then
-		echo "test-trust: FVATest.Cheats.$c $args → $got, pinned $want"
+	# a PASS exits 0, a FAIL 1 (an rc 2 setup error prints no tags either)
+	wrc=1
+	[[ $want == PASS ]] && wrc=0
+	if [[ $got != "$want" ]] || (($(rc "cheat.$n") != wrc)); then
+		echo "test-trust: FVATest.Cheats.$c $args → $got rc $(rc "cheat.$n"), pinned $want rc $wrc"
 		fail=1
 	fi
 done <<<"$pinned"
@@ -245,5 +258,19 @@ if (($(rc usage) != 2)); then
 	echo "test-trust: spec module as subject → rc $(rc usage), pinned 2"
 	fail=1
 fi
-((fail)) || echo "test-trust: glue checks + self package + $n cheat runs + 2 usage cases checked"
+# U36 C2: the `--json` report lists each review module's commands (`fva explain` reads `module`)
+clean=$(jq -r '.report.reviewModules |
+	if length > 0 and all(.commands == []) then "none" else tojson end' \
+	"$tmp/json.Clean.log" 2>/dev/null)
+meta=$(jq -c '[.report.reviewModules[] | select(.module == "FVATest.Cheats.MetaCmd.Spec") |
+	.commands]' "$tmp/json.MetaCmd.log" 2>/dev/null)
+if (($(rc json.Clean) != 0)) || [[ $clean != none ]] || (($(rc json.MetaCmd) != 1)) ||
+	[[ $meta != '[["run_cmd at line 7"]]' ]]; then
+	echo "test-trust: --json commands → Clean rc $(rc json.Clean) ${clean:-no report}," \
+		"MetaCmd rc $(rc json.MetaCmd) ${meta:-no report};" \
+		'pinned rc 0 none, rc 1 [["run_cmd at line 7"]]'
+	fail=1
+fi
+((fail)) || echo "test-trust: glue checks + self package + $n cheat runs + 2 usage cases +" \
+	"2 JSON reports checked"
 exit "$fail"

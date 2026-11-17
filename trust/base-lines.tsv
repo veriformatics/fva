@@ -19,10 +19,10 @@ FVA/Spec/Rel/Compile.lean	38
 FVA/Spec/Rel/Sort.lean	7
 FVA/Spec/Rel/Text.lean	6
 FVA/Spec/Syntax.lean	219
-FVA/Spec/Trust.lean	101
+FVA/Spec/Trust.lean	116
 FVA/Spec/Types.lean	83
 FVA/Spec/Valid/Instr.lean	249
 FVA/Spec/Valid/Module.lean	106
 FVA/Spec/Valid/Runtime.lean	115
 FVA/Spec/Valid/Soundness.lean	27
-total	2762
+total	2777

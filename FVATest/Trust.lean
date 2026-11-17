@@ -2,6 +2,7 @@ import FVA.Trust.Collect
 import FVA.Trust.Replay
 import FVA.Trust.Canary
 import FVA.Trust.Verdict
+import FVA.Tool.Sandbox
 import FVA.Json
 
 /-!
@@ -47,6 +48,58 @@ open FVA.Trust Lean
       List (String × Nat)) do
     unless codeLines env src == n do
       throw <| .userError s!"codeLines {repr src} = {codeLines env src}, pinned {n}"
+
+/-! ## Listed commands (U36 C3, C5): by Lean's tokenizer, one entry per position, with its line -/
+
+-- every command token in code position, one per line
+#eval show IO Unit from do
+  let env ← mkEmptyEnvironment
+  let got := (listedTokens env ("\n".intercalate commandTokens)).toList
+  unless got == commandTokens.zipIdx 1 do
+    throw <| .userError s!"listedTokens over commandTokens = {got}"
+
+#eval show IO Unit from do
+  let env ← mkEmptyEnvironment
+  for (src, want) in ([
+      -- Mathlib's `eval%` splits in the builtin table: adjacency decides; `eval %` is `HMod`
+      ("def c := eval% (1 + 1)", [("eval%", 1)]), ("def n := eval % 3", []),
+      ("def n := eval/- c -/% 3", []),
+      -- attribute names, escaped or not, after `local`/`scoped`/`-`; never their arguments
+      ("@[term_elab foo] def f := 1", [("term_elab", 1)]),
+      ("attribute [«term_elab» Lean.Parser.Term.hole] Lean.Elab.Term.elabHole", [("term_elab", 1)]),
+      ("@[inherit_doc term_elab] def x := 1", []), ("@[macro K] def m := 1", [("macro", 1)]),
+      ("@[simp, local command_elab x] def f := 1", [("command_elab", 1)]),
+      ("@[foo [bar, term_parser]] def x := 1", []), ("attribute [local instance] foo", []),
+      ("attribute [-builtin_init] x", [("builtin_init", 1)]),
+      ("@[app_unexpander Foo] def u := 1", [("app_unexpander", 1)]),
+      ("@[scoped tactic t] def t := 1", [("tactic", 1)]),
+      ("def term_elab := 1\ndef app_unexpander := 2", []),
+      -- terms interpolated into a string literal (one string token to the tokenizer); a plain
+      -- literal's braces read as one too, and an escaped `\{`, unknown to the plain-string
+      -- tokenizer, leaves the rest of the line to it as code (both conservative); raw strings
+      -- and chars hold none
+      ("def s := s!\"{((by_elab return default) : Nat)}\"", [("by_elab", 1)]),
+      ("def t := s!\"{f \"x\"} {include_str \"p\"}\"", [("include_str", 1)]),
+      ("def p := \"{#eval}\"", [("#eval", 1)]), ("def e := s!\"\\{#eval}\"", [("#eval", 1)]),
+      ("def r := r\"{#eval}\"", []), ("def c := '{'", []),
+      -- comments, doc comments, identifiers holding a listed word, escaped names
+      ("-- #eval\n/- run_cmd -/\n/-- set_option -/\ndef x := 1", []),
+      ("def elaborate := macroName syntaxTree set_optionX myinitialize x.meta Foo.initialize",
+        []), ("def «run_cmd» := 1", []),
+      -- every place, in order, with its line (CRLF ends, non-ASCII text before)
+      ("def α := 1\r\nset_option pp.all true\r\n-- ∀ #eval\r\n#exit",
+        [("set_option", 2), ("#exit", 4)]),
+      ("@[macro K] macro \"x\" : term => `(1)", [("macro", 1), ("macro", 1)])] :
+      List (String × List (String × Nat))) do
+    let got := (listedTokens env src).toList
+    unless got == want do
+      throw <| .userError s!"listedTokens {repr src} = {got}, pinned {want}"
+
+#guard (ruleSyntax { (default : Report) with
+    reviewModules := [⟨"M", ["M.n"], ["run_cmd at line 3"], true, 1⟩] }).map
+      (fun i => (i.tag, i.detail)) ==
+  [("syntax", "M declares syntax, elaborators or initializers: M.n"),
+   ("syntax", "M: run_cmd at line 3 (runs code or changes elaboration)")]
 
 /-! ## Bounded JSON (D70): an exponent Lean's parser would expand aborts nothing -/
 
@@ -113,6 +166,19 @@ def checkout (root : System.FilePath) (dir name head : String) : IO Unit := do
 /-- Fail the build unless `got = want`. -/
 def expect {α : Type} [BEq α] [ToString α] (what : String) (got want : α) : IO Unit :=
   unless got == want do throw <| .userError s!"{what}: got {got}, want {want}"
+
+-- Sandbox (D12, U36 C6): the full mode unshares the user namespace and denies nested ones;
+-- `nested` and `noNet` keep their arguments; each mode's word names it again
+#eval show IO Unit from IO.FS.withTempDir fun tmp => do
+  let has (m : FVA.Tool.Sandbox.Mode) (flag : String) : IO Bool :=
+    return (← FVA.Tool.Sandbox.bwrapArgs tmp "/sysroot" #[] m).contains flag
+  expect "full: user namespace" (← has .full "--unshare-user") true
+  expect "full: nested ones denied" (← has .full "--disable-userns") true
+  expect "nested: allowed" (← has .nested "--disable-userns") false
+  expect "nested: unshared" (← has .nested "--unshare-all") true
+  expect "noNet: allowed" (← has .noNet "--disable-userns") false
+  expect "words" (([.full, .nested, .noNet, .off] : List FVA.Tool.Sandbox.Mode).all fun m =>
+    FVA.Tool.Sandbox.Mode.ofWord m.word == m) true
 
 -- Mathlib origin (F2): only packages pinned exactly as FVA pins them, checked out at that pin
 #eval show IO Unit from IO.FS.withTempDir fun tmp => do

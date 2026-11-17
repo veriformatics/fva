@@ -195,6 +195,11 @@ def isSyntaxExt (ci : ConstantInfo) : Bool :=
       ``Elab.Command.CommandElab, ``Elab.Tactic.Tactic].contains n
   | none => false
 
+/-- An initializer: `initialize`, `builtin_initialize` or a command expanding to one
+(`register_option`, Mathlib's `register_simp_attr`, …), code that every later import runs. -/
+def isInit (env : Environment) (n : Name) : Bool :=
+  (regularInitAttr.getParam? env n).isSome || (builtinInitAttr.getParam? env n).isSome
+
 /-- Generated equation lemmas land in whichever module first unfolds a definition. -/
 def isEqnLemma : Name → Bool
   | .str _ s =>
@@ -415,18 +420,22 @@ def collect (input : Input) :
   let mut subjectSyntax := #[]
   let mut rebuild := #[]
   for m in specClosure do
-    let exts := (moduleConsts env m).filter fun n => ((env.find? n).map isSyntaxExt).getD false
+    let exts := (moduleConsts env m).filter fun n =>
+      ((env.find? n).map isSyntaxExt).getD false || isInit env n
     if orig.get? m == some .subject then
       subjectSyntax := subjectSyntax ++ exts.map fun n => s!"{m}: {n}"
     unless orig.get? m == some .project || orig.get? m == some .subject do continue
     let src ← sourceOf m
     rebuild := rebuild.push (m, ← IO.FS.realPath (← findOLean m), src)
     unless orig.get? m == some .project do continue
-    let lines ← match src with
-      | some f => pure (codeLines env (← IO.FS.readFile f))
-      | none => pure 0
-    reviewModules := reviewModules.push { module := m.toString, codeLines := lines,
-                                          found := src.isSome,
+    let text ← match src with
+      | some f => pure (some (← IO.FS.readFile f))
+      | none => pure none
+    let commands := ((text.map (listedTokens env)).getD #[]).toList.map fun (t, l) =>
+      s!"{t} at line {l}"
+    reviewModules := reviewModules.push { module := m.toString,
+                                          codeLines := (text.map (codeLines env)).getD 0,
+                                          found := src.isSome, commands,
                                           syntaxExts := (exts.map (·.toString)).toList }
   -- D8: a subject's instances + coercions fix what the statements' notation and casts mean;
   -- an instance passed straight to a subject function is that function's input, and

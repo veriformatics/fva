@@ -15,7 +15,7 @@ Run `fva help` to see the commands, and `fva <command> --help` to see the argume
 - Lean 4.35.0 and Lake (`elan` installs them from `lean-toolchain`).
 - Mathlib v4.35.0. The command `lake exe cache get` downloads its compiled files once; after that, FVA works offline.
 - To compile examples: `clang` with the `wasm32` target, `rustc` with `wasm32-unknown-unknown`.
-- For `fva trust` and `fva explain`: `bwrap` (bubblewrap) with unprivileged user namespaces.
+- For `fva trust` and `fva explain`: `bwrap` (bubblewrap) 0.8 or later, with unprivileged user namespaces. An older or setuid `bwrap` still runs the sandbox, but it cannot stop the project's code from creating user namespaces, and `fva trust` tells you so.
 - For `fva explain`: a signed-in `codex` CLI.
 
 ## Start a project
@@ -96,7 +96,7 @@ An agent can draft this file from the README, the issues or the source code. Rea
 | trusted glue | reading facts from Lean, the file checks, process control, the external kernels | small and tested; each kernel must reject the known false proofs |
 | residual trust | the Lean kernel (checked again by an independent kernel), the Lean compiler, Mathlib at its pinned revision | standard for Lean proofs |
 
-Your review covers the claims in your specification files only. FVA's own files count as reviewed only when they are byte-identical to the pinned versions.
+Your review covers the claims in your specification files only. `fva trust` fails when one of these files runs code or changes how Lean reads the rest of it (for example `#eval`, `run_cmd`, `#exit` or `set_option`), because the text that you read would then not be the statement that the kernel checks. FVA's own files count as reviewed only when they are byte-identical to the pinned versions.
 
 ## Examples in this repository
 
@@ -121,7 +121,7 @@ The third-party binaries that these results are about are not in this repository
 - FVA verifies core WebAssembly 2.0 without SIMD, threads, exceptions or garbage-collected types.
 - Programs that read files or the network through WASI are not modeled; certify their outputs instead.
 - A proof shows that the binary meets the claims. It is your task to check that the claims say what you want.
-- `fva trust` and `fva explain` run the project's own code (its Lake configuration, its build, its Lean definitions) in a `bwrap` sandbox: no network, the system read-only, your home directory hidden, and writes allowed only in the project's `.lake` directories. The project needs a `lake-manifest.json`. Inside an agent's sandbox that denies network sockets, `fva trust` keeps its sandbox without its own network namespace and says so; where bwrap cannot run at all, `--no-sandbox` runs without it (use it only inside a container you trust). FVA itself still reads the project's compiled `.olean` files. FVA builds the spec module and the project modules that it imports again, in the same sandbox, and the check fails if the project's compiled files are different. If you do not trust a project, run FVA inside a container or a virtual machine as well.
+- `fva trust` and `fva explain` run the project's own code (its Lake configuration, its build, its Lean definitions) in a `bwrap` sandbox: no network, no new user namespaces, the system read-only, your home directory hidden, and writes allowed only in the project's `.lake` directories. The project needs a `lake-manifest.json`. Inside an agent's sandbox that denies network sockets, `fva trust` keeps its sandbox without its own network namespace and says so; where bwrap cannot run at all, `--no-sandbox` runs without it (use it only inside a container you trust). FVA itself still reads the project's compiled `.olean` files. FVA builds the spec module and the project modules that it imports again, in the same sandbox, and the check fails if the project's compiled files are different. If you do not trust a project, run FVA inside a container or a virtual machine as well.
 
 ## License
 

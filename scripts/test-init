@@ -198,7 +198,69 @@ LAKEFILE
 			"$([[ -e $tmp/outside ]] && echo written || echo absent); pinned rc 1, [build], absent"
 		f=1
 	fi
+	lane_userns || f=1
 	exit "$f"
+}
+
+# U36 (C6): the project's code creates no user namespace inside the sandbox (bwrap
+# --disable-userns): a build target records `unshare --user`'s rc, then fails the build. A bwrap
+# that refuses the flag alone (stub: before 0.8, or setuid) leaves the rest of the sandbox and a
+# note; any other refusal stays a setup error
+lane_userns() {
+	local f=0 u=$tmp/userns s=$tmp/oldbwrap real got rc
+	mkdir -p "$u" "$s"
+	cat >"$u/lakefile.lean" <<LAKEFILE
+import Lake
+open Lake DSL
+
+package userns
+
+@[default_target] lean_lib Userns
+
+/-- Records whether the build may create a user namespace, then fails the build. -/
+@[default_target] target probe : Unit := do
+  let o ← IO.Process.output { cmd := "unshare", args := #["--user", "true"] }
+  IO.FS.writeFile "$u/.lake/userns.rc" s!"{o.exitCode}"
+  error "probe recorded"
+LAKEFILE
+	echo 'def x := 1' >"$u/Userns.lean"
+	echo '{"version": "1.3.0", "packagesDir": ".lake/packages", "packages": [], "name": "userns",' \
+		'"lakeDir": ".lake"}' >"$u/lake-manifest.json"
+	"$fva" trust "$u" --spec-module Userns >"$tmp/userns.out" 2>&1
+	rc=$?
+	got=$(cat "$u/.lake/userns.rc" 2>/dev/null)
+	if ((rc != 1)) || [[ -z $got || $got == 0 ]] || grep -q '^fva trust: sandbox:' "$tmp/userns.out"; then
+		echo "test-init: unshare --user inside the sandbox → rc ${got:-none} (fva rc $rc," \
+			"$(grep -c '^fva trust: sandbox:' "$tmp/userns.out") notes); pinned refused, rc 1, no note"
+		f=1
+	fi
+	real=$(command -v bwrap) || exit 2
+	cat >"$s/bwrap" <<EOF
+#!/usr/bin/env bash
+for a; do [[ \$a == --disable-userns ]] && { echo "\$BWRAP_REFUSAL" >&2; exit 1; }; done
+exec '$real' "\$@"
+EOF
+	chmod +x "$s/bwrap"
+	rm -f "$u/.lake/userns.rc"
+	BWRAP_REFUSAL='bwrap: Unknown option --disable-userns' PATH=$s:$PATH \
+		"$fva" trust "$u" --spec-module Userns >"$tmp/userns-old.out" 2>&1
+	rc=$?
+	got=$(cat "$u/.lake/userns.rc" 2>/dev/null)
+	if ((rc != 1)) || [[ $got != 0 ]] ||
+		! grep -q '^fva trust: sandbox: .*--disable-userns needs bubblewrap 0.8' "$tmp/userns-old.out"; then
+		echo "test-init: a bwrap without --disable-userns → unshare rc ${got:-none}, fva rc $rc;" \
+			"pinned the reduced sandbox with its note (unshare rc 0, fva rc 1)"
+		f=1
+	fi
+	BWRAP_REFUSAL='bwrap: setting up uid map: Permission denied' PATH=$s:$PATH \
+		"$fva" trust "$u" --spec-module Userns >"$tmp/userns-other.out" 2>&1
+	rc=$?
+	if ((rc != 2)) || ! grep -q 'the sandbox for the project.s code cannot start' "$tmp/userns-other.out"; then
+		echo "test-init: bwrap failing for another reason under --disable-userns → rc $rc;" \
+			"pinned rc 2, the sandbox cannot start"
+		f=1
+	fi
+	return "$f"
 }
 
 # on the copy q (its own files and builds; Mathlib hard links, each planted file replaced): one

@@ -7,8 +7,9 @@ import FVA.Json
 `fva trust` and `fva explain` run the project's own code: its Lake configuration (`lake build`,
 `lake env`), its modules' elaboration (`#eval`, macros, build targets) and the exporter reading
 its `.olean`s. Each such process runs in `bwrap`, as `lake check` does: `/` read-only, home
-directories, `/run/user` and `/tmp` covered, an empty network namespace, the environment
-cleared but for `PATH`; writable alone the `.lake` directories of the project and its path
+directories, `/run/user` and `/tmp` covered, an empty network namespace, no user namespace
+created inside it (`--disable-userns`), the environment cleared but for `PATH`; writable alone the
+`.lake` directories of the project and its path
 dependencies, plus the private scratch directories a caller names. A write anywhere else fails,
 so project code cannot change FVA, its canaries, the toolchain or the user's files.
 -/
@@ -55,18 +56,31 @@ def externalPackages (root : FilePath) : IO (Array FilePath) := do
       out := out.push (← IO.FS.realPath pkg)
   return out
 
-/-- How project code is confined (D19): `full` = every namespace unshared; `noNet` = the same
-without a network namespace, chosen only where bwrap cannot create one (an agent sandbox that
-denies netlink sockets) and the outer sandbox already denies sockets; `off` = `--no-sandbox`. -/
+/-- How project code is confined (D19): `full` = every namespace unshared, and no user namespace
+inside (bwrap's `--disable-userns`: each one is kernel attack surface the project's code does not
+need); `nested` = the same with nested user namespaces left allowed, where this bwrap lacks
+`--disable-userns` (before 0.8, or setuid); `noNet` = the same as `nested` without a network
+namespace, chosen only where bwrap cannot create one (an agent sandbox that denies netlink
+sockets) and the outer sandbox already denies sockets; `off` = `--no-sandbox`. -/
 inductive Mode where
-  | full | noNet | off
+  | full | nested | noNet | off
 deriving BEq, Repr
 
 /-- The report line for a mode. -/
 def Mode.describe : Mode → String
   | .full => "bwrap (no network, the system read-only, writes to the project's .lake only)"
+  | .nested => "bwrap, but this bwrap cannot stop the project's code from creating user " ++
+    "namespaces (--disable-userns needs bubblewrap 0.8 or later, not installed setuid)"
   | .noNet => "bwrap without its own network namespace (the outer sandbox already denies sockets)"
   | .off => "off (--no-sandbox: the project's code runs with your permissions)"
+
+/-- A mode's `--sandbox-mode` word (`fva trust` hands its choice to `trust-run`). -/
+def Mode.word : Mode → String
+  | .full => "full" | .nested => "nested" | .noNet => "noNet" | .off => "off"
+
+/-- The mode a `--sandbox-mode` word names (`full` for any other word). -/
+def Mode.ofWord : String → Mode
+  | "nested" => .nested | "noNet" => .noNet | "off" => .off | _ => .full
 
 /-- `bwrap` arguments that run a command in `root` (resolved) with `writable` directories
 (created when missing) writable. The toolchain (`sysroot`) and every path dependency stay
@@ -80,8 +94,12 @@ def bwrapArgs (root sysroot : FilePath) (writable : Array FilePath) (mode : Mode
   -- the outer `PATH` stays (NixOS keeps its tools under /run/current-system); its entries under
   -- a covered directory just vanish
   let path := (← IO.getEnv "PATH").getD "/usr/local/bin:/usr/bin:/bin"
-  let unshare := if mode == .full then #["--unshare-all"] else
-    #["--unshare-user", "--unshare-ipc", "--unshare-pid", "--unshare-uts", "--unshare-cgroup-try"]
+  -- `--disable-userns` needs the user namespace unshared outright (`--unshare-all` only tries)
+  let unshare := match mode with
+    | .full => #["--unshare-all", "--unshare-user", "--disable-userns"]
+    | .nested => #["--unshare-all"]
+    | _ => #["--unshare-user", "--unshare-ipc", "--unshare-pid", "--unshare-uts",
+      "--unshare-cgroup-try"]
   return #["--die-with-parent", "--new-session"] ++ unshare ++ #["--clearenv",
       "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
       "--tmpfs", "/tmp", "--tmpfs", "/home", "--tmpfs", "/root", "--tmpfs", "/run/user"] ++
@@ -117,9 +135,11 @@ def unavailable (root sysroot : FilePath) : IO (Option String) := do
   let o ← try IO.Process.output a catch e => return some (toString e)
   return if o.exitCode == 0 then none else some (o.stderr.trimAscii.toString)
 
-/-- The mode for this host (D19): `full` when it starts; else `noNet` when the full sandbox fails
-on its network namespace and, inside the reduced one, a TCP socket is denied (an agent sandbox
-such as Codex's); else the failure's message. `noSandbox` = `off`, unchecked. -/
+/-- The mode for this host (D19): `full` when it starts; else `nested` when bwrap refuses
+`--disable-userns` alone (an older or setuid bwrap: every other failure stays one); else `noNet`
+when the sandbox fails on its network namespace and, inside the reduced one, a TCP socket is
+denied (an agent sandbox such as Codex's); else the failure's message. `noSandbox` = `off`,
+unchecked. -/
 def choose (root sysroot : FilePath) (noSandbox : Bool := false) : IO (Except String Mode) := do
   if noSandbox then return .ok .off
   let probe (m : Mode) (cmd : String) (args : Array String) : IO IO.Process.Output := do
@@ -127,6 +147,9 @@ def choose (root sysroot : FilePath) (noSandbox : Bool := false) : IO (Except St
     catch e => return { exitCode := 127, stdout := "", stderr := toString e }
   let o ← probe .full "true" #[]
   if o.exitCode == 0 then return .ok .full
+  let o ← if (o.stderr.splitOn "disable-userns").length > 1 then probe .nested "true" #[]
+    else pure o
+  if o.exitCode == 0 then return .ok .nested
   let err := o.stderr.trimAscii.toString
   unless (err.splitOn "NETLINK").length > 1 || (err.splitOn "loopback").length > 1 do
     return .error err

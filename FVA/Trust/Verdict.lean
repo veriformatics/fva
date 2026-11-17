@@ -88,13 +88,16 @@ def ruleLayout (r : Report) : List Issue :=
 def ruleOverride (r : Report) : List Issue :=
   r.flags.map fun f => ⟨"override", s!"{f.decl} ({f.module}) is {f.kind}"⟩
 
-/-- `[syntax]`. -/
+/-- `[syntax]`: one issue per module declaring extensions, one per listed command. -/
 def ruleSyntax (r : Report) : List Issue :=
   r.reviewModules.flatMap (fun m =>
-    if m.syntaxExts.isEmpty then []
-    else [⟨"syntax", s!"{m.module} extends syntax: {", ".intercalate m.syntaxExts}"⟩]) ++
+    (if m.syntaxExts.isEmpty then []
+     else [⟨"syntax", s!"{m.module} declares syntax, elaborators or initializers: " ++
+       ", ".intercalate m.syntaxExts⟩]) ++
+    m.commands.map fun c => ⟨"syntax", s!"{m.module}: {c} (runs code or changes elaboration)"⟩) ++
   if r.subjectSyntax.isEmpty then []
-  else [⟨"syntax", s!"subject modules extend syntax: {", ".intercalate r.subjectSyntax}"⟩]
+  else [⟨"syntax", "subject modules declare syntax, elaborators or initializers: " ++
+    ", ".intercalate r.subjectSyntax⟩]
 
 /-- `[subject]`. -/
 def ruleSubject (r : Report) : List Issue :=

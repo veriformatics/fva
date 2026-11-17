@@ -47,10 +47,11 @@ theorem ruleOverride_nil (r : Report) : ruleOverride r = [] ↔ r.flags = [] := 
   simp [ruleOverride]
 
 theorem ruleSyntax_nil (r : Report) : ruleSyntax r = [] ↔
-    (∀ m ∈ r.reviewModules, m.syntaxExts = []) ∧ r.subjectSyntax = [] := by
-  simp only [ruleSyntax, List.append_eq_nil_iff, List.flatMap_eq_nil_iff]
+    (∀ m ∈ r.reviewModules, m.syntaxExts = [] ∧ m.commands = []) ∧ r.subjectSyntax = [] := by
+  simp only [ruleSyntax, List.append_eq_nil_iff, List.flatMap_eq_nil_iff, List.map_eq_nil_iff]
   refine and_congr (forall₂_congr fun m _ => ?_) ?_
-  · split <;> simp_all [List.isEmpty_iff]
+  · refine and_congr ?_ Iff.rfl
+    split <;> simp_all [List.isEmpty_iff]
   · split <;> simp_all [List.isEmpty_iff]
 
 theorem ruleSubject_nil (r : Report) : ruleSubject r = [] ↔ r.subjectMeaning = [] := by

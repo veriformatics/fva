@@ -42,7 +42,7 @@ structure Opts where
   known : Option String := none
   /-- `--no-sandbox` (D19): run the project's code unconfined. -/
   noSandbox : Bool := false
-  /-- The sandbox mode `main` chose, for `trust-run`'s exporter (`full`, `noNet`, `off`). -/
+  /-- The sandbox mode `main` chose, for `trust-run`'s exporter (`Sandbox.Mode.word`). -/
   sandbox : String := "full"
 
 /-- Parse options (`dir` first). -/
@@ -246,8 +246,7 @@ def run (argv : List String) : IO UInt32 := do
     let exportPath := tmp / "export.ndjson"
     -- the rebuild + the exporter read the project's `.olean`s, the rebuild runs its code:
     -- sandboxed, the temp dir alone writable
-    let mode : Sandbox.Mode := match o.sandbox with
-      | "off" => .off | "noNet" => .noNet | _ => .full
+    let mode := Sandbox.Mode.ofWord o.sandbox
     let leanPath := (← IO.getEnv "LEAN_PATH").getD ""
     let sandbox ← if mode == .off then pure #[] else
       pure ((← Sandbox.bwrapArgs root (← findSysroot) #[tmp] mode) ++
@@ -340,8 +339,7 @@ def main (argv : List String) : IO UInt32 := do
         "trust")
       return 2
   unless mode == .full do IO.eprintln s!"fva trust: sandbox: {mode.describe}"
-  let o := { o with
-    sandbox := match mode with | .full => "full" | .noNet => "noNet" | .off => "off" }
+  let o := { o with sandbox := mode.word }
   let b ← IO.Process.output (← Sandbox.spawnArgs root sysroot (sysroot / "bin" / "lake").toString
     #["build"] (mode := mode))
   if b.exitCode != 0 then
