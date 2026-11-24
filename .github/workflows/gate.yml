@@ -25,17 +25,30 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # `./.lake` = lean-action's cache scheme (Mathlib's packages + the last build), restored by
+      # prefix from main's latest; saved by main pushes alone (gate-fix-8: lean-action saved ≈ 2 GB per
+      # new commit in each ref's scope, and a few concurrent runs overflowed the 10 GB cache)
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ./.lake
+          key: lake-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('./lean-toolchain') }}-${{ hashFiles('./lake-manifest.json') }}-${{ github.sha }}
+          restore-keys: lake-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('./lean-toolchain') }}-${{ hashFiles('./lake-manifest.json') }}
       - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
         with:
           auto-config: "false"
           use-mathlib-cache: "true"
-          use-github-cache: "true"
+          use-github-cache: "false"
       - name: Build
         run: lake --wfail build && lake --wfail build fvatest fvafuzz
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .lake/build
           key: fva-build-${{ github.sha }}
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: ./.lake
+          key: lake-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('./lean-toolchain') }}-${{ hashFiles('./lake-manifest.json') }}-${{ github.sha }}
 
   gate:
     needs: build
@@ -55,18 +68,31 @@ jobs:
         with:
           fetch-depth: 0 # gitleaks scans history
           persist-credentials: false
+      # `./.lake` = lean-action's cache scheme (Mathlib's packages + the last build), restored by
+      # prefix from main's latest; saved by main pushes alone (gate-fix-8: lean-action saved ≈ 2 GB per
+      # new commit in each ref's scope, and a few concurrent runs overflowed the 10 GB cache)
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: matrix.group != 'static'
+        with:
+          path: ./.lake
+          key: lake-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('./lean-toolchain') }}-${{ hashFiles('./lake-manifest.json') }}-${{ github.sha }}
+          restore-keys: lake-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('./lean-toolchain') }}-${{ hashFiles('./lake-manifest.json') }}
       - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6 # v1.6.2
         if: matrix.group != 'static'
         with:
           auto-config: "false"
           use-mathlib-cache: "true"
-          use-github-cache: "true"
+          use-github-cache: "false"
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: build
         if: matrix.group != 'static'
         with:
           path: .lake/build
           key: fva-build-${{ github.sha }}
-          fail-on-cache-miss: true
+      # the build job's cache evicted before this job (concurrent runs share the 10 GB) → rebuild
+      - name: Build (cache evicted)
+        if: matrix.group != 'static' && steps.build.outputs.cache-hit != 'true'
+        run: lake --wfail build && lake --wfail build fvatest fvafuzz
       # `lake check` (test-init) and fva trust's own sandbox use bwrap: absent from the image, and
       # Ubuntu 24.04's AppArmor default denies the unprivileged user namespace it needs
       - name: Sandbox
