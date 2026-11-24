@@ -56,6 +56,32 @@ if ! diff -u "$work/inventory-scripts" "$work/scripts"; then
 fi
 
 status=0
+# U28e E4: the engine switch must reach another backend, not a label. Fuel counts each engine's
+# own steps (a value movement is a machine step, no reference step), so under this budget the
+# canary's call returns on the reference stepper and exhausts on the machine.
+canary_fuel=6
+mkdir -p "$work/canary" || setup 'mkdir failed'
+wasm-tools json-from-wast "$suite/dispatch/canary.wast" -o "$work/canary/canary.json" \
+	--wasm-dir "$work/canary" >"$work/canary/json.log" 2>&1 || setup 'canary json-from-wast failed'
+for engine in ref machine; do
+	: >"$work/canary/$engine"
+	FVA_SPEC_OUTCOMES="$work/canary/$engine" "$bin" spec --engine "$engine" --fuel "$canary_fuel" \
+		"$work/canary/canary.json" >"$work/canary/$engine.log" 2>&1
+	rc=$?
+	if ((rc > 128 || rc == 3)); then
+		cat "$work/canary/$engine.log"
+		exit 3
+	fi
+	((rc == 0 || rc == 1)) || setup "canary $engine runner rc $rc"
+done
+if [[ $(cut -f1-3 "$work/canary/ref") != $'1\tmodule\tpass\n2\tassert_return\tpass' ]] ||
+	[[ $(cut -f1-2 "$work/canary/machine") != $'1\tmodule\n2\tassert_return' ]] ||
+	! grep -q $'^2\tassert_return\tfail: .*fuel exhausted' "$work/canary/machine"; then
+	printf 'p2exec: engine dispatch canary: under fuel %s ref must return, machine exhaust\n' \
+		"$canary_fuel"
+	cat "$work/canary/ref" "$work/canary/machine"
+	status=1
+fi
 matched_total=0
 machine_total=0
 command_total=0
@@ -98,12 +124,10 @@ for script in "${scripts[@]}"; do
 	# U28d E1: the reference stepper and the optimized machine, each against the pins and
 	# command by command against each other
 	for engine in ref machine; do
-		eargs=()
-		[[ $engine == machine ]] && eargs=(--engine machine)
 		out="$dir/outcomes.$engine"
 		: >"$out"
 		FVA_SPEC_OUTCOMES="$out" FVA_SPEC_SKIPS=1 \
-			"$bin" p2 "${eargs[@]}" "$dir/script.json" >"$dir/fva.$engine.log" 2>&1
+			"$bin" spec --engine "$engine" "$dir/script.json" >"$dir/fva.$engine.log" 2>&1
 		runner_rc=$?
 		if ((runner_rc > 128 || runner_rc == 3)); then
 			cat "$dir/fva.$engine.log"

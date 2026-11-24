@@ -27,7 +27,15 @@ FILENAME == ARGV[3] {
 	else if (outcome ~ /^skip:/) {
 		sub(/^skip: */, "", outcome)
 		sub(/^line [0-9]+: */, "", outcome)
-		if (outcome ~ /^outside wasm2,-simd:/) reason="outside-profile"
+		# U28e: a P′ exclusion keeps its class: the classifier (positive), the decoder (negative)
+		if (outcome ~ /^outside P′: excluded: /) {
+			sub(/^outside P′: excluded: /, "", outcome); reason="outside-profile:" outcome
+		} else if (outcome ~ /^outside P′: oracle rejects/) reason="outside-profile:oracle"
+		else if (outcome ~ /^outside P′: more than one memory/) reason="outside-profile:multi-memory"
+		else if (outcome ~ /^outside P′: decoder offset [0-9]+: /) {
+			sub(/^outside P′: decoder offset [0-9]+: /, "", outcome); split(outcome, parts, ": ")
+			reason="decoder-unsupported:" parts[1]
+		}
 		else if (outcome == "assert_malformed") reason="assert_malformed:" format[i]
 		else if (outcome ~ /^decoder offset /) reason="decode-error"
 		else {split(outcome, parts, ": "); reason=parts[1]}

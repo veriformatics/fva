@@ -1,0 +1,83 @@
+3	module	pass	valid
+247	assert_return	pass	-
+248	assert_return	pass	-
+249	assert_return	pass	-
+250	assert_return	pass	-
+252	assert_return	pass	-
+254	assert_return	pass	-
+255	assert_return	pass	-
+256	assert_return	pass	-
+257	assert_return	pass	-
+259	assert_return	pass	-
+260	assert_return	pass	-
+261	assert_return	pass	-
+262	assert_return	pass	-
+264	assert_return	pass	-
+265	assert_return	pass	-
+266	assert_return	pass	-
+267	assert_return	pass	-
+268	assert_trap	pass	-
+269	assert_trap	pass	-
+270	assert_trap	pass	-
+271	assert_trap	pass	-
+272	assert_trap	pass	-
+274	assert_return	pass	-
+275	assert_return	pass	-
+276	assert_return	pass	-
+277	assert_return	pass	-
+278	assert_trap	pass	-
+279	assert_trap	pass	-
+281	assert_return	pass	-
+282	assert_return	pass	-
+283	assert_return	pass	-
+285	assert_return	pass	-
+286	assert_return	pass	-
+287	assert_return	pass	-
+288	assert_return	pass	-
+290	assert_return	pass	-
+291	assert_return	pass	-
+292	assert_return	pass	-
+293	assert_return	pass	-
+294	assert_return	pass	-
+295	assert_return	pass	-
+296	assert_return	pass	-
+297	assert_return	pass	-
+298	assert_return	pass	-
+299	assert_return	pass	-
+300	assert_return	pass	-
+301	assert_return	pass	-
+303	assert_return	pass	-
+304	assert_return	pass	-
+305	assert_return	pass	-
+310	assert_malformed	skip:text format	not-run:malformed
+322	assert_malformed	skip:text format	not-run:malformed
+334	assert_malformed	skip:text format	not-run:malformed
+346	assert_malformed	skip:text format	not-run:malformed
+358	assert_malformed	skip:text format	not-run:malformed
+370	assert_malformed	skip:text format	not-run:malformed
+382	assert_malformed	skip:text format	not-run:malformed
+389	assert_malformed	skip:text format	not-run:malformed
+399	assert_malformed	skip:text format	not-run:malformed
+409	assert_malformed	skip:text format	not-run:malformed
+421	assert_malformed	skip:text format	not-run:malformed
+436	assert_invalid	pass	invalid
+444	assert_invalid	pass	invalid
+452	assert_invalid	pass	invalid
+460	assert_invalid	pass	invalid
+471	assert_invalid	pass	invalid
+479	assert_invalid	pass	invalid
+487	module	pass	valid
+493	module	pass	valid
+502	assert_invalid	pass	invalid
+510	assert_invalid	pass	invalid
+519	assert_invalid	pass	invalid
+529	assert_invalid	pass	invalid
+539	assert_invalid	pass	invalid
+549	assert_invalid	pass	invalid
+559	assert_invalid	pass	invalid
+570	assert_invalid	pass	invalid
+581	assert_invalid	pass	invalid
+594	assert_invalid	pass	invalid
+605	assert_invalid	pass	invalid
+612	assert_invalid	pass	invalid
+623	assert_invalid	pass	invalid

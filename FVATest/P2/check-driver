@@ -5,7 +5,8 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P) || exit 2
 checker=${1:-$root/scripts/test-p2exec}
 work=$(mktemp -d) || exit 2
 trap 'rm -rf -- "$work"' EXIT
-mkdir -p "$work/scripts" "$work/.tools/bin" "$work/FVATest/P2" || exit 2
+mkdir -p "$work/scripts" "$work/.tools/bin" "$work/FVATest/P2/dispatch" || exit 2
+printf '(module)\n' >"$work/FVATest/P2/dispatch/canary.wast"
 cp -- "$checker" "$work/scripts/test-p2exec" || exit 2
 chmod +x "$work/scripts/test-p2exec"
 printf '(module)\n(action)\n(assert_invalid)\n' >"$work/FVATest/P2/fixture.wast"
@@ -40,6 +41,23 @@ if [[ $1 == profile ]]; then
   printf '{"wasmtimeFlags":"-W exceptions=y,tail-call=y,function-references=y,gc=y"}\n'
   exit 0
 fi
+engine=machine
+for arg; do
+  case $arg in
+    ref | machine) engine=$arg ;;
+    */canary.json)
+      # the dispatch canary (fuel 6): ref returns, machine exhausts; a dispatch to the
+      # machine behind the ref label exhausts both
+      printf '1\tmodule\tpass\n' >>"$FVA_SPEC_OUTCOMES"
+      if [[ $engine == ref && ${P2_CASE:-ok} != dispatch-ignored ]]; then
+        printf '2\tassert_return\tpass\n' >>"$FVA_SPEC_OUTCOMES"
+        exit 0
+      fi
+      printf '2\tassert_return\tfail: line 2: actual fuel exhausted\n' >>"$FVA_SPEC_OUTCOMES"
+      exit 1
+      ;;
+  esac
+done
 case ${P2_CASE:-ok} in
   runner-setup) exit 2 ;;
   runner-crash) exit 139 ;;
@@ -55,9 +73,9 @@ esac
     malformed) printf '2\taction\tpass\textra\n' ;;
     *) printf '2\taction\tpass\n' ;;
   esac
-  case ${P2_CASE:-ok},${2:-} in
+  case ${P2_CASE:-ok},$engine in
     wrong-reason,*) printf '3\tassert_invalid\tskip: outside P′\n' ;;
-    engine-diverge,--engine) printf '3\tassert_invalid\tskip: P′ validation = U28c: other detail\n' ;;
+    engine-diverge,machine) printf '3\tassert_invalid\tskip: P′ validation = U28c: other detail\n' ;;
     *) printf '3\tassert_invalid\tskip: P′ validation = U28c: fixture detail\n' ;;
   esac
   case ${P2_CASE:-ok} in
@@ -87,7 +105,7 @@ run() {
 }
 run ok 0
 for mode in failure missing duplicate extra wrong-type wrong-class wrong-reason malformed \
-	no-outcomes runner-fail oracle-fail engine-diverge; do
+	no-outcomes runner-fail oracle-fail engine-diverge dispatch-ignored; do
 	run "$mode" 1
 done
 for mode in runner-setup oracle-setup json-setup; do run "$mode" 2; done

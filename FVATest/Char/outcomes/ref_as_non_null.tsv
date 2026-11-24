@@ -1,0 +1,7 @@
+1	module	pass	valid
+25	assert_trap	pass	-
+27	assert_trap	pass	-
+28	assert_return	pass	-
+29	assert_return	pass	-
+32	assert_invalid	pass	invalid
+41	module	pass	valid

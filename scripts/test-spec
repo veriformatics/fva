@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Official validation + execution scripts; exact counts prevent shrinking runs.
-# Four workers; --fast omits bulk + memory_fill.
+# Four workers; --fast omits bulk + memory_fill + the two million-call tail recursions
+# (return_call, return_call_ref: 85 + 73 s on a loaded desktop, the rest of the P′ scripts < 13 s).
 # Validation columns: module unlinkable uninstantiable invalid malformed outside undecodable.
 # Differential columns: valid invalid undecoded outside (binary candidates; oracle = wasm-tools
 # under the support manifest's features; outside = decoded but beyond the static profile (> 1
@@ -54,7 +55,9 @@ LEAN
 	exit 0
 fi
 # script pass fail skip; longest scripts first keeps the parallel tail short.
-pinned="memory_copy 4450 0 0
+pinned="return_call_ref 53 0 0
+return_call 51 0 0
+memory_copy 4450 0 0
 memory_fill 100 0 0
 bulk 117 0 0
 address 260 0 0
@@ -71,8 +74,8 @@ comments 8 0 0
 const 702 0 76
 conversions 619 0 0
 custom 11 0 0
-data 62 0 6
-elem 124 0 30
+data 64 0 4
+elem 142 0 12
 endianness 69 0 0
 exports 97 0 0
 f32 2512 0 2
@@ -89,24 +92,24 @@ float_misc 471 0 0
 forward 5 0 0
 func 152 0 23
 func_ptrs 36 0 0
-global 50 0 74
+global 58 0 66
 i32 458 0 2
 i64 414 0 2
 id 1 0 6
 if 217 0 24
-imports 143 0 75
+imports 202 0 16
 inline-module 1 0 0
 int_exprs 108 0 0
 int_literals 31 0 20
 labels 29 0 0
 left-to-right 96 0 0
-linking 120 0 43
+linking 163 0 0
 load 84 0 13
 local_get 36 0 0
 local_set 53 0 0
 local_tee 98 0 0
 loop 106 0 15
-memory 86 0 4
+memory 87 0 3
 memory_init 250 0 0
 memory_redundancy 8 0 0
 memory_size 42 0 0
@@ -121,7 +124,7 @@ stack 7 0 0
 start 19 0 1
 store 61 0 7
 switch 28 0 0
-table 30 0 16
+table 43 0 3
 table_copy 1728 0 0
 table_fill 45 0 0
 table_get 16 0 0
@@ -133,9 +136,22 @@ token 35 0 26
 traps 36 0 0
 type 1 0 2
 unreachable 64 0 0
-unreached-valid 2 0 11
+unreached-valid 13 0 0
 unwind 50 0 0
-utf8-invalid-encoding 3 0 180"
+utf8-invalid-encoding 3 0 180
+tag 10 0 0
+throw 13 0 0
+throw_ref 15 0 0
+try_table 65 0 2
+return_call_indirect 72 0 11
+call_ref 35 0 0
+br_on_null 10 0 0
+br_on_non_null 12 0 0
+ref_as_non_null 7 0 0
+local_init 10 0 0
+type-canon 2 0 0
+type-equivalence 32 0 0
+type-rec 6 0 21"
 coverage="differential address 4 0 0 0
 validation address 4 0 0 1 0 0 0
 differential align 25 44 0 0
@@ -152,12 +168,18 @@ differential br 1 20 0 0
 validation br 1 0 0 20 0 0 0
 differential br_if 1 30 0 0
 validation br_if 1 0 0 30 0 0 0
+differential br_on_non_null 3 1 0 0
+validation br_on_non_null 3 0 0 1 0 0 0
+differential br_on_null 3 1 0 0
+validation br_on_null 3 0 0 1 0 0 0
 differential bulk 13 0 0 0
 validation bulk 13 0 0 0 0 0 0
 differential call 1 18 0 0
 validation call 1 0 0 18 0 0 0
 differential call_indirect 3 24 0 0
 validation call_indirect 3 0 0 24 11 0 0
+differential call_ref 4 4 0 0
+validation call_ref 4 0 0 4 0 0 0
 differential comments 4 0 0 0
 validation comments 5 0 0 0 0 0 0
 differential const 402 0 0 0
@@ -167,9 +189,9 @@ validation conversions 1 0 0 25 0 0 0
 differential custom 3 0 0 0
 validation custom 3 0 0 0 8 0 0
 differential data 42 24 0 0
-validation data 26 0 14 20 0 6 0
+validation data 28 0 14 20 0 4 0
 differential elem 85 30 0 0
-validation elem 55 0 12 26 0 22 0
+validation elem 73 0 12 26 0 4 0
 differential endianness 1 0 0 0
 validation endianness 1 0 0 0 0 0 0
 differential exports 56 32 0 0
@@ -203,7 +225,7 @@ validation func 4 0 0 52 23 0 0
 differential func_ptrs 3 7 0 0
 validation func_ptrs 3 0 0 7 0 0 0
 differential global 8 41 0 0
-validation global 5 0 0 40 7 4 0
+validation global 8 0 0 40 7 1 0
 differential i32 1 83 0 0
 validation i32 1 0 0 83 2 0 0
 differential i64 1 29 0 0
@@ -213,7 +235,7 @@ validation id 1 0 0 0 6 0 0
 differential if 1 92 0 0
 validation if 1 0 0 92 24 0 0
 differential imports 161 1 0 0
-validation imports 66 88 0 1 16 7 0
+validation imports 68 93 0 1 16 0 0
 differential inline-module 1 0 0 0
 validation inline-module 1 0 0 0 0 0 0
 differential int_exprs 19 0 0 0
@@ -225,11 +247,13 @@ validation labels 1 0 0 3 0 0 0
 differential left-to-right 1 0 0 0
 validation left-to-right 1 0 0 0 0 0 0
 differential linking 71 0 0 0
-validation linking 17 19 7 0 0 28 0
+validation linking 21 43 7 0 0 0 0
 differential load 1 46 0 0
 validation load 1 0 0 46 13 0 0
 differential local_get 1 16 0 0
 validation local_get 1 0 0 16 0 0 0
+differential local_init 2 4 0 0
+validation local_init 2 0 0 4 0 0 0
 differential local_set 1 33 0 0
 validation local_set 1 0 0 33 0 0 0
 differential local_tee 1 42 0 0
@@ -237,7 +261,7 @@ validation local_tee 1 0 0 42 0 0 0
 differential loop 1 27 0 0
 validation loop 1 0 0 27 15 0 0
 differential memory 11 22 0 0
-validation memory 11 0 0 22 3 0 0
+validation memory 12 0 0 22 3 0 0
 differential memory_copy 33 64 0 0
 validation memory_copy 33 0 0 64 0 0 0
 differential memory_fill 11 64 0 0
@@ -254,10 +278,18 @@ differential names 4 0 0 0
 validation names 4 0 0 0 0 0 0
 differential nop 1 4 0 0
 validation nop 1 0 0 4 0 0 0
+differential ref_as_non_null 2 1 0 0
+validation ref_as_non_null 2 0 0 1 0 0 0
 differential ref_func 3 3 0 0
 validation ref_func 3 0 0 3 0 0 0
 differential return 1 20 0 0
 validation return 1 0 0 20 0 0 0
+differential return_call 3 14 0 0
+validation return_call 3 0 0 14 0 0 0
+differential return_call_indirect 3 19 0 0
+validation return_call_indirect 3 0 0 19 11 0 0
+differential return_call_ref 5 13 0 0
+validation return_call_ref 5 0 0 13 0 0 0
 differential select 3 30 0 0
 validation select 3 0 0 30 0 0 0
 differential skip-stack-guard-page 1 0 0 0
@@ -271,7 +303,7 @@ validation store 1 0 0 51 7 0 0
 differential switch 1 1 0 0
 validation switch 1 0 0 1 0 0 0
 differential table 17 16 0 0
-validation table 11 0 0 19 3 6 0
+validation table 18 0 0 19 3 0 0
 differential table_copy 52 0 0 0
 validation table_copy 52 0 0 0 0 0 0
 differential table_fill 1 9 0 0
@@ -286,16 +318,30 @@ differential table_set 1 7 0 0
 validation table_set 1 0 0 7 0 0 0
 differential table_size 1 2 0 0
 validation table_size 1 0 0 2 0 0 0
+differential tag 6 2 0 0
+validation tag 4 2 0 2 0 0 0
+differential throw 1 3 0 0
+validation throw 1 0 0 3 0 0 0
+differential throw_ref 1 2 0 0
+validation throw_ref 1 0 0 2 0 0 0
 differential token 35 0 0 0
 validation token 35 0 0 0 26 0 0
 differential traps 4 0 0 0
 validation traps 4 0 0 0 0 0 0
+differential try_table 6 9 0 0
+validation try_table 6 0 0 9 2 0 0
 differential type 1 0 0 0
 validation type 1 0 0 0 2 0 0
+differential type-canon 2 0 0 0
+validation type-canon 2 0 0 0 0 0 0
+differential type-equivalence 21 1 0 0
+validation type-equivalence 21 0 0 1 0 0 0
+differential type-rec 3 4 16 0
+validation type-rec 2 1 0 4 0 16 0
 differential unreachable 1 0 0 0
 validation unreachable 1 0 0 0 0 0 0
 differential unreached-valid 3 0 0 0
-validation unreached-valid 1 0 0 0 0 2 0
+validation unreached-valid 3 0 0 0 0 0 0
 differential unwind 1 0 0 0
 validation unwind 1 0 0 0 0 0 0
 differential utf8-invalid-encoding 0 0 0 0
@@ -308,12 +354,13 @@ fi
 if (($#)); then
 	names=("$@")
 elif $fast; then
-	mapfile -t names < <(awk '$1 !~ /^(bulk|memory_fill)$/ {print $1}' <<<"$pinned")
+	mapfile -t names < <(awk '$1 !~ /^(bulk|memory_fill|return_call|return_call_ref)$/ {print $1}' \
+		<<<"$pinned")
 else
 	mapfile -t names < <(awk '{print $1}' <<<"$pinned")
 fi
 for name in "${names[@]}"; do
-	if $fast && [[ $name =~ ^(bulk|memory_fill)$ ]]; then
+	if $fast && [[ $name =~ ^(bulk|memory_fill|return_call|return_call_ref)$ ]]; then
 		echo "test-spec: $name requires the full mode" >&2
 		exit 2
 	fi
@@ -434,7 +481,8 @@ run_script() {
 		: >"$work/$name.infra"
 		return 1
 	fi
-	timeout 900s \
+	: >"$work/$name.outcomes"
+	FVA_SPEC_OUTCOMES="$work/$name.outcomes" timeout 900s \
 		"$root/.lake/build/bin/fvatest" spec "$work/$name/$name.json" \
 		>"$work/$name.out" 2>>"$work/$name.err"
 	rc=$?
@@ -444,6 +492,21 @@ run_script() {
 	# no verdict (U12 K4): the 900-second limit or a signal = crash, a missing program = setup
 	if ((rc == 124 || rc >= 128)); then : >"$work/$name.crash"; fi
 	if ((rc == 2 || rc == 126 || rc == 127)); then : >"$work/$name.infra"; fi
+	# U28e I7: the public defaults (the machine, fuel for the million-call tail recursions)
+	if ((rc < 2)) && ! grep -qx 'engine machine fuel 40000000' "$work/$name.out"; then
+		echo "  FAIL $name: runner defaults are not 'engine machine fuel 40000000'" >>"$work/$name.out"
+		rc=1
+	fi
+	# U28e I6: every skip carries a reason established apart from the runner
+	if ((rc < 2)); then
+		"$root/scripts/check-skips" "$name" "$work/$name/$name.json" "$work/$name.outcomes" \
+			"$root/FVATest/Profile/commands.tsv" "$pfeatures" | sed 's/^/  FAIL /' >>"$work/$name.out"
+		case ${PIPESTATUS[0]} in
+		0) ;;
+		1) rc=1 ;;
+		*) : >"$work/$name.infra" ;;
+		esac
+	fi
 	diff_script "$name"
 	diff_rc=$?
 	if ((diff_rc)); then rc=$diff_rc; fi
@@ -459,7 +522,7 @@ rc=$?
 : >"$work/actual.txt"
 for name in "${names[@]}"; do
 	if [[ -f $work/$name.out ]]; then
-		awk '!/^  /' "$work/$name.out" >>"$work/actual.txt"
+		awk '!/^  / && !/^engine /' "$work/$name.out" >>"$work/actual.txt"
 		awk '/^  FAIL/ {if (n++ < 20) print}' "$work/$name.out"
 	fi
 	if [[ -s $work/$name.err ]]; then tail -5 "$work/$name.err"; fi

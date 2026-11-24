@@ -354,8 +354,9 @@ if ! (cd "$d" && scripts/check-json) >/dev/null; then
 fi
 printf 'def x := Json.parse "1"\n' >"$d/FVA/Tool/X.lean"
 expect_fail "Json.parse outside FVA/Json.lean" "$d" scripts/check-json
-# check-profile (U28a E7): the probe tables name exactly the support manifest's classes; a manifest
-# class without a probe, a probe naming another class and a binary probe's unknown class each fail
+# check-profile (U28a E7, U28e E6): the probe tables name exactly the support manifest's classes and
+# its testsuite pin is fetch-corpus's revision; a manifest class without a probe, a probe naming
+# another class, a binary probe's unknown class and another corpus revision each fail
 d=$tmp/profile && mkdir -p "$d" && cp -r FVATest/Profile/probes "$d/probes"
 if ! .lake/build/bin/fvatest profile >"$d/profile.json" ||
 	! scripts/check-profile "$d/profile.json" "$d/probes" >/dev/null; then
@@ -368,6 +369,47 @@ cp -r "$d/probes" "$d/p2" && sed -i 's/^x-simd\tsimd/x-simd\tvector/' "$d/p2/exp
 expect_fail "check-profile: a probe class outside the manifest" . scripts/check-profile "$d/profile.json" "$d/p2"
 cp -r "$d/probes" "$d/p3" && sed -i 's/\tunsupported:gc-types\t/\tunsupported:gc\t/' "$d/p3/binary.tsv"
 expect_fail "check-profile: a binary probe class outside the manifest" . scripts/check-profile "$d/profile.json" "$d/p3"
+sed 's|^\(ts=.*/testsuite/\)[0-9a-f]*$|\10000000000000000000000000000000000000000|' scripts/fetch-corpus \
+	>"$d/fetch-corpus"
+expect_fail "check-profile: a corpus revision other than the manifest's" . \
+	scripts/check-profile "$d/profile.json" "$d/probes" "$d/fetch-corpus"
+# check-skips (U28e I6): a skip passes only on a reason the command manifest, the payload or a
+# skipped predecessor module establishes; each planted reason below fails
+d=$tmp/skips && mkdir -p "$d"
+.tools/bin/wasm-tools parse - -o "$d/one.wasm" <<<'(module (memory 1))'
+printf '{"commands":[%s,%s,%s,%s]}\n' \
+	'{"line":1,"type":"module","filename":"one.wasm"}' \
+	'{"line":2,"type":"module","filename":"two.wasm"}' \
+	'{"line":3,"type":"assert_malformed","module_type":"text","filename":"x.wat"}' \
+	'{"line":4,"type":"assert_return"}' >"$d/s.json"
+printf 's\t0\t1\tmodule\tbinary\tp-prime\tok\ns\t1\t2\tmodule\tbinary\tgc-types\tunsupported:gc-types\n' \
+	>"$d/commands.tsv"
+printf 's\t2\t3\tassert_malformed\ttext\t-\t-\n' >>"$d/commands.tsv"
+features=$(jq -r .wasmToolsFeatures "$tmp/profile/profile.json")
+skips() { # rows…: check-skips over the fixture with these outcome rows
+	printf '%s\n' "$@" >"$d/out.tsv"
+	scripts/check-skips s "$d/s.json" "$d/out.tsv" "$d/commands.tsv" "$features" >/dev/null 2>&1
+}
+r1=$'1\tmodule\tpass' r3=$'3\tassert_malformed\tskip: line 3: text format'
+r2=$'2\tmodule\tskip: line 2: outside P′: excluded: gc-types'
+r4=$'4\tassert_return\tskip: line 4: rejected module: line 2'
+if ! skips "$r1" "$r2" "$r3" "$r4"; then
+	echo "test-checks: check-skips failed justified skips"
+	fail=1
+fi
+for planted in \
+	"class|$r1|${r2/gc-types/simd}|$r3|$r4" \
+	"text on binary|1	module	skip: line 1: text format|$r2|$r3|$r4" \
+	"provenance to a passing module|$r1|$r2|$r3|${r4/line 2/line 1}" \
+	"unknown reason|$r1|$r2|$r3|4	assert_return	skip: line 4: unsupported expectation" \
+	"oracle accepts|1	module	skip: line 1: outside P′: oracle rejects: x|$r2|$r3|$r4" \
+	"one memory|1	module	skip: line 1: outside P′: more than one memory|$r2|$r3|$r4"; do
+	IFS='|' read -r -a rows <<<"$planted"
+	if skips "${rows[@]:1}"; then
+		echo "test-checks: check-skips passed a planted ${rows[0]} skip"
+		fail=1
+	fi
+done
 # make-base-manifest --check (U28a E8): a stale base-lines table fails, as a stale manifest does;
 # a stub fvatest prints the committed table, a stub lake runs `lake env`'s command
 d=$tmp/base && mkdir -p "$d/scripts" "$d/trust" "$d/.lake/build/bin" "$d/bin"
@@ -454,13 +496,100 @@ if ((rc != 1)); then
 	echo "test-checks: runner on a non-null reference under a null expectation → rc $rc, want 1"
 	fail=1
 fi
+# U28e E5 controls (`fvatest spec`, docs/contracts/U28e-runner.md): rc + per-command outcome
+# prefixes. control NAME WANT_RC WAST [LINE=OUTCOME_PREFIX…]
+control() {
+	local name=$1 want=$2 spec rc
+	printf '%s\n' "$3" >"$d/$name.wast"
+	shift 3
+	if ! .tools/bin/wasm-tools json-from-wast "$d/$name.wast" -o "$d/$name.json" \
+		--wasm-dir "$d/" >/dev/null 2>&1; then
+		echo "test-checks: control $name: json-from-wast failed"
+		fail=1
+		return
+	fi
+	: >"$d/$name.out"
+	FVA_SPEC_OUTCOMES="$d/$name.out" .lake/build/bin/fvatest spec "$d/$name.json" >/dev/null 2>&1
+	rc=$?
+	if ((rc != want)); then
+		echo "test-checks: control $name → rc $rc, want $want"
+		fail=1
+	fi
+	for spec in "$@"; do
+		awk -F '\t' -v l="${spec%%=*}" -v w="${spec#*=}" '$1 == l && index($3, w) == 1 {f = 1}
+			END {exit !f}' "$d/$name.out" || {
+			echo "test-checks: control $name: line ${spec%%=*} is not ${spec#*=}"
+			fail=1
+		}
+	done
+}
+# shellcheck disable=SC2016 # WAT identifiers, not shell expansions
+controls() {
+	local f='(module (func (export "f") (param i32) (result i32) (local.get 0)))'
+	local g='(module (func (export "g") (param funcref) (result i32) (i32.const 1)))'
+	# I4: argument count + literal types against the export's parameters (upstream runner.ml:411)
+	control arg-type 1 "$f
+(assert_return (invoke \"f\" (i64.const 7)) (i64.const 7))" '2=fail:'
+	control arg-many 1 "$f
+(assert_return (invoke \"f\" (i32.const 7) (i32.const 8)) (i32.const 7))" '2=fail:'
+	control arg-few 1 "$f
+(assert_return (invoke \"f\") (i32.const 7))" '2=fail:'
+	control arg-ok 0 "$f
+(assert_return (invoke \"f\" (i32.const 7)) (i32.const 7))" '2=pass'
+	control arg-null-heap 1 "$g
+(assert_return (invoke \"g\" (ref.null extern)) (i32.const 1))" '2=fail:'
+	control arg-null 0 "$g
+(assert_return (invoke \"g\" (ref.null func)) (i32.const 1))" '2=pass'
+	# I2: initializers in allocation order (U28c R1 = B) on the shared candidates
+	control init-prefix 0 '(module $M (global (export "g") (mut i32) (i32.const 0)))
+(register "M" $M)
+(assert_trap (module (import "M" "g" (global $g (mut i32)))
+  (global $a i32 (i32.const 5)) (global $b i32 (global.get $a))
+  (func $s (global.set $g (global.get $b)) unreachable) (start $s)) "unreachable")
+(assert_return (get $M "g") (i32.const 5))' '3=pass' '6=pass'
+	# I2 result matrix: uninstantiable = a trap or an uncaught exception (runner.ml:559)
+	control start-trap 0 '(assert_trap (module (func $s unreachable) (start $s)) "unreachable")' \
+		'1=pass'
+	control start-throw 0 \
+		'(assert_trap (module (tag $t) (func $s (throw $t)) (start $s)) "uncaught exception")' '1=pass'
+	control start-throw-module 1 '(module (tag $t) (func $s (throw $t)) (start $s))' '1=fail:'
+	control start-caught 1 \
+		'(module (tag $t) (func $s (block $h (try_table (catch_all $h) (throw $t)))) (start $s))
+(assert_trap (module (tag $t) (func $s (block $h (try_table (catch_all $h) (throw $t))))
+  (start $s)) "x")' '1=pass' '2=fail:'
+	# I3: assert_exception = an uncaught exception alone; its effects stay
+	control exc-return 1 '(module (func (export "r") (result i32) (i32.const 1)))
+(assert_exception (invoke "r"))' '2=fail:'
+	control exc-trap 1 '(module (func (export "t") unreachable))
+(assert_exception (invoke "t"))' '2=fail:'
+	control exc-effects 0 '(module (tag $e) (global $g (mut i32) (i32.const 0))
+  (func (export "w") (global.set $g (i32.const 9)) (throw $e))
+  (func (export "g") (result i32) (global.get $g))
+  (func (export "c") (result i32) (block $h (try_table (catch_all $h) (throw $e))) (i32.const 5)))
+(assert_exception (invoke "w"))
+(assert_return (invoke "g") (i32.const 9))
+(assert_return (invoke "c") (i32.const 5))' '5=pass' '6=pass' '7=pass'
+}
+controls
+# I7: CLI misuse fails closed (rc 2): no script, the retired `p2`, an unknown engine, zero fuel,
+# a repeated option
+for args in 'spec' 'p2 x.json' 'spec --engine gpu x.json' 'spec --fuel 0 x.json' \
+	'spec --engine ref --engine ref x.json'; do
+	read -r -a argv <<<"$args"
+	.lake/build/bin/fvatest "${argv[@]}" >/dev/null 2>&1
+	rc=$?
+	if ((rc != 2)); then
+		echo "test-checks: fvatest $args → rc $rc, want 2"
+		fail=1
+	fi
+done
 scripts/test-mutation-fixture || fail=1
 scripts/test-subject-matrix || fail=1
 scripts/test-char-fixture || fail=1
-# U28b E3 + U28d E1: tester-3's driver battery over scripts/test-p2exec (21 stubbed cases, the
-# count pinned: an engine divergence fails the step)
+# U28b E3 + U28d E1 + U28e E4: tester-3's driver battery over scripts/test-p2exec (22 stubbed
+# cases, the count pinned: an engine divergence or an ignored engine switch fails the step)
 if ! FVATest/P2/check-driver >"$tmp/p2-driver.log" 2>&1 ||
-	! grep -qx 'p2exec-driver: passed=21 failed=0' "$tmp/p2-driver.log"; then
+	! grep -qx 'p2exec-driver: passed=22 failed=0' "$tmp/p2-driver.log"; then
 	echo "test-checks: p2exec driver battery failed"
 	tail -20 "$tmp/p2-driver.log"
 	fail=1

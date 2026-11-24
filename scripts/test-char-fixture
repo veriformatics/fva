@@ -89,10 +89,10 @@ cat "$work/valid.seed" >>"$work/valid"
 check_case trace-duplicate-validation 1 run_normalize
 
 skip_classes() {
-	printf '7\tassert_malformed\tbinary\tbad.wasm\n7\tassert_malformed\ttext\tbad.wat\n7\tmodule\tbinary\tprobe.wasm\n7\tregister\tbinary\t-\n7\tmodule\tbinary\tother.wasm\n7\taction\tbinary\t-\n' >"$work/meta"
-	printf 'probe.wasm\tunsupported\nother.wasm\tmalformed\n' >"$work/valid"
-	printf '7\tassert_malformed\tskip: line 7: assert_malformed\n7\tassert_malformed\tskip: line 7: assert_malformed\n7\tmodule\tskip: line 7: outside wasm2,-simd: error: proposal disabled (at offset 0x1)\n7\tregister\tskip: line 7: register rejected module\n7\tmodule\tskip: line 7: decoder offset 17: unsupported\n7\taction\tskip: line 7: validation-only\n' >"$work/trace"
-	printf '7\tassert_malformed\tskip:assert_malformed:binary\tnot-run:malformed\n7\tassert_malformed\tskip:assert_malformed:text\tnot-run:malformed\n7\tmodule\tskip:outside-profile\tunsupported\n7\tregister\tskip:register rejected module\t-\n7\tmodule\tskip:decode-error\tmalformed\n7\taction\tskip:validation-only\t-\n' >"$work/skip.expected"
+	printf '7\tassert_malformed\tbinary\tbad.wasm\n7\tassert_malformed\ttext\tbad.wat\n7\tmodule\tbinary\tprobe.wasm\n7\tregister\tbinary\t-\n7\tmodule\tbinary\tother.wasm\n7\taction\tbinary\t-\n7\tassert_invalid\tbinary\tgc.wasm\n7\tmodule\tbinary\tsimd.wasm\n7\tmodule\tbinary\ttwo.wasm\n' >"$work/meta"
+	printf 'probe.wasm\tunsupported\nother.wasm\tmalformed\ngc.wasm\tunsupported\nsimd.wasm\tunsupported\ntwo.wasm\tunsupported\n' >"$work/valid"
+	printf '7\tassert_malformed\tskip: line 7: assert_malformed\n7\tassert_malformed\tskip: line 7: assert_malformed\n7\tmodule\tskip: line 7: outside P′: excluded: gc-types,gc-instructions\n7\tregister\tskip: line 7: register rejected module\n7\tmodule\tskip: line 7: decoder offset 17: unsupported\n7\taction\tskip: line 7: validation-only\n7\tassert_invalid\tskip: line 7: outside P′: decoder offset 13: gc-types: sub, struct or array type\n7\tmodule\tskip: line 7: outside P′: oracle rejects: error: SIMD support is not enabled\n7\tmodule\tskip: line 7: outside P′: more than one memory\n' >"$work/trace"
+	printf '7\tassert_malformed\tskip:assert_malformed:binary\tnot-run:malformed\n7\tassert_malformed\tskip:assert_malformed:text\tnot-run:malformed\n7\tmodule\tskip:outside-profile:gc-types,gc-instructions\tunsupported\n7\tregister\tskip:register rejected module\t-\n7\tmodule\tskip:decode-error\tmalformed\n7\taction\tskip:validation-only\t-\n7\tassert_invalid\tskip:decoder-unsupported:gc-types\tunsupported\n7\tmodule\tskip:outside-profile:oracle\tunsupported\n7\tmodule\tskip:outside-profile:multi-memory\tunsupported\n' >"$work/skip.expected"
 	run_normalize && cmp -s "$work/skip.expected" "$work/normalized"
 }
 check_case trace-skip-reason-classes 0 skip_classes

@@ -1,0 +1,27 @@
+3	module	pass	valid
+22	assert_invalid	pass	invalid
+29	assert_invalid	pass	invalid
+39	module	skip:outside-profile:gc-types	unsupported
+45	module	pass	valid
+52	assert_invalid	pass	invalid
+60	assert_invalid	pass	invalid
+71	module	skip:outside-profile:gc-types	unsupported
+78	module	skip:outside-profile:gc-types	unsupported
+94	assert_invalid	skip:decoder-unsupported:gc-types	unsupported
+104	assert_invalid	skip:decoder-unsupported:gc-types	unsupported
+115	assert_invalid	skip:decoder-unsupported:gc-types	unsupported
+125	assert_invalid	skip:decoder-unsupported:gc-types	unsupported
+137	module	skip:outside-profile:gc-types	unsupported
+141	register	skip:register rejected module	-
+143	module	skip:outside-profile:gc-types	unsupported
+149	assert_unlinkable	skip:outside-profile:gc-types	unsupported
+157	assert_unlinkable	skip:unavailable import	valid
+167	module	skip:outside-profile:gc-types	unsupported
+174	assert_return	skip:rejected module	-
+176	module	skip:outside-profile:gc-types	unsupported
+183	assert_trap	skip:rejected module	-
+185	module	skip:outside-profile:gc-types	unsupported
+192	assert_trap	skip:rejected module	-
+197	module	skip:outside-profile:gc-types	unsupported
+205	assert_invalid	skip:decoder-unsupported:gc-types	unsupported
+217	assert_invalid	skip:decoder-unsupported:gc-types	unsupported

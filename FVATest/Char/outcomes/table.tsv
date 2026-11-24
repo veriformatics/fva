@@ -4,16 +4,16 @@
 6	module	pass	valid
 7	module	pass	valid
 8	module	pass	valid
-9	module_definition	skip:module_definition	-
+9	module_definition	pass	-
 10	module	pass	valid
 12	module	pass	valid
 13	module	pass	valid
-14	module	skip:outside-profile	valid
+14	module	pass	valid
 16	module	pass	valid
 17	module	pass	valid
-19	module	skip:outside-profile	valid
-20	module	skip:outside-profile	valid
-21	module	skip:outside-profile	valid
+19	module	pass	valid
+20	module	pass	valid
+21	module	pass	valid
 23	assert_invalid	pass	invalid
 24	assert_invalid	pass	invalid
 27	assert_invalid	pass	invalid
@@ -30,14 +30,14 @@
 71	assert_invalid	pass	invalid
 75	assert_invalid	pass	invalid
 79	assert_invalid	pass	invalid
-86	module	skip:outside-profile	valid
-91	register	skip:register rejected module	-
-93	module	skip:outside-profile	valid
-112	assert_return	skip:missing/rejected module	-
-113	assert_return	skip:missing/rejected module	-
-114	assert_return	skip:missing/rejected module	-
-115	assert_return	skip:missing/rejected module	-
-116	assert_return	skip:missing/rejected module	-
+86	module	pass	valid
+91	register	pass	-
+93	module	pass	valid
+112	assert_return	pass	-
+113	assert_return	pass	-
+114	assert_return	pass	-
+115	assert_return	pass	-
+116	assert_return	pass	-
 120	assert_invalid	pass	invalid
 128	assert_invalid	pass	invalid
 136	assert_invalid	pass	invalid

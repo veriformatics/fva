@@ -21,3 +21,23 @@ D30.memory-copy
 D30.wall nixbox
 D30.full-mode
 D29.cpp-lift
+D29.handlers
+D29.rethrow-tail
+D29.typed-refs
+D29.rec-imports
+D29.assert-exception-return
+D29.assert-exception-trap
+D29.official-tag
+D29.official-throw
+D29.official-throw_ref
+D29.official-try_table
+D29.official-return_call
+D29.official-return_call_indirect
+D29.official-return_call_ref
+D29.official-call_ref
+D29.official-br_on_null
+D29.official-br_on_non_null
+D29.official-ref_as_non_null
+D29.official-local_init
+D29.official-source-pins
+D29.outcomes-validator

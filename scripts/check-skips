@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# check-skips NAME SCRIPT_JSON OUTCOMES COMMANDS_TSV FEATURES (U28e I6): every `skip` row the
+# runner wrote (`FVA_SPEC_OUTCOMES`) must carry a reason established apart from the runner:
+#   text format                      the command's payload is WAST text (no FVA text parser)
+#   outside P′: excluded: C          the U28a command manifest's classifier class is C
+#   outside P′: decoder offset N: C  the manifest's decoder verdict is unsupported:C
+#   outside P′: oracle rejects …     wasm-tools rejects the payload under the manifest's features
+#   outside P′: more than one memory `wasm-tools print` declares or imports > 1 memory
+#   rejected module | unavailable import | register rejected module: line M
+#                                    the `module` command of line M is itself a skip
+# Any other skip fails. Exit: 0 every skip justified, 1 an unjustified skip, 2 setup.
+set -uo pipefail
+(($# == 5)) || {
+	echo 'usage: check-skips NAME SCRIPT_JSON OUTCOMES COMMANDS_TSV FEATURES' >&2
+	exit 2
+}
+name=$1 json=$2 outcomes=$3 commands=$4 features=$5
+for f in "$json" "$outcomes" "$commands"; do
+	[[ -r $f ]] || {
+		echo "check-skips: unreadable $f" >&2
+		exit 2
+	}
+done
+work=$(mktemp -d) || exit 2
+trap 'rm -rf -- "$work"' EXIT
+jq -r '.commands[] | [.line, .type, (.module_type // "-"), (.filename // "-")] | @tsv' "$json" \
+	>"$work/json.tsv" || {
+	echo "check-skips: unreadable script JSON $json" >&2
+	exit 2
+}
+dir=$(dirname -- "$json")
+# Judge each skip; payload facts the manifest lacks come back as `oracle|memories FILE ROW`.
+awk -F '\t' -v name="$name" -v out="$work/probes" '
+	FILENAME == ARGV[1] {
+		if ($1 == name) {k = $3 SUBSEP $4; cls[k] = $6; dec[k] = $7; fmt[k] = $5}
+		next
+	}
+	FILENAME == ARGV[2] {k = $1 SUBSEP $2; jfmt[k] = $3; file[k] = $4; next}
+	{
+		k = $1 SUBSEP $2
+		if ($2 == "module" && $3 ~ /^skip: /) skipped[$1] = 1
+		if ($3 !~ /^skip: /) next
+		row[++n] = $0; key[n] = k; line[n] = $1
+		why = $3
+		sub(/^skip: (line [0-9]+: )?/, "", why)
+		reason[n] = why
+	}
+	END {
+		bad = 0
+		for (i = 1; i <= n; i++) {
+			k = key[i]; why = reason[i]; ok = 0
+			if (why == "text format") ok = (jfmt[k] == "text")
+			else if (index(why, "outside P′: excluded: ") == 1) {
+				c = substr(why, length("outside P′: excluded: ") + 1)
+				ok = (k in cls && cls[k] == c)
+			} else if (index(why, "outside P′: decoder offset ") == 1) {
+				rest = substr(why, length("outside P′: decoder offset ") + 1)
+				sub(/^[0-9]+: /, "", rest); split(rest, parts, ": ")
+				ok = (k in dec && dec[k] == "unsupported:" parts[1])
+			} else if (index(why, "outside P′: oracle rejects") == 1) {
+				print "oracle\t" file[k] "\t" row[i] > out; ok = 1
+			} else if (why == "outside P′: more than one memory") {
+				print "memories\t" file[k] "\t" row[i] > out; ok = 1
+			} else {
+				split(why, dep, ": line ")
+				if ((dep[1] == "rejected module" || dep[1] == "unavailable import" ||
+					dep[1] == "register rejected module") && dep[2] ~ /^[0-9]+$/)
+					ok = (dep[2] in skipped)
+			}
+			if (!ok) {print "check-skips: " name ": unjustified skip: " row[i]; bad = 1}
+		}
+		exit bad
+	}' "$commands" "$work/json.tsv" "$outcomes"
+rc=$?
+((rc < 2)) || exit 2
+[[ -f $work/probes ]] || exit "$rc"
+while IFS=$'\t' read -r kind file row; do
+	path="$dir/$file"
+	[[ $file != - && -r $path ]] || {
+		echo "check-skips: $name: no payload for: $row"
+		rc=1
+		continue
+	}
+	if [[ $kind == oracle ]]; then
+		wasm-tools validate --features="$features" "$path" >/dev/null 2>&1
+		orc=$?
+		((orc < 2)) || exit 2
+		((orc == 1)) || {
+			echo "check-skips: $name: the oracle accepts: $row"
+			rc=1
+		}
+	else
+		# module fields print one per line: declared + imported memories, never exports or uses
+		mems=$(wasm-tools print "$path" | grep -cE '^ *\((memory|import [^(]*\(memory) ')
+		((mems > 1)) || {
+			echo "check-skips: $name: $mems memories: $row"
+			rc=1
+		}
+	fi
+done <"$work/probes"
+exit "$rc"

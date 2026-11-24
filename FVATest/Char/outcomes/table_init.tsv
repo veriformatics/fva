@@ -788,5 +788,5 @@
 2245	assert_trap	pass	-
 2246	assert_trap	pass	-
 2248	module	pass	valid
-2272	module	skip:outside-profile	unsupported
-2286	assert_return	skip:missing/rejected module	-
+2272	module	skip:outside-profile:gc-types,gc-instructions	unsupported
+2286	assert_return	skip:rejected module	-

@@ -3,7 +3,6 @@ import FVA.Tool.Encode
 import FVATest.Numeric
 import FVATest.FloatDiff
 import FVATest.Spec
-import FVATest.P2
 import FVATest.RawExec
 import FVATest.ValidRun
 import FVATest.Valid
@@ -17,8 +16,9 @@ import FVATest.BaseLines
 property tests (`FVATest.Props`, D69).
 `reencode <in.wasm> <out.wasm>`: decode, then write the re-encoding (decoder differential, E2).
 `numeric <script.json>…`: run numeric test scripts (U3 E1); prints `name pass fail skip`.
-`spec <script.json>…`: run execution scripts through `Exec.Ref`, with the same tally format
-plus validation-category counts.
+`spec [--engine ref|machine] [--fuel N] <script.json>…`: run execution scripts on the optimized
+machine (default) or the reference stepper; prints `engine <name> fuel <n>`, then per script
+`name pass fail skip` + validation-category counts (U28e).
 `validate <file.wasm>…`: print `file<TAB>valid|invalid|malformed|unsupported` per artifact.
 `classify <file.wasm>…`: `file<TAB>p-prime|print-failed|<excluded classes><TAB>memories` (U28a E6).
 `profile`: the support manifest `FVA.Profile` as JSON (U28a E7).
@@ -51,13 +51,17 @@ def main : List String → IO UInt32
       for f in t.failures.toList.take 10 do IO.println s!"  FAIL {f}"
       if t.fail > 0 then bad := true
     return if bad then 1 else 0
-  | "spec" :: scripts => do
+  | "spec" :: args => do
+    let some (engine, fuel, scripts) := FVA.Test.Spec.parseArgs args | do
+      IO.eprintln "usage: fvatest spec [--engine ref|machine] [--fuel N] SCRIPT.json…"
+      return 2
     try
+      IO.println s!"engine {engine.name} fuel {fuel}"
       let mut bad := false
       for path in scripts do
         let p : System.FilePath := path
         let json ← IO.ofExcept (Lean.Json.parse (← IO.FS.readFile p))
-        let t ← FVA.Test.Spec.runScript (p.parent.getD ".") json
+        let t ← FVA.Test.Spec.runScript (p.parent.getD ".") json fuel engine
         IO.println s!"{p.fileStem.getD path} {t.pass} {t.fail} {t.skip}"
         IO.println s!"validation {p.fileStem.getD path} {t.validation.summary}"
         for f in t.failures do IO.println s!"  FAIL {f}"
@@ -68,32 +72,10 @@ def main : List String → IO UInt32
     catch e =>
       IO.eprintln s!"fvatest spec: {e}"
       return 2
-  | "p2" :: args => do
-    try
-      let mut bad := false
-      -- steps per command (each engine's own); `FVA_P2_FUEL` raises it for the million-call
-      -- tail recursions
-      let fuel := ((← IO.getEnv "FVA_P2_FUEL").bind String.toNat?).getD 2000000
-      let (engine, scripts) := match args with
-        | "--engine" :: "machine" :: rest => (FVA.Test.P2.Engine.machine, rest)
-        | rest => (.ref, rest)
-      for path in scripts do
-        let p : System.FilePath := path
-        let json ← IO.ofExcept (Lean.Json.parse (← IO.FS.readFile p))
-        let t ← FVA.Test.P2.runScript (p.parent.getD ".") json fuel engine
-        IO.println s!"{p.fileStem.getD path} {t.pass} {t.fail} {t.skip}"
-        for f in t.failures do IO.println s!"  FAIL {f}"
-        if (← IO.getEnv "FVA_SPEC_SKIPS") == some "1" then
-          for skip in t.skips do IO.println s!"  SKIP {skip}"
-        if t.fail > 0 then bad := true
-      return if bad then 1 else 0
-    catch e =>
-      IO.eprintln s!"fvatest p2: {e}"
-      return 2
   | ["floatdiff", dir, seed, nBin, nOther] => do
     FVA.Test.FloatDiff.run dir seed.toNat!.toUInt64 nBin.toNat! nOther.toNat!
     return 0
-  | _ => do
+  | [] => do
     let lake ← IO.FS.readFile "lakefile.toml"
     let want := s!"version = \"{FVA.version}\""
     if (lake.splitOn "\n").contains want then
@@ -101,3 +83,6 @@ def main : List String → IO UInt32
       return ← FVA.Test.Props.run
     IO.eprintln s!"fvatest: lakefile.toml lacks {want}"
     return 1
+  | args => do
+    IO.eprintln s!"fvatest: unknown command {args}"
+    return 2

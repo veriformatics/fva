@@ -3,8 +3,9 @@
 # every excluded class has a negative WAT probe pinned to it alone, every class a probe table names
 # is the manifest's, and every probe row names its file. Run by scripts/test-decoder (E6) and,
 # over planted copies, by scripts/test-checks.
-# Usage: check-profile [PROFILE_JSON [PROBES_DIR]] (default: `fvatest profile`,
-# FVATest/Profile/probes). Exit status: 0 agree, 1 drift, 2 setup.
+# U28e E6: the manifest's testsuite pin = the revision scripts/fetch-corpus downloads (two
+# literals). Usage: check-profile [PROFILE_JSON [PROBES_DIR [FETCH_CORPUS]]] (default: `fvatest
+# profile`, FVATest/Profile/probes, scripts/fetch-corpus). Exit status: 0 agree, 1 drift, 2 setup.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 probes=${2:-FVATest/Profile/probes}
@@ -59,4 +60,16 @@ while IFS=$'\t' read -r name want _; do
 		;;
 	esac
 done <"$probes/binary.tsv"
+fetch=${3:-scripts/fetch-corpus}
+pin=$(jq -r '.testsuite' <<<"$json") || exit 2
+rev=$(sed -n 's|^ts=https://raw.githubusercontent.com/WebAssembly/testsuite/\([0-9a-f]*\)$|\1|p' "$fetch") ||
+	exit 2
+[[ -n $rev ]] || {
+	echo "check-profile: no testsuite revision in $fetch"
+	exit 2
+}
+if [[ $pin != "WebAssembly/testsuite@$rev" ]]; then
+	echo "check-profile: the manifest pins $pin, $fetch fetches WebAssembly/testsuite@$rev"
+	bad=1
+fi
 exit "$bad"
