@@ -26,7 +26,13 @@
     {"name": "difftest", "cmd": ["scripts/test-difftest", "--fast"],
      "exeRoots": ["FVA.Tool.Difftest"],
      "files": ["scripts/test-difftest", "scripts/fetch-corpus", "scripts/fetch-tools", "Main.lean",
-               "bench/subjects/wasm"]}
+               "bench/subjects/wasm"]},
+    {"name": "p2exec", "cmd": ["scripts/test-p2exec"], "exeRoots": ["FVATest.P2"],
+     "files": ["scripts/test-p2exec", "scripts/fetch-tools", "FVATest/Main.lean", "FVATest/P2"]},
+    {"name": "p2valid", "cmd": ["scripts/test-p2valid"],
+     "exeRoots": ["FVATest.ValidRun", "FVATest.Profile"],
+     "files": ["scripts/test-p2valid", "scripts/fetch-tools", "FVATest/Main.lean",
+               "FVATest/P2Valid"]}
   ],
   "groups": [
     {"name": "decode", "dirs": ["FVA/Impl/Decode"], "reachFrom": [], "within": "",
@@ -36,17 +42,18 @@
      "stages": ["module", "proofs", "exes", "test:floatdiff", "test:numerics", "test:spec",
                 "test:difftest"]},
     {"name": "exec", "dirs": ["FVA/Impl/Exec"], "reachFrom": [], "within": "",
-     "stages": ["module", "exes", "test:spec", "test:difftest", "proofs"]},
+     "stages": ["module", "exes", "test:spec", "test:difftest", "test:p2exec", "test:p2valid",
+                "proofs"]},
     {"name": "trust", "dirs": ["FVA/Trust/Verdict.lean"], "reachFrom": [], "within": "",
      "stages": ["module", "exes", "proofs"]},
     {"name": "cert", "dirs": ["FVA/Impl/Cert"], "reachFrom": [], "within": "",
      "stages": ["module", "proofs"]},
     {"name": "valid", "dirs": ["FVA/Impl/Valid.lean"], "reachFrom": [], "within": "",
-     "stages": ["module", "exes", "test:spec", "proofs"]},
+     "stages": ["module", "exes", "test:spec", "test:p2exec", "test:p2valid", "proofs"]},
     {"name": "helpers", "dirs": [],
      "reachFrom": ["decode", "float", "exec", "trust", "cert", "valid"], "within": "FVA.Spec",
      "stages": ["module", "exes", "test:spec", "test:numerics", "test:floatdiff",
-                "test:difftest", "test:decoder", "proofs"]}
+                "test:difftest", "test:decoder", "test:p2exec", "test:p2valid", "proofs"]}
   ],
   "results": "FVATest/Mutate/results.tsv",
   "rulings": "FVATest/Mutate/rulings.tsv",

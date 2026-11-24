@@ -4,8 +4,8 @@ import FVA.Impl.Valid
 /-!
 # Validation and instantiation helpers, pinned
 
-Concrete cases of behavior the U28c contract specifies that no proof or mutation-stage test fixes
-(U28c survivors; `scripts/test-p2valid` + `scripts/test-p2exec` pin them outside the stages).
+Concrete cases of behavior the U28c contract specifies that no other proof fixes (the mutation
+stages `test:p2exec` + `test:p2valid` cover them too).
 -/
 
 namespace FVA.Wasm.Pin

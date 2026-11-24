@@ -157,7 +157,7 @@ def baseManifest : List (String × String) := [
   ("FVA/Proof/Pin/Exec.lean",
     "57c8443bc0fd38de3c101d1783c9d3c33ead42a0b33de98deafb05a2158d822f"),
   ("FVA/Proof/Pin/Valid.lean",
-    "af0e3fc4d0dd529ca7158c00ddcef43cf013327d8564b73f6cdc8ba90157ea5b"),
+    "563dadb2fbbf55282a7b96e2a5ccafeeed98d900bc5963fb5bc5d2e231b1099a"),
   ("FVA/Proof/Trust.lean",
     "5ef4df0890a925319448a05921861ffa3196ebb203243e716527ef563506dc20"),
   ("FVA/Proof/Valid/Branch.lean",
