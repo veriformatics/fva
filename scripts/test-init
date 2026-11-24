@@ -366,21 +366,22 @@ pfiles() {
 		-printf '%p\t%i %T@ %s\n'
 }
 pfiles >"$tmp/pfiles.before" || exit 2
-# every copy of p is made before a lane writes into p (lane_budget replaces p/fva.json): the
-# cheat copy first, so the longest lane starts at once
+# every copy of p is made before any lane runs in p: lane_budget replaces p/fva.json, and
+# lane_check's `lake check` refreshes the git indexes in p's packages (index.lock created, then
+# renamed), which a hard-link copy of p beside it can list and then miss (`cp: cannot stat`)
 cp -al "$p" "$tmp/cheat" && rm -r "$tmp/cheat/Demo/Proof.lean" "$tmp/cheat/.lake/build" &&
 	cp -a "$p/.lake/build" "$tmp/cheat/.lake/" || exit 2
 {
 	cat "$p/Demo/Proof.lean"
 	printf '\naxiom fvaCheatAx : False\ntheorem cheat_uses : 1 = 2 := fvaCheatAx.elim\n'
 } >"$tmp/cheat/Demo/Proof.lean"
-lane check
 t=$tmp/tamper
 cp -al "$p" "$t" && rm -r "$t/.lake/build" "$t/lakefile.toml" && cp -a "$p/.lake/build" "$t/.lake/" ||
 	exit 2
 q=$tmp/planted-project
 mkdir -p "$q/.lake" && rsync -a --exclude=/.lake/packages "$p/" "$q/" &&
 	cp -al "$p/.lake/packages" "$q/.lake/packages" || exit 2
+lane check
 lane budget
 lane sandbox
 lane planted
