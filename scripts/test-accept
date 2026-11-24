@@ -8,6 +8,10 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 list=${FVA_ACCEPT_MERGED:-FVATest/Accept/LWR/merged}
 suite=${FVA_ACCEPT_SUITE:-scripts/test-accept-lwr}
+# each official script's case limit (the suite's default: 180 s): D29.official-return_call, a
+# million-call tail recursion (≈ 95–123 s alone on the desktop), passed 180 s on a loaded CI lean
+# job (gate-fix-9)
+export FVA_ACCEPT_CASE_TIMEOUT=${FVA_ACCEPT_CASE_TIMEOUT:-600}
 host=$(hostname -s) || exit 2
 mapfile -t rows < <(grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$list") || exit 2
 ((${#rows[@]})) || {
