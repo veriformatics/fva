@@ -94,6 +94,9 @@ lean_lane() {
 	run build bash -c 'lake --wfail build && lake --wfail build fvatest fvafuzz'
 	# the .olean pins (D48): the package files the Mathlib cache delivered
 	run olean-pins scripts/make-olean-pins --check &
+	# the base manifest + line counts: `fvatest base-lines` imports built FVA modules, so after the
+	# build (beside it, a stale build's half-written .oleans fail it)
+	run base-manifest scripts/make-base-manifest --check &
 	# the planted checks need the built fvamut; they run beside the rest of this lane
 	run checks scripts/test-checks &
 	run test lake --wfail test
@@ -130,7 +133,6 @@ run shellcheck shellcheck -x "${shells[@]}" &
 run shfmt shfmt -d "${shells[@]}" &
 run spec-lint .agent/spec-lint &
 run pins scripts/check-pins &
-run base-manifest scripts/make-base-manifest --check &
 run scope scripts/check-scope &
 run json scripts/check-json &
 run notices scripts/check-notices &
