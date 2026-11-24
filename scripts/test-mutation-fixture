@@ -105,6 +105,7 @@ clean_cases() {
 	for c in "${pids[@]}"; do wait "$c" || fail=1; done
 	cat "$tmp"/c-*.out
 	shard_case "$d/results.tsv"
+	slice_case "$d/results.tsv"
 }
 
 # D84 / scripts/mutation-ci: two trees (hosts) each run an ad-hoc update over half the
@@ -121,6 +122,31 @@ shard_case() { # one-host results.tsv
 	[[ -z $got && $(<"$a/f.log.rc") == 0 ]] ||
 		bad "shards: the merged update ran '$(tr '\n' ' ' <<<"$got")', rc $(<"$a/f.log.rc")"
 	cmp -s "$1" "$a/results.tsv" || bad "shards: merged table differs from the one-host table"
+}
+
+# --slice K/N: two trees each run one listing-position class of the same declarations; the
+# classes are disjoint, cover them, and merged give a full update that executes nothing
+slice_case() { # one-host results.tsv
+	local a b got
+	a=$(variant slice-a clean) && b=$tmp/slice-b && cp -a "$a" "$b" || exit 1
+	rc_is 0 "slice a" "$a" "$a/s.log" update --decls Fix.inc Fix.dbl Fix.mk Fix.width --slice 0/2
+	rc_is 0 "slice b" "$b" "$b/s.log" update --decls Fix.inc Fix.dbl Fix.mk Fix.width --slice 1/2
+	[[ ! -e $a/results.tsv && ! -e $b/results.tsv ]] || bad "slices: an ad-hoc run wrote results.tsv"
+	for x in a b; do
+		sed -n 's/^fvamut: \[[0-9]*\/[0-9]*\] \([^ ]*\) → .*/\1/p' "$tmp/slice-$x/s.log" |
+			grep -v ':probe:' | sort >"$tmp/slice-$x.ids"
+	done
+	[[ $(wc -l <"$tmp/slice-a.ids") == 4 && $(wc -l <"$tmp/slice-b.ids") == 4 &&
+	-z $(comm -12 "$tmp/slice-a.ids" "$tmp/slice-b.ids") ]] ||
+		bad "slices: want 4 + 4 disjoint mutants, ran $(tr '\n' ' ' <"$tmp/slice-a.ids")| $(tr '\n' ' ' <"$tmp/slice-b.ids")"
+	cp "$b"/.cache/mutate/exec/* "$a/.cache/mutate/exec/" || bad "slices: no cache to merge"
+	got=$(ran "$a" "$a/f.log")
+	[[ -z $got && $(<"$a/f.log.rc") == 0 ]] ||
+		bad "slices: the merged update ran '$(tr '\n' ' ' <<<"$got")', rc $(<"$a/f.log.rc")"
+	cmp -s "$1" "$a/results.tsv" || bad "slices: merged table differs from the one-host table"
+	for v in 2/2 1/0 x/2 1; do
+		rc_is 2 "slice $v" "$b" "$b/bad.log" update --slice "$v"
+	done
 }
 
 clean_case() { # name dir

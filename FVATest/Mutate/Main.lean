@@ -4,11 +4,13 @@ import FVATest.Mutate.Run
 # `fvamut` — mutation check driver (contract `docs/contracts/U12-mutation.md`)
 
 `fvamut [check|update|fresh|list] [--config F] [--files F…] [--decls D…] [--stages S…]
-[--workers N] [--spot N]`, run from the tree root under `lake env` (the facts import needs the
-package's search path). `check` (full gate) never writes; `update` runs the stale mutants and
-rewrites the results table; `fresh` reruns every mutant ignoring both caches; `list` prints the
-mutants.
-Ad-hoc selections (`--files`, `--decls`, `--stages`) report without touching the table.
+[--slice K/N] [--workers N] [--spot N]`, run from the tree root under `lake env` (the facts
+import needs the package's search path). `check` (full gate) never writes; `update` runs the stale
+mutants and rewrites the results table; `fresh` reruns every mutant ignoring both caches; `list`
+prints the mutants.
+Ad-hoc selections (`--files`, `--decls`, `--stages`, `--slice`) report without touching the table;
+`--slice K/N` keeps the selected mutants whose listing position is `K` mod `N` (one large
+declaration across `N` hosts).
 rc 0 = clean, 1 = findings (stale, unruled, conflict, spot-check mismatch, error), 2 = setup.
 `fvamut sites <file> [--keep F | --skip F]` = one file's JSON listing (internal).
 -/
@@ -41,6 +43,8 @@ structure Opts where
   decls : List String := []
   /-- Ad-hoc stage list in place of each group's (S4). -/
   stages : Option (List String) := none
+  /-- Ad-hoc slice `(K, N)`: the selected mutants at listing positions `K` mod `N`. -/
+  slice : Option (Nat × Nat) := none
   /-- Worker count in place of the configured one. -/
   workers : Option Nat := none
   /-- Spot-check count in place of the configured one. -/
@@ -54,6 +58,15 @@ partial def parseOpts (o : Opts) : List String → Except String Opts
     else if m == "--config" then match rest with
       | f :: r => parseOpts { o with config := f } r
       | [] => .error "--config needs a file"
+    else if m == "--slice" then match rest with
+      | v :: r => match v.splitOn "/" with
+        | [k, n] => match k.toNat?, n.toNat? with
+          | some k, some n =>
+            if k < n then parseOpts { o with slice := some (k, n) } r
+            else .error "--slice K/N needs K < N"
+          | _, _ => .error "--slice needs K/N"
+        | _ => .error "--slice needs K/N"
+      | [] => .error "--slice needs K/N"
     else if m == "--workers" || m == "--spot" then match rest with
       | n :: r => match n.toNat? with
         | some k =>
@@ -339,6 +352,9 @@ def runMain (opts : Opts) : IO UInt32 := do
   let ctx : Ctx := { root, cfg, graph, facts, hashes, manifest, self, proofSet,
                      stages? := opts.stages }
   let (jobs, listings) ← listAll ctx opts
+  let jobs := match opts.slice with
+    | some (k, n) => (jobs.zipIdx.filter fun (_, i) => i % n == k).map (·.1)
+    | none => jobs
   let jobs ← keyJobs ctx tmp jobs
   -- inventory (S3)
   let mut inv := #[]
@@ -352,7 +368,8 @@ def runMain (opts : Opts) : IO UInt32 := do
     for j in jobs do IO.println s!"{j.m.id}\tline {j.m.line}\t{snippetOf j.m.orig j.m.repl}"
     IO.println s!"fvamut: {jobs.size} mutants"
     return 0
-  let adhoc := !opts.files.isEmpty || !opts.decls.isEmpty || opts.stages.isSome
+  let adhoc := !opts.files.isEmpty || !opts.decls.isEmpty || opts.stages.isSome ||
+    opts.slice.isSome
   -- reuse current rows
   let digests ← IO.mkRef ({} : Digests)
   let tableRows ← readTable (root / cfg.results)
