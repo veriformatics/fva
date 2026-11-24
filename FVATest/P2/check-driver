@@ -55,8 +55,9 @@ esac
     malformed) printf '2\taction\tpass\textra\n' ;;
     *) printf '2\taction\tpass\n' ;;
   esac
-  case ${P2_CASE:-ok} in
-    wrong-reason) printf '3\tassert_invalid\tskip: outside P′\n' ;;
+  case ${P2_CASE:-ok},${2:-} in
+    wrong-reason,*) printf '3\tassert_invalid\tskip: outside P′\n' ;;
+    engine-diverge,--engine) printf '3\tassert_invalid\tskip: P′ validation = U28c: other detail\n' ;;
     *) printf '3\tassert_invalid\tskip: P′ validation = U28c: fixture detail\n' ;;
   esac
   case ${P2_CASE:-ok} in
@@ -86,7 +87,7 @@ run() {
 }
 run ok 0
 for mode in failure missing duplicate extra wrong-type wrong-class wrong-reason malformed \
-	no-outcomes runner-fail oracle-fail; do
+	no-outcomes runner-fail oracle-fail engine-diverge; do
 	run "$mode" 1
 done
 for mode in runner-setup oracle-setup json-setup; do run "$mode" 2; done

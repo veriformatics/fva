@@ -457,8 +457,10 @@ fi
 scripts/test-mutation-fixture || fail=1
 scripts/test-subject-matrix || fail=1
 scripts/test-char-fixture || fail=1
-# U28b E3: tester-3's driver battery over scripts/test-p2exec (20 stubbed cases)
-if ! FVATest/P2/check-driver >"$tmp/p2-driver.log" 2>&1; then
+# U28b E3 + U28d E1: tester-3's driver battery over scripts/test-p2exec (21 stubbed cases, the
+# count pinned: an engine divergence fails the step)
+if ! FVATest/P2/check-driver >"$tmp/p2-driver.log" 2>&1 ||
+	! grep -qx 'p2exec-driver: passed=21 failed=0' "$tmp/p2-driver.log"; then
 	echo "test-checks: p2exec driver battery failed"
 	tail -20 "$tmp/p2-driver.log"
 	fail=1

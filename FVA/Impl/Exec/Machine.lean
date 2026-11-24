@@ -26,12 +26,15 @@ structure MStore where
 /-- The spec store. -/
 def MStore.abs (s : MStore) : Store := { s.base with mems := s.mems.map MMem.abs }
 
-/-- A suspended context: a block's label or a caller's frame. -/
+/-- A suspended context: a block's label, a caller's frame or an exception handler. -/
 inductive Ctl where
   /-- `label_n{cont}` with the operands below it and the instructions after it. -/
   | label (n : Nat) (cont : List Instr) (saved : List Val) (rest : List AInstr)
   /-- `frame_n{caller}`: the caller's frame, operands below the call and instructions after. -/
   | frame (n : Nat) (caller : Frame) (saved : List Val) (rest : List AInstr)
+  /-- `handler_n{catch*}` (P′, `try_table`): its clauses, operands below it and instructions
+  after; no frame: the frame current when it is innermost is the one its tags resolve in. -/
+  | handler (n : Nat) (cs : List Catch) (saved : List Val) (rest : List AInstr)
 
 /-- A machine state. -/
 structure MState where
@@ -54,30 +57,41 @@ def wrap : List Ctl → Frame → List AInstr → Frame × List AInstr
     wrap ctl f (vals saved.reverse ++ [.label n cont es] ++ rest)
   | .frame n caller saved rest :: ctl, f, es =>
     wrap ctl caller (vals saved.reverse ++ [.frame n f es] ++ rest)
+  | .handler n cs saved rest :: ctl, f, es =>
+    wrap ctl f (vals saved.reverse ++ [.handler n cs es] ++ rest)
 
 /-- The spec configuration a machine state denotes. -/
 def MState.abs (m : MState) : Config :=
   let (f, es) := wrap m.ctl m.frame (vals m.stack.reverse ++ m.code)
   ⟨m.store.abs, f, es⟩
 
-/-- Pop operands and labels for `br l`: the operands, code and control after the branch. -/
+/-- Pop operands, labels and handlers for `br l` (a handler is no branch target): the operands,
+code and control after the branch. -/
 def brPop : Nat → List Val → List Ctl → Option (List Val × List AInstr × List Ctl)
   | 0, stk, .label n cont saved rest :: ctl =>
     bif Nat.blt stk.length n then none else some (stk.take n ++ saved, cont.map .plain ++ rest, ctl)
   | l + 1, stk, .label .. :: ctl => brPop l stk ctl
+  | l, stk, .handler .. :: ctl => brPop l stk ctl
   | _, _, _ => none
 
-/-- Pop operands, labels and the innermost frame for `return`. -/
+/-- Pop operands, labels, handlers and the innermost frame for `return`. -/
 def retPop : List Val → List Ctl → Option (Frame × List Val × List AInstr × List Ctl)
-  | stk, .label .. :: ctl => retPop stk ctl
+  | stk, .label .. :: ctl | stk, .handler .. :: ctl => retPop stk ctl
   | stk, .frame n caller saved rest :: ctl =>
     bif Nat.blt stk.length n then none else some (caller, stk.take n ++ saved, rest, ctl)
   | _, [] => none
 
+/-- Pop labels + handlers to the innermost frame and that frame for a tail call: the caller,
+its operands below the call, the code after it and the control below. -/
+def framePop : List Ctl → Option (Frame × List Val × List AInstr × List Ctl)
+  | .label .. :: ctl | .handler .. :: ctl => framePop ctl
+  | .frame _ caller saved rest :: ctl => some (caller, saved, rest, ctl)
+  | [] => none
+
 /-- The outermost frame (the configuration's frame). -/
 def outerFrame : List Ctl → Frame → Frame
   | [], f => f
-  | .label .. :: ctl, f => outerFrame ctl f
+  | .label .. :: ctl, f | .handler .. :: ctl, f => outerFrame ctl f
   | .frame _ caller _ _ :: ctl, _ => outerFrame ctl caller
 
 namespace MState
@@ -116,9 +130,45 @@ def invoke (m : MState) (a : Nat) (rest : List AInstr) : Option MState :=
         .frame ft.results.length m.frame (m.stack.drop k) rest :: m.ctl }
   | _ => none
 
-/-- A trap: every context collapses, the store stays. -/
+/-- A trap: every context collapses (handlers do not catch traps), the store stays. -/
 def trapOut (m : MState) : MState :=
   { m with frame := outerFrame m.ctl m.frame, stack := [], code := [.trap], ctl := [] }
+
+/-- Enter `try_table`: its handler outside its result label, its parameters as the operands. -/
+def enterTry (m : MState) (n : Nat) (cs : List Catch) (k : Nat) (body : List Instr)
+    (rest : List AInstr) : Option MState :=
+  bif Nat.blt m.stack.length k then none
+  else some { m with stack := m.stack.take k, code := body.map .plain,
+                     ctl := .label n [] [] [] :: .handler n cs (m.stack.drop k) rest :: m.ctl }
+
+/-- Exception `a` alone in the innermost block (`[ref.exn a, throw_ref]`): the innermost entry
+takes it (3.0 `throw_ref-label`, `-frame`, `-handler-*`), one reduction; `none` at the top
+(uncaught, `ending`). A label or frame passes it out with its operands + code restored around
+it (a later step drops them); a handler tries its first clause in the current frame. -/
+def throwPop (m : MState) (a : Nat) : Option MState :=
+  match m.ctl with
+  | [] => none
+  | .label _ _ saved rest :: ctl =>
+    some { m with stack := .ref (.exn a) :: saved, code := .plain .throwRef :: rest, ctl }
+  | .frame _ caller saved rest :: ctl =>
+    some { m with frame := caller, stack := .ref (.exn a) :: saved,
+                  code := .plain .throwRef :: rest, ctl }
+  | .handler n cs saved rest :: ctl => match cs with
+    | [] => some { m with stack := .ref (.exn a) :: saved, code := .plain .throwRef :: rest, ctl }
+    | c :: cs' => match Ref.catchStep m.store.abs m.frame a c with
+      | some out => some { m with stack := saved, code := out ++ rest, ctl }
+      | none => some { m with ctl := .handler n cs' saved rest :: ctl }
+
+/-- A tail call of `a` (`return_invoke`): the callee's arguments replace the innermost frame's
+labels, handlers and operands; the call runs in the caller's place. -/
+def retInvoke (m : MState) (a : Nat) : Option MState :=
+  match m.store.base.funcs[a]? with
+  | some fn => fn.type.expand.bind fun ft =>
+    let k := ft.params.length
+    bif Nat.blt m.stack.length k then none
+    else (framePop m.ctl).map fun (caller, saved, rest, ctl) =>
+      { m with frame := caller, stack := m.stack.take k ++ saved, code := .invoke a :: rest, ctl }
+  | none => none
 
 /-- One step at plain instruction `i` before `rest`. -/
 def stepPlain (m : MState) (i : Instr) (rest : List AInstr) : Option MState :=
@@ -175,6 +225,13 @@ def stepPlain (m : MState) (i : Instr) (rest : List AInstr) : Option MState :=
       else some ((m.setMem a (mm.init d.toNat ((di.data.drop s'.toNat).take n.toNat))).cont stk []
         rest)
     | _, _ => none
+  | .tryTable bt cs body, _ => (bt.expand m.frame).bind fun ft =>
+    m.enterTry ft.results.length cs ft.params.length body rest
+  -- 3.0 `throw_ref-instrs`: other operands or code around the exception are dropped first
+  | .throwRef, .ref (.exn a) :: stk =>
+    bif stk.isEmpty && rest.isEmpty then m.throwPop a
+    else some (m.cont [.ref (.exn a)] [.plain .throwRef] [])
+  | .throwRef, .ref .null :: stk => some (m.cont stk [.trap] rest)
   | i, stk => (Ref.instrStep m.store.abs m.frame i stk).map fun (s', f', stk', out) =>
     { m with store := { m.store with base := s' }, frame := f', stack := stk', code := out ++ rest }
 
@@ -186,11 +243,13 @@ def step (m : MState) : Option MState :=
     | none => match e with
       | .plain i => m.stepPlain i rest
       | .invoke a => m.invoke a rest
+      | .returnInvoke a => m.retInvoke a
       | .trap => bif m.ctl.isEmpty && m.stack.isEmpty && rest.isEmpty then none else some m.trapOut
       | _ => none
   | [] => match m.ctl with
     | [] => none
-    | .label _ _ saved rest :: ctl => some { m with stack := m.stack ++ saved, code := rest, ctl }
+    | .label _ _ saved rest :: ctl | .handler _ _ saved rest :: ctl =>
+      some { m with stack := m.stack ++ saved, code := rest, ctl }
     | .frame n caller saved rest :: ctl =>
       bif Nat.beq m.stack.length n then
         some { m with frame := caller, stack := m.stack ++ saved, code := rest, ctl }
@@ -208,25 +267,37 @@ def ofInvoke (s : MStore) (a : Nat) (args : List Val) : MState :=
   { store := s, frame := ⟨[], {}⟩, stack := args.reverse, code := [.invoke a], ctl := [] }
 
 /-- The next step is no choice point of the spec under growth policy `fits` (U27): a value, a
-control exit, a plain instruction `Ref.instrUnique` admits, or a call of a module function; a
-host call or a trap is one. -/
+control exit, a plain instruction `Ref.atUnique` admits (`throw_ref` on an exception: alone in
+its block), a call of a module function or a tail call; a host call or a trap is one. -/
 def uniq (fits : Bool) (m : MState) : Bool :=
   match m.code with
-  | e :: _ => match Ref.toVal e with
+  | e :: rest => match Ref.toVal e with
     | some _ => true
     | none => match e with
+      | .plain .throwRef => match m.stack with
+        | .ref (.exn _) :: stk => stk.isEmpty && rest.isEmpty
+        | _ => true
       | .plain i => Ref.instrUnique fits i m.stack
       | .invoke a => match m.store.base.funcs[a]? with
         | some (.wasm ..) => true
         | _ => false
+      | .returnInvoke _ => true
       | _ => false
   | [] => true
 
-/-- Run up to `fuel` steps while each is no choice point under `fits`: the last state reached
-and whether fuel ran out. -/
+/-- The next step drops the operands or code around a thrown exception (3.0 `throw_ref-instrs`):
+a choice point of the spec whose every choice reaches the same handler, or the top, with the
+same exception and store (`FVA.Proof.Exec.MachineSys`: `must_admin`, `sysMust_admin`). -/
+def admin (m : MState) : Bool :=
+  match m.code, m.stack with
+  | .plain .throwRef :: rest, .ref (.exn _) :: stk => !(stk.isEmpty && rest.isEmpty)
+  | _, _ => false
+
+/-- Run up to `fuel` steps while each is no choice point under `fits` or an administrative
+throw step: the last state reached and whether fuel ran out. -/
 def runU (fits : Bool) : Nat → MState → MState × Bool
   | 0, m => (m, true)
-  | n + 1, m => bif m.uniq fits then
+  | n + 1, m => bif m.uniq fits || m.admin then
       match m.step with
       | some m' => runU fits n m'
       | none => (m, false)
@@ -247,10 +318,12 @@ instructions `out` (values or `trap`) in its place, the store `ms` the host left
 def hostResume (m : MState) (ms : MStore) (out rest : List AInstr) (k : Nat) : MState :=
   { m with store := ms, stack := m.stack.drop k, code := out ++ rest }
 
-/-- How a run ended: only values remain, only `trap` remains, or neither (stuck). -/
+/-- How a run ended: only values remain, only `trap` remains, an uncaught exception, or
+neither (stuck). -/
 inductive Ending where
   | returned (vs : List Val)
   | trapped
+  | thrown (a : Nat)
   | stuck
 
 /-- The ending of a state with no step. -/
@@ -258,6 +331,7 @@ def ending (m : MState) : Ending :=
   match m.ctl, m.code, m.stack with
   | [], [], stk => .returned stk.reverse
   | [], [.trap], [] => .trapped
+  | [], [.plain .throwRef], [.ref (.exn a)] => .thrown a
   | _, _, _ => .stuck
 
 end MState
@@ -277,9 +351,9 @@ def MHostOut.out : MHostOut → List AInstr
   | .returned vs => vals vs
   | .trapped => [.trap]
 
-/-- A process on the machine with executable host `X` (U27): unique core steps (`fits = true`)
-and host calls; stops at an exit, a final or stuck state, a choice point, a host call `X`
-leaves undefined, or when fuel runs out (`true`). -/
+/-- A process on the machine with executable host `X` (U27): unique core steps (`fits = true`),
+administrative throw steps and host calls; stops at an exit, a final or stuck state, a choice
+point, a host call `X` leaves undefined, or when fuel runs out (`true`). -/
 def sysRun {St : Type} (exited : St → Option Nat)
     (X : St → Nat → MStore → List Val → Option (St × MStore × MHostOut)) :
     Nat → St × MState → St × MState × Bool
@@ -291,7 +365,7 @@ def sysRun {St : Type} (exited : St → Option Nat)
       | some (id, k, rest) => match X σ id m.store (m.stack.take k).reverse with
         | some (τ, ms, r) => sysRun exited X n (τ, m.hostResume ms r.out rest k)
         | none => (σ, m, false)
-      | none => bif m.uniq true then
+      | none => bif m.uniq true || m.admin then
           match m.step with
           | some m' => sysRun exited X n (σ, m')
           | none => (σ, m, false)

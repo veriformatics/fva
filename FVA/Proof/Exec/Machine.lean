@@ -95,6 +95,7 @@ theorem stepNU_plain {fits : Bool} {S : Store} {f : Frame} {stk : List Val} {i :
 def layer : Ctl → Frame → List AInstr → Frame × List AInstr
   | .label n cont saved rest, f, es => (f, vals saved.reverse ++ [.label n cont es] ++ rest)
   | .frame n caller saved rest, f, es => (caller, vals saved.reverse ++ [.frame n f es] ++ rest)
+  | .handler n cs saved rest, f, es => (f, vals saved.reverse ++ [.handler n cs es] ++ rest)
 
 theorem wrap_cons (c : Ctl) (ctl : List Ctl) (f : Frame) (es : List AInstr) :
     wrap (c :: ctl) f es = wrap ctl (layer c f es).1 (layer c f es).2 := by
@@ -109,6 +110,9 @@ theorem seq_layer_step {S S' : Store} {f f' : Frame} {es es' : List AInstr} (c :
     simp only [layer, List.append_assoc, Ref.seq_vals, List.reverse_reverse, List.append_nil,
       List.singleton_append, Ref.seq, Ref.toVal, Ref.atInstr, h]
   | frame n caller saved rest =>
+    simp only [layer, List.append_assoc, Ref.seq_vals, List.reverse_reverse, List.append_nil,
+      List.singleton_append, Ref.seq, Ref.toVal, Ref.atInstr, h]
+  | handler n cs saved rest =>
     simp only [layer, List.append_assoc, Ref.seq_vals, List.reverse_reverse, List.append_nil,
       List.singleton_append, Ref.seq, Ref.toVal, Ref.atInstr, h]
 
@@ -166,6 +170,9 @@ theorem seqUnique_layer (fits : Bool) (S : Store) (c : Ctl) (f : Frame) (es : Li
     simp only [layer, List.append_assoc, Ref.seqUnique_vals, List.singleton_append,
       Ref.seqUnique, Ref.toVal, Ref.atUnique]
   | frame n caller saved rest =>
+    simp only [layer, List.append_assoc, Ref.seqUnique_vals, List.singleton_append,
+      Ref.seqUnique, Ref.toVal, Ref.atUnique]
+  | handler n cs saved rest =>
     simp only [layer, List.append_assoc, Ref.seqUnique_vals, List.singleton_append,
       Ref.seqUnique, Ref.toVal, Ref.atUnique]
 
@@ -291,6 +298,15 @@ theorem seq_layer_final_frame {S : Store} {f : Frame} {stk : List Val} (n : Nat)
     Ref.isTrapOnly_vals, Bool.cond_false, hb, Bool.cond_true, List.reverse_append, vals,
     List.map_append]
 
+theorem seq_layer_final_handler {S : Store} {f : Frame} {stk : List Val} (n : Nat)
+    (cs : List Catch) (saved : List Val) (rest : List AInstr) :
+    Ref.seq S (layer (.handler n cs saved rest) f (vals stk.reverse)).1 []
+        (layer (.handler n cs saved rest) f (vals stk.reverse)).2 =
+      .step S f (vals (stk ++ saved).reverse ++ rest) := by
+  simp only [layer, List.append_assoc, Ref.seq_vals, List.reverse_reverse, List.append_nil,
+    List.singleton_append, Ref.seq, Ref.toVal, Ref.atInstr, Ref.seq_values,
+    Ref.isTrapOnly_vals, Bool.cond_false, List.reverse_append, vals, List.map_append]
+
 theorem seq_wrap_br {S : Store} {f : Frame} {es : List AInstr} {bvs stk' : List Val}
     {code' : List AInstr} : ∀ (l : Nat) (ctl ctl' : List Ctl),
     Ref.seq S f [] es = .br l bvs → brPop l bvs ctl = some (stk', code', ctl') →
@@ -314,6 +330,12 @@ theorem seq_wrap_br {S : Store} {f : Frame} {es : List AInstr} {bvs stk' : List 
     apply seq_wrap_br l ctl ctl' _ hb
     simp only [layer, List.append_assoc, Ref.seq_vals, List.singleton_append, Ref.seq, Ref.toVal,
       Ref.atInstr, h]
+  | l, .handler n cs saved rest :: ctl, ctl', h, hb => by
+    simp only [brPop] at hb
+    rw [wrap_cons]
+    apply seq_wrap_br l ctl ctl' _ hb
+    simp only [layer, List.append_assoc, Ref.seq_vals, List.singleton_append, Ref.seq, Ref.toVal,
+      Ref.atInstr, h]
   | _, .frame .. :: _, _, _, hb => by simp [brPop] at hb
   | _, [], _, _, hb => by simp [brPop] at hb
 
@@ -324,6 +346,12 @@ theorem seq_wrap_ret {S : Store} {f : Frame} {es : List AInstr} {bvs stk' : List
       .step S (wrap ctl' f' (vals stk'.reverse ++ code')).1
         (wrap ctl' f' (vals stk'.reverse ++ code')).2
   | .label n cont saved rest :: ctl, ctl', h, hb => by
+    simp only [retPop] at hb
+    rw [wrap_cons]
+    apply seq_wrap_ret ctl ctl' _ hb
+    simp only [layer, List.append_assoc, Ref.seq_vals, List.singleton_append, Ref.seq, Ref.toVal,
+      Ref.atInstr, h]
+  | .handler n cs saved rest :: ctl, ctl', h, hb => by
     simp only [retPop] at hb
     rw [wrap_cons]
     apply seq_wrap_ret ctl ctl' _ hb
@@ -342,9 +370,37 @@ theorem seq_wrap_ret {S : Store} {f : Frame} {es : List AInstr} {bvs stk' : List
     · simp [hlt] at hb
   | [], _, _, hb => by simp [retPop] at hb
 
+theorem seq_wrap_retInvoke {S : Store} {f : Frame} {es : List AInstr} {a : Nat}
+    {args saved : List Val} {f' : Frame} {rest : List AInstr} : ∀ (ctl ctl' : List Ctl),
+    Ref.seq S f [] es = .retInvoke a args → framePop ctl = some (f', saved, rest, ctl') →
+    Ref.seq S (wrap ctl f es).1 [] (wrap ctl f es).2 =
+      .step S (wrap ctl' f' (vals saved.reverse ++ vals args ++ .invoke a :: rest)).1
+        (wrap ctl' f' (vals saved.reverse ++ vals args ++ .invoke a :: rest)).2
+  | .label n cont saved' rest' :: ctl, ctl', h, hb => by
+    simp only [framePop] at hb
+    rw [wrap_cons]
+    apply seq_wrap_retInvoke ctl ctl' _ hb
+    simp only [layer, List.append_assoc, Ref.seq_vals, List.singleton_append, Ref.seq, Ref.toVal,
+      Ref.atInstr, h]
+  | .handler n cs saved' rest' :: ctl, ctl', h, hb => by
+    simp only [framePop] at hb
+    rw [wrap_cons]
+    apply seq_wrap_retInvoke ctl ctl' _ hb
+    simp only [layer, List.append_assoc, Ref.seq_vals, List.singleton_append, Ref.seq, Ref.toVal,
+      Ref.atInstr, h]
+  | .frame n caller saved' rest' :: ctl, ctl', h, hb => by
+    simp only [framePop, Option.some.injEq, Prod.mk.injEq] at hb
+    obtain ⟨rfl, rfl, rfl, rfl⟩ := hb
+    rw [wrap_cons]
+    apply seq_wrap_step
+    simp only [layer, List.append_assoc, Ref.seq_vals, List.reverse_reverse, List.append_nil,
+      List.singleton_append, Ref.seq, Ref.toVal, Ref.atInstr, h]
+  | [], _, _, hb => by simp [framePop] at hb
+
 /-- The instructions just outside control entry `c` once its body is `[trap]`. -/
 def trapOut1 : Ctl → List AInstr
-  | .label _ _ saved rest | .frame _ _ saved rest => vals saved.reverse ++ .trap :: rest
+  | .label _ _ saved rest | .frame _ _ saved rest | .handler _ _ saved rest =>
+    vals saved.reverse ++ .trap :: rest
 
 theorem seq_layer_trap (S : Store) (f : Frame) (c : Ctl) :
     Ref.seq S (layer c f [.trap]).1 [] (layer c f [.trap]).2 =
@@ -386,10 +442,98 @@ theorem trap_collapse (S : Store) : ∀ (ctl : List Ctl) (f : Frame) (stk : List
         cases c with
         | label n cont saved rest' => exact trap_collapse S ctl' f saved rest'
         | frame n caller saved rest' => exact trap_collapse S ctl' caller saved rest'
+        | handler n cs saved rest' => exact trap_collapse S ctl' f saved rest'
       obtain ⟨k, hk⟩ := hc
       refine ⟨k₀ + (1 + k), ?_⟩
       rw [stepN_add, hk₀, Option.bind_some, stepN_add, stepN_one (step_layer_trap S c ctl' f),
         Option.bind_some, hk]
+
+/-- Where the innermost entry `c` puts exception `a` thrown alone in its body (one reference
+step, `throwPop`): the frame and sequence outside `c`. -/
+def throwOut1 (S : Store) (f : Frame) (a : Nat) : Ctl → Frame × List AInstr
+  | .label _ _ saved rest => (f, vals saved.reverse ++ throwing a ++ rest)
+  | .frame _ caller saved rest => (caller, vals saved.reverse ++ throwing a ++ rest)
+  | .handler n cs saved rest => match cs with
+    | [] => (f, vals saved.reverse ++ throwing a ++ rest)
+    | c :: cs' => match Ref.catchStep S f a c with
+      | some out => (f, vals saved.reverse ++ out ++ rest)
+      | none => (f, vals saved.reverse ++ [.handler n cs' (throwing a)] ++ rest)
+
+theorem seq_layer_thrown (S : Store) (f : Frame) (a : Nat) (c : Ctl) :
+    Ref.seq S (layer c f (throwing a)).1 [] (layer c f (throwing a)).2 =
+      .step S (throwOut1 S f a c).1 (throwOut1 S f a c).2 := by
+  cases c with
+  | label n cont saved rest =>
+    simp only [layer, throwOut1, List.append_assoc, Ref.seq_vals, List.singleton_append, Ref.seq,
+      Ref.toVal, Ref.atInstr, List.reverse_reverse,
+      List.isEmpty_nil, Bool.and_self, Bool.cond_true, List.append_nil]
+  | frame n caller saved rest =>
+    simp only [layer, throwOut1, List.append_assoc, Ref.seq_vals, List.singleton_append, Ref.seq,
+      Ref.toVal, Ref.atInstr, List.reverse_reverse,
+      List.isEmpty_nil, Bool.and_self, Bool.cond_true, List.append_nil]
+  | handler n cs saved rest =>
+    cases cs with
+    | nil =>
+      simp only [layer, throwOut1, List.append_assoc, Ref.seq_vals, List.singleton_append,
+        Ref.seq, Ref.toVal, Ref.atInstr, List.reverse_reverse,
+      List.isEmpty_nil, Bool.and_self, Bool.cond_true, List.append_nil]
+    | cons c cs' =>
+      cases hc : Ref.catchStep S f a c <;>
+        simp only [layer, throwOut1, List.append_assoc, Ref.seq_vals, List.singleton_append,
+          Ref.seq, Ref.toVal, Ref.atInstr, List.reverse_reverse, hc,
+          List.isEmpty_nil, Bool.and_self, Bool.cond_true, List.append_nil]
+
+/-- An exception alone in the innermost block: the innermost entry takes it in one reference
+step (`throwPop`, 3.0 `throw_ref-label`, `-frame`, `-handler-*`). -/
+theorem step_throwPop {m m' : MState} {a : Nat} (hs : m.stack = [.ref (.exn a)])
+    (hc : m.code = [.plain .throwRef]) (h : m.throwPop a = some m') :
+    m'.store = m.store ∧ Ref.step m.abs = some m'.abs := by
+  rcases m with ⟨st, f, stk, code, ctl⟩
+  dsimp only at hs hc
+  subst hs hc
+  cases ctl with
+  | nil => simp [MState.throwPop] at h
+  | cons c ctl =>
+    have hin : Ref.step (wrapC st.abs (c :: ctl) f (throwing a)) =
+        some (wrapC st.abs ctl (throwOut1 st.abs f a c).1 (throwOut1 st.abs f a c).2) := by
+      simp only [wrapC, wrap_cons, Ref.step, seq_wrap_step ctl (seq_layer_thrown st.abs f a c)]
+    have habs : (⟨st, f, [.ref (.exn a)], [.plain .throwRef], c :: ctl⟩ : MState).abs =
+        wrapC st.abs (c :: ctl) f (throwing a) := rfl
+    rw [habs, hin]
+    cases c with
+    | label n cont saved rest =>
+      simp only [MState.throwPop, Option.some.injEq] at h
+      subst h
+      refine ⟨rfl, ?_⟩
+      simp [abs_eq_wrapC, throwOut1, Val.instr, List.append_assoc]
+    | frame n caller saved rest =>
+      simp only [MState.throwPop, Option.some.injEq] at h
+      subst h
+      refine ⟨rfl, ?_⟩
+      simp [abs_eq_wrapC, throwOut1, Val.instr, List.append_assoc]
+    | handler n cs saved rest =>
+      cases cs with
+      | nil =>
+        simp only [MState.throwPop, Option.some.injEq] at h
+        subst h
+        refine ⟨rfl, ?_⟩
+        simp [abs_eq_wrapC, throwOut1, Val.instr, List.append_assoc]
+      | cons c' cs' =>
+        simp only [MState.throwPop] at h
+        split at h
+        · next out hcs =>
+          simp only [Option.some.injEq] at h
+          subst h
+          have hcs' : Ref.catchStep st.abs f a c' = some out := hcs
+          refine ⟨rfl, ?_⟩
+          simp [abs_eq_wrapC, throwOut1, hcs', List.append_assoc]
+        · next hcs =>
+          simp only [Option.some.injEq] at h
+          subst h
+          have hcs' : Ref.catchStep st.abs f a c' = none := hcs
+          refine ⟨rfl, ?_⟩
+          simp [abs_eq_wrapC, wrapC, wrap_cons, layer, throwOut1, hcs', Val.instr,
+            List.append_assoc]
 
 /-! ## Store abstraction -/
 
@@ -1069,6 +1213,19 @@ theorem sim_bulk {m : MState} {a : Nat} {mm' : MMem} {stk : List Val} {rest : Li
   simp only [MState.cont, setMem_abs, List.nil_append]
   exact h fits
 
+/-- An administrative throw step (3.0 `throw_ref-instrs`): the operands and code around the
+exception dropped, one reference step. -/
+theorem step_admin {m : MState} {a : Nat} {stk : List Val} {rest : List AInstr}
+    (hc : m.code = .plain .throwRef :: rest) (hs : m.stack = .ref (.exn a) :: stk)
+    (hb : (stk.isEmpty && rest.isEmpty) = false) :
+    Ref.step m.abs = some (m.cont [.ref (.exn a)] [.plain .throwRef] []).abs := by
+  rw [abs_eq_wrapC, abs_eq_wrapC]
+  apply step_wrap
+  simp only [MState.cont, List.append_nil]
+  rw [hc, hs]
+  apply step_focus rfl
+  simp [Ref.atInstr, hb, Val.instr]
+
 theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
     (hi : m.Inv) (hc : m.code = .plain i :: rest) (hv : Ref.toVal (.plain i) = none)
     (h : m.stepPlain i rest = some m') : m'.Inv ∧ Sim m m' := by
@@ -1146,7 +1303,7 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
     · cases Nat.blt mm.size (x.toNat + ma.offset + t.bytes) <;> rfl
     · rw [hc]
       cases hb : Nat.blt mm.size (x.toNat + ma.offset + t.bytes) <;>
-        simpa [hb, MState.cont, vals_cons_reverse, List.append_assoc] using hs
+        simpa [hb, MState.cont, Val.instr, List.append_assoc] using hs
   case case6 w p sx ma x stk hstk =>
     simp only [MState.stepPlain, hstk, Option.map_eq_some_iff] at h
     obtain ⟨⟨a, mm⟩, hm, rfl⟩ := h
@@ -1159,7 +1316,7 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
     · cases Nat.blt mm.size (x.toNat + ma.offset + p.bits / 8) <;> rfl
     · rw [hc]
       cases hb : Nat.blt mm.size (x.toNat + ma.offset + p.bits / 8) <;>
-        simpa [hb, MState.cont, vals_cons_reverse, List.append_assoc] using hs
+        simpa [hb, MState.cont, Val.instr, List.append_assoc] using hs
   case case7 =>
     exact sim_store hi hc hv ‹_› ‹_› ‹_› (by simpa [MState.stepPlain, *] using h)
   case case8 =>
@@ -1187,7 +1344,7 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
       rw [MMem.grow_none.mp hg] at hst
       refine ⟨hi, sim_one rfl ?_⟩
       rw [hc]
-      simpa [MState.cont, vals_cons_reverse, List.append_assoc] using step_instr rest hst hv
+      simpa [MState.cont, Val.instr, List.append_assoc] using step_instr rest hst hv
     | some mm' =>
       obtain ⟨hinv', habs⟩ := MMem.grow_some hmi hg
       rw [habs] at hst
@@ -1296,7 +1453,45 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
     exfalso
     simp only [MState.stepPlain, *] at h
     simp at h
-  case case18 hblock hloop hbr hret hload hloadp hstore hstorep hgrow hfill hcopy hinit =>
+  case case18 bt cs body =>
+    simp only [MState.stepPlain, Option.bind_eq_some_iff, MState.enterTry] at h
+    obtain ⟨ft, hft, h⟩ := h
+    cases hlt : Nat.blt m.stack.length ft.params.length
+    · simp only [hlt, Bool.cond_false, Option.some.injEq] at h
+      subst h
+      have hle := le_of_blt_false hlt
+      refine ⟨hi, Sim.one ?_⟩
+      rw [abs_eq_wrapC, abs_eq_wrapC, hc]
+      apply stepN_one
+      apply step_wrap
+      have := step_instr (S := m.store.abs) (f := m.frame) rest
+        (i := .tryTable bt cs body) (stk := m.stack) (S' := m.store.abs) (f' := m.frame)
+        (stk' := m.stack.drop ft.params.length)
+        (out := [.handler ft.results.length cs [.label ft.results.length []
+          (vals (m.stack.take ft.params.length).reverse ++ body.map .plain)]])
+        (by simp [Ref.instrStep, hft, hle]) hv
+      simpa [List.append_assoc] using this
+    · simp [hlt] at h
+  case case19 a stk hstk hb =>
+    obtain ⟨hs0, hr0⟩ : stk = [] ∧ rest = [] := by simpa using hb
+    subst hs0 hr0
+    have h' : m.throwPop a = some m' := by simpa [MState.stepPlain, hstk] using h
+    obtain ⟨hst, hstep⟩ := step_throwPop hstk hc h'
+    exact ⟨by simpa [MState.Inv, hst] using hi, Sim.one (stepN_one hstep)⟩
+  case case20 a stk hstk hb =>
+    simp only [MState.stepPlain, hstk, hb, Bool.cond_false, Option.some.injEq] at h
+    subst h
+    exact ⟨hi, Sim.one (stepN_one (step_admin hc hstk hb))⟩
+  case case21 stk hstk =>
+    simp only [MState.stepPlain, hstk, Option.some.injEq] at h
+    subst h
+    refine ⟨hi, sim_one rfl ?_⟩
+    simp only [MState.cont]
+    rw [hc, hstk]
+    apply step_focus rfl
+    simp [Ref.atInstr]
+  case case22 hblock hloop hbr hret htry hload hloadp hstore hstorep hgrow hfill hcopy hinit hexn
+      hnull =>
     have hd : m.stepPlain i rest = (Ref.instrStep m.store.abs m.frame i m.stack).map
         fun (s', f', stk', out) =>
           { m with store := { m.store with base := s' }, frame := f', stack := stk',
@@ -1317,6 +1512,9 @@ theorem stepPlain_sim {m m' : MState} {i : Instr} {rest : List AInstr}
         | exact (hfill _ _ _ _ rfl (by assumption)).elim
         | exact (hcopy _ _ _ _ rfl (by assumption)).elim
         | exact (hinit _ _ _ _ _ rfl (by assumption)).elim
+        | exact (htry _ _ _ rfl).elim
+        | exact (hexn _ _ rfl (by assumption)).elim
+        | exact (hnull _ rfl (by assumption)).elim
     rw [hd, Option.map_eq_some_iff] at h
     obtain ⟨⟨s', f', stk', out⟩, hstep, rfl⟩ := h
     have hmem : s'.mems = m.store.abs.mems := by
@@ -1398,6 +1596,29 @@ theorem step_sim {m m' : MState} (hi : m.Inv) (h : m.step = some m') :
           simp only [Ref.uniqueStep, Ref.seqUnique_vals, List.reverse_reverse, List.append_nil]
           rfl
         · simp [hb] at h
+      | returnInvoke a =>
+        simp only [MState.step, hv, MState.retInvoke] at h
+        split at h
+        · next fn hfn =>
+          cases hft : fn.type.expand with
+          | none => simp [hft] at h
+          | some ft =>
+            simp only [hft, Option.bind_some] at h
+            cases hlt : Nat.blt stk.length ft.params.length
+            · simp only [hlt, Bool.cond_false, Option.map_eq_some_iff] at h
+              obtain ⟨⟨caller, saved, rest', ctl'⟩, hpop, rfl⟩ := h
+              have hfn' : st.abs.funcs[a]? = some fn := hfn
+              have hin : Ref.seq st.abs f [] (vals stk.reverse ++ .returnInvoke a :: rest) =
+                  .retInvoke a (stk.take ft.params.length).reverse := by
+                rw [seq_focus _ _ _ _ rfl]
+                simp only [Ref.atInstr, hfn', hft, hlt, Bool.cond_false]
+              refine ⟨hi, Sim.one ?_⟩
+              rw [abs_eq_wrapC, abs_eq_wrapC]
+              apply stepN_one
+              simp only [wrapC, Ref.step, seq_wrap_retInvoke ctl ctl' hin hpop]
+              simp [List.reverse_append, vals, List.map_append, List.append_assoc]
+            · simp [hlt] at h
+        · contradiction
       | _ => simp [MState.step, hv] at h
   | nil =>
     cases ctl with
@@ -1412,6 +1633,15 @@ theorem step_sim {m m' : MState} (hi : m.Inv) (h : m.step = some m') :
         apply stepN_one
         simp only [wrapC, wrap_cons, Ref.step, List.append_nil]
         rw [seq_wrap_step ctl (seq_layer_final_label (S := st.abs) (f := f) (stk := stk) n cont
+          saved rest)]
+      | handler n cs saved rest =>
+        simp only [MState.step, Option.some.injEq] at h
+        subst h
+        refine ⟨hi, Sim.one ?_⟩
+        rw [abs_eq_wrapC, abs_eq_wrapC]
+        apply stepN_one
+        simp only [wrapC, wrap_cons, Ref.step, List.append_nil]
+        rw [seq_wrap_step ctl (seq_layer_final_handler (S := st.abs) (f := f) (stk := stk) n cs
           saved rest)]
       | frame n caller saved rest =>
         simp only [MState.step] at h
@@ -1436,8 +1666,7 @@ theorem abs_returned {m : MState} {vs : List Val} (h : m.ending = .returned vs) 
     simp only [MState.Ending.returned.injEq] at h
     subst h
     simp [Final, abs_eq_wrapC, wrapC, wrap, hc, hcode]
-  · contradiction
-  · contradiction
+  all_goals contradiction
 
 theorem abs_trapped {m : MState} (h : m.ending = .trapped) :
     Final m.abs (.trapped m.store.abs) := by
@@ -1445,6 +1674,19 @@ theorem abs_trapped {m : MState} (h : m.ending = .trapped) :
   split at h
   · contradiction
   · next hc hcode hstk => simp [Final, abs_eq_wrapC, wrapC, wrap, hc, hcode, hstk]
+  all_goals contradiction
+
+/-- Contract U28d T2: an uncaught exception ending is the spec's thrown outcome. -/
+theorem abs_thrown {m : MState} {a : Nat} (h : m.ending = .thrown a) :
+    Final m.abs (.thrown m.store.abs a) := by
+  simp only [MState.ending] at h
+  split at h
+  · contradiction
+  · contradiction
+  · next a' hc hcode hstk =>
+    simp only [MState.Ending.thrown.injEq] at h
+    subst h
+    simp [Final, abs_eq_wrapC, wrapC, wrap, hc, hcode, hstk, Val.instr]
   · contradiction
 
 /-! ## Runs and the instantiation boundary (contract U26 T4) -/
@@ -1565,8 +1807,7 @@ theorem instantiate_sound {H : HostSem} {fuel : Nat} {s s' : MStore} {m : Module
           · rw [hs₁, hinst]; exact hg
           · rw [hs₁, hinst]; exact ht
           · rw [hs₁, hinst]; exact he
-        · contradiction
-        · contradiction
+        all_goals contradiction
       · contradiction
   · contradiction
 

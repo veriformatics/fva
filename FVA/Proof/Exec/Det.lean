@@ -1284,4 +1284,47 @@ theorem _root_.FVA.Wasm.Exec.Must.outcome {H : HostSem} {Q : Outcome → Prop} {
     · obtain ⟨_, h⟩ := hex; exact absurd h (no_step_final hf)
     · exact ih c₁ h hrest
 
+/-- `Must` holds at every successor (a finished configuration takes no step). -/
+theorem _root_.FVA.Wasm.Exec.Must.forward {H : HostSem} {Q : Outcome → Prop} {c c' : Config}
+    (hm : Must H Q c) (hs : Step H c c') : Must H Q c' := by
+  cases hm with
+  | done hf _ => exact absurd hs (no_step_final hf)
+  | next _ hall => exact hall c' hs
+
+/-- `Must` holds along every execution. -/
+theorem _root_.FVA.Wasm.Exec.Must.steps {H : HostSem} {Q : Outcome → Prop} {c d : Config}
+    (hm : Must H Q c) (hs : Steps H c d) : Must H Q d := by
+  induction hs with
+  | refl => exact hm
+  | tail _ h ih => exact ih.forward h
+
+/-- Continuation transfer over one administrative throw step (contract U28d T3, Q1): a step of a
+configuration with a pending throw keeps its normalization target — the nearest handler with the
+exception's body, or `throwing a` at the top, store and frame kept (`step_throw`) — so `Must` at
+the successor gives `Must` at the target and, through `must_throwHandler`/`must_throw`, at the
+start. -/
+theorem must_of_throwStep {H : HostSem} {Q : Outcome → Prop} {c c' : Config}
+    {r : Nat ⊕ List AInstr} (hs : Step H c c') (ht : seqThrow [] c.instrs = some r)
+    (hc' : Must H Q c') : Must H Q c := by
+  obtain ⟨hstore, hframe, -, hh⟩ := step_throw hs [] [] r (by simpa using ht)
+  cases r with
+  | inl a =>
+    rcases hh with hh | ⟨L, hL, -⟩
+    · refine must_throw ht ?_
+      have hq := hc'.outcome (o := .thrown c'.store a) (steps_throw (H := H) (by simpa using hh))
+        ⟨rfl, rfl⟩
+      rwa [hstore] at hq
+    · cases hL
+  | inr L =>
+    refine must_throwHandler ht ?_
+    rcases hh with hh | ⟨L', hL', hl⟩
+    · have hb := hc'.steps (steps_throwHandler (H := H) (by simpa using hh))
+      rwa [hstore, hframe] at hb
+    · cases hL'
+      simp only [List.reverse_nil, List.map_nil, List.nil_append, List.append_nil] at hl
+      obtain ⟨s', f', es'⟩ := c'
+      dsimp only at hstore hframe hl
+      subst hstore hframe hl
+      exact hc'
+
 end FVA.Wasm.Exec.Ref

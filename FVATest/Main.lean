@@ -68,15 +68,19 @@ def main : List String → IO UInt32
     catch e =>
       IO.eprintln s!"fvatest spec: {e}"
       return 2
-  | "p2" :: scripts => do
+  | "p2" :: args => do
     try
       let mut bad := false
-      -- steps per command; `FVA_P2_FUEL` raises it for the million-call tail recursions
+      -- steps per command (each engine's own); `FVA_P2_FUEL` raises it for the million-call
+      -- tail recursions
       let fuel := ((← IO.getEnv "FVA_P2_FUEL").bind String.toNat?).getD 2000000
+      let (engine, scripts) := match args with
+        | "--engine" :: "machine" :: rest => (FVA.Test.P2.Engine.machine, rest)
+        | rest => (.ref, rest)
       for path in scripts do
         let p : System.FilePath := path
         let json ← IO.ofExcept (Lean.Json.parse (← IO.FS.readFile p))
-        let t ← FVA.Test.P2.runScript (p.parent.getD ".") json fuel
+        let t ← FVA.Test.P2.runScript (p.parent.getD ".") json fuel engine
         IO.println s!"{p.fileStem.getD path} {t.pass} {t.fail} {t.skip}"
         for f in t.failures do IO.println s!"  FAIL {f}"
         if (← IO.getEnv "FVA_SPEC_SKIPS") == some "1" then

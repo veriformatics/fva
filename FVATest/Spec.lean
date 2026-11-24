@@ -157,6 +157,8 @@ def showValue : Val → String
 inductive Result where
   | returned (vs : List Val)
   | trapped
+  /-- An uncaught exception (`assert_exception` = U28e). -/
+  | thrown (a : Nat)
   | exhausted
   | stuck
   | skipped (why : String)
@@ -168,6 +170,7 @@ def runMachine (fuel : Nat) (m : Machine.MState) : Machine.MState × Result :=
   | (m', false) => (m', match m'.ending with
     | .returned vs => .returned vs
     | .trapped => .trapped
+    | .thrown a => .thrown a
     | .stuck => .stuck)
 
 /-- Execute an invocation or read an exported global; traps retain their preceding effects. -/
@@ -191,7 +194,8 @@ def action (fuel : Nat) (s : State) (j : Json) : Except String (State × Result)
 /-- A diagnostic outcome, separate from the expected result. -/
 def Result.describe : Result → String
   | .returned vs => "returned [" ++ String.intercalate ", " (vs.map showValue) ++ "]"
-  | .trapped => "trap" | .exhausted => "fuel exhausted" | .stuck => "stuck"
+  | .trapped => "trap" | .thrown a => s!"exception exn:@{a}" | .exhausted => "fuel exhausted"
+  | .stuck => "stuck"
   | .skipped why => s!"skipped ({why})"
 
 /-- Disjoint payload categories: checked modules by command kind, then explicit exclusions. -/

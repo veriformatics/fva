@@ -5,8 +5,9 @@ import FVA.Profile
 /-!
 # P′ contract harness (U28b E3, FVATest only)
 
-Oracle-assisted execution of P′ scripts on the reference stepper (`Ref.seq`), for the blind P′
-suite and the official P′ scripts until U28d (the machine) and U28e (the public runner) take over.
+Oracle-assisted execution of P′ scripts on the reference stepper (`Ref.seq`) or the optimized
+machine (`--engine machine`, U28d E1: both engines on one command inventory), for the blind P′
+suite and the official P′ scripts until U28e (the public runner) takes over.
 A positive payload must pass `wasm-tools validate` with the support manifest's features, FVA's
 syntax classifier (`p-prime`) and the ≤ 1-memory static profile, then FVA's validator (U28c);
 FVA's validator must reject every decodable `assert_invalid` payload. Commands and outcomes as
@@ -68,17 +69,43 @@ def Result.describe : Result → String
   | .trapped => "trap" | .thrown a => s!"exception exn:@{a}" | .exhausted => "fuel exhausted"
   | .stuck => "stuck" | .skipped why => s!"skipped ({why})"
 
+/-- The engine running actions and initialization; fuel counts its own steps (a machine value
+movement is 0 reference steps). -/
+inductive Engine where
+  | ref
+  | machine
+
+/-- How a machine state with no step left ended. -/
+def endResult (m : Machine.MState) : Result :=
+  match m.ending with
+  | .returned vs => .returned vs
+  | .trapped => .trapped
+  | .thrown a => .thrown a
+  | .stuck => .stuck
+
+/-- Machine steps; the reached state survives every outcome. -/
+def runMachine (fuel : Nat) (m : Machine.MState) : Machine.MState × Result :=
+  match m.run fuel with
+  | (m', true) => (m', .exhausted)
+  | (m', false) => (m', endResult m')
+
 /-- `Ref.instantiate`'s initial values (candidates checked in their own allocation), then the
 initialization code; the store survives a trap (§4.5.4). `none` = an initializer failed. -/
-def runInit (fuel : Nat) (s : Store) (m : FVA.Wasm.Module) (imports : List ExternVal) :
-    Option (Config × Result) := do
-  let (gvals, trefs, erefs) ← Ref.initCandidates fuel s m imports
-  guard (Ref.initAgrees fuel s m imports gvals trefs erefs)
-  let (s₁, inst) := allocModule s m imports gvals trefs erefs
-  some (runRef fuel ⟨s₁, ⟨[], inst⟩, (initCode m).map .plain⟩)
+def runInit (engine : Engine) (fuel : Nat) (s : Store) (m : FVA.Wasm.Module)
+    (imports : List ExternVal) : Option (Config × Result) := do
+  match engine with
+  | .ref =>
+    let (gvals, trefs, erefs) ← Ref.initCandidates fuel s m imports
+    guard (Ref.initAgrees fuel s m imports gvals trefs erefs)
+    let (s₁, inst) := allocModule s m imports gvals trefs erefs
+    some (runRef fuel ⟨s₁, ⟨[], inst⟩, (initCode m).map .plain⟩)
+  | .machine =>
+    let (m', exhausted) ← Machine.initRun fuel (Machine.MStore.ofStore s) m imports
+    some (m'.abs, if exhausted then .exhausted else endResult m')
 
 /-- Execute an invocation or read an exported global. -/
-def action (fuel : Nat) (s : State) (j : Json) : Except String (State × Result) := do
+def action (engine : Engine) (fuel : Nat) (s : State) (j : Json) :
+    Except String (State × Result) := do
   let some inst := s.moduleAt j | return (s, .skipped "missing/rejected module")
   let ty ← j.getObjValAs? String "type"
   let field ← j.getObjValAs? String "field"
@@ -91,15 +118,21 @@ def action (fuel : Nat) (s : State) (j : Json) : Except String (State × Result)
     let args ← j.getObjValAs? (Array Json) "args"
     let argVals ← args.toList.mapM (parseValue inst)
     let some vs := argVals.mapM id | return (s, .skipped "unsupported action argument")
-    let (c, result) := runRef fuel (invokeConfig s.store a vs)
-    return ({ s with store := c.store }, result)
+    match engine with
+    | .ref =>
+      let (c, result) := runRef fuel (invokeConfig s.store a vs)
+      return ({ s with store := c.store }, result)
+    | .machine =>
+      let (m', result) := runMachine fuel
+        (Machine.MState.ofInvoke (Machine.MStore.ofStore s.store) a vs)
+      return ({ s with store := m'.store.abs }, result)
   | _, _ => throw s!"unsupported action/export {ty} {field}"
 
 /-- Run one assertion or standalone action, keeping the resulting store across commands. -/
-def checkAction (fuel : Nat) (s : State) (ty : String) (c : Json) :
+def checkAction (engine : Engine) (fuel : Nat) (s : State) (ty : String) (c : Json) :
     State × Except String (Option String) := Id.run do
   let .ok j := c.getObjVal? "action" | return (s, .error "missing action")
-  let .ok (s', r) := action fuel s j | return (s, .error "action lookup/parse failed")
+  let .ok (s', r) := action engine fuel s j | return (s, .error "action lookup/parse failed")
   if let .skipped why := r then return (s', .ok (some why))
   let expected := (c.getObjVal? "expected").toOption.getD .null
   let label := s!"{j.compress}: expected {ty} {expected.compress}, actual {r.describe}"
@@ -177,7 +210,8 @@ def validatePayload (dir : System.FilePath) (c : Json) (kind : String) (line : N
     return (t, some m)
 
 /-- Interpret one script (`fvatest spec`'s commands, on the reference stepper). -/
-def runScript (dir : System.FilePath) (json : Json) (fuel : Nat := 2000000) : IO Tally := do
+def runScript (dir : System.FilePath) (json : Json) (fuel : Nat := 2000000)
+    (engine : Engine := .ref) : IO Tally := do
   let cmds ← IO.ofExcept (json.getObjValAs? (Array Json) "commands")
   let outcomes ← IO.getEnv "FVA_SPEC_OUTCOMES"
   let mut log : Array String := #[]
@@ -198,7 +232,7 @@ def runScript (dir : System.FilePath) (json : Json) (fuel : Nat := 2000000) : IO
         | .linked imports =>
           if !Ref.importsMatch s.store m imports then
             t := tally t line (.error s!"{ty}: imports do not match")
-          else match runInit fuel s.store m imports, ty with
+          else match runInit engine fuel s.store m imports, ty with
           | some (c', .returned []), "module" =>
             s := { s with store := c'.store }
             inst := some c'.frame.inst
@@ -238,7 +272,7 @@ def runScript (dir : System.FilePath) (json : Json) (fuel : Nat := 2000000) : IO
       t := tally t line (.ok (if inst.isSome then none else some "register rejected module"))
     else if ["action", "assert_return", "assert_trap", "assert_exhaustion",
         "assert_exception"].contains ty then
-      let (s', r) := checkAction (if ty == "assert_exhaustion" then 1000 else fuel) s ty c
+      let (s', r) := checkAction engine (if ty == "assert_exhaustion" then 1000 else fuel) s ty c
       s := s'
       t := tally t line r
     else t := tally t line (.ok (some ty))

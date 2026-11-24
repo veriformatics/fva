@@ -568,4 +568,97 @@ theorem host_diverged_not_must {W : World} {fits : Bool} {Q : SysOutcome W.St �
     subst hx
     exact ih _ hself rfl
 
+/-- `SysMust` holds at every successor (a finished process takes no step). -/
+theorem SysMust.forward {W : World} {fits : Bool} {Q : SysOutcome W.St → Prop}
+    {x y : W.St × Config} (hm : SysMust W fits Q x) (hs : SysStep W fits x y) :
+    SysMust W fits Q y := by
+  cases hm with
+  | done hf _ => exact absurd hs (sysFinal_no_step hf)
+  | next _ hall => exact hall y hs
+
+/-- A live process with a pending throw inside a handler: `SysMust` at the start holds where the
+throw reaches that handler (`L`), store, frame and world kept — forward along policy-valid
+administrative steps (`stepP_free`), each keeping the target (`step_throw`). -/
+theorem sysMust_throw_boundary {W : World} {fits : Bool} {Q : SysOutcome W.St → Prop}
+    {σ : W.St} {c : Config} {L : List AInstr} (hl : W.exited σ = none)
+    (ht : seqThrow [] c.instrs = some (.inr L)) (hc : SysMust W fits Q (σ, c)) :
+    SysMust W fits Q (σ, ⟨c.store, c.frame, L⟩) := by
+  obtain ⟨c', hc'⟩ : ∃ c', Step NoHost c c' := by
+    rcases seqThrow_runs c.store c.frame [] c.instrs _ ht with ⟨a', ha, -⟩ | ⟨s', f', es', hh⟩
+    · cases ha
+    · exact ⟨⟨s', f', es'⟩, by simpa using seq_step (H := NoHost) hh⟩
+  obtain ⟨d, hd⟩ := stepP_free (fits := fits) hc'
+  have hy := hc.forward (y := (σ, d)) (sysStep_iff.mpr ⟨hl, .inl ⟨hd, rfl⟩⟩)
+  obtain ⟨hstore, hframe, -, hh⟩ := step_throw hd.toStep [] [] _ (by simpa using ht)
+  rcases hh with hh | ⟨L', hL', hl'⟩
+  · have hb := sysMust_throw_boundary hl (by simpa using hh) hy
+    rwa [hstore, hframe] at hb
+  · cases hL'
+    simp only [List.reverse_nil, List.map_nil, List.nil_append, List.append_nil] at hl'
+    obtain ⟨s', f', es'⟩ := d
+    dsimp only at hstore hframe hl'
+    subst hstore hframe hl'
+    exact hy
+termination_by seqSize c.instrs
+decreasing_by
+  obtain ⟨-, -, hsize, -⟩ := step_throw hd.toStep [] [] _ (by simpa using ht)
+  simpa using hsize
+
+/-- A live process with a pending throw no handler encloses: `SysMust` at the start fixes its
+uncaught outcome (abnormal, store kept). -/
+theorem sysMust_throw_outcome {W : World} {fits : Bool} {Q : SysOutcome W.St → Prop}
+    {σ : W.St} {c : Config} {a : Nat} (hl : W.exited σ = none)
+    (ht : seqThrow [] c.instrs = some (.inl a)) (hc : SysMust W fits Q (σ, c)) :
+    Q (.abnormal σ c.store) := by
+  by_cases hf : c.instrs = throwing a
+  · have hfin := sysFinal_thrown (W := W) (σ := σ) hl hf
+    cases hc with
+    | done hx hq => exact sysFinal_unique hx hfin ▸ hq
+    | next hex _ =>
+      obtain ⟨y, hy⟩ := hex
+      exact absurd hy (sysFinal_no_step hfin)
+  · obtain ⟨c', hc'⟩ : ∃ c', Step NoHost c c' := by
+      rcases seqThrow_runs c.store c.frame [] c.instrs _ ht with ⟨a', ha, hh⟩ |
+        ⟨s', f', es', hh⟩
+      · cases ha
+        exact False.elim (hf (by simpa using seq_thrown hh))
+      · exact ⟨⟨s', f', es'⟩, by simpa using seq_step (H := NoHost) hh⟩
+    obtain ⟨d, hd⟩ := stepP_free (fits := fits) hc'
+    have hy := hc.forward (y := (σ, d)) (sysStep_iff.mpr ⟨hl, .inl ⟨hd, rfl⟩⟩)
+    obtain ⟨hstore, -, -, hh⟩ := step_throw hd.toStep [] [] _ (by simpa using ht)
+    rcases hh with hh | ⟨L, hL, -⟩
+    · have hq := sysMust_throw_outcome hl (by simpa using hh) hy
+      rwa [hstore] at hq
+    · cases hL
+termination_by seqSize c.instrs
+decreasing_by
+  obtain ⟨-, -, hsize, -⟩ := step_throw hd.toStep [] [] _ (by simpa using ht)
+  simpa using hsize
+
+/-- `must_of_throwStep` for processes, under either growth policy (contract U28d T3): `SysMust`
+after one administrative throw step of a live process gives `SysMust` before it. -/
+theorem sysMust_of_throwStep {W : World} {fits : Bool} {Q : SysOutcome W.St → Prop}
+    {σ : W.St} {c c' : Config} {r : Nat ⊕ List AInstr} (hl : W.exited σ = none)
+    (hs : Step NoHost c c') (ht : seqThrow [] c.instrs = some r)
+    (hc' : SysMust W fits Q (σ, c')) : SysMust W fits Q (σ, c) := by
+  obtain ⟨hstore, hframe, -, hh⟩ := step_throw hs [] [] r (by simpa using ht)
+  cases r with
+  | inl a =>
+    rcases hh with hh | ⟨L, hL, -⟩
+    · refine sysMust_throw hl ht ?_
+      have hq := sysMust_throw_outcome hl (by simpa using hh) hc'
+      rwa [hstore] at hq
+    · cases hL
+  | inr L =>
+    refine sysMust_throwHandler hl ht ?_
+    rcases hh with hh | ⟨L', hL', hl'⟩
+    · have hb := sysMust_throw_boundary hl (by simpa using hh) hc'
+      rwa [hstore, hframe] at hb
+    · cases hL'
+      simp only [List.reverse_nil, List.map_nil, List.nil_append, List.append_nil] at hl'
+      obtain ⟨s', f', es'⟩ := c'
+      dsimp only at hstore hframe hl'
+      subst hstore hframe hl'
+      exact hc'
+
 end FVA.Wasm.Exec

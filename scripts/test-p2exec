@@ -57,6 +57,7 @@ fi
 
 status=0
 matched_total=0
+machine_total=0
 command_total=0
 for script in "${scripts[@]}"; do
 	name=${script##*/}
@@ -94,55 +95,71 @@ for script in "${scripts[@]}"; do
 		continue
 	fi
 
-	: >"$dir/outcomes"
-	FVA_SPEC_OUTCOMES="$dir/outcomes" FVA_SPEC_SKIPS=1 \
-		"$bin" p2 "$dir/script.json" >"$dir/fva.log" 2>&1
-	runner_rc=$?
-	if ((runner_rc > 128 || runner_rc == 3)); then
-		cat "$dir/fva.log"
-		printf 'p2exec: %s runner crashed rc=%s\n' "$name" "$runner_rc"
-		exit 3
+	# U28d E1: the reference stepper and the optimized machine, each against the pins and
+	# command by command against each other
+	for engine in ref machine; do
+		eargs=()
+		[[ $engine == machine ]] && eargs=(--engine machine)
+		out="$dir/outcomes.$engine"
+		: >"$out"
+		FVA_SPEC_OUTCOMES="$out" FVA_SPEC_SKIPS=1 \
+			"$bin" p2 "${eargs[@]}" "$dir/script.json" >"$dir/fva.$engine.log" 2>&1
+		runner_rc=$?
+		if ((runner_rc > 128 || runner_rc == 3)); then
+			cat "$dir/fva.$engine.log"
+			printf 'p2exec: %s %s runner crashed rc=%s\n' "$name" "$engine" "$runner_rc"
+			exit 3
+		fi
+		if ((runner_rc != 0 && runner_rc != 1)); then
+			cat "$dir/fva.$engine.log" >&2
+			setup "$name $engine runner rc $runner_rc"
+		fi
+		((runner_rc)) && cat "$dir/fva.$engine.log"
+		awk -F '\t' -v name="$name $engine" '
+      NR == FNR { expected[$1 SUBSEP $2] = $3; next }
+      {
+        key = $1 SUBSEP $2
+        got = $3
+        if (NF != 3 || (got != "pass" && got !~ /^(fail|skip): /)) {
+          print "p2exec: " name " malformed outcome: " $0; bad++; next
+        }
+        if (!(key in expected) || seen[key]++) {
+          print "p2exec: " name " extra/duplicate outcome: " $0; bad++; next
+        }
+        want = expected[key]
+        if ((want == "pass" && got == "pass") ||
+            (want ~ /^skip: / && index(got, want) == 1)) ok++
+        else {
+          print "p2exec: " name ":" $1 " " $2 " expected [" want "] got [" got "]"
+          bad++
+        }
+      }
+      END {
+        for (key in expected) if (!(key in seen)) {
+          split(key, id, SUBSEP)
+          print "p2exec: " name ":" id[1] " " id[2] " missing outcome"; bad++
+        }
+        print ok + 0 > matched
+        exit (bad != 0)
+      }
+    ' matched="$dir/matched.$engine" "$dir/expected" "$out"
+		compare_rc=$?
+		matched=$(<"$dir/matched.$engine")
+		if [[ $engine == ref ]]; then
+			matched_total=$((matched_total + matched))
+		else
+			machine_total=$((machine_total + matched))
+		fi
+		if ((runner_rc || compare_rc)); then status=1; fi
+		printf 'p2exec: %s %s wasmtime=pass commands=%s matched=%s runner_rc=%s compare_rc=%s\n' \
+			"$name" "$engine" "$count" "$matched" "$runner_rc" "$compare_rc"
+	done
+	if ! cmp -s "$dir/outcomes.ref" "$dir/outcomes.machine"; then
+		diff "$dir/outcomes.ref" "$dir/outcomes.machine" | head -5
+		printf 'p2exec: %s engines differ\n' "$name"
+		status=1
 	fi
-	if ((runner_rc != 0 && runner_rc != 1)); then
-		cat "$dir/fva.log" >&2
-		setup "$name runner rc $runner_rc"
-	fi
-	((runner_rc)) && cat "$dir/fva.log"
-	awk -F '\t' -v name="$name" '
-    NR == FNR { expected[$1 SUBSEP $2] = $3; next }
-    {
-      key = $1 SUBSEP $2
-      got = $3
-      if (NF != 3 || (got != "pass" && got !~ /^(fail|skip): /)) {
-        print "p2exec: " name " malformed outcome: " $0; bad++; next
-      }
-      if (!(key in expected) || seen[key]++) {
-        print "p2exec: " name " extra/duplicate outcome: " $0; bad++; next
-      }
-      want = expected[key]
-      if ((want == "pass" && got == "pass") ||
-          (want ~ /^skip: / && index(got, want) == 1)) ok++
-      else {
-        print "p2exec: " name ":" $1 " " $2 " expected [" want "] got [" got "]"
-        bad++
-      }
-    }
-    END {
-      for (key in expected) if (!(key in seen)) {
-        split(key, id, SUBSEP)
-        print "p2exec: " name ":" id[1] " " id[2] " missing outcome"; bad++
-      }
-      print ok + 0 > matched
-      exit (bad != 0)
-    }
-  ' matched="$dir/matched" "$dir/expected" "$dir/outcomes"
-	compare_rc=$?
-	matched=$(<"$dir/matched")
-	matched_total=$((matched_total + matched))
-	if ((runner_rc || compare_rc)); then status=1; fi
-	printf 'p2exec: %s wasmtime=pass commands=%s matched=%s runner_rc=%s compare_rc=%s\n' \
-		"$name" "$count" "$matched" "$runner_rc" "$compare_rc"
 done
-printf 'p2exec: total scripts=%s commands=%s matched=%s rc=%s\n' \
-	"${#scripts[@]}" "$command_total" "$matched_total" "$status"
+printf 'p2exec: total scripts=%s commands=%s matched=%s machine_matched=%s rc=%s\n' \
+	"${#scripts[@]}" "$command_total" "$matched_total" "$machine_total" "$status"
 exit "$status"

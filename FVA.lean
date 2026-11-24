@@ -73,6 +73,7 @@ import FVA.Proof.Lib
 import FVA.Proof.Lib.FootprintExamples
 import FVA.Proof.Lib.SysExamples
 import FVA.Proof.Lib.EHExamples
+import FVA.Proof.Lib.EHMachine
 import FVA.Explain
 import FVA.Spec.Trust
 import FVA.Trust.Verdict

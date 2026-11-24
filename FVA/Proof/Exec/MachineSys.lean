@@ -4,9 +4,11 @@ import FVA.Proof.Exec.System
 /-!
 # Machine runs and process claims (contract U27 T5)
 
-`runU fits` steps the machine while each step is no choice point under `fits`; such a run is
-reference steps that are each the spec's only successor (`runU_sim`), so `Must` (`fits = false`)
-and `SysMust` (the world kept) transfer back over it (`machineRun_must`,
+`runU fits` steps the machine while each step is no choice point under `fits` (reference steps,
+each the spec's only successor: `step_simU`) or an administrative throw step (a choice point
+whose every choice reaches the same handler, or the top, with the same exception: `must_admin`,
+`sysMust_admin`, contract U28d T3), so `Must` (`fits = false`) and `SysMust` (the world kept)
+transfer back over it (`runU_must`, `runU_sysMust`; `machineRun_must`,
 `machineSegment_sysMust`). Fuel exhaustion and a choice point both end a run as a prefix,
 never as termination.
 -/
@@ -41,13 +43,20 @@ theorem step_simU {fits : Bool} {m m' : MState} (hi : m.Inv) (hu : m.uniq fits =
       | plain i =>
         by_cases ht : i = .throwRef
         · subst ht
-          simp [MState.step, hv, MState.stepPlain, Ref.instrStep] at h
+          simp only [Ref.atUnique]
+          revert hu
+          rcases stk with _ | ⟨v, stk⟩
+          · simp
+          · cases v with
+            | ref r => cases r <;> simp
+            | _ => simp
         · simpa [Ref.atUnique_plain ht] using hu
       | invoke a =>
         simp only [Ref.atUnique, MStore.abs]
         cases hf : st.base.funcs[a]? with
         | none => simp [hf] at hu
         | some fi => cases fi <;> simp_all
+      | returnInvoke a => simp [Ref.atUnique]
       | _ => simp at hu
   | nil =>
     refine ⟨k, hU fits ?_⟩
@@ -57,32 +66,6 @@ theorem step_simU {fits : Bool} {m m' : MState} (hi : m.Inv) (hu : m.uniq fits =
     simp only [List.append_nil] at this
     rw [this]
     rfl
-
-/-- A run that stops at a choice point, a final state or exhausted fuel = unique reference
-steps between the abstractions. -/
-theorem runU_sim {fits : Bool} : ∀ (n : Nat) {m m' : MState} {b : Bool}, m.Inv →
-    m.runU fits n = (m', b) → m'.Inv ∧ ∃ k, stepNU fits k m.abs = some m'.abs
-  | 0, m, m', b, hi, h => by
-    simp only [MState.runU, Prod.mk.injEq] at h
-    obtain ⟨rfl, -⟩ := h
-    exact ⟨hi, 0, rfl⟩
-  | n + 1, m, m', b, hi, h => by
-    simp only [MState.runU] at h
-    cases hu : m.uniq fits
-    · simp only [hu, Bool.cond_false, Prod.mk.injEq] at h
-      obtain ⟨rfl, -⟩ := h
-      exact ⟨hi, 0, rfl⟩
-    · simp only [hu, Bool.cond_true] at h
-      cases hs : m.step with
-      | none =>
-        simp only [hs, Prod.mk.injEq] at h
-        obtain ⟨rfl, -⟩ := h
-        exact ⟨hi, 0, rfl⟩
-      | some m₁ =>
-        simp only [hs] at h
-        obtain ⟨hi₁, k₁, hk₁⟩ := step_simU hi hu hs
-        obtain ⟨hi', k₂, hk₂⟩ := runU_sim n hi₁ h
-        exact ⟨hi', k₁ + k₂, by rw [stepNU_add, hk₁, Option.bind_some, hk₂]⟩
 
 theorem sysMust_of_stepNU {W : World} {fits : Bool} {Q : SysOutcome W.St → Prop} {σ : W.St}
     (hl : W.exited σ = none) : ∀ {k : Nat} {c c' : Config}, stepNU fits k c = some c' →
@@ -119,22 +102,187 @@ theorem must_of_stepNU {H : HostSem} {Q : Outcome → Prop} : ∀ {k : Nat} {c c
         simp only [hs, Option.bind_some] at h
         exact Ref.must_of_step hs hu (must_of_stepNU h hm)
 
+theorem isThrowing_layer (vs : List Val) {e : AInstr} (rest : List AInstr)
+    (he : ∀ a, e ≠ .refExnAddr a) (he' : e ≠ .plain .throwRef) :
+    Ref.isThrowing (vals vs ++ e :: rest) = false := by
+  cases h : Ref.isThrowing (vals vs ++ e :: rest)
+  · rfl
+  · obtain ⟨a, ha⟩ := Ref.isThrowing_eq_true.mp h
+    have hm : e ∈ throwing a := ha ▸ (by simp)
+    simp only [throwing, List.mem_cons, List.not_mem_nil, or_false] at hm
+    rcases hm with hm | hm
+    · exact absurd hm (he a)
+    · exact absurd hm he'
+
+theorem seqThrow_layer {es : List AInstr} (c : Ctl) (f : Frame) (hr : Ref.seqThrow [] es ≠ none)
+    (hn : Ref.isThrowing es = false) :
+    Ref.seqThrow [] (layer c f es).2 ≠ none ∧ Ref.isThrowing (layer c f es).2 = false := by
+  cases c with
+  | label n cont saved rest =>
+    have hn' := isThrowing_layer saved.reverse (e := .label n cont es) rest
+      (fun _ h => by cases h) (fun h => by cases h)
+    refine ⟨?_, by simpa only [layer, List.append_assoc, List.singleton_append] using hn'⟩
+    simp only [layer, List.append_assoc, Ref.seqThrow_vals, List.singleton_append, Ref.seqThrow,
+      Ref.toVal, Ref.atThrow]
+    cases h : Ref.seqThrow [] es with
+    | none => exact absurd h hr
+    | some r => cases r <;> simp
+  | frame n caller saved rest =>
+    have hn' := isThrowing_layer saved.reverse (e := .frame n f es) rest
+      (fun _ h => by cases h) (fun h => by cases h)
+    refine ⟨?_, by simpa only [layer, List.append_assoc, List.singleton_append] using hn'⟩
+    simp only [layer, List.append_assoc, Ref.seqThrow_vals, List.singleton_append, Ref.seqThrow,
+      Ref.toVal, Ref.atThrow]
+    cases h : Ref.seqThrow [] es with
+    | none => exact absurd h hr
+    | some r => cases r <;> simp
+  | handler n cs saved rest =>
+    have hn' := isThrowing_layer saved.reverse (e := .handler n cs es) rest
+      (fun _ h => by cases h) (fun h => by cases h)
+    refine ⟨?_, by simpa only [layer, List.append_assoc, List.singleton_append] using hn'⟩
+    simp only [layer, List.append_assoc, Ref.seqThrow_vals, List.singleton_append, Ref.seqThrow,
+      Ref.toVal, Ref.atThrow]
+    cases h : Ref.seqThrow [] es with
+    | none => exact absurd h hr
+    | some r => cases r <;> simp [hn]
+
+/-- A pending throw that is not alone in its block stays pending through every control
+entry: each layer passes it out, a handler turns it into its boundary (`Ref.seqThrow`). -/
+theorem seqThrow_wrap : ∀ (ctl : List Ctl) (f : Frame) (es : List AInstr),
+    Ref.seqThrow [] es ≠ none → Ref.isThrowing es = false →
+    Ref.seqThrow [] (wrap ctl f es).2 ≠ none
+  | [], _, _, h, _ => h
+  | c :: ctl, f, es, hr, hn => by
+    rw [wrap_cons]
+    obtain ⟨hr', hn'⟩ := seqThrow_layer c f hr hn
+    exact seqThrow_wrap ctl _ _ hr' hn'
+
+theorem admin_parts {m : MState} (ha : m.admin = true) :
+    ∃ a stk rest, m.code = .plain .throwRef :: rest ∧ m.stack = .ref (.exn a) :: stk ∧
+      (stk.isEmpty && rest.isEmpty) = false := by
+  unfold MState.admin at ha
+  split at ha
+  · next rest a stk hc hs =>
+    refine ⟨a, stk, rest, hc, hs, ?_⟩
+    cases hb : (stk.isEmpty && rest.isEmpty) <;> simp_all
+  · simp at ha
+
+/-- An administrative throw step: one reference step from a configuration with a pending throw,
+the store kept. -/
+theorem admin_step {m m' : MState} (ha : m.admin = true) (h : m.step = some m') :
+    m'.store = m.store ∧ Ref.step m.abs = some m'.abs ∧
+      ∃ r, Ref.seqThrow [] m.abs.instrs = some r := by
+  obtain ⟨a, stk, rest, hc, hs, hb⟩ := admin_parts ha
+  have hm' : m' = m.cont [.ref (.exn a)] [.plain .throwRef] [] := by
+    simp only [MState.step, hc, Ref.toVal, MState.stepPlain, hs, hb, Bool.cond_false,
+      Option.some.injEq] at h
+    exact h.symm
+  subst hm'
+  refine ⟨rfl, step_admin hc hs hb, ?_⟩
+  rw [abs_eq_wrapC, ← Option.ne_none_iff_exists']
+  apply seqThrow_wrap
+  · rw [hs, hc, Ref.seqThrow_vals]
+    simp [Ref.seqThrow, Ref.toVal, Ref.atThrow]
+  · cases h : Ref.isThrowing (vals m.stack.reverse ++ m.code)
+    · rfl
+    · obtain ⟨a', ha'⟩ := Ref.isThrowing_eq_true.mp h
+      have hl := congrArg List.length ha'
+      rw [hs, hc] at hl
+      simp only [List.length_append, vals, List.length_map, List.length_reverse, List.length_cons,
+        throwing, List.length_nil] at hl
+      have : stk = [] ∧ rest = [] := ⟨List.length_eq_zero_iff.mp (by omega),
+        List.length_eq_zero_iff.mp (by omega)⟩
+      obtain ⟨rfl, rfl⟩ := this
+      simp at hb
+
+/-- Contract U28d T3: `Must` after an administrative throw step gives `Must` before it. -/
+theorem must_admin {H : HostSem} {Q : Outcome → Prop} {m m' : MState} (ha : m.admin = true)
+    (h : m.step = some m') (hm : Must H Q m'.abs) : Must H Q m.abs := by
+  obtain ⟨-, hstep, r, hr⟩ := admin_step ha h
+  exact Ref.must_of_throwStep (Ref.step_sound hstep) hr hm
+
+/-- Contract U28d T3: `SysMust` after an administrative throw step of a live process gives
+`SysMust` before it, under either growth policy. -/
+theorem sysMust_admin {W : World} {fits : Bool} {Q : SysOutcome W.St → Prop} {σ : W.St}
+    {m m' : MState} (hl : W.exited σ = none) (ha : m.admin = true) (h : m.step = some m')
+    (hm : SysMust W fits Q (σ, m'.abs)) : SysMust W fits Q (σ, m.abs) := by
+  obtain ⟨-, hstep, r, hr⟩ := admin_step ha h
+  exact sysMust_of_throwStep hl (Ref.step_sound hstep) hr hm
+
+/-- A run that stops at a choice point, a final state or exhausted fuel transfers `Must` from
+where it stops back to its start (unique steps + administrative throw steps). -/
+theorem runU_must {H : HostSem} {Q : Outcome → Prop} : ∀ (n : Nat) {m m' : MState} {b : Bool},
+    m.Inv → m.runU false n = (m', b) → Must H Q m'.abs → Must H Q m.abs
+  | 0, m, m', b, _, h, hm => by
+    simp only [MState.runU, Prod.mk.injEq] at h
+    obtain ⟨rfl, -⟩ := h
+    exact hm
+  | n + 1, m, m', b, hi, h, hm => by
+    simp only [MState.runU] at h
+    cases hs : m.step with
+    | none =>
+      have h' : (m, false) = (m', b) := by
+        cases m.uniq false || m.admin <;> simpa [hs] using h
+      cases h'
+      exact hm
+    | some m₁ =>
+      have hi₁ := (step_sim hi hs).1
+      cases hu : m.uniq false
+      · cases ha : m.admin
+        · simp only [hu, ha, Bool.or_self, Bool.cond_false, Prod.mk.injEq] at h
+          obtain ⟨rfl, -⟩ := h
+          exact hm
+        · simp only [hu, ha, Bool.or_true, Bool.cond_true, hs] at h
+          exact must_admin ha hs (runU_must n hi₁ h hm)
+      · simp only [hu, Bool.true_or, Bool.cond_true, hs] at h
+        obtain ⟨-, k₁, hk₁⟩ := step_simU hi hu hs
+        exact must_of_stepNU hk₁ (runU_must n hi₁ h hm)
+
+/-- A segment of a live process (unique steps + administrative throw steps) transfers `SysMust`
+from where it stops back to its start, the world kept. -/
+theorem runU_sysMust {W : World} {fits : Bool} {Q : SysOutcome W.St → Prop} {σ : W.St}
+    (hl : W.exited σ = none) : ∀ (n : Nat) {m m' : MState} {b : Bool},
+      m.Inv → m.runU fits n = (m', b) → SysMust W fits Q (σ, m'.abs) →
+      SysMust W fits Q (σ, m.abs)
+  | 0, m, m', b, _, h, hm => by
+    simp only [MState.runU, Prod.mk.injEq] at h
+    obtain ⟨rfl, -⟩ := h
+    exact hm
+  | n + 1, m, m', b, hi, h, hm => by
+    simp only [MState.runU] at h
+    cases hs : m.step with
+    | none =>
+      have h' : (m, false) = (m', b) := by
+        cases m.uniq fits || m.admin <;> simpa [hs] using h
+      cases h'
+      exact hm
+    | some m₁ =>
+      have hi₁ := (step_sim hi hs).1
+      cases hu : m.uniq fits
+      · cases ha : m.admin
+        · simp only [hu, ha, Bool.or_self, Bool.cond_false, Prod.mk.injEq] at h
+          obtain ⟨rfl, -⟩ := h
+          exact hm
+        · simp only [hu, ha, Bool.or_true, Bool.cond_true, hs] at h
+          exact sysMust_admin hl ha hs (runU_sysMust hl n hi₁ h hm)
+      · simp only [hu, Bool.true_or, Bool.cond_true, hs] at h
+        obtain ⟨-, k₁, hk₁⟩ := step_simU hi hu hs
+        exact sysMust_of_stepNU hl hk₁ (runU_sysMust hl n hi₁ h hm)
+
 /-- Contract U27 T5 (U26 T3): a machine run that finishes, each step no choice point, gives
 total correctness of its starting configuration. -/
 theorem machineRun_must {H : HostSem} {Q : Outcome → Prop} {m m' : MState} {n : Nat} {b : Bool}
     {o : Outcome} (hi : m.Inv) (h : m.runU false n = (m', b)) (hf : Final m'.abs o) (hq : Q o) :
-    Must H Q m.abs := by
-  obtain ⟨-, k, hk⟩ := runU_sim n hi h
-  exact must_of_stepNU hk (.done hf hq)
+    Must H Q m.abs :=
+  runU_must n hi h (.done hf hq)
 
 /-- A machine segment of a live process: `SysMust` at its end transfers to its start, the world
 kept (a segment stops at a host call, a trap, a final state or a choice point). -/
 theorem machineSegment_sysMust {W : World} {fits : Bool} {Q : SysOutcome W.St → Prop}
     {σ : W.St} {m m' : MState} {n : Nat} {b : Bool} (hi : m.Inv) (hl : W.exited σ = none)
     (h : m.runU fits n = (m', b)) (hm : SysMust W fits Q (σ, m'.abs)) :
-    SysMust W fits Q (σ, m.abs) := by
-  obtain ⟨-, k, hk⟩ := runU_sim n hi h
-  exact sysMust_of_stepNU hl hk hm
+    SysMust W fits Q (σ, m.abs) :=
+  runU_sysMust hl n hi h hm
 
 /-! ## Host calls on the machine -/
 
@@ -142,6 +290,7 @@ theorem machineSegment_sysMust {W : World} {fits : Bool} {Q : SysOutcome W.St �
 def layerK : Ctl → Frame → Ref.HCtx → Ref.HCtx
   | .label n cont saved rest, _, K => .seq saved.reverse (.label n cont K) rest
   | .frame n _ saved rest, f, K => .seq saved.reverse (.frame n f K) rest
+  | .handler n cs saved rest, _, K => .seq saved.reverse (.handler n cs K) rest
 
 theorem layer_fst (c : Ctl) (f : Frame) (es es' : List AInstr) :
     (layer c f es).1 = (layer c f es').1 := by
@@ -159,6 +308,9 @@ theorem seq_layer_host {S : Store} {f : Frame} {es : List AInstr} {a : Nat} {arg
     simp only [layer, layerK, List.append_assoc, Ref.seq_vals, List.append_nil,
       List.singleton_append, Ref.seq, Ref.toVal, Ref.atInstr, h, List.reverse_reverse]
   | frame n caller saved rest =>
+    simp only [layer, layerK, List.append_assoc, Ref.seq_vals, List.append_nil,
+      List.singleton_append, Ref.seq, Ref.toVal, Ref.atInstr, h, List.reverse_reverse]
+  | handler n cs saved rest =>
     simp only [layer, layerK, List.append_assoc, Ref.seq_vals, List.append_nil,
       List.singleton_append, Ref.seq, Ref.toVal, Ref.atInstr, h, List.reverse_reverse]
 
@@ -290,18 +442,24 @@ theorem machineRun_sysMust {W : World} {Q : SysOutcome W.St → Prop}
           rw [heq]
           exact machineRun_sysMust hX n hinv h hend
       | none =>
-        cases hu : m.uniq true
-        · simp only [sysRun, he, hh, hu, Bool.cond_false, Prod.mk.injEq] at h
-          obtain ⟨rfl, rfl, -⟩ := h
+        cases hs : m.step with
+        | none =>
+          have h' : (σ, m, false) = (σ', m', b) := by
+            cases m.uniq true || m.admin <;> simpa [sysRun, he, hh, hs] using h
+          cases h'
           exact hend
-        · cases hs : m.step with
-          | none =>
-            simp only [sysRun, he, hh, hu, hs, Bool.cond_true, Prod.mk.injEq] at h
-            obtain ⟨rfl, rfl, -⟩ := h
-            exact hend
-          | some m₁ =>
-            simp only [sysRun, he, hh, hu, hs, Bool.cond_true] at h
-            obtain ⟨hi₁, k₁, hk₁⟩ := step_simU hi hu hs
+        | some m₁ =>
+          have hi₁ := (step_sim hi hs).1
+          cases hu : m.uniq true
+          · cases ha : m.admin
+            · simp only [sysRun, he, hh, hu, ha, Bool.or_self, Bool.cond_false,
+                Prod.mk.injEq] at h
+              obtain ⟨rfl, rfl, -⟩ := h
+              exact hend
+            · simp only [sysRun, he, hh, hu, ha, Bool.or_true, Bool.cond_true, hs] at h
+              exact sysMust_admin he ha hs (machineRun_sysMust hX n hi₁ h hend)
+          · simp only [sysRun, he, hh, hu, Bool.true_or, Bool.cond_true, hs] at h
+            obtain ⟨-, k₁, hk₁⟩ := step_simU hi hu hs
             exact sysMust_of_stepNU he hk₁ (machineRun_sysMust hX n hi₁ h hend)
 
 end FVA.Wasm.Exec.Machine
