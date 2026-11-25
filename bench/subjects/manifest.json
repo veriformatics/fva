@@ -215,13 +215,13 @@
       ]
     },
     {
-      "id": "cppeh-wasm",
+      "id": "cpp-eh-wasm",
       "file": "FVATest/Subjects/CppEH/eh.wasm",
       "sha256": "4e2fe131b94743ec16e11c868d5d1dc0903956c8edfe1c2d3626c1fec7155292",
-      "license": "Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND MIT",
-      "upstream": "https://github.com/veriformatics/fva (FVATest/Subjects/CppEH)",
-      "version": "wasi-sdk 34.0",
-      "source": "FVATest/Subjects/CppEH/eh.cpp + FVATest/Subjects/CppEH/build + https://github.com/WebAssembly/wasi-sdk/tree/wasi-sdk-34",
+      "license": "Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND MIT AND CC0-1.0",
+      "upstream": "https://github.com/WebAssembly/wasi-sdk",
+      "version": "34.0",
+      "source": "FVATest/Subjects/CppEH/eh.cpp + FVATest/Subjects/CppEH/build (wasi-sdk 34.0 release: llvm-project 895aa2c896ada719451be2e3673c83da8ddf1141, wasi-libc 2e6fb9d8ee0c)",
       "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v1/eh.wasm",
       "places": [
         "FVATest/Subjects/CppEH/eh.wasm"

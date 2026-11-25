@@ -410,6 +410,36 @@ for planted in \
 		fail=1
 	fi
 done
+# fingerprint (U28f I2): the C++ subject's EH form + import boundary over `wasm-tools print`; the
+# shipped artifact passes, each planted print text (re-encoded by `wasm-tools parse`) fails with rc 1
+d=$tmp/fingerprint && mkdir -p "$d"
+fingerprint() { PATH=$PWD/.tools/bin:$PATH FVATest/Subjects/CppEH/fingerprint "$@" >/dev/null 2>&1; }
+if ! fingerprint FVATest/Subjects/CppEH/eh.wasm; then
+	echo "test-checks: fingerprint failed the shipped C++ subject"
+	fail=1
+fi
+.tools/bin/wasm-tools print FVATest/Subjects/CppEH/eh.wasm >"$d/eh.wat"
+imp='(import "wasi_snapshot_preview1" "sock_accept" (func (param i32 i32 i32) (result i32)))'
+for planted in \
+	"undeclared import|/\"proc_exit\"/a\\  $imp" \
+	"import of another module|/\"proc_exit\"/a\\  (import \"env\" \"f\" (func))" \
+	"legacy try|0,/^\\( *\\)try_table/s//\\1try\\n\\1end\\n\\1try_table/" \
+	"throw removed|s/^\\( *\\)throw .*/\\1unreachable/" \
+	"extra export|/(export \"memory\"/a\\  (export \"extra\" (memory 0))"; do
+	label=${planted%%|*}
+	if ! sed "${planted#*|}" "$d/eh.wat" >"$d/p.wat" ||
+		! .tools/bin/wasm-tools parse "$d/p.wat" -o "$d/p.wasm"; then
+		echo "test-checks: fingerprint plant '$label' does not assemble"
+		fail=1
+		continue
+	fi
+	fingerprint "$d/p.wasm"
+	rc=$?
+	if ((rc != 1)); then
+		echo "test-checks: fingerprint on a planted $label: rc $rc, want 1"
+		fail=1
+	fi
+done
 # make-base-manifest --check (U28a E8): a stale base-lines table fails, as a stale manifest does;
 # a stub fvatest prints the committed table, a stub lake runs `lake env`'s command
 d=$tmp/base && mkdir -p "$d/scripts" "$d/trust" "$d/.lake/build/bin" "$d/bin"

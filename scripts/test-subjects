@@ -47,6 +47,7 @@ negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
 # `block`) run in one shard; the map fails closed before any fetch (rc 2): a directory without a
 # shard or owning no check, a shard outside 1..N or holding no directory
 declare -A shard=(
+	[CppEH]=3
 	[EdgerCpm]=1
 	[GlmCall]=2
 	[GlmIround]=2
@@ -54,7 +55,7 @@ declare -A shard=(
 	[Lz4C]=3
 	[Lz4Wasm]=3
 )
-blocks=(GlmCall)
+blocks=(CppEH GlmCall)
 k=all n='' list=0
 while (($#)); do
 	case $1 in
@@ -131,7 +132,7 @@ if ! lake --wfail build fva >"$tmp/build" 2>&1; then
 	exit 2
 fi
 for lift in EdgerCpm/edgeR.so:EdgerCpm Lz4Wasm/lz4-block-codec.wasm:Lz4Wasm Lz4C/lz4-c.wasm:Lz4C \
-	Lz4C/O1/lz4-c-O1.wasm:Lz4C.O1 GlmIround/glm-iround.wasm:GlmIround; do
+	Lz4C/O1/lz4-c-O1.wasm:Lz4C.O1 GlmIround/glm-iround.wasm:GlmIround CppEH/eh.wasm:CppEH; do
 	bin=FVATest/Subjects/${lift%%:*} ns=Subjects.${lift#*:}.Lifted
 	"$fva" lift "$bin" "$tmp/Lifted.lean" --ns "$ns" >/dev/null || exit 2
 	cmp -s "$tmp/Lifted.lean" "${bin%/*}/Lifted.lean" || cp "$tmp/Lifted.lean" "${bin%/*}/Lifted.lean" ||
@@ -166,6 +167,21 @@ if ! lake --wfail build "${roots[@]}" >"$tmp/build" 2>&1; then
 	exit 2
 fi
 
+# U28f: eh on the machine, checked by CppEH.Run's build-time #eval (72 inputs): its error (message
+# `CppEH run:`) = the run off the source contract (1), any other build failure = setup (2)
+run_err='^error: FVATest/Subjects/CppEH/Run\.lean:[0-9]+:[0-9]+: CppEH run:'
+if block CppEH && ! lake --wfail build FVATest.Subjects.CppEH.Run >"$tmp/run" 2>&1; then
+	if grep -qE "$run_err" "$tmp/run"; then
+		echo "test-subjects: the C++ subject's machine run is off its contract"
+		grep -E "$run_err" "$tmp/run" | cut -c1-600 | head -3
+		fail=1
+	else
+		echo "test-subjects: FVATest.Subjects.CppEH.Run did not build"
+		grep '^error' "$tmp/run" | head -5
+		exit 2
+	fi
+fi
+
 # every subject's fva trust in default and --paranoid mode, fail closed (scripts/subject-matrix,
 # docs/contracts/U22-subject-matrix.md)
 # D74: a host that keeps .cache reuses each (root, mode) PASS whose input closure is unchanged
@@ -185,6 +201,6 @@ for neg in "${negs[@]}"; do
 	fi
 done
 
-((fail)) || echo "test-subjects: ${#subjects[@]} subject(s) × default + paranoid PASS with pinned surface + ${#proofs[@]} proof module(s) built + ${#negs[@]} planted negatives checked"
+((fail)) || echo "test-subjects: ${#subjects[@]} subject(s) × default + paranoid PASS with pinned surface + ${#proofs[@]} proof module(s) built + the C++ machine run + ${#negs[@]} planted negatives checked"
 ((crash)) && exit 3
 exit "$fail"

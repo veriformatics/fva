@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# fingerprint WASM (D29/U28f I2): the C++ subject's EH form + import boundary, read from
+# `wasm-tools print` (independent of FVA's decoder). Requires: every import a function of
+# `wasi_snapshot_preview1` among the 20 preview1 calls the Decisions' WASI profile declares (U29a's
+# reviewed model takes over this list), exports exactly `memory` + `eh`, at least one `try_table`
+# and one `throw`, no legacy EH instruction (`try`, `catch`, `catch_all`, `delegate`, `rethrow` as a
+# line's instruction; `try_table`'s clauses are parenthesized). Prints the counts.
+# Exit: 0 ok, 1 a violation (each named), 2 setup.
+set -uo pipefail
+(($# == 1)) || {
+	echo 'usage: fingerprint WASM' >&2
+	exit 2
+}
+wat=$(mktemp) || exit 2
+trap 'rm -f "$wat"' EXIT
+wasm-tools print "$1" >"$wat" || {
+	echo "fingerprint: wasm-tools print failed on $1" >&2
+	exit 2
+}
+# Non-folded print: one instruction per line, its mnemonic the first field.
+awk -v file="$1" '
+	BEGIN {
+		n = split("args_get args_sizes_get environ_get environ_sizes_get clock_time_get " \
+			"fd_close fd_fdstat_get fd_fdstat_set_flags fd_prestat_get fd_prestat_dir_name " \
+			"fd_read fd_seek fd_write path_create_directory path_filestat_get path_open " \
+			"path_remove_directory path_unlink_file proc_exit random_get", w, " ")
+		for (i = 1; i <= n; i++) declared[w[i]] = 1
+		legacy["try"] = legacy["catch"] = legacy["catch_all"] = 1
+		legacy["delegate"] = legacy["rethrow"] = 1
+	}
+	function bad(msg) { print "fingerprint: " file ": " msg; viol = 1 }
+	/^[ \t]*\(import "/ {
+		split($0, q, "\"")
+		kind = q[5]; sub(/^ \(/, "", kind); sub(/[ )].*/, "", kind)
+		imports++
+		if (q[2] != "wasi_snapshot_preview1" || kind != "func" || !(q[4] in declared))
+			bad("import outside the declared WASI calls: " q[2] " " q[4] " (" kind ")")
+		next
+	}
+	/^[ \t]*\(export "/ {
+		split($0, q, "\"")
+		exports++
+		if (q[2] == "memory") mem++
+		else if (q[2] == "eh") eh++
+		else bad("unexpected export " q[2])
+		next
+	}
+	$1 == "try_table" {
+		tt++
+		s = $0; cr += gsub(/\(catch_ref /, "", s); car += gsub(/\(catch_all_ref /, "", s)
+		ca += gsub(/\(catch_all /, "", s); c += gsub(/\(catch /, "", s)
+	}
+	$1 == "throw" { th++ }
+	$1 == "throw_ref" { thr++ }
+	$1 in legacy { bad("legacy EH instruction " $1 " at line " NR) }
+	END {
+		if (mem != 1 || eh != 1 || exports != 2)
+			bad("exports must be exactly memory + eh (" exports " exports)")
+		if (!tt) bad("no try_table")
+		if (!th) bad("no throw")
+		printf "imports %d try_table %d throw %d throw_ref %d", imports, tt, th, thr
+		printf " catch %d catch_ref %d catch_all %d catch_all_ref %d\n", c, cr, ca, car
+		exit viol
+	}' "$wat"

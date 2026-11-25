@@ -29,6 +29,7 @@ FVATest/Subjects/Lz4C/O1/Lifted.lean
 FVATest/Subjects/GlmIround/glm-iround.wasm
 FVATest/Subjects/GlmIround/Lifted.lean
 FVATest/Subjects/CppEH/eh.wasm
+FVATest/Subjects/CppEH/Lifted.lean
 bench/subjects/wasm/lz4-c.wasm
 bench/subjects/wasm/lz4-flex.wasm
 bench/subjects/wasm-glm/glm-iround.wasm

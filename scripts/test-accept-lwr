@@ -343,6 +343,11 @@ if selected CppEH || [[ $group == D29 ]]; then
 		:
 	elif ((last_rc == 0)) && [[ -s $work/Lifted.lean ]]; then
 		pass D29.cpp-lift
+		# the lifted module is generated, never committed (Decisions: Repository contents): place it
+		# for the trust checks below (temp + rename: scripts/test-subjects may read it meanwhile)
+		cmp -s "$work/Lifted.lean" "$cpp/Lifted.lean" || {
+			cp "$work/Lifted.lean" "$cpp/.Lifted.lean.$$" && mv -f "$cpp/.Lifted.lean.$$" "$cpp/Lifted.lean"
+		}
 	else fail D29.cpp-lift "lift rc=$last_rc; needs U28a/U28f"; fi
 	for mode in default paranoid; do
 		if [[ ! -f $cpp/Proof.lean || ! -f $cpp/Lifted.lean ]]; then

@@ -1,12 +1,37 @@
 #!/usr/bin/env bash
-# D29/U28f: real SDK libc++abi + libunwind; no exception-runtime replacements.
-set -euo pipefail
-root=$(cd "$(dirname "$0")/../../.." && pwd)
-sdk=${WASI_SDK_PATH:-$root/.tools/wasi-sdk}
-out=${1:-$root/FVATest/Subjects/CppEH/eh.wasm}
+# D29/U28f: build eh.wasm with the pinned wasi-sdk 34.0 (real libc++abi + libunwind, no
+# exception-runtime replacements), then check the output's fingerprint.
+# Usage: build [OUT.wasm] (default: the committed eh.wasm). Exit: 0 built + fingerprint ok,
+# 1 fingerprint violation, 2 setup (SDK missing or not the pinned one, compiler failure).
+set -uo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$here/../../.." && pwd)
+out=${1:-$here/eh.wasm}
+if [[ -n ${WASI_SDK_PATH:-} ]]; then
+	sdk=$WASI_SDK_PATH
+else
+	sdk=$root/.tools/wasi-sdk
+	if [[ ! -e $sdk/.pin-34.0 ]]; then
+		"$root/scripts/fetch-bench-tools" wasi-sdk >&2 || {
+			echo "build: fetching wasi-sdk 34.0 failed" >&2
+			exit 2
+		}
+	fi
+fi
+# The release's VERSION file; the tarball's sha256 is checked when fetch-bench-tools fetches it.
+pinned='34.0
+wasi-libc: 2e6fb9d8ee0c
+llvm: 895aa2c896ad
+llvm-version: 23.1.0
+config: f992bcc08219'
+if [[ $(cat "$sdk/VERSION" 2>/dev/null) != "$pinned" ]]; then
+	echo "build: $sdk is not the pinned wasi-sdk 34.0 (its VERSION differs)" >&2
+	exit 2
+fi
 "$sdk/bin/clang++" --target=wasm32-wasip1 -std=c++17 -O1 \
 	-fwasm-exceptions -mllvm -wasm-use-legacy-eh=false \
 	-nostartfiles -Wl,--no-entry -Wl,--export=eh -Wl,--strip-debug \
 	-Wl,-z,stack-size=65536 -Wl,--initial-memory=262144 -Wl,--max-memory=262144 \
-	"$root/FVATest/Subjects/CppEH/eh.cpp" -lunwind -o "$out"
+	"$here/eh.cpp" -lunwind -o "$out" || exit 2
 chmod 644 "$out"
+"$here/fingerprint" "$out"

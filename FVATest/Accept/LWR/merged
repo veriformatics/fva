@@ -1,6 +1,7 @@
 # Gate-merged acceptance checks (scripts/test-accept): `ID [HOST]`, each unit appending the checks
 # it turns green; red at bd00b00 = credited. Green there = controls of the planted cases, merged with
-# them: U25 function/global/memory/table/module-true, D30.memory-boundaries.
+# them: U25 function/global/memory/table/module-true, D30.memory-boundaries, D29.cpp-build +
+# D29.cpp-oracle (U28f plants: SDK pin, fingerprint, oracle; docs/contracts/U28f-cpp-subject.md).
 U25.function-false
 U25.function-true
 U25.global-false
@@ -21,6 +22,8 @@ D30.memory-copy
 D30.wall nixbox
 D30.full-mode
 D29.cpp-lift
+D29.cpp-build
+D29.cpp-oracle
 D29.handlers
 D29.rethrow-tail
 D29.typed-refs
