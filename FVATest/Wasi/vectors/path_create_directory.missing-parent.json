@@ -1,0 +1,80 @@
+{
+  "id": "path_create_directory.missing-parent",
+  "sources": [
+    "U29a-v2:S3 typed walk",
+    "probe path_create_directory.missing-parent"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "missing/new"
+        }
+      ],
+      "call": "path_create_directory",
+      "args": [
+        3,
+        128,
+        11
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 44,
+        "mem": [],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

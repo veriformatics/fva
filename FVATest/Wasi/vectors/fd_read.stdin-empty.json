@@ -1,0 +1,95 @@
+{
+  "id": "fd_read.stdin-empty",
+  "sources": [
+    "p1:1724-1737",
+    "probe fd_read.stdin-empty"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 0,
+          "u32": [
+            256,
+            8
+          ]
+        }
+      ],
+      "call": "fd_read",
+      "args": [
+        0,
+        0,
+        1,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              0
+            ]
+          },
+          {
+            "addr": 256,
+            "text": ""
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

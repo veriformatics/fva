@@ -1,0 +1,74 @@
+{
+  "id": "fd_fdstat_set_flags.invalid-bit",
+  "sources": [
+    "Wt:394-414",
+    "p1:1114-1120",
+    "probe fd_fdstat_set_flags.invalid-bit",
+    "LEAD-D2: invalid scalar outside profile; observed conversion trap"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [],
+      "call": "fd_fdstat_set_flags",
+      "args": [
+        99,
+        32
+      ],
+      "expect": {
+        "outcome": "out-of-profile",
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

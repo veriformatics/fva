@@ -1,0 +1,136 @@
+{
+  "id": "fd_read.skip-empty",
+  "sources": [
+    "p1:207-224",
+    "probe fd_read.skip-empty"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "f"
+        }
+      ],
+      "call": "path_open",
+      "args": [
+        3,
+        0,
+        128,
+        1,
+        0,
+        110,
+        0,
+        0,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              4
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 0,
+          "u32": [
+            256,
+            0,
+            320,
+            2,
+            384,
+            1
+          ]
+        }
+      ],
+      "call": "fd_read",
+      "args": [
+        4,
+        0,
+        3,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              2
+            ]
+          },
+          {
+            "addr": 320,
+            "text": "ab"
+          },
+          {
+            "addr": 384,
+            "hex": "00"
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

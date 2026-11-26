@@ -1,0 +1,84 @@
+{
+  "id": "path_create_directory.slash",
+  "sources": [
+    "probe c13:mkdir_trailing",
+    "U29a-v2:S3 mkdir",
+    "probe path_create_directory.slash"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "newdir/"
+        }
+      ],
+      "call": "path_create_directory",
+      "args": [
+        3,
+        128,
+        7
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        },
+        "newdir": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

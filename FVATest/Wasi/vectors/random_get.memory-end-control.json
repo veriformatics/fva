@@ -1,0 +1,75 @@
+{
+  "id": "random_get.memory-end-control",
+  "sources": [
+    "p1:2630-2640",
+    "probe r5 MemoryEnd",
+    "probe random_get.memory-end-control"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 65536,
+  "steps": [
+    {
+      "mem": [],
+      "call": "random_get",
+      "args": [
+        4294967294,
+        1
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

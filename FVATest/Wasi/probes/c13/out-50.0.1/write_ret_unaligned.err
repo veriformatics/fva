@@ -1,0 +1,9 @@
+Error: failed to run main module `/tmp/consultant-13/abi.wat`
+
+Caused by:
+    0: failed to invoke `write_ret_unaligned`
+    1: error while executing at wasm backtrace:
+    0:    0x14c - <unknown>!<wasm function 5>
+    2: In func wasi_snapshot_preview1::fd_write at write size: Pointer not aligned to 4: Region { start: 1, len: 4 }
+    3: Pointer not aligned to 4: Region { start: 1, len: 4 }
+

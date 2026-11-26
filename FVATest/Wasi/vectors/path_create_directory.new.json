@@ -1,0 +1,84 @@
+{
+  "id": "path_create_directory.new",
+  "sources": [
+    "Wf:302-310",
+    "p1:2038-2050",
+    "probe path_create_directory.new"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "newdir"
+        }
+      ],
+      "call": "path_create_directory",
+      "args": [
+        3,
+        128,
+        6
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        },
+        "newdir": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

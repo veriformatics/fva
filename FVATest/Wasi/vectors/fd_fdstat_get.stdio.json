@@ -1,0 +1,163 @@
+{
+  "id": "fd_fdstat_get.stdio",
+  "sources": [
+    "p1:1410-1431",
+    "U29a-v2:S1 non-tty streams",
+    "probe fd_fdstat_get.stdio"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [],
+      "call": "fd_fdstat_get",
+      "args": [
+        0,
+        256
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 256,
+            "u32": [
+              0
+            ]
+          },
+          {
+            "addr": 260,
+            "u32": [
+              0
+            ]
+          },
+          {
+            "addr": 264,
+            "u64": [
+              2,
+              2
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [],
+      "call": "fd_fdstat_get",
+      "args": [
+        1,
+        256
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 256,
+            "u32": [
+              0
+            ]
+          },
+          {
+            "addr": 260,
+            "u32": [
+              0
+            ]
+          },
+          {
+            "addr": 264,
+            "u64": [
+              64,
+              64
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [],
+      "call": "fd_fdstat_get",
+      "args": [
+        2,
+        256
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 256,
+            "u32": [
+              0
+            ]
+          },
+          {
+            "addr": 260,
+            "u32": [
+              0
+            ]
+          },
+          {
+            "addr": 264,
+            "u64": [
+              64,
+              64
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

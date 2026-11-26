@@ -1,0 +1,199 @@
+{
+  "id": "fd_fdstat_set_flags.clear",
+  "sources": [
+    "p1:1543-1552",
+    "p1:1506-1521",
+    "probe fd_fdstat_set_flags.clear"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "f"
+        }
+      ],
+      "call": "path_open",
+      "args": [
+        3,
+        0,
+        128,
+        1,
+        0,
+        110,
+        0,
+        0,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              4
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [],
+      "call": "fd_fdstat_set_flags",
+      "args": [
+        4,
+        5
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [],
+      "call": "fd_fdstat_get",
+      "args": [
+        4,
+        512
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 512,
+            "u32": [
+              327684
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [],
+      "call": "fd_fdstat_set_flags",
+      "args": [
+        4,
+        0
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [],
+      "call": "fd_fdstat_get",
+      "args": [
+        4,
+        512
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 512,
+            "u32": [
+              4
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 0,
+          "u32": [
+            256,
+            1
+          ]
+        },
+        {
+          "addr": 256,
+          "text": "X"
+        }
+      ],
+      "call": "fd_write",
+      "args": [
+        4,
+        0,
+        1,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              1
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "Xbc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

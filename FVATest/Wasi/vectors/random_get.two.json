@@ -1,0 +1,80 @@
+{
+  "id": "random_get.two",
+  "sources": [
+    "Wf:484-494",
+    "p1:2625-2640",
+    "probe random_get.two"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 255,
+          "hex": "aa0000bb"
+        }
+      ],
+      "call": "random_get",
+      "args": [
+        256,
+        2
+      ],
+      "expect": {
+        "outcome": "any-bytes",
+        "errno": 0,
+        "length": 2,
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

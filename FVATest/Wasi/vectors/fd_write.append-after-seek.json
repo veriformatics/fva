@@ -1,0 +1,174 @@
+{
+  "id": "fd_write.append-after-seek",
+  "sources": [
+    "p1:665-702",
+    "probe fd_write.append-after-seek"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "f"
+        }
+      ],
+      "call": "path_open",
+      "args": [
+        3,
+        0,
+        128,
+        1,
+        0,
+        110,
+        0,
+        1,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              4
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [],
+      "call": "fd_seek",
+      "args": [
+        4,
+        0,
+        0,
+        40
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 40,
+            "u64": [
+              0
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 0,
+          "u32": [
+            256,
+            1
+          ]
+        },
+        {
+          "addr": 256,
+          "text": "Z"
+        }
+      ],
+      "call": "fd_write",
+      "args": [
+        4,
+        0,
+        1,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              1
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [],
+      "call": "fd_seek",
+      "args": [
+        4,
+        0,
+        1,
+        40
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 40,
+            "u64": [
+              4
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abcZ"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

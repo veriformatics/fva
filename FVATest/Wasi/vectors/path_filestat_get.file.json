@@ -1,0 +1,102 @@
+{
+  "id": "path_filestat_get.file",
+  "sources": [
+    "Wf:313-324",
+    "p1:2055-2097",
+    "U29a-v2:S1 depth-first ino; S3 stat; E metadata departure",
+    "probe path_filestat_get.file"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "f"
+        }
+      ],
+      "call": "path_filestat_get",
+      "args": [
+        3,
+        0,
+        128,
+        1,
+        256
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 256,
+            "u64": [
+              1,
+              2
+            ]
+          },
+          {
+            "addr": 272,
+            "u32": [
+              4
+            ]
+          },
+          {
+            "addr": 280,
+            "u64": [
+              1,
+              3,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "basis": "contract"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+Error: failed to run main module `/tmp/consultant-13/wrong-signature.wat`
+
+Caused by:
+    0: failed to instantiate "/tmp/consultant-13/wrong-signature.wat"
+    1: incompatible import type for `wasi_snapshot_preview1::fd_write`
+    2: types incompatible: expected type `(func)`, found type `(func (param i32 i32 i32 i32) (result i32))`
+

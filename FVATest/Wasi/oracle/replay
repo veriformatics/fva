@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+set -uo pipefail
+here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+root=$(cd -- "$here/../../.." && pwd -P)
+wasmtime=$root/.tools/bin/wasmtime
+wasm_tools=$root/.tools/bin/wasm-tools
+base=${TMPDIR:-/tmp}/tester-5
+mkdir -p "$base" || exit 2
+tmp=$(mktemp -d "$base/replay.XXXXXXXX") || exit 2
+trap 'rm -rf -- "$tmp"' EXIT
+setup() {
+	printf 'wasi replay: setup: %s\n' "$*" >&2
+	exit 2
+}
+diagnostic() { awk 'NF { line = $0 } END { print line }' "$1"; }
+for tool in "$wasmtime" "$wasm_tools" jq xxd diff cmp; do
+	command -v "$tool" >/dev/null || setup "missing $tool"
+done
+[[ $("$wasmtime" --version) == 'wasmtime 50.0.0 (ebe5e8df1 2026-10-20)' ]] || setup 'wasmtime pin differs'
+# shellcheck disable=SC2016 # Exact CLI diagnostic suffix; guest stderr can lack a newline.
+printf '%s\n' 'warning: using `--invoke` with a function that returns values is experimental and may break in the future' >"$tmp/warning"
+warning_length=$(wc -c <"$tmp/warning")
+bytes() {
+	local object=$1
+	if jq -e 'has("text")' <<<"$object" >/dev/null; then
+		jq -jr '.text' <<<"$object"
+	else
+		jq -jr '.hex' <<<"$object" | xxd -r -p
+	fi
+}
+materialize() {
+	local tree=$1 target=$2 entry name node
+	mkdir -p -- "$target" || return 2
+	while IFS= read -r entry; do
+		name=$(jq -r '.key' <<<"$entry")
+		node=$(jq -c '.value' <<<"$entry")
+		if jq -e 'has("dir")' <<<"$node" >/dev/null; then
+			materialize "$(jq -c '.dir' <<<"$node")" "$target/$name" || return 2
+		else
+			bytes "$(jq -c '.file' <<<"$node")" >"$target/$name" || return 2
+		fi
+	done < <(jq -c 'to_entries[]' <<<"$tree")
+}
+passes=0 fails=0 outprofile=0 skipped=0 checks=0 selected=0
+for vector in "$here/../vectors/"*.json; do
+	[[ -f $vector ]] || setup 'no vectors'
+	id=${vector##*/}
+	id=${id%.json}
+	if (($#)); then
+		match=0
+		for requested in "$@"; do [[ $requested == "$id" ]] && match=1; done
+		((match)) || continue
+	fi
+	((selected += 1))
+	jq -er -L "$here" 'include "schema"; valid' "$vector" >/dev/null || setup "$id: schema"
+	jq -r -L "$here" 'include "probe"; probe' "$vector" >"$tmp/generated.wat" || setup "$id: emitter"
+	cmp -s -- "$tmp/generated.wat" "$here/$id.wat" || setup "$id: stale probe (run oracle/make)"
+	"$wasm_tools" parse "$here/$id.wat" -o "$tmp/probe.wasm" 2>"$tmp/parse.err" || setup "$id: WAT parse: $(<"$tmp/parse.err")"
+	"$wasm_tools" validate "$tmp/probe.wasm" 2>"$tmp/parse.err" || setup "$id: WAT validation: $(<"$tmp/parse.err")"
+	run=$tmp/$id
+	mkdir -p "$run" || setup "$id: temp directory"
+	args=(run -S inherit-env=n --argv0 "$(jq -r '.world.args[0]' "$vector")")
+	index=0
+	while IFS= read -r dir; do
+		guest=$(jq -r '.guest' <<<"$dir")
+		materialize "$(jq -c '.tree' <<<"$dir")" "$run/fs$index" || setup "$id: fixture"
+		args+=(--dir "$run/fs$index::$guest")
+		((index += 1))
+	done < <(jq -c '.world.dirs[]' "$vector")
+	while IFS= read -r env; do args+=(--env "$env"); done < <(jq -r '.world.env[]' "$vector")
+	mapfile -t argv < <(jq -r '.world.args[1:][]' "$vector")
+	bytes "$(jq -c '.world.stdin' "$vector")" >"$run/stdin" || setup "$id: stdin"
+	"$wasmtime" "${args[@]}" -- "$here/$id.wat" "${argv[@]}" <"$run/stdin" >"$run/raw.out" 2>"$run/raw.err"
+	rc=$?
+	if jq -e 'any(.steps[]; .expect.outcome=="out-of-profile")' "$vector" >/dev/null; then
+		printf 'observe %s out-of-profile rc=%s stdout_hex=%s\n' "$id" "$rc" "$(xxd -p "$run/raw.out" | tr -d '\n')"
+		if ((rc)); then printf '  %s\n' "$(diagnostic "$run/raw.err")"; fi
+		((outprofile += 1, passes += 1))
+		continue
+	fi
+	bad=0 cells=0 skip=0
+	fail() {
+		printf 'FAIL %s %s\n' "$id" "$*"
+		bad=1
+	}
+	expected_rc=$(jq -r '[.steps[]|select(.expect.outcome=="exit" and .expect.basis=="wasmtime")|.expect.code][-1] // 0' "$vector")
+	contract_exit=$(jq -r 'any(.steps[];.expect.outcome=="exit" and .expect.basis=="contract")' "$vector")
+	if [[ $contract_exit != true && $rc -ne $expected_rc ]]; then fail "exit: expected $expected_rc, got $rc ($(diagnostic "$run/raw.err"))"; fi
+	final_exit=$(jq -r '.final.exited // empty' "$vector")
+	if [[ $contract_exit != true && -n $final_exit && $rc -ne $final_exit ]]; then fail "final.exited: expected $final_exit, got $rc"; fi
+	bytes "$(jq -c '.final.stdout' "$vector")" >"$run/expected.out" || setup "$id: stdout bytes"
+	bytes "$(jq -c '.final.stderr' "$vector")" >"$run/expected.err" || setup "$id: stderr bytes"
+	length=$(wc -c <"$run/expected.out")
+	dd if="$run/raw.out" of="$run/guest.out" bs=1 count="$length" status=none || setup "$id: split stdout"
+	dd if="$run/raw.out" of="$run/results" bs=1 skip="$length" status=none || setup "$id: split observations"
+	error_length=$(wc -c <"$run/raw.err")
+	if ((error_length >= warning_length)) &&
+		tail -c "$warning_length" "$run/raw.err" | cmp -s -- "$tmp/warning" -; then
+		head -c "$((error_length - warning_length))" "$run/raw.err" >"$run/guest.err"
+	else
+		cp -- "$run/raw.err" "$run/guest.err"
+	fi
+	cmp -s -- "$run/expected.out" "$run/guest.out" || fail 'final.stdout'
+	cmp -s -- "$run/expected.err" "$run/guest.err" || fail 'final.stderr'
+	mapfile -t actual <"$run/results"
+	jq -c -L "$here" 'include "probe"; observations[]' "$vector" >"$run/plan"
+	n=0
+	while IFS= read -r field; do
+		basis=$(jq -r '.basis' <<<"$field")
+		label=$(jq -r '"step["+(.step|tostring)+"]."+.label' <<<"$field")
+		value=${actual[$n]-missing}
+		if [[ $basis == wasmtime ]]; then
+			expected=$(jq -r '.expected' <<<"$field")
+			# WASM CLI prints i64 as signed; unsigned JSON words retain exact decimal strings.
+			expected=$((expected))
+			[[ $value == "$expected" ]] || fail "$label: expected $expected, got $value"
+			((cells += 1))
+		else
+			printf 'contract %s %s observed=%s\n' "$id" "$label" "$value"
+			((skip += 1))
+		fi
+		((n += 1))
+	done <"$run/plan"
+	[[ ${#actual[@]} -eq $n ]] || fail "observation count: expected $n, got ${#actual[@]}"
+	index=0
+	while IFS= read -r guest; do
+		tree=$(jq -c --arg g "$guest" '.final.files[$g]' "$vector")
+		[[ $tree != null ]] || setup "$id: missing final preopen $guest"
+		materialize "$tree" "$run/expected-fs$index" || setup "$id: final fixture"
+		diff -qr -- "$run/expected-fs$index" "$run/fs$index" >"$run/files.diff"
+		diff_rc=$?
+		if ((diff_rc == 2)); then setup "$id: file comparison"; fi
+		if ((diff_rc)); then fail "final.files[$guest]: $(<"$run/files.diff")"; fi
+		((index += 1))
+	done < <(jq -r '.world.dirs[].guest' "$vector")
+	((skipped += skip, checks += cells))
+	if ((bad)); then ((fails += 1)); else
+		printf 'ok %s cells=%s contract-skipped=%s rc=%s\n' "$id" "$cells" "$skip" "$rc"
+		((passes += 1))
+	fi
+done
+((selected > 0)) || setup 'selection contains no vectors'
+if (($#)); then [[ $# -eq $selected ]] || setup 'selection has a duplicate or absent id'; fi
+printf 'wasi replay: %s pass; %s FAIL; %s vectors; %s out-of-profile observed; %s wasmtime cells; %s contract cells skipped\n' \
+	"$passes" "$fails" "$selected" "$outprofile" "$checks" "$skipped"
+((fails == 0))

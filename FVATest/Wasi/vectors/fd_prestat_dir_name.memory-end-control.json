@@ -1,0 +1,81 @@
+{
+  "id": "fd_prestat_dir_name.memory-end-control",
+  "sources": [
+    "p1:1840-1852",
+    "probe r5 MemoryEnd",
+    "probe fd_prestat_dir_name.memory-end-control"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 65536,
+  "steps": [
+    {
+      "mem": [],
+      "call": "fd_prestat_dir_name",
+      "args": [
+        3,
+        4294967294,
+        1
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 4294967294,
+            "text": "."
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

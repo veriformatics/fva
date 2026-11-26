@@ -1,0 +1,155 @@
+{
+  "id": "fd_read.offset-limit",
+  "sources": [
+    "p1:1689-1707 pread",
+    "Linux rw_verify_area: pos + count >= 2^63 -> EINVAL",
+    "probe r5 OffsetIO",
+    "probe fd_read.offset-limit"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "f"
+        }
+      ],
+      "call": "path_open",
+      "args": [
+        3,
+        0,
+        128,
+        1,
+        0,
+        110,
+        0,
+        0,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              4
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [],
+      "call": "fd_seek",
+      "args": [
+        4,
+        "9223372036854775807",
+        0,
+        40
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 40,
+            "u64": [
+              "9223372036854775807"
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 0,
+          "u32": [
+            256,
+            1
+          ]
+        },
+        {
+          "addr": 32,
+          "u32": [
+            4660
+          ]
+        }
+      ],
+      "call": "fd_read",
+      "args": [
+        4,
+        0,
+        1,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 28,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              4660
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

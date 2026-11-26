@@ -1,0 +1,15 @@
+(module
+  (import "wasi_snapshot_preview1" "path_open" (func $open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "fd_fdstat_get" (func $stat (param i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "fd_fdstat_set_flags" (func $set (param i32 i32) (result i32)))
+  (memory (export "memory") 1)
+  (data (i32.const 512) "fd")
+  (func (export "probe") (param $path i32) (param $of i32) (param $rb i64) (param $ff i32) (param $newfl i32) (result i32 i32 i32 i32)
+    (local $e i32) (local $before i32) (local $seterr i32)
+    (local.set $e (call $open (i32.const 3) (i32.const 0) (i32.add (i32.const 512) (local.get $path)) (i32.const 1) (local.get $of) (local.get $rb) (i64.const 0) (local.get $ff) (i32.const 0)))
+    (if (i32.eqz (local.get $e)) (then
+      (drop (call $stat (i32.load (i32.const 0)) (i32.const 64)))
+      (local.set $before (i32.load16_u (i32.const 66)))
+      (local.set $seterr (call $set (i32.load (i32.const 0)) (local.get $newfl)))
+      (drop (call $stat (i32.load (i32.const 0)) (i32.const 64)))))
+    (local.get $e) (local.get $before) (local.get $seterr) (i32.load16_u (i32.const 66))))

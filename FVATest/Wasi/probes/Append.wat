@@ -1,0 +1,28 @@
+(module
+  (import "wasi_snapshot_preview1" "path_open" (func $open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "fd_seek" (func $seek (param i32 i64 i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "fd_write" (func $write (param i32 i32 i32 i32) (result i32)))
+  (memory (export "memory") 1)
+  (data (i32.const 16) "f")
+  ;; iovec at 32: buf 64, len set per call; nwritten at 40; fd at 48/52; seek result at 56
+  (func $w (param $fd i32) (param $len i32) (result i32 i32)
+    (i32.store (i32.const 32) (i32.const 64))
+    (i32.store (i32.const 36) (local.get $len))
+    (i32.store (i32.const 40) (i32.const 999))
+    (call $write (local.get $fd) (i32.const 32) (i32.const 1) (i32.const 40))
+    (i32.load (i32.const 40)))
+  (func (export "probe") (param $back i64) (param $len1 i32) (param $len2 i32) (param $len3 i32) (result i32 i32 i32 i32 i32 i32 i32 i32)
+    (local $a i32) (local $b i32) (local $e i32)
+    ;; fd A: plain, rights read+seek+write
+    (drop (call $open (i32.const 3) (i32.const 0) (i32.const 16) (i32.const 1) (i32.const 0) (i64.const 70) (i64.const 0) (i32.const 0) (i32.const 48)))
+    (local.set $a (i32.load (i32.const 48)))
+    ;; seek A to 2^63 - back, write len1 there (makes the file 2^63 - back + len1 long)
+    (drop (call $seek (local.get $a) (i64.sub (i64.const 0x7fffffffffffffff) (i64.sub (local.get $back) (i64.const 1))) (i32.const 0) (i32.const 56)))
+    (call $w (local.get $a) (local.get $len1))
+    ;; fd B: APPEND
+    (drop (call $open (i32.const 3) (i32.const 0) (i32.const 16) (i32.const 1) (i32.const 0) (i64.const 70) (i64.const 0) (i32.const 1) (i32.const 52)))
+    (local.set $b (i32.load (i32.const 52)))
+    (call $w (local.get $b) (local.get $len2))
+    (call $w (local.get $b) (local.get $len3))
+    (i32.load (i32.const 52))
+    (local.get $b)))

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+base=${TMPDIR:-/tmp}/tester-5
+mkdir -p "$base"
+tmp=$(mktemp -d "$base/make.XXXXXXXX")
+trap 'rm -rf -- "$tmp"' EXIT
+mkdir "$tmp/vectors"
+jq -n -f "$here/cases.jq" >"$tmp/cases.json"
+jq -er 'length > 0 and ([.[].id] | unique | length) == length' "$tmp/cases.json" >/dev/null
+jq -r '.[] | [.row, .id, ([.steps[].expect.basis] | unique | join("+"))] | @tsv' \
+	"$tmp/cases.json" >"$tmp/rows.tsv"
+while IFS= read -r vector; do
+	id=$(jq -r '.id' <<<"$vector")
+	jq 'del(.row)' <<<"$vector" >"$tmp/vectors/$id.json"
+	jq -er -L "$here" 'include "schema"; valid' "$tmp/vectors/$id.json" >/dev/null
+	jq -r -L "$here" 'include "probe"; probe' "$tmp/vectors/$id.json" >"$tmp/$id.wat"
+done < <(jq -c '.[]' "$tmp/cases.json")
+if [[ ${1-} == --check ]]; then
+	diff -qr -- "$tmp/vectors" "$here/../vectors"
+	cmp -- "$tmp/rows.tsv" "$here/rows.tsv"
+	for f in "$tmp/"*.wat; do cmp -- "$f" "$here/${f##*/}"; done
+	expected=$(jq length "$tmp/cases.json")
+	actual=$(find "$here" -maxdepth 1 -name '*.wat' -type f | wc -l)
+	[[ $expected -eq $actual ]]
+else
+	[[ $# -eq 0 ]] || exit 2
+	cp -- "$tmp/vectors/"*.json "$here/../vectors/"
+	cp -- "$tmp/"*.wat "$tmp/rows.tsv" "$here/"
+fi
+printf 'wasi make: %s vectors; %s\n' "$(jq length "$tmp/cases.json")" "${1-generated}"

@@ -1,0 +1,176 @@
+{
+  "id": "path_open.removed-parent",
+  "sources": [
+    "POSIX rmdir: no new entries in a removed directory",
+    "probe r5 UnlinkedDirectory",
+    "probe path_open.removed-parent"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          },
+          "e": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "e"
+        }
+      ],
+      "call": "path_open",
+      "args": [
+        3,
+        0,
+        128,
+        1,
+        0,
+        9728,
+        66,
+        0,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              4
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "e"
+        }
+      ],
+      "call": "path_remove_directory",
+      "args": [
+        3,
+        128,
+        1
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "child"
+        },
+        {
+          "addr": 36,
+          "u32": [
+            4660
+          ]
+        }
+      ],
+      "call": "path_open",
+      "args": [
+        4,
+        0,
+        128,
+        5,
+        1,
+        0,
+        0,
+        0,
+        36
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 44,
+        "mem": [
+          {
+            "addr": 36,
+            "u32": [
+              4660
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "hild"
+        }
+      ],
+      "call": "path_create_directory",
+      "args": [
+        4,
+        128,
+        4
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 44,
+        "mem": [],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

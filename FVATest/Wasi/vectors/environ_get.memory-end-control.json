@@ -1,0 +1,88 @@
+{
+  "id": "environ_get.memory-end-control",
+  "sources": [
+    "p1:1240-1256",
+    "probe r5 MemoryEnd",
+    "probe environ_get.memory-end-control"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [
+      "K=V"
+    ],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 65536,
+  "steps": [
+    {
+      "mem": [],
+      "call": "environ_get",
+      "args": [
+        0,
+        4294967291
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 0,
+            "u32": [
+              4294967291
+            ]
+          },
+          {
+            "addr": 4294967291,
+            "text": "K=V\u0000"
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

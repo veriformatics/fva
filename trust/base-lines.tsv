@@ -25,4 +25,8 @@ FVA/Spec/Valid/Instr.lean	249
 FVA/Spec/Valid/Module.lean	106
 FVA/Spec/Valid/Runtime.lean	115
 FVA/Spec/Valid/Soundness.lean	27
-total	2777
+FVA/Spec/Wasi/Abi.lean	75
+FVA/Spec/Wasi/Call.lean	422
+FVA/Spec/Wasi/State.lean	140
+FVA/Spec/Wasi/World.lean	83
+total	3497

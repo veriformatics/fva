@@ -1,0 +1,92 @@
+{
+  "id": "fd_read.stdin-zero-table",
+  "sources": [
+    "LEAD-D1: stdin empty buffers intr",
+    "p1:276-287",
+    "probe stdin-zero:readnone",
+    "probe fd_read.stdin-zero-table"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": "data"
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 32,
+          "u32": [
+            4660
+          ]
+        }
+      ],
+      "call": "fd_read",
+      "args": [
+        0,
+        0,
+        0,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 27,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              4660
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

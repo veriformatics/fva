@@ -10,7 +10,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 declare -A groups=(
-	[lean]="build checks test char accept decoder numerics floatdiff spec p2exec p2valid difftest fuzz-replay lint mutation pins olean-pins base-manifest"
+	[lean]="build checks test char accept decoder numerics floatdiff spec p2exec p2valid wasi difftest fuzz-replay lint mutation pins olean-pins base-manifest"
 	[trust]="build trust"
 	[init]="build init"
 	[subjects]="build subjects"
@@ -113,6 +113,8 @@ lean_lane() {
 	run p2exec scripts/test-p2exec
 	# U28c E3: tester-4's blind P′ validation suite (wasm-tools under the manifest flags = oracle)
 	run p2valid scripts/test-p2valid
+	# U29a E4: tester-5's blind WASI call vectors on the model (full gate: + the wasmtime replay)
+	if ((fast)); then run wasi scripts/test-wasi; else run wasi scripts/test-wasi --oracle; fi
 	if ((fast)); then run difftest scripts/test-difftest --fast; else run difftest scripts/test-difftest; fi
 	# D70: the committed fuzz corpus + every crash input through the compiled readers
 	run fuzz-replay scripts/fuzz-replay

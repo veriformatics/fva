@@ -1,0 +1,83 @@
+{
+  "id": "fd_seek.stdout",
+  "sources": [
+    "p1:534-546",
+    "probe fd_seek.stdout"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [],
+      "call": "fd_seek",
+      "args": [
+        1,
+        0,
+        0,
+        40
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 70,
+        "mem": [
+          {
+            "addr": 40,
+            "u64": [
+              0
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

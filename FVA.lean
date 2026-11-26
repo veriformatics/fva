@@ -9,6 +9,7 @@ import FVA.Spec.Exec.Runtime
 import FVA.Spec.Exec.Numeric
 import FVA.Spec.Exec.Step
 import FVA.Spec.Exec.System
+import FVA.Spec.Wasi.World
 import FVA.Spec.Exec.Access
 import FVA.Spec.Exec.Instantiate
 import FVA.Spec.Claims
@@ -72,6 +73,11 @@ import FVA.Proof.Valid.Closed
 import FVA.Proof.Lib
 import FVA.Proof.Lib.FootprintExamples
 import FVA.Proof.Lib.SysExamples
+import FVA.Proof.Wasi.World
+import FVA.Proof.Wasi.Examples
+import FVA.Proof.Wasi.Launch
+import FVA.Proof.Wasi.WfRun
+import FVA.Proof.Wasi.Policy
 import FVA.Proof.Lib.EHExamples
 import FVA.Proof.Lib.EHMachine
 import FVA.Explain

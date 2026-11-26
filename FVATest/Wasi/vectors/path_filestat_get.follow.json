@@ -1,0 +1,102 @@
+{
+  "id": "path_filestat_get.follow",
+  "sources": [
+    "Wt:445-452 lookupflags",
+    "p1:2055-2097",
+    "probe path_filestat_get.follow"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 128,
+          "text": "f"
+        }
+      ],
+      "call": "path_filestat_get",
+      "args": [
+        3,
+        1,
+        128,
+        1,
+        256
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 256,
+            "u64": [
+              1
+            ]
+          },
+          {
+            "addr": 272,
+            "u32": [
+              4
+            ]
+          },
+          {
+            "addr": 288,
+            "u64": [
+              3
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

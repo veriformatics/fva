@@ -1,0 +1,90 @@
+{
+  "id": "environ_get.layout",
+  "sources": [
+    "Wf:37-43",
+    "p1:1234-1261",
+    "probe environ_get.layout"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [
+      "A=1",
+      "B=xy"
+    ],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [],
+      "call": "environ_get",
+      "args": [
+        0,
+        128
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 0,
+            "u32": [
+              128,
+              132
+            ]
+          },
+          {
+            "addr": 128,
+            "text": "A=1\u0000B=xy\u0000"
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

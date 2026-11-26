@@ -1,0 +1,74 @@
+{
+  "id": "fd_prestat_dir_name.memory-end",
+  "sources": [
+    "p1:1171,1849",
+    "probe r5 MemoryEnd",
+    "probe fd_prestat_dir_name.memory-end"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 65536,
+  "steps": [
+    {
+      "mem": [],
+      "call": "fd_prestat_dir_name",
+      "args": [
+        3,
+        4294967295,
+        1
+      ],
+      "expect": {
+        "outcome": "out-of-profile",
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

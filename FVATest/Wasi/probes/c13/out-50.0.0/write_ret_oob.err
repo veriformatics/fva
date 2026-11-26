@@ -1,0 +1,9 @@
+Error: failed to run main module `/tmp/consultant-13/abi.wat`
+
+Caused by:
+    0: failed to invoke `write_ret_oob`
+    1: error while executing at wasm backtrace:
+    0:    0x13f - <unknown>!<wasm function 4>
+    2: In func wasi_snapshot_preview1::fd_write at write size: Pointer out of bounds: Region { start: 65536, len: 4 }
+    3: Pointer out of bounds: Region { start: 65536, len: 4 }
+

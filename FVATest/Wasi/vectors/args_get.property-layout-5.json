@@ -1,0 +1,134 @@
+{
+  "id": "args_get.property-layout-5",
+  "sources": [
+    "Wf:15-35",
+    "p1:1190-1230",
+    "property: count; sum(lenUTF8+1); pointer prefix sums; joined NUL bytes; guards",
+    "probe args_get.property-layout-5"
+  ],
+  "world": {
+    "args": [
+      "",
+      "ab",
+      "α",
+      "",
+      "ab"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [],
+      "call": "args_sizes_get",
+      "args": [
+        32,
+        36
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              5,
+              11
+            ]
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 127,
+          "hex": "aa"
+        },
+        {
+          "addr": 139,
+          "hex": "bb"
+        }
+      ],
+      "call": "args_get",
+      "args": [
+        0,
+        128
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 0,
+            "u32": [
+              128,
+              129,
+              132,
+              135,
+              136
+            ]
+          },
+          {
+            "addr": 128,
+            "text": "\u0000ab\u0000α\u0000\u0000ab\u0000"
+          },
+          {
+            "addr": 127,
+            "hex": "aa"
+          },
+          {
+            "addr": 139,
+            "hex": "bb"
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

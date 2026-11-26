@@ -1,0 +1,53 @@
+WASI call oracle
+
+Run from any directory:
+  <repo>/FVATest/Wasi/oracle/replay [VECTOR_ID ...]
+  <repo>/FVATest/Wasi/oracle/make --check
+  <repo>/FVATest/Wasi/oracle/check-replay
+
+replay: rc 0 all selected comparisons hold; rc 1 assertion failure; rc 2 setup.
+Pinned binary: <repo>/.tools/bin/wasmtime = 50.0.0 (ebe5e8df1 2026-10-20).
+Tools: <repo>/.tools/bin/wasm-tools; jq, xxd, standard GNU utilities.
+Temporary fixtures: ${TMPDIR:-/tmp}/tester-5; removed on exit.
+
+Inputs
+- Wf = WebAssembly/WASI fae981ba, legacy/preview1/witx/wasi_snapshot_preview1.witx.
+- Wt = the same pin's typenames.witx; WD = legacy/tools/witx-docs.md.
+- p1 = wasmtime v50.0.0 crates/wasi/src/p1.rs.
+- U29a-v2 = frozen U29a WASI contract supplied to the blind tester.
+- LEAD-D1/D2 = contract corrections: empty stdin iovecs return intr; invalid
+  scalar enum/flag values are outside the profile; rmdir final .. returns inval.
+- Each vector cites its probe id. cases.jq owns source-derived expected values;
+  make serializes JSON + emits WAT mechanically. No FVA WASI code is consulted.
+
+Observation boundary
+- Each vector runs in a fresh process with exact argv, env, stdin and preopens.
+- _start returns one i64 per errno/scalar cell or one Boolean per byte region.
+  Byte comparisons check every byte, including the 65,536-byte stdin prefix.
+  Observations are saved immediately after each step, before later writes.
+- stdout is split from returned values by its expected byte length. A wrong
+  length fails the stream or observation comparison. The pinned CLI's one
+  experimental-results warning is filtered from stderr; guest stderr is checked.
+- Every final tree is compared recursively, including extra/missing entries,
+  entry kinds and exact file bytes. Metadata is intentionally not a file oracle.
+- Contract-basis cells are logged, not equated with wasmtime. They encode virtual
+  clocks, requested/enforced rights and virtual metadata. These are model inputs,
+  not claims that wasmtime implements the virtual host.
+- Out-of-profile vectors record the oracle's trap/errno without asserting it.
+  Their FVA consumer must check profile classification, not execute the call.
+- random_get accepts every buffer value; errno and the requested length define
+  its acceptance, not a chosen byte string.
+
+Coverage
+rows.tsv maps contract coverage rows to vector ids + basis. Fixed vectors pin
+all 20 calls; boundary vectors cover empty transfers, signed/u64 seek limits,
+rights, output-cell preservation, descriptor identity and record padding.
+Generated source-level families: args count 1..6 over empty/ASCII/UTF-8 entries
+(pointer prefix sums, NUL sizes, byte layout, guards); 12 file-read iovec length
+pairs from {0,1,3,5} x {0,1,4} (first nonempty prefix, later buffers untouched,
+position advancement). These finite families are properties over their stated
+parameter sets, not exhaustive tests of all possible WASI worlds.
+
+CLI coverage limit: wasmtime inserts argv[0]. --argv0 '' gives one argument,
+one NUL byte; a zero-argument world cannot be replayed by this CLI. The corpus
+makes no FVA model/kernel claim: MAIN evaluates these vectors independently.

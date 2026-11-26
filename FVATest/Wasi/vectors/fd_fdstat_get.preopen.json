@@ -1,0 +1,95 @@
+{
+  "id": "fd_fdstat_get.preopen",
+  "sources": [
+    "p1:1432-1478",
+    "U29a-v2:S1 preBase/preInh; E rights departure",
+    "probe fd_fdstat_get.preopen"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [],
+      "call": "fd_fdstat_get",
+      "args": [
+        3,
+        256
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 256,
+            "u32": [
+              3
+            ]
+          },
+          {
+            "addr": 260,
+            "u32": [
+              0
+            ]
+          },
+          {
+            "addr": 264,
+            "u64": [
+              130022929,
+              268435455
+            ]
+          }
+        ],
+        "basis": "contract"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

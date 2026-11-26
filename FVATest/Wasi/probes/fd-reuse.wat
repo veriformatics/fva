@@ -1,0 +1,18 @@
+(module
+  (import "wasi_snapshot_preview1" "path_open"
+    (func $open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "fd_close" (func $close (param i32) (result i32)))
+  (memory (export "memory") 1)
+  (data (i32.const 16) "f")
+  (func $o (result i32)
+    (drop (call $open (i32.const 3) (i32.const 0) (i32.const 16) (i32.const 1) (i32.const 1)
+      (i64.const 0x3fffffff) (i64.const 0x3fffffff) (i32.const 0) (i32.const 0)))
+    (i32.load (i32.const 0)))
+  (func (export "probe") (result i32 i32 i32 i32 i32)
+    (local $a i32) (local $b i32) (local $c i32)
+    (local.set $a (call $o))
+    (local.set $b (call $o))
+    (local.set $c (call $o))
+    (drop (call $close (local.get $a)))
+    (drop (call $close (local.get $c)))
+    (local.get $a) (local.get $b) (local.get $c) (call $o) (call $o)))

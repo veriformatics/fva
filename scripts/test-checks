@@ -632,4 +632,19 @@ if ! scripts/test-p2valid --self-test >"$tmp/p2valid-driver.log" 2>&1 ||
 	tail -20 "$tmp/p2valid-driver.log"
 	fail=1
 fi
+# U29a E4: the WASI vector harness (scripts/wasi-vectors.lean) on planted copies: a clean vector
+# passes, an expected errno changed fails (rc 1), a malformed vector is setup (rc 2)
+mkdir -p "$tmp/wasi/clean" "$tmp/wasi/wrong" "$tmp/wasi/bad"
+cp FVATest/Wasi/vectors/fd_write.first-buffer.json "$tmp/wasi/clean/"
+jq '.steps[0].expect.errno = 8' FVATest/Wasi/vectors/fd_write.first-buffer.json >"$tmp/wasi/wrong/v.json"
+printf '{"id": "bad"}\n' >"$tmp/wasi/bad/v.json"
+for c in clean:0 wrong:1 bad:2; do
+	lake env lean --run scripts/wasi-vectors.lean "$tmp/wasi/${c%%:*}" >"$tmp/wasi/${c%%:*}.log" 2>&1
+	got=$?
+	if ((got != ${c##*:})); then
+		echo "test-checks: wasi-vectors ${c%%:*} rc $got, expected ${c##*:}"
+		tail -5 "$tmp/wasi/${c%%:*}.log"
+		fail=1
+	fi
+done
 exit "$fail"

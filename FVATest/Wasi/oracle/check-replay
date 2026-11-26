@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+root=$(cd -- "$here/../../.." && pwd -P)
+base=${TMPDIR:-/tmp}/tester-5
+mkdir -p "$base"
+tmp=$(mktemp -d "$base/driver.XXXXXXXX")
+trap 'rm -rf -- "$tmp"' EXIT
+repo=$tmp/repo
+mkdir -p "$repo/FVATest/Wasi"
+cp -r -- "$here" "$repo/FVATest/Wasi/oracle"
+cp -r -- "$here/../vectors" "$repo/FVATest/Wasi/vectors"
+ln -s "$root/.tools" "$repo/.tools"
+oracle=$repo/FVATest/Wasi/oracle
+vectors=$repo/FVATest/Wasi/vectors
+pass=0 fail=0
+run() {
+	local label=$1 expected=$2 id=$3 rc
+	set +e
+	"$oracle/replay" "$id" >"$tmp/$label.log" 2>&1
+	rc=$?
+	set -e
+	if [[ $rc -eq $expected ]]; then
+		printf 'ok replay-driver %s rc=%s\n' "$label" "$rc"
+		((pass += 1))
+	else
+		printf 'FAIL replay-driver %s: expected rc=%s, got %s\n' "$label" "$expected" "$rc"
+		tail -n 8 "$tmp/$label.log"
+		((fail += 1))
+	fi
+}
+patch() {
+	local id=$1 filter=$2
+	jq "$filter" "$here/../vectors/$id.json" >"$vectors/$id.json"
+	jq -r -L "$oracle" 'include "probe"; probe' "$vectors/$id.json" >"$oracle/$id.wat"
+}
+restore() {
+	cp -- "$here/../vectors/$1.json" "$vectors/$1.json"
+	cp -- "$here/$1.wat" "$oracle/$1.wat"
+}
+run clean 0 args_sizes_get.two
+run stderr-no-newline 0 fd_write.stderr
+patch args_sizes_get.two '.steps[0].expect.errno=8'
+run errno 1 args_sizes_get.two
+restore args_sizes_get.two
+patch args_sizes_get.two '.steps[0].expect.mem[0].u32[1]=4'
+run u32 1 args_sizes_get.two
+restore args_sizes_get.two
+patch args_get.layout '.steps[0].expect.mem[1].text="p\u0000xz\u0000"'
+run bytes 1 args_get.layout
+restore args_get.layout
+patch fd_seek.u64-overflow '.steps[2].expect.mem[0].u64=["18446744073709551613"]'
+run u64 1 fd_seek.u64-overflow
+restore fd_seek.u64-overflow
+patch fd_write.first-buffer '.final.stdout.text="B"'
+run stdout 1 fd_write.first-buffer
+restore fd_write.first-buffer
+patch fd_write.first-buffer '.final.stderr.text="unexpected"'
+run stderr 1 fd_write.first-buffer
+restore fd_write.first-buffer
+patch path_open.create '.final.files["."].new.file.text="not-empty"'
+run file-bytes 1 path_open.create
+restore path_open.create
+patch path_open.create 'del(.final.files["."].new)'
+run extra-file 1 path_open.create
+restore path_open.create
+patch proc_exit.three '.steps[0].expect.code=4 | .final.exited=4'
+run exit-code 1 proc_exit.three
+restore proc_exit.three
+patch proc_exit.three '.final.exited=4'
+run final-exit 1 proc_exit.three
+restore proc_exit.three
+patch random_get.two '.steps[0].expect.length=3'
+run random-length 2 random_get.two
+restore random_get.two
+patch clock_time_get.realtime '.steps[0].expect.errno=76 | .steps[0].expect.mem[0].u64=[999]'
+run contract-skip 0 clock_time_get.realtime
+restore clock_time_get.realtime
+run out-of-profile 0 fd_write.oob-tail
+printf '\n;; stale\n' >>"$oracle/args_sizes_get.two.wat"
+run stale-probe 2 args_sizes_get.two
+restore args_sizes_get.two
+printf '{}\n' >"$vectors/args_sizes_get.two.json"
+run schema 2 args_sizes_get.two
+restore args_sizes_get.two
+run missing-id 2 does_not_exist.case
+printf 'wasi replay-driver: %s pass; %s FAIL\n' "$pass" "$fail"
+((fail == 0))

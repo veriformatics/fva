@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# U29a E4: tester-5's blind WASI call vectors (FVATest/Wasi/vectors, generated from
+# FVATest/Wasi/oracle/cases.jq) against the reviewed model at E's choices
+# (scripts/wasi-vectors.lean); --oracle also replays them on the pinned wasmtime.
+# Exit: 0 pass, 1 a vector or the corpus differs, 2 setup.
+set -uo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root" || exit 2
+export PATH="$root/.tools/bin:$PATH"
+oracle=0
+case ${1:-} in
+'') ;;
+--oracle) oracle=1 ;;
+*)
+	echo 'usage: scripts/test-wasi [--oracle]' >&2
+	exit 2
+	;;
+esac
+FVATest/Wasi/oracle/make --check
+rc=$?
+((rc == 0)) || exit "$rc"
+lake env lean --run scripts/wasi-vectors.lean FVATest/Wasi/vectors >"${TMPDIR:-/tmp}/wasi-vectors.$$" 2>&1
+rc=$?
+grep -v '^ok ' "${TMPDIR:-/tmp}/wasi-vectors.$$"
+rm -f "${TMPDIR:-/tmp}/wasi-vectors.$$"
+((rc == 0)) || exit "$rc"
+((oracle)) || exit 0
+FVATest/Wasi/oracle/replay | tail -1
+exit "${PIPESTATUS[0]}"
