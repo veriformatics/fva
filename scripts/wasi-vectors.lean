@@ -2,11 +2,13 @@ import FVA.Spec.Wasi.World
 import FVA.Json
 
 /-!
-U29a E4: tester-5's blind call-level vectors (`FVATest/Wasi/vectors/*.json`, schema in
-`docs/contracts/U29a-wasi.md`) checked against the reviewed model at `E`'s choices. Run by
-`scripts/test-wasi`: `lake env lean --run scripts/wasi-vectors.lean DIR`. Prints `ok ID` or
-`FAIL ID: reason` per vector; exit 0 all pass, 1 a mismatch, 2 setup. Lives outside `FVATest/`
-so it stays out of the mutation module graph (`.claude/rules/fva-mutation.md`).
+U29a E4: the call-level vectors (`FVATest/Wasi/vectors/*.json`, schema in
+`docs/contracts/U29a-wasi.md`) checked against the reviewed model at `E`'s choices, and (U29b1)
+the model's numbering against the WITX table `ABI.tsv` (`FVATest/Wasi/oracle/abi.tsv`). Run by
+`scripts/test-wasi`: `lake env lean --run scripts/wasi-vectors.lean DIR [ABI.tsv]`. Prints `ok ID`
+or `FAIL ID: reason` per vector (+ `FAIL abi …` per differing value); exit 0 all pass, 1 a
+mismatch, 2 setup. Lives outside `FVATest/` so it stays out of the mutation module graph
+(`.claude/rules/fva-mutation.md`).
 -/
 
 open Lean FVA.Wasi FVA.Wasm FVA.Wasm.Exec
@@ -105,7 +107,10 @@ def check (v : Json) : M (Option String) := do
   let mut s : Store := { mems := [⟨pages, none, fun _ => 0⟩] }
   let steps ← arr (← field v "steps")
   for (st, i) in steps.zipIdx do
-    let some c := Call.ofName (← (← field st "call").getStr?) | throw "call"
+    let name ← (← field st "call").getStr?
+    -- schema.jq admits the 20 WITX names alone: a name the model lacks is a model defect (rc 1),
+    -- never setup (fvamut records no row for a stage's rc 2)
+    let some c := Call.ofName name | return some s!"step {i}: the model has no call {name}"
     let mut m := s.mems.headD ⟨pages, none, fun _ => 0⟩
     for w in (← arr ((field st "mem").toOption.getD (.arr #[]))) do
       m := writeBytes m (← natOf (← field w "addr")) (← cellBytes w)
@@ -153,10 +158,67 @@ def check (v : Json) : M (Option String) := do
       if σ.exited != some k then return some s!"final exited {σ.exited}, expected {k}"
   return none
 
+/-- The model's numbering under its `typenames.witx` names; `Right.count` + `clockCount` = the
+number of `rights` + `clockid` rows. -/
+def abi : List (String × String × Nat) :=
+  [("badf", Errno.badf), ("exist", Errno.exist), ("fbig", Errno.fbig), ("intr", Errno.intr),
+   ("inval", Errno.inval), ("isdir", Errno.isdir), ("mfile", Errno.mfile),
+   ("nametoolong", Errno.nametoolong), ("noent", Errno.noent), ("nospc", Errno.nospc),
+   ("notdir", Errno.notdir), ("notempty", Errno.notempty), ("notsup", Errno.notsup),
+   ("overflow", Errno.overflow), ("perm", Errno.perm), ("spipe", Errno.spipe),
+   ("notcapable", Errno.notcapable)].map (fun (n, v) => ("errno", n, v)) ++
+  [("fd_datasync", Right.fdDatasync), ("fd_read", Right.fdRead), ("fd_seek", Right.fdSeek),
+   ("fd_fdstat_set_flags", Right.fdFdstatSetFlags), ("fd_sync", Right.fdSync),
+   ("fd_tell", Right.fdTell), ("fd_write", Right.fdWrite), ("fd_advise", Right.fdAdvise),
+   ("fd_allocate", Right.fdAllocate), ("path_create_directory", Right.pathCreateDirectory),
+   ("path_create_file", Right.pathCreateFile), ("path_link_source", Right.pathLinkSource),
+   ("path_link_target", Right.pathLinkTarget), ("path_open", Right.pathOpen),
+   ("fd_readdir", Right.fdReaddir), ("path_readlink", Right.pathReadlink),
+   ("path_rename_source", Right.pathRenameSource), ("path_rename_target", Right.pathRenameTarget),
+   ("path_filestat_get", Right.pathFilestatGet),
+   ("path_filestat_set_size", Right.pathFilestatSetSize),
+   ("path_filestat_set_times", Right.pathFilestatSetTimes),
+   ("fd_filestat_get", Right.fdFilestatGet), ("fd_filestat_set_size", Right.fdFilestatSetSize),
+   ("fd_filestat_set_times", Right.fdFilestatSetTimes), ("path_symlink", Right.pathSymlink),
+   ("path_remove_directory", Right.pathRemoveDirectory),
+   ("path_unlink_file", Right.pathUnlinkFile),
+   ("poll_fd_readwrite", Right.pollFdReadwrite)].map (fun (n, b) => ("rights", n, 2 ^ b)) ++
+  [("filetype", "unknown", Filetype.unknown), ("filetype", "directory", Filetype.directory),
+   ("filetype", "regular_file", Filetype.regularFile), ("fdflags", "append", Fdflags.append),
+   ("fdflags", "dsync", Fdflags.dsync), ("fdflags", "nonblock", Fdflags.nonblock),
+   ("fdflags", "rsync", Fdflags.rsync), ("fdflags", "sync", Fdflags.sync),
+   ("oflags", "creat", Oflags.creat), ("oflags", "directory", Oflags.directory),
+   ("oflags", "excl", Oflags.excl), ("oflags", "trunc", Oflags.trunc)]
+
+/-- Mismatches of `abi` against the WITX table `tsv` (rows: type, name, value, line). -/
+def abiCheck (tsv : String) : M (List String) := do
+  let rows ← (tsv.splitOn "\n").filter (fun l => !l.isEmpty && !l.startsWith "#") |>.mapM fun l =>
+    match l.splitOn "\t" with
+    | [t, n, v, _] => match v.toNat? with
+      | some k => pure (t, n, k)
+      | none => throw s!"abi row {l}"
+    | _ => throw s!"abi row {l}"
+  let count (t : String) := (rows.filter (·.1 == t)).length
+  let named := abi.filterMap fun (t, n, v) =>
+    match rows.find? (fun r => r.1 == t && r.2.1 == n) with
+    | some (_, _, w) => if v == w then none else some s!"{t} {n}: model {v}, WITX {w}"
+    | none => some s!"{t} {n}: not in the WITX table"
+  let counts := [("rights", Right.count), ("clockid", clockCount)].filterMap fun (t, k) =>
+    if k == count t then none else some s!"{t}: model {k} values, WITX {count t}"
+  return named ++ counts
+
 def main (argv : List String) : IO UInt32 := do
-  let some dir := argv.head? | IO.eprintln "usage: wasi-vectors DIR"; return 2
+  let some dir := argv.head? | IO.eprintln "usage: wasi-vectors DIR [ABI.tsv]"; return 2
   let files := (← System.FilePath.readDir dir).filter (·.path.extension == some "json")
   if files.isEmpty then IO.eprintln s!"wasi-vectors: no vectors in {dir}"; return 2
+  let mut abiFails := 0
+  if let some (t : String) := argv[1]? then
+    match abiCheck (← IO.FS.readFile t) with
+    | .error e => IO.eprintln s!"wasi-vectors: {t}: {e}"; return 2
+    | .ok bad =>
+      for b in bad do IO.println s!"FAIL abi {b}"
+      abiFails := bad.length
+      if bad.isEmpty then IO.println s!"ok abi: {abi.length} values as in {t}"
   let mut fails := 0
   for f in files.qsort (·.fileName < ·.fileName) do
     let v ← match FVA.parseJson (← IO.FS.readFile f.path) with
@@ -168,4 +230,4 @@ def main (argv : List String) : IO UInt32 := do
     | .ok none => IO.println s!"ok {id}"
     | .ok (some r) => IO.println s!"FAIL {id}: {r}"; fails := fails + 1
   IO.println s!"wasi-vectors: {files.size - fails} pass, {fails} FAIL, {files.size} vectors"
-  return if fails = 0 then 0 else 1
+  return if fails + abiFails = 0 then 0 else 1

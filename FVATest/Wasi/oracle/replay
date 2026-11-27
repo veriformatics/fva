@@ -75,6 +75,19 @@ for vector in "$here/../vectors/"*.json; do
 	if jq -e 'any(.steps[]; .expect.outcome=="out-of-profile")' "$vector" >/dev/null; then
 		printf 'observe %s out-of-profile rc=%s stdout_hex=%s\n' "$id" "$rc" "$(xxd -p "$run/raw.out" | tr -d '\n')"
 		if ((rc)); then printf '  %s\n' "$(diagnostic "$run/raw.err")"; fi
+		# U29b1: a `basis: wasmtime` out-of-profile step = the vector's last step, and wasmtime traps
+		# there (the oracle of the profile-boundary rows; a contract row stays observed alone)
+		if jq -e '.steps[-1].expect | .outcome=="out-of-profile" and .basis=="wasmtime"' "$vector" >/dev/null; then
+			jq -e '[.steps[:-1][] | select(.expect.outcome=="out-of-profile")] == []' "$vector" >/dev/null ||
+				setup "$id: an out-of-profile step before the last"
+			if ((rc == 0)) || ! grep -q 'error while executing' "$run/raw.err"; then
+				printf 'FAIL %s out-of-profile: wasmtime did not trap (rc=%s)\n' "$id" "$rc"
+				((fails += 1))
+				continue
+			fi
+		elif jq -e 'any(.steps[]; .expect.outcome=="out-of-profile" and .expect.basis=="wasmtime")' "$vector" >/dev/null; then
+			setup "$id: a wasmtime out-of-profile step before the last"
+		fi
 		((outprofile += 1, passes += 1))
 		continue
 	fi

@@ -1,29 +1,77 @@
 #!/usr/bin/env bash
-# U29a E4: tester-5's blind WASI call vectors (FVATest/Wasi/vectors, generated from
-# FVATest/Wasi/oracle/cases.jq) against the reviewed model at E's choices
-# (scripts/wasi-vectors.lean); --oracle also replays them on the pinned wasmtime.
-# Exit: 0 pass, 1 a vector or the corpus differs, 2 setup.
+# U29a E4: the WASI call vectors (FVATest/Wasi/vectors, generated from
+# FVATest/Wasi/oracle/cases.jq: tester-5's blind rows + U29b1's mutation-kill rows) and the WITX
+# numbering table (FVATest/Wasi/oracle/abi.tsv) against the reviewed model at E's choices
+# (scripts/wasi-vectors.lean), then the model's import names + raw signatures linked by the pinned
+# wasmtime (scripts/wasi-imports.lean: the vectors call through the model's own signatures);
+# --oracle also replays the vectors on the pinned wasmtime. `--link FILE` links one WAT file alone
+# (test-checks' planted inputs).
+# Exit: 0 pass, 1 a vector, a number, the corpus or an import differs, 2 setup.
 set -uo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root" || exit 2
 export PATH="$root/.tools/bin:$PATH"
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/test-wasi.XXXXXX") || exit 2
+trap 'rm -rf -- "$tmp"' EXIT
+
+# rc 1 when wasmtime's linker rejects an import (unknown name or other signature), 2 on any other
+# failure
+link() {
+	if ! command -v wasm-tools >/dev/null || ! command -v wasmtime >/dev/null; then
+		echo 'test-wasi: setup: wasm-tools or wasmtime missing' >&2
+		return 2
+	fi
+	if ! wasm-tools parse "$1" -o "$tmp/imports.wasm" 2>"$tmp/parse.err"; then
+		echo 'test-wasi: the import module does not parse'
+		tail -3 "$tmp/parse.err"
+		return 1
+	fi
+	if wasmtime run "$tmp/imports.wasm" >"$tmp/link.out" 2>&1; then
+		echo "test-wasi: $(grep -c '(import ' "$1") imports link on wasmtime"
+		return 0
+	fi
+	if grep -Eq 'incompatible import type|unknown import' "$tmp/link.out"; then
+		echo 'test-wasi: wasmtime rejects an import:'
+		tail -2 "$tmp/link.out"
+		return 1
+	fi
+	echo 'test-wasi: setup: wasmtime failed:' >&2
+	tail -3 "$tmp/link.out" >&2
+	return 2
+}
+
 oracle=0
 case ${1:-} in
 '') ;;
 --oracle) oracle=1 ;;
+--link)
+	[[ $# == 2 ]] || exit 2
+	link "$2"
+	exit
+	;;
 *)
-	echo 'usage: scripts/test-wasi [--oracle]' >&2
+	echo 'usage: scripts/test-wasi [--oracle | --link FILE]' >&2
 	exit 2
 	;;
 esac
 FVATest/Wasi/oracle/make --check
 rc=$?
 ((rc == 0)) || exit "$rc"
-lake env lean --run scripts/wasi-vectors.lean FVATest/Wasi/vectors >"${TMPDIR:-/tmp}/wasi-vectors.$$" 2>&1
+# lean killed by a signal (a model that recurses without bound under fvamut) = rc 3, a crash
+lake env lean --run scripts/wasi-vectors.lean FVATest/Wasi/vectors FVATest/Wasi/oracle/abi.tsv \
+	>"$tmp/vectors.log" 2>&1
 rc=$?
-grep -v '^ok ' "${TMPDIR:-/tmp}/wasi-vectors.$$"
-rm -f "${TMPDIR:-/tmp}/wasi-vectors.$$"
+grep -v '^ok ' "$tmp/vectors.log"
+((rc > 128)) && exit 3
 ((rc == 0)) || exit "$rc"
+lake env lean --run scripts/wasi-imports.lean >"$tmp/imports.wat" 2>"$tmp/imports.err"
+rc=$?
+((rc > 128)) && exit 3
+((rc == 0)) || {
+	cat "$tmp/imports.err" >&2
+	exit 2
+}
+link "$tmp/imports.wat" || exit
 ((oracle)) || exit 0
 FVATest/Wasi/oracle/replay | tail -1
 exit "${PIPESTATUS[0]}"

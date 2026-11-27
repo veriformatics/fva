@@ -399,3 +399,132 @@ def fdstat($type;$base;$inh): [cell(256;[$type]),cell(260;[0]),wide(264;[$base,$
   (v(182;"random_get.memory-end-control";["p1:2630-2640","probe r5 MemoryEnd"];
     [step("random_get";[4294967294,1];0;[])]) | .pages=65536)
 ]
++ [
+  # Rows 183+ (U29b1, MAIN; README "Rows 183+"): behavior the rows above leave unobserved (each
+  # row kills a surviving mutant of the model), same sources. Memory = 1 page (65,536 bytes):
+  # `*.memory-end` = a region past the last byte (wasmtime traps at the pointer), `*-control` = one
+  # ending at the last byte; `*.after`/`*.beside` = bytes next to an output that must keep their
+  # value.
+  (v(183;"args_get.memory-end";["WD:Pointers","p1:1190-1210","U29a-v2:S2 profile"];
+    [step("args_get";[65532,128];0;[])|outside]) | .world.args=["p","q"]),
+  (v(184;"args_get.memory-end-control";["p1:1190-1210","U29a-v2:S2 profile"];
+    [step("args_get";[65532,128];0;[cell(65532;[128]),text(128;"p\u0000")])])),
+  (v(185;"args_sizes_get.memory-end";["WD:Pointers","p1:1214-1230"];
+    [step("args_sizes_get";[32,65536];0;[])|outside])),
+  (v(186;"args_sizes_get.memory-end-control";["p1:1214-1230"];
+    [step("args_sizes_get";[32,65532];0;[cell(32;[1]),cell(65532;[2])])])),
+  (v(187;"clock_time_get.memory-end-control";["p1:1303-1323"];
+    [step("clock_time_get";[2,0,65528];8;[])])),
+  (v(188;"fd_fdstat_get.memory-end";["WD:Pointers","p1:1410-1431"];
+    [step("fd_fdstat_get";[0,65520];0;[])|outside])),
+  (v(189;"fd_fdstat_get.memory-end-control";["p1:507-512","p1:1404-1410"];
+    [step("fd_fdstat_get";[99,65512];8;[])])),
+  (v(190;"fd_prestat_get.memory-end";["WD:Pointers","p1:1815-1828"];
+    [step("fd_prestat_get";[3,65532];0;[])|outside])),
+  (v(191;"fd_prestat_get.memory-end-control";["p1:1815-1828","Wt:731-760"];
+    [step("fd_prestat_get";[3,65528];0;[cell(65528;[0,1])])])),
+  (v(192;"fd_read.iovecs-memory-end";["WD:Pointers","p1:184-224","p1:1724-1737"];
+    [step("fd_read";[0,65528,2,32];0;[])|outside|init([cell(65528;[256,0])])]) | .world.stdin.text="data"),
+  (v(193;"fd_read.nread-memory-end";["WD:Pointers","p1:1724-1737"];
+    [step("fd_read";[0,0,1,65536];0;[])|outside|init([cell(0;[256,4])])]) | .world.stdin.text="data"),
+  (v(194;"fd_read.memory-end-control";["p1:507-512","p1:1672-1674","U29a-v2:S2 profile disjointness"];
+    [step("fd_read";[99,65528,1,65524];8;[])|init([cell(65528;[256,4])])])),
+  (v(195;"fd_write.iovecs-memory-end";["WD:Pointers","p1:184-204","p1:706-723"];
+    [step("fd_write";[1,65528,2,32];0;[])|outside|init([cell(65528;[256,0])])])),
+  (v(196;"fd_write.memory-end-control";["p1:507-512","p1:626-640","U29a-v2:S2 profile disjointness"];
+    [step("fd_write";[99,65528,1,65524];8;[])|init([cell(65528;[256,1]),text(256;"A")])])),
+  (v(197;"fd_seek.memory-end";["WD:Pointers","p1:1889-1921"];
+    [fileOpen,(seek(4;0;0;0;0)|.args[3]=65536|outside)])),
+  (v(198;"fd_seek.memory-end-control";["p1:534-546"];
+    [seek(1;0;0;70;0)|.args[3]=65528|.expect.mem=[]])),
+  (v(199;"path_create_directory.memory-end";["WD:Pointers","p1:2038-2050"];
+    [step("path_create_directory";[3,65534,3];0;[])|outside|init([text(65534;"ne")])])),
+  (v(200;"path_filestat_get.memory-end";["WD:Pointers","p1:2055-2097"];
+    [stat("f";0;0;[])|.args[4]=65480|outside])),
+  (v(201;"path_filestat_get.path-memory-end";["WD:Pointers","p1:2055-2097"];
+    [step("path_filestat_get";[3,0,65534,3,256];0;[])|outside|init([text(65534;"ab")])])),
+  (v(202;"path_filestat_get.memory-end-control";["U29a-v2:S3 stat"];
+    [stat("missing";0;44;[])|.args[4]=65472])),
+  (v(203;"path_open.memory-end";["WD:Pointers","p1:2156-2220"];
+    [open("f";0;110;0;0;0;4)|.args[8]=65536|outside])),
+  (v(204;"path_open.path-memory-end";["WD:Pointers","p1:2156-2220"];
+    [step("path_open";[3,0,65534,3,0,2,0,0,32];0;[])|outside|init([text(65534;"ab")])])),
+  (v(205;"path_open.memory-end-control";["p1:2156-2220"];
+    [open("f";0;110;0;0;0;4)|.args[8]=65532|.expect.mem=[cell(65532;[4])]])),
+  (v(206;"fd_prestat_dir_name.odd-buffer";["p1:1833-1856"];
+    [step("fd_prestat_dir_name";[3,257,1];0;[text(257;".")])])),
+  (v(207;"path_create_directory.odd-path";["p1:2038-2050"];
+    [step("path_create_directory";[3,129,6];0;[])|init([text(129;"newdir")])]) | .final.files["."].newdir={dir:{}}),
+  (v(208;"path_filestat_get.odd-path";["U29a-v2:S3 stat"];
+    [step("path_filestat_get";[3,0,129,7,256];44;[])|init([text(129;"missing")])])),
+  (v(209;"path_open.odd-path";["U29a-v2:S3 path_open"];
+    [step("path_open";[3,0,129,7,0,2,0,0,32];44;[cell(32;[0])])|init([text(129;"missing")])])),
+  (v(210;"random_get.odd-buffer";["Wf:484-494","p1:2625-2640"];
+    [{mem:[],call:"random_get",args:[257,1],expect:{outcome:"any-bytes",errno:0,length:1,basis:"wasmtime"}}])),
+  (v(211;"fd_read.buffer-in-iovecs";["U29a-v2:S2 profile disjointness"];
+    [{mem:[cell(0;[4,1])],call:"fd_read",args:[0,0,1,32],expect:{outcome:"out-of-profile",basis:"contract"}}]) | .world.stdin.text="data"),
+  (v(212;"fd_read.nread-in-iovecs";["U29a-v2:S2 profile disjointness"];
+    [{mem:[cell(0;[256,4])],call:"fd_read",args:[0,0,1,4],expect:{outcome:"out-of-profile",basis:"contract"}}]) | .world.stdin.text="data"),
+  (v(213;"fd_write.buffer-is-iovec";["p1:184-204","p1:706-723","U29a-v2:S2 profile: only written regions apart"];
+    [step("fd_write";[1,0,1,32];0;[cell(32;[8])])|init([cell(0;[0,8])])]) | .final.stdout={hex:"0000000008000000"}),
+  (v(214;"fd_write.empty-buffer-in-nwritten";["p1:184-204","U29a-v2:S2 profile: empty regions apart"];
+    [step("fd_write";[1,0,2,32];0;[cell(32;[1])])|init([cell(0;[34,0,256,1]),text(256;"A")])]) | .final.stdout.text="A"),
+  (v(215;"path_filestat_get.path-in-buffer";["U29a-v2:S2 profile disjointness"];
+    [{mem:[text(256;"f")],call:"path_filestat_get",args:[3,0,256,1,256],expect:{outcome:"out-of-profile",basis:"contract"}}])),
+  (v(216;"path_open.path-in-fd";["U29a-v2:S2 profile disjointness"];
+    [{mem:[text(32;"f")],call:"path_open",args:[3,0,32,1,0,2,0,0,32],expect:{outcome:"out-of-profile",basis:"contract"}}])),
+  (v(217;"fd_fdstat_get.after";["Wt:416-428 fdstat fields","p1:1410-1421"];
+    [step("fd_fdstat_get";[0,256];0;[hex(256;"00aa0000aaaaaaaa02000000000000000200000000000000aaaaaaaaaaaaaaaa")])
+     |init([hex(256;("aa"*32))])])),
+  (v(218;"fd_prestat_get.after";["Wt:731-760 prestat fields","p1:1815-1828"];
+    [step("fd_prestat_get";[3,256];0;[hex(256;"00aaaaaa01000000aaaaaaaaaaaaaaaa")])|init([hex(256;("aa"*16))])])),
+  (v(219;"fd_read.stdin-nread-after";["p1:1724-1737"];
+    [step("fd_read";[0,0,1,32];0;[cell(32;[4]),text(256;"data"),hex(36;"aaaaaaaa")])
+     |init([cell(0;[256,4]),hex(36;"aaaaaaaa")])]) | .world.stdin.text="data"),
+  (v(220;"fd_read.file-nread-after";["p1:1680-1722"];
+    [fileOpen,(read(4;8;"abc")|.mem+=[hex(36;"aaaaaaaa")]|.expect.mem+=[hex(36;"aaaaaaaa")])])),
+  (v(221;"fd_write.stdio-append";["p1:706-723"];
+    [write(1;"A"),write(1;"B"),write(2;"C"),write(2;"D")]
+    | map(.mem+=[hex(36;"aaaaaaaa")]|.expect.mem+=[hex(36;"aaaaaaaa")])) | .final.stdout.text="AB" | .final.stderr.text="CD"),
+  (v(222;"fd_seek.newoffset-after";["p1:1889-1921"];
+    [fileOpen,(seek(4;2;0;0;2)|.mem+=[hex(48;"aaaaaaaaaaaaaaaa")]|.expect.mem+=[hex(48;"aaaaaaaaaaaaaaaa")])])),
+  (v(223;"path_filestat_get.beside";["Wt:313-340 filestat fields","p1:2055-2097","U29a-v2:S1 depth-first ino; E metadata departure"];
+    [(stat("f";0;0;[hex(200;("aa"*56)),hex(272;"04aaaaaaaaaaaaaa"),wide(288;[3]),hex(320;("aa"*8))])
+      |.mem+=[hex(200;("aa"*128))]),
+     (stat("f";0;0;[wide(256;[1,2]),hex(272;"04"),wide(280;[1,3,0,0,0])])|.mem+=[hex(256;("aa"*64))]|contract)])
+   | del(.world.dirs[0].tree.d,.final.files["."].d)),
+  (v(224;"args_get.beside";["Wf:15-28","p1:1190-1210"];
+    [step("args_get";[0,128];0;[cell(0;[128,130]),hex(8;"cccccccc"),text(128;"p\u0000xy\u0000"),hex(133;"cccccc")])
+     |init([hex(0;("cc"*12)),hex(128;("cc"*8))])]) | .world.args=["p","xy"]),
+  (v(225;"args_sizes_get.beside";["Wf:30-35","p1:1214-1230"];
+    [step("args_sizes_get";[32,40];0;[cell(32;[2]),hex(36;"cccccccc"),cell(40;[5]),hex(44;"cccccccc")])
+     |init([hex(32;("cc"*16))])]) | .world.args=["p","xy"]),
+  (v(226;"fd_write.third-buffer";["p1:184-204"];
+    [step("fd_write";[1,0,3,32];0;[cell(32;[1])])|init([cell(0;[256,0,260,0,264,1]),text(264;"C")])]) | .final.stdout.text="C"),
+  (v(227;"fd_write.one-empty-iovec";["p1:184-204"];
+    [step("fd_write";[1,0,1,64];0;[cell(64;[0])])|init([cell(0;[256,0,257,1]),text(257;"B")])])),
+  (v(228;"path_unlink_file.dotdot";["U29a-v2:S3 path walk escape","observed: wasmtime 50.0.0 perm"];
+    [path("path_unlink_file";"..";63)])),
+  (v(229;"path_unlink_file.dot";["Wf:438-447","U29a-v2:S3 unlink"];
+    [path("path_unlink_file";".";31)])),
+  (v(234;"path_unlink_file.dir-dotdot";["Wf:438-447","U29a-v2:S3 unlink"];
+    [path("path_unlink_file";"d/..";31)])),
+  (v(235;"path_remove_directory.root-dotdot";["U29a-v2:S3 path walk escape","observed: wasmtime 50.0.0 perm"];
+    [path("path_remove_directory";"..";63)])),
+  (v(236;"path_remove_directory.root-dot";["U29a-v2:S3 rmdir"];
+    [path("path_remove_directory";".";28)])),
+  (v(230;"path_open.directory-excl";["U29a-v2:S3 path_open argument checks"];
+    [open("d";6;2;0;0;28;0)])),
+  (v(231;"path_open.directory-truncate";["U29a-v2:S3 path_open argument checks"];
+    [open("d";10;2;0;0;28;0)])),
+  (v(232;"path_open.required-rights";["Wt:197-262 rights","U29a-v2:S3 E rights enforcement","p1:2176-2183"];
+    [open(".";2;8192;110;0;0;4),
+     (open("f";5;2;0;0;76;0)|.args[0]=4|.mem+=[cell(32;[0])]|contract),
+     (open("x";8;2;0;0;76;0)|.args[0]=4|.mem+=[cell(32;[0])]|contract),
+     (open("f";0;2;0;2;76;0)|.args[0]=4|.mem+=[cell(32;[0])]|contract),
+     (open("f";0;2;0;8;76;0)|.args[0]=4|.mem+=[cell(32;[0])]|contract),
+     open(".";2;8193;110;0;0;5),
+     (open("f";0;2;0;2;58;0)|.args[0]=5|.mem+=[cell(32;[0])])])),
+  (v(233;"path_open.invalid-inheriting-rights";["LEAD-D2: invalid right bit >=30 outside profile"];
+    [open("f";0;2;1073741824;0;28;0)|outside]))
+]

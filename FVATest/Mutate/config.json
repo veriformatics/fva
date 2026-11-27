@@ -32,7 +32,11 @@
     {"name": "p2valid", "cmd": ["scripts/test-p2valid"],
      "exeRoots": ["FVATest.ValidRun", "FVATest.Profile"],
      "files": ["scripts/test-p2valid", "scripts/fetch-tools", "FVATest/Main.lean",
-               "FVATest/P2Valid"]}
+               "FVATest/P2Valid"]},
+    {"name": "wasi", "cmd": ["scripts/test-wasi"],
+     "exeRoots": ["FVA.Spec.Wasi.World", "FVA.Json"],
+     "files": ["scripts/test-wasi", "scripts/wasi-vectors.lean", "scripts/wasi-imports.lean",
+               "FVATest/Wasi/vectors", "FVATest/Wasi/oracle"]}
   ],
   "groups": [
     {"name": "decode", "dirs": ["FVA/Impl/Decode"], "reachFrom": [], "within": "",
@@ -53,7 +57,8 @@
     {"name": "helpers", "dirs": [],
      "reachFrom": ["decode", "float", "exec", "trust", "cert", "valid"], "within": "FVA.Spec",
      "stages": ["module", "exes", "test:spec", "test:numerics", "test:floatdiff",
-                "test:difftest", "test:decoder", "test:p2exec", "test:p2valid", "proofs"]}
+                "test:difftest", "test:decoder", "test:p2exec", "test:p2valid", "proofs",
+                "test:wasi"]}
   ],
   "results": "FVATest/Mutate/results.tsv",
   "rulings": "FVATest/Mutate/rulings.tsv",

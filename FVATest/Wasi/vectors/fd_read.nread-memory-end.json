@@ -1,0 +1,83 @@
+{
+  "id": "fd_read.nread-memory-end",
+  "sources": [
+    "WD:Pointers",
+    "p1:1724-1737",
+    "probe fd_read.nread-memory-end"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": "data"
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 0,
+          "u32": [
+            256,
+            4
+          ]
+        }
+      ],
+      "call": "fd_read",
+      "args": [
+        0,
+        0,
+        1,
+        65536
+      ],
+      "expect": {
+        "outcome": "out-of-profile",
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

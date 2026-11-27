@@ -77,6 +77,10 @@ patch clock_time_get.realtime '.steps[0].expect.errno=76 | .steps[0].expect.mem[
 run contract-skip 0 clock_time_get.realtime
 restore clock_time_get.realtime
 run out-of-profile 0 fd_write.oob-tail
+run out-of-profile-trap 0 environ_get.memory-end
+patch environ_get.memory-end-control '.steps[0].expect={outcome:"out-of-profile",basis:"wasmtime"}'
+run out-of-profile-no-trap 1 environ_get.memory-end-control
+restore environ_get.memory-end-control
 printf '\n;; stale\n' >>"$oracle/args_sizes_get.two.wat"
 run stale-probe 2 args_sizes_get.two
 restore args_sizes_get.two

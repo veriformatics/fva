@@ -1,0 +1,84 @@
+{
+  "id": "fd_write.iovecs-memory-end",
+  "sources": [
+    "WD:Pointers",
+    "p1:184-204",
+    "p1:706-723",
+    "probe fd_write.iovecs-memory-end"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 65528,
+          "u32": [
+            256,
+            0
+          ]
+        }
+      ],
+      "call": "fd_write",
+      "args": [
+        1,
+        65528,
+        2,
+        32
+      ],
+      "expect": {
+        "outcome": "out-of-profile",
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

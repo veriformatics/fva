@@ -1,0 +1,102 @@
+{
+  "id": "args_sizes_get.beside",
+  "sources": [
+    "Wf:30-35",
+    "p1:1214-1230",
+    "probe args_sizes_get.beside"
+  ],
+  "world": {
+    "args": [
+      "p",
+      "xy"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 32,
+          "hex": "cccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "call": "args_sizes_get",
+      "args": [
+        32,
+        40
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              2
+            ]
+          },
+          {
+            "addr": 36,
+            "hex": "cccccccc"
+          },
+          {
+            "addr": 40,
+            "u32": [
+              5
+            ]
+          },
+          {
+            "addr": 44,
+            "hex": "cccccccc"
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

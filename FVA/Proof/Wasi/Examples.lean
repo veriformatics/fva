@@ -279,6 +279,13 @@ example : errno σ₀ [(512, b "d")] .pathUnlinkFile [3, 512, 1] = some Errno.is
 example : errno σ₀ [(512, b "d/")] .pathUnlinkFile [3, 512, 2] = some Errno.isdir := by decide
 example : errno σ₀ [(512, b "f/")] .pathUnlinkFile [3, 512, 2] = some Errno.notdir := by decide
 example : errno σ₀ [(512, b "z")] .pathUnlinkFile [3, 512, 1] = some Errno.noent := by decide
+-- a final `..` above the dirfd's directory escapes before the `.`/`..` rules (pinned wasmtime:
+-- oracle rows `path_unlink_file.dotdot`, `path_remove_directory.root-dotdot` → perm; `.` rows
+-- `path_unlink_file.dot` → isdir, `path_remove_directory.root-dot` → inval)
+example : errno σ₀ [(512, b "..")] .pathUnlinkFile [3, 512, 2] = some Errno.perm ∧
+    errno σ₀ [(512, b "..")] .pathRemoveDirectory [3, 512, 2] = some Errno.perm ∧
+    errno σ₀ [(512, b ".")] .pathUnlinkFile [3, 512, 1] = some Errno.isdir ∧
+    errno σ₀ [(512, b ".")] .pathRemoveDirectory [3, 512, 1] = some Errno.inval := by decide
 -- unlink while open: the open fd still reads the old data; a recreated `f` is a new empty file
 example : let τ := (openAt σ₀ "f").1
     let τ₁ := (call τ [(512, b "f")] .pathUnlinkFile [3, 512, 1]).1
@@ -310,13 +317,22 @@ example : let ch : Choice := { err := some Errno.perm }
     let r := call σ₀ [(64, b "AB"), (0, iov [(64, 2)])] .fdWrite [1, 0, 1, 40] ch
     r.1.stdout = [] ∧ r.2.1 = some Errno.perm ∧ r.2.2.read 40 4 = 0 := by decide
 
--- proc_exit: the exit status in the world, a trap carrier (System layer)
+-- proc_exit: the exit status in the world, a trap carrier (System layer); `step`'s `exit k` carries
+-- it too (contract S3: `Resp.exit k`)
 example : let r := call σ₀ [] .procExit [3]
     r.1.exited = some 3 ∧ r.2.1 = none := by decide
+example : (match (step σ₀ (decode .procExit (page []) [7]) {}).2 with
+    | .exit k => some k | _ => none) = some 7 := by decide
 
 -- random_get: E's bytes = the choice, cut or zero-padded to the buffer
 example : let r := call σ₀ [] .randomGet [64, 2] { bytes := [7, 9, 11] }
     r.2.1 = some 0 ∧ r.2.2.byte 64 = 7 ∧ r.2.2.byte 65 = 9 ∧ r.2.2.byte 66 = 0 := by decide
+example : let r := call σ₀ [(0, [170, 187])] .randomGet [0, 2] { bytes := [7] }
+    r.2.2.byte 0 = 7 ∧ r.2.2.byte 1 = 0 := by decide
+
+-- the profile needs arguments of the call's types and memory `mem` (contract S2 (a), (b))
+example : inProfile σ₀ .procExit { mems := [page []] } 0 [] = false ∧
+    inProfile σ₀ .fdClose {} 0 [.i32 0] = false := by decide
 
 -- every 2-byte string is a `random_get` output (Wf random_get fills the buffer)
 example (b₀ b₁ : UInt8) : let r := call σ₀ [] .randomGet [64, 2] { bytes := [b₀, b₁] }
@@ -412,14 +428,15 @@ example : ¬ ChoiceOK σ₀ (decode .pathOpen (page [(512, b "new")]) [3, 0, 512
 example : (openAt { σ₀ with nodes := σ₀.nodes.set 4 ⟨2 ^ 64 - 1, .dir []⟩ } "new"
     (of := Oflags.creat)).2.1 = some Errno.nospc := by decide
 
--- errno branches the matrix lacked (R20): args/environ overflow (p1:1223–1229; a 2^32-byte
--- argument has no literal: `simp`), no descriptor number left (Wf path_open: fd < 2^31), missing
--- fd_read / fd_write rights on files and streams (typenames.witx rights)
-example (n : Nat) (hn : 2 ^ 32 ≤ n) : run { σ₀ with args := [List.replicate n 65] }
+-- errno branches the matrix lacked (R20): args/environ overflow from 2^32 bytes with the NULs
+-- (p1:1223–1229: the u32 conversion; a 2^32-byte argument has no literal: `simp`), no descriptor
+-- number left (Wf path_open: fd < 2^31), missing fd_read / fd_write rights on files and streams
+-- (typenames.witx rights)
+example (n : Nat) (hn : 2 ^ 32 ≤ n + 1) : run { σ₀ with args := [List.replicate n 65] }
     (decode .argsSizesGet (page []) [0, 4]) {} = .error Errno.overflow := by
   simp [run, run.sizes, decode]
   omega
-example (n : Nat) (hn : 2 ^ 32 ≤ n) : run { σ₀ with env := [List.replicate n 65] }
+example (n : Nat) (hn : 2 ^ 32 ≤ n + 1) : run { σ₀ with env := [List.replicate n 65] }
     (decode .environSizesGet (page []) [0, 4]) {} = .error Errno.overflow := by
   simp [run, run.sizes, decode]
   omega

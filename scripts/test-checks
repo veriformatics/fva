@@ -632,14 +632,23 @@ if ! scripts/test-p2valid --self-test >"$tmp/p2valid-driver.log" 2>&1 ||
 	tail -20 "$tmp/p2valid-driver.log"
 	fail=1
 fi
-# U29a E4: the WASI vector harness (scripts/wasi-vectors.lean) on planted copies: a clean vector
-# passes, an expected errno changed fails (rc 1), a malformed vector is setup (rc 2)
-mkdir -p "$tmp/wasi/clean" "$tmp/wasi/wrong" "$tmp/wasi/bad"
-cp FVATest/Wasi/vectors/fd_write.first-buffer.json "$tmp/wasi/clean/"
-jq '.steps[0].expect.errno = 8' FVATest/Wasi/vectors/fd_write.first-buffer.json >"$tmp/wasi/wrong/v.json"
+# U29a E4 + U29b1: the WASI vector harness (scripts/wasi-vectors.lean) on planted copies: a clean
+# vector passes; an expected errno changed, a call name the model lacks (a mutant dropping a name
+# = a kill, never setup) or a WITX table value changed fails (rc 1); a malformed vector is setup
+# (rc 2)
+mkdir -p "$tmp/wasi/clean" "$tmp/wasi/wrong" "$tmp/wasi/unknown" "$tmp/wasi/bad" "$tmp/wasi/abi"
+wv=FVATest/Wasi/vectors/fd_write.first-buffer.json
+cp "$wv" "$tmp/wasi/clean/"
+cp "$wv" "$tmp/wasi/abi/"
+jq '.steps[0].expect.errno = 8' "$wv" >"$tmp/wasi/wrong/v.json"
+jq '.steps[0].call = "fd_writ"' "$wv" >"$tmp/wasi/unknown/v.json"
 printf '{"id": "bad"}\n' >"$tmp/wasi/bad/v.json"
-for c in clean:0 wrong:1 bad:2; do
-	lake env lean --run scripts/wasi-vectors.lean "$tmp/wasi/${c%%:*}" >"$tmp/wasi/${c%%:*}.log" 2>&1
+sed 's/^errno\tfbig\t22\t/errno\tfbig\t23\t/' FVATest/Wasi/oracle/abi.tsv >"$tmp/wasi/abi.tsv"
+for c in clean:0 wrong:1 unknown:1 bad:2 abi:1; do
+	abi=()
+	[[ ${c%%:*} == abi ]] && abi=("$tmp/wasi/abi.tsv")
+	lake env lean --run scripts/wasi-vectors.lean "$tmp/wasi/${c%%:*}" "${abi[@]}" \
+		>"$tmp/wasi/${c%%:*}.log" 2>&1
 	got=$?
 	if ((got != ${c##*:})); then
 		echo "test-checks: wasi-vectors ${c%%:*} rc $got, expected ${c##*:}"
@@ -647,4 +656,37 @@ for c in clean:0 wrong:1 bad:2; do
 		fail=1
 	fi
 done
+# U29b1: the import link check (`scripts/test-wasi --link`) on planted modules: the model's own
+# imports link (rc 0); a changed parameter, a dropped result, an unknown name, a malformed module
+# → rc 1
+mkdir -p "$tmp/wasi/link"
+if lake env lean --run scripts/wasi-imports.lean >"$tmp/wasi/link/ok.wat" 2>"$tmp/wasi/link/ok.err"; then
+	sed 's/"args_get" (func (param i32 i32)/"args_get" (func (param i64 i32)/' \
+		"$tmp/wasi/link/ok.wat" >"$tmp/wasi/link/sig.wat"
+	sed 's/"fd_write" (func (param i32 i32 i32 i32) (result i32))/"fd_write" (func (param i32 i32 i32 i32))/' \
+		"$tmp/wasi/link/ok.wat" >"$tmp/wasi/link/result.wat"
+	sed 's/"args_get"/"args_got"/' "$tmp/wasi/link/ok.wat" >"$tmp/wasi/link/name.wat"
+	printf '(module (import "x"\n' >"$tmp/wasi/link/bad.wat"
+	for c in ok:0 sig:1 result:1 name:1 bad:1; do
+		scripts/test-wasi --link "$tmp/wasi/link/${c%%:*}.wat" >"$tmp/wasi/link/${c%%:*}.log" 2>&1
+		got=$?
+		if ((got != ${c##*:})); then
+			echo "test-checks: wasi-imports ${c%%:*} rc $got, expected ${c##*:}"
+			tail -5 "$tmp/wasi/link/${c%%:*}.log"
+			fail=1
+		fi
+	done
+else
+	echo 'test-checks: wasi-imports did not run'
+	tail -5 "$tmp/wasi/link/ok.err"
+	fail=1
+fi
+# U29b1: the wasmtime replay's planted cases (FVATest/Wasi/oracle/check-replay: a changed errno,
+# u32, byte, stream, file or exit code and an out-of-profile row wasmtime does not trap on → rc 1;
+# a stale probe, a bad schema, an absent id → rc 2)
+if ! FVATest/Wasi/oracle/check-replay >"$tmp/wasi/check-replay.log" 2>&1; then
+	echo 'test-checks: wasi replay driver failed'
+	grep '^FAIL' "$tmp/wasi/check-replay.log" | tail -5
+	fail=1
+fi
 exit "$fail"

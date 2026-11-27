@@ -24,6 +24,8 @@ import FVA.Impl.Exec.Access
 import FVA.Impl.Exec.Imports
 import FVA.Impl.Exec.Chunks
 import FVA.Impl.Exec.Machine
+import FVA.Impl.Exec.Process
+import FVA.Impl.Exec.WasiHost
 import FVA.Lifted
 import FVA.Proof.Decode.Reader
 import FVA.Proof.Decode.Name
@@ -60,9 +62,11 @@ import FVA.Proof.Exec.Imports
 import FVA.Proof.Exec.Chunks
 import FVA.Proof.Exec.Machine
 import FVA.Proof.Exec.MachineSys
+import FVA.Proof.Exec.Process
 import FVA.Proof.Pin.Decode
 import FVA.Proof.Pin.Exec
 import FVA.Proof.Pin.Valid
+import FVA.Proof.Pin.Wasi
 import FVA.Proof.Valid.Validator
 import FVA.Proof.Valid.Complete
 import FVA.Proof.Valid.Soundness
@@ -78,6 +82,9 @@ import FVA.Proof.Wasi.Examples
 import FVA.Proof.Wasi.Launch
 import FVA.Proof.Wasi.WfRun
 import FVA.Proof.Wasi.Policy
+import FVA.Proof.Wasi.Host
+import FVA.Proof.Wasi.Canonical
+import FVA.Proof.Wasi.Exit
 import FVA.Proof.Lib.EHExamples
 import FVA.Proof.Lib.EHMachine
 import FVA.Explain

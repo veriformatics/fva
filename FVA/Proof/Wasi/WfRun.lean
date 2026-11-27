@@ -250,18 +250,11 @@ theorem run_wf {σ : State} (hw : σ.Wf) {r : Req} {ch : Choice} (hc : ChoiceOK 
     obtain ⟨dn, hdn, h⟩ := bind_ok h
     obtain ⟨⟨st, c, sl⟩, hres, h⟩ := bind_ok h
     obtain ⟨hst, hdirs, -, -, -⟩ := resolve_spec hres (dirOf_ok hw hdn)
-    simp only at h
-    split at h
-    · simp at h
-    · obtain ⟨tg, -, h⟩ := bind_ok h
-      cases tg with
-      | none => simp at h
-      | some n =>
-        simp only at h
-        repeat' (first | (simp at h; done) | split at h)
-        all_goals
-          rw [ok_fst h]
-          exact wf_setDir hw (hdirs _ (head_mem hst)) (List.filter_sublist)
+    obtain ⟨tg, -, h⟩ := bind_ok h
+    repeat' (first | (simp at h; done) | split at h)
+    all_goals
+      rw [ok_fst h]
+      exact wf_setDir hw (hdirs _ (head_mem hst)) (List.filter_sublist)
   case pathFilestatGet =>
     obtain ⟨dn, -, h⟩ := bind_ok h
     obtain ⟨⟨st, c, sl⟩, -, h⟩ := bind_ok h

@@ -1,0 +1,232 @@
+{
+  "id": "fd_write.stdio-append",
+  "sources": [
+    "p1:706-723",
+    "probe fd_write.stdio-append"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 0,
+          "u32": [
+            256,
+            1
+          ]
+        },
+        {
+          "addr": 256,
+          "text": "A"
+        },
+        {
+          "addr": 36,
+          "hex": "aaaaaaaa"
+        }
+      ],
+      "call": "fd_write",
+      "args": [
+        1,
+        0,
+        1,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              1
+            ]
+          },
+          {
+            "addr": 36,
+            "hex": "aaaaaaaa"
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 0,
+          "u32": [
+            256,
+            1
+          ]
+        },
+        {
+          "addr": 256,
+          "text": "B"
+        },
+        {
+          "addr": 36,
+          "hex": "aaaaaaaa"
+        }
+      ],
+      "call": "fd_write",
+      "args": [
+        1,
+        0,
+        1,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              1
+            ]
+          },
+          {
+            "addr": 36,
+            "hex": "aaaaaaaa"
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 0,
+          "u32": [
+            256,
+            1
+          ]
+        },
+        {
+          "addr": 256,
+          "text": "C"
+        },
+        {
+          "addr": 36,
+          "hex": "aaaaaaaa"
+        }
+      ],
+      "call": "fd_write",
+      "args": [
+        2,
+        0,
+        1,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              1
+            ]
+          },
+          {
+            "addr": 36,
+            "hex": "aaaaaaaa"
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    },
+    {
+      "mem": [
+        {
+          "addr": 0,
+          "u32": [
+            256,
+            1
+          ]
+        },
+        {
+          "addr": 256,
+          "text": "D"
+        },
+        {
+          "addr": 36,
+          "hex": "aaaaaaaa"
+        }
+      ],
+      "call": "fd_write",
+      "args": [
+        2,
+        0,
+        1,
+        32
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 0,
+        "mem": [
+          {
+            "addr": 32,
+            "u32": [
+              1
+            ]
+          },
+          {
+            "addr": 36,
+            "hex": "aaaaaaaa"
+          }
+        ],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": "AB"
+    },
+    "stderr": {
+      "text": "CD"
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

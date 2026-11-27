@@ -506,8 +506,11 @@ def run (σ : State) (r : Req) (ch : Choice) : Except Nat (State × List (Nat ×
     | none => .ok (← create (st.headD 0) c (.dir []), [])
   | .pathRemoveDirectory => do
     let (st, c, _) ← σ.resolve (← dirOf (x 0 0) Right.pathRemoveDirectory) r.path
+    -- the target first: a final `..` above the dirfd's directory escapes (`perm`, wasmtime 50.0.0:
+    -- oracle rows `path_remove_directory.root-dotdot`, `path_unlink_file.dotdot`)
+    let t ← σ.target st c
     if c = [46] ∨ c = [46, 46] then .error Errno.inval  -- `.` + `..`: probes c13, tester-5 C89
-    else match ← σ.target st c with
+    else match t with
       | none => .error Errno.noent
       | some n =>
         if !σ.isDir n then .error Errno.notdir
@@ -515,8 +518,8 @@ def run (σ : State) (r : Req) (ch : Choice) : Except Nat (State × List (Nat ×
         else .ok (unlink (st.headD 0) c, [])
   | .pathUnlinkFile => do
     let (st, c, slash) ← σ.resolve (← dirOf (x 0 0) Right.pathUnlinkFile) r.path
-    if c = [46] ∨ c = [46, 46] then .error Errno.isdir
-    else match ← σ.target st c with
+    -- a final `.`/`..` names a directory (`isdir`) or escapes (`perm`): `target` decides
+    match ← σ.target st c with
       | none => .error Errno.noent
       | some n =>
         if σ.isDir n then .error Errno.isdir  -- WITX path_unlink_file

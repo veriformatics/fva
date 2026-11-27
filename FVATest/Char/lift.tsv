@@ -15,6 +15,7 @@ FVATest/Subjects/GlmIround/glm-iround.wasm	0	21a2d8242a2f8ae0063a923e492a591e7b5
 FVATest/Subjects/Lz4C/O1/lz4-c-O1.wasm	0	d2a06af2cbbc79da38fcf55488bc28a94c93c825c2c610bb8508276f11896762
 FVATest/Subjects/Lz4C/lz4-c.wasm	0	2b29a82d09f62b7056d6fc2c7167156a0403628d21cf7781e3354c1f4a307868
 FVATest/Subjects/Lz4Wasm/lz4-block-codec.wasm	0	dc831c2237f536b3ad7994bface2fa4b5247d9bfd87e3e205521f19bca585d68
+FVATest/Subjects/WasiExit/exit.wasm	0	eddceed358f9690a50984aac41b5956146d4918fb74b00b91f404f7cd3efb04c
 bench/subjects/wasm-glm/glm-iround.wasm	0	783e9dc74c5fdbbf254dcced1abccfd5875e3a7a6d4b447f55f0cf79688d2aad
 bench/subjects/wasm-pflog/runorm-pflog.wasm	0	463216756cd59be638fd54f6076dcebf44dbf5a58bffa6f1e610a61dd55fe7d9
 bench/subjects/wasm/lz4-c.wasm	0	37189808e1992ebcf6db904c7eff2dfce6f8ce813559d95378bd005ba74fe14f

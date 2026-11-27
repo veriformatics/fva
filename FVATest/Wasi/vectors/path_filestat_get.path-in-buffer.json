@@ -1,0 +1,80 @@
+{
+  "id": "path_filestat_get.path-in-buffer",
+  "sources": [
+    "U29a-v2:S2 profile disjointness",
+    "probe path_filestat_get.path-in-buffer"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 256,
+          "text": "f"
+        }
+      ],
+      "call": "path_filestat_get",
+      "args": [
+        3,
+        0,
+        256,
+        1,
+        256
+      ],
+      "expect": {
+        "outcome": "out-of-profile",
+        "basis": "contract"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

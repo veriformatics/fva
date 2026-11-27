@@ -1,0 +1,86 @@
+{
+  "id": "fd_read.memory-end-control",
+  "sources": [
+    "p1:507-512",
+    "p1:1672-1674",
+    "U29a-v2:S2 profile disjointness",
+    "probe fd_read.memory-end-control"
+  ],
+  "world": {
+    "args": [
+      "p"
+    ],
+    "env": [],
+    "stdin": {
+      "text": ""
+    },
+    "clocks": [
+      123456789,
+      87654321,
+      0,
+      0
+    ],
+    "dirs": [
+      {
+        "guest": ".",
+        "tree": {
+          "f": {
+            "file": {
+              "text": "abc"
+            }
+          },
+          "d": {
+            "dir": {}
+          }
+        }
+      }
+    ]
+  },
+  "pages": 1,
+  "steps": [
+    {
+      "mem": [
+        {
+          "addr": 65528,
+          "u32": [
+            256,
+            4
+          ]
+        }
+      ],
+      "call": "fd_read",
+      "args": [
+        99,
+        65528,
+        1,
+        65524
+      ],
+      "expect": {
+        "outcome": "errno",
+        "errno": 8,
+        "mem": [],
+        "basis": "wasmtime"
+      }
+    }
+  ],
+  "final": {
+    "stdout": {
+      "text": ""
+    },
+    "stderr": {
+      "text": ""
+    },
+    "files": {
+      ".": {
+        "f": {
+          "file": {
+            "text": "abc"
+          }
+        },
+        "d": {
+          "dir": {}
+        }
+      }
+    }
+  }
+}

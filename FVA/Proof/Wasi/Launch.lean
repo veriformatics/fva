@@ -73,4 +73,14 @@ theorem mistyped_no_launch : ¬ ∃ c mem, Launch (cmdWith 2) "_start" [] c mem 
   rintro ⟨c, mem, -, -, -, -, hk, -⟩
   exact absurd (hk 0 _ rfl rfl rfl) (by decide)
 
+/-- `fd_write` imported at its parameters without its result (`[i32, i32, i32, i32] → []`). -/
+def noResult : Module :=
+  { cmd with
+    types := cmd.types ++ [[⟨[i32, i32, i32, i32], []⟩]]
+    imports := [⟨"wasi_snapshot_preview1", "fd_write", .func 3⟩] }
+
+/-- Parameters and results both decide: `noResult`'s import binds no call (wasmtime 50.0.0 refuses
+that link, "types incompatible": `scripts/test-checks`' dropped-result link plant). -/
+theorem noResult_unbound : bind noResult 0 = none := by decide
+
 end FVA.Wasi.LaunchExample
