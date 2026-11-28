@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# U29b2 E4/E5: `fva run` against its evidence, the two suites side by side — the selected
+# wasi-testsuite cases (FVATest/Wasi/testsuite/check) + tester-6's blind corpus
+# (FVATest/Wasi/run/check fva); --oracle also replays wasmtime on the testsuite's wasmtime-basis
+# rows and the corpus' oracle rows. Failed corpus bundles stay under .cache/wasi-run.
+# Exit: 0 pass, 1 a case differs, 2 setup, 3 crash (1 wins: a differing case is never hidden).
+set -uo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root" || exit 2
+oracle=()
+case ${1:-} in
+'') ;;
+--oracle) oracle=(--oracle) ;;
+*)
+	echo 'usage: scripts/test-wasi-run [--oracle]' >&2
+	exit 2
+	;;
+esac
+tmp=$(mktemp -d)
+trap 'rm -rf -- "$tmp"' EXIT
+FVATest/Wasi/testsuite/check "${oracle[@]}" >"$tmp/testsuite.log" 2>&1 &
+ts=$!
+{
+	FVA=$root/.lake/build/bin/fva FVATest/Wasi/run/check fva
+	rc=$?
+	if ((${#oracle[@]})) && ((rc == 0)); then
+		FVATest/Wasi/run/check wasmtime
+		rc=$?
+	fi
+	exit "$rc"
+} >"$tmp/corpus.log" 2>&1 &
+cp=$!
+wait "$ts"
+r1=$?
+wait "$cp"
+r2=$?
+grep -vE '^PASS ' "$tmp/testsuite.log" | tail -40
+grep -vE '^PASS ' "$tmp/corpus.log" | tail -40
+if ((r1 == 1 || r2 == 1)); then exit 1; fi
+exit $((r1 > r2 ? r1 : r2))

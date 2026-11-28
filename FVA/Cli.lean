@@ -34,7 +34,8 @@ def helpText : String :=
   "  certify   Write a certificate: a claim that an output file stands in a relation to an\n" ++
   "            input file, and its proof by a verified checker.\n" ++
   "  call      Write the claim and the proof of what one call of an exported function\n" ++
-  "            returns.\n\n" ++
+  "            returns.\n" ++
+  "  run       Run a WASI command on FVA's verified machine.\n\n" ++
   "Run \"fva <command> --help\" to see the arguments and options of a command.\n"
 
 /-- Usage text of each command that takes arguments (`fva <command> --help`); `difftest`
@@ -116,6 +117,27 @@ def usage : String → Option String
     "  --force          Replace the spec and proof files when they exist.\n\n" ++
     "Exit status: 0 when the files are written, 1 when the call traps or does not finish,\n" ++
     "2 for a usage error or an unsupported module.\n"
+  | "run" => some <|
+    "Usage: fva run <file.wasm> [options] [-- <arguments>...]\n\n" ++
+    "Run a WASI command on FVA's verified machine and its verified WASI host. The program\n" ++
+    "gets the arguments after --, with the file name of the module as argument 0. FVA reads\n" ++
+    "standard input and every --dir directory before the program starts, and writes the\n" ++
+    "changed files back when the program stops. The clocks read 0. FVA supports the 20 WASI\n" ++
+    "calls of its model. The module must export _start (no parameters, no results) and its\n" ++
+    "memory, and must have no start function and no _initialize export.\n\n" ++
+    "Options:\n" ++
+    "  --dir HOST[::GUEST]   Give the program the directory HOST, under the name GUEST\n" ++
+    "                        (default: HOST as written). You can give this option more\n" ++
+    "                        than once. The directories must not overlap. FVA accepts\n" ++
+    "                        regular files and directories only.\n" ++
+    "  --env NAME=VALUE      Add an environment variable. You can give this option more\n" ++
+    "                        than once; FVA keeps the order and duplicate names.\n" ++
+    "  --random HEX          Give these bytes to every random_get call (cut or padded with\n" ++
+    "                        zeros), in place of fresh random bytes.\n" ++
+    "  --fuel N              Stop after N machine steps.\n\n" ++
+    "Exit status: the program's exit status (statuses from 126 on are reported as 1), 0\n" ++
+    "when _start returns, 134 when the program traps, 1 for an exception that no handler\n" ++
+    "catches, 2 when FVA cannot run or finish the program (the message names the cause).\n"
   | "init" => some <|
     "Usage: fva init <directory> [--lib Name] [--wasm file.wasm]\n\n" ++
     "Create a verification project: FVA vendored in fva/, a lakefile, and templates for the\n" ++

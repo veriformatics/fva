@@ -51,3 +51,10 @@ paths:
   ends instead of going red ⇒ run red checks of such cases under `systemd-run --user --scope -p
   MemoryMax=8G`; size examples take a symbolic length (`simp` expands a literal
   `List.replicate (2 ^ 63) …`).
+- `fva run` (U29b2, `FVA/Tool/Run.lean` = glue graded by `scripts/test-wasi-run`): machine segments
+  end at each host call, `answerHost (wasiHost …)` answers it and its stdout/stderr bytes are
+  emitted at once (stream order kept); `random_get` = fresh bytes or `--random`'s; every stop syncs
+  the trees back first; one `fva run: ` diagnostic at most, after the guest's last stderr byte.
+  Its states = `sysRun`'s (`sysRunRem_eq`); `--fuel` counts steps exactly (`sysRunRem_spent`). A
+  behavior change lands with a corpus case (`FVATest/Wasi/run/cases.jq` → `make`; expected bytes
+  from the contract or the pinned wasmtime, never from running `fva`) + its testsuite comparison.

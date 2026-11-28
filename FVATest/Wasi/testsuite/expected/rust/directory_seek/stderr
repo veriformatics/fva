@@ -1,0 +1,6 @@
+
+thread 'main' (1) panicked at tests/rust/wasm32-wasip1/src/bin/directory_seek.rs:41:5:
+assertion `left == right` failed: directory does NOT have the seek right
+  left: 4
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

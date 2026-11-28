@@ -1,0 +1,5 @@
+(func (export "_start") (local $fd i32)
+  (local.set $fd (call $file (i32.const 3) (i32.const 16448) (i32.const 10) (i32.const 1) (i64.const 64)))
+  (call $emit (local.get $fd) (i32.const 16512) (i32.const 6))
+  (call $ok (call $close (local.get $fd)))
+  (call $emit (i32.const 1) (i32.const 16558) (i32.const 2)))

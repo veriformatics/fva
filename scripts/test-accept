@@ -18,6 +18,15 @@ mapfile -t rows < <(grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$list") || 
 	echo "test-accept: $list lists no checks"
 	exit 2
 }
+# the D28 group builds its fixtures with the pinned wasi-sdk (FVATest/Accept/LWR/wasi/build): fetched
+# here when absent, as CppEH's build fetches its own (a CI lean job has none)
+if [[ -z ${WASI_SDK_PATH:-} && ! -e .tools/wasi-sdk/.pin-34.0 ]] &&
+	printf '%s\n' "${rows[@]}" | grep -q '^D28\.'; then
+	scripts/fetch-bench-tools wasi-sdk >&2 || {
+		echo "test-accept: fetching wasi-sdk 34.0 failed"
+		exit 2
+	}
+fi
 out=$(mktemp) || exit 2
 trap 'rm -f "$out"' EXIT
 for g in $(printf '%s\n' "${rows[@]}" | cut -d. -f1 | sort -u); do

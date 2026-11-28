@@ -70,6 +70,30 @@ lake build && fva trust . --spec-module Certs.Sorted.Spec --root-module Certs.So
 
 The build fails when the output does not satisfy the relation. The certificate is about the exact bytes of the files: if the program prints a number in a different format, that is a different output.
 
+## Run a WASI program
+
+FVA can run a WASI command on its verified machine with its verified WASI host:
+
+```sh
+fva run program.wasm --dir data::/data --env LANG=C -- input.txt
+```
+
+The program gets the arguments after `--`, with the module's file name as argument 0. FVA reads standard input and each `--dir` directory before the program starts. It writes the changed files back when the program stops, also when the program fails. The exit status is the program's status. A status from 126 on is reported as 1, a trap as 134, and an exception that no handler catches as 1. Status 2 means that FVA could not run or finish the program, and the message names the cause. FVA writes at most one message of its own. The message starts with `fva run: ` and comes after all the output of the program on standard error. Run `fva run --help` for the options.
+
+FVA supports the 20 WASI preview1 calls that C and C++ programs built with wasi-sdk use: `args_get`, `args_sizes_get`, `environ_get`, `environ_sizes_get`, `clock_time_get`, `fd_close`, `fd_fdstat_get`, `fd_fdstat_set_flags`, `fd_prestat_get`, `fd_prestat_dir_name`, `fd_read`, `fd_seek`, `fd_write`, `path_create_directory`, `path_filestat_get`, `path_open`, `path_remove_directory`, `path_unlink_file`, `proc_exit` and `random_get`. A module that imports other functions does not run. The reviewed specification `FVA/Spec/Wasi` states what these calls may do (WITX allows many results) and the host `E` that claims assume: the results of wasmtime 50.0.0, with these differences:
+
+- Rights: FVA checks the rights of each descriptor and reports them as the program requested them. A preopened directory has wasmtime's rights plus `fd_datasync`, `fd_sync` and `path_filestat_set_size`. Wasmtime does not check most rights and reports fixed values.
+- File status: the serial number is the file's index + 1, the link count is 1, and the times are 0.
+- Clocks: `fva run` reads 0 on every clock. A claim states the clock readings that it assumes.
+- Files can grow to 2^63 − 1 bytes, as on a Linux tmpfs. Other file systems stop earlier.
+- Reads and writes transfer the first non-empty buffer, and a read from standard input returns at most 65,536 bytes.
+- A call fails only for the reasons that the specification states. There are no I/O or resource errors.
+- `fva run` reads standard input and the directories completely before the run, and changes the host files only at the end. The directories must contain regular files and directories only, without symbolic links or hard links.
+- When a step has more than one allowed result (the payload of a NaN), `fva run` stops with status 2.
+- With `--random`, every `random_get` call gets the given bytes, and the message of FVA says so.
+
+The full list, with sources, is in `docs/contracts/U29a-wasi.md` and `docs/contracts/U29b-host.md`. FVA checks `fva run` against wasmtime on a pinned selection of the WASI test suite (`FVATest/Wasi/testsuite`) and on a corpus of 116 small programs (`FVATest/Wasi/run`).
+
 ## Read the claims in plain English
 
 ```sh
@@ -119,7 +143,7 @@ The third-party binaries that these results are about are not in this repository
 ## Limits
 
 - FVA verifies core WebAssembly 2.0 without SIMD, threads, exceptions or garbage-collected types.
-- Programs that read files or the network through WASI are not modeled; certify their outputs instead.
+- FVA models 20 WASI preview1 calls (see Run a WASI program). For programs that use other WASI calls or the network, certify their outputs instead.
 - A proof shows that the binary meets the claims. It is your task to check that the claims say what you want.
 - `fva trust` and `fva explain` run the project's own code (its Lake configuration, its build, its Lean definitions) in a `bwrap` sandbox: no network, no new user namespaces, the system read-only, your home directory hidden, and writes allowed only in the project's `.lake` directories. The project needs a `lake-manifest.json`. Inside an agent's sandbox that denies network sockets, `fva trust` keeps its sandbox without its own network namespace and says so; where bwrap cannot run at all, `--no-sandbox` runs without it (use it only inside a container you trust). FVA itself still reads the project's compiled `.olean` files. FVA builds the spec module and the project modules that it imports again, in the same sandbox, and the check fails if the project's compiled files are different. If you do not trust a project, run FVA inside a container or a virtual machine as well.
 

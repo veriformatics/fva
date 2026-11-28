@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Binary-safe diagnostic framing; guest bytes may contain NUL and the marker.
+set -uo pipefail
+(($# == 3)) || exit 2
+raw=$1 guest=$2 diag=$3
+offset=$(LC_ALL=C /usr/bin/grep -abo 'fva run: ' "$raw" | tail -n 1 | cut -d: -f1)
+if [[ -n $offset ]]; then
+	head -c "$offset" "$raw" >"$guest" || exit 2
+	tail -c "+$((offset + 1))" "$raw" >"$diag" || exit 2
+else
+	cp "$raw" "$guest" || exit 2
+	: >"$diag" || exit 2
+fi

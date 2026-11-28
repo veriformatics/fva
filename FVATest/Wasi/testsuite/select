@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# U29b2 E4: classify every C + Rust wasm32-wasip1 test of a wasi-testsuite checkout
+# (prod/testsuite-base) against FVA's 20-call WASI profile → manifest.tsv on stdout.
+# A test is excluded when it imports anything beyond the profile (the reason lists those imports,
+# read from the binary: independent of FVA's result); a selected test's basis = wasmtime unless
+# basis.tsv names a departure. Run at a pin change: select CHECKOUT > manifest.tsv.
+set -uo pipefail
+(($# == 1)) || {
+	echo 'usage: FVATest/Wasi/testsuite/select CHECKOUT' >&2
+	exit 2
+}
+here=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$here/../../.." && pwd)
+wt=$root/.tools/bin/wasm-tools
+profile=" args_get args_sizes_get environ_get environ_sizes_get clock_time_get fd_close \
+fd_fdstat_get fd_fdstat_set_flags fd_prestat_get fd_prestat_dir_name fd_read fd_seek fd_write \
+path_create_directory path_filestat_get path_open path_remove_directory path_unlink_file \
+proc_exit random_get "
+printf 'id\tsha256\tselection\tbasis\n'
+for lang in c rust; do
+	for w in "$1/tests/$lang/testsuite/wasm32-wasip1/"*.wasm; do
+		id=$lang/$(basename "$w" .wasm)
+		sha=$(sha256sum "$w" | cut -d' ' -f1)
+		extra=$("$wt" print "$w" | grep -o '(import "[^"]*" "[^"]*"' |
+			sed 's/(import "\([^"]*\)" "\([^"]*\)"/\1 \2/' | sort -u |
+			while read -r m n; do
+				if [[ $m != wasi_snapshot_preview1 || $profile != *" $n "* ]]; then printf '%s ' "$m.$n"; fi
+			done)
+		if [[ -n $extra ]]; then
+			printf '%s\t%s\texcluded\tprofile: imports %s\n' "$id" "$sha" "${extra% }"
+		else
+			basis=$(awk -F'\t' -v i="$id" '$1 == i {print $2}' "$here/basis.tsv")
+			printf '%s\t%s\tselected\t%s\n' "$id" "$sha" "${basis:-wasmtime}"
+		fi
+	done
+done

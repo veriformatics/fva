@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Planted bad inputs grade the harness, not FVA. A neutered check must fail here.
+set -euo pipefail
+src=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$src/../../.." && pwd)
+parent=${FVA_RUN_OUT:-$root/.cache/wasi-run}
+mkdir -p "$parent"
+tmp=$(mktemp -d "$parent/self.XXXXXXXX")
+trap 'chmod -R u+rwX "$tmp"; rm -rf -- "$tmp"' EXIT
+copy=$tmp/project/FVATest/Wasi/run
+mkdir -p "$copy"
+cp -a "$src/." "$copy/"
+export WASMTIME=${WASMTIME:-$root/.tools/bin/wasmtime}
+export WASM_TOOLS=${WASM_TOOLS:-$root/.tools/bin/wasm-tools}
+export FVA_RUN_OUT=$tmp/out
+cp "$copy/cases.json" "$tmp/original.json"
+expect() {
+	local wanted=$1 name=$2 caseid=${3:-process-empty} rc
+	set +e
+	"$copy/check" wasmtime --case "$caseid" >"$tmp/$name.log" 2>&1
+	rc=$?
+	set -e
+	if ((rc != wanted)); then
+		printf 'SELF FAIL %s: rc=%s expected=%s\n' "$name" "$rc" "$wanted" >&2
+		tail -10 "$tmp/$name.log" >&2
+		exit 1
+	fi
+	printf 'SELF PASS %s rc=%s\n' "$name" "$rc"
+	cp "$tmp/original.json" "$copy/cases.json"
+}
+mutate() { jq "$1" "$tmp/original.json" >"$copy/cases.json"; }
+printf 'B|D|fva run: guest\nX\000\377fva run: guest tail' >"$tmp/guest"
+printf 'fva run: arbitrary diagnostic\n' >"$tmp/diagnostic"
+cat "$tmp/guest" "$tmp/diagnostic" >"$tmp/raw"
+"$copy/split-stderr" "$tmp/raw" "$tmp/actual-guest" "$tmp/actual-diagnostic"
+cmp "$tmp/guest" "$tmp/actual-guest"
+cmp "$tmp/diagnostic" "$tmp/actual-diagnostic"
+printf 'SELF PASS last-marker-binary-framing rc=0\n'
+printf 'unterminated\000\377guest' >"$tmp/raw"
+"$copy/split-stderr" "$tmp/raw" "$tmp/actual-guest" "$tmp/actual-diagnostic"
+cmp "$tmp/raw" "$tmp/actual-guest"
+[[ ! -s $tmp/actual-diagnostic ]]
+printf 'SELF PASS no-marker-binary-framing rc=0\n'
+for ((byte = 0; byte < 256; byte++)); do
+	printf -v octal '%03o' "$byte"
+	printf '%b' "\\$octal"
+done >"$tmp/alphabet"
+seed=161803
+for ((i = 0; i < 16; i++)); do
+	seed=$(((seed * 1103515245 + 12345) & 2147483647))
+	n=$((seed % 257))
+	if ((i == 0)); then n=0; elif ((i == 1)); then n=256; fi
+	head -c "$n" "$tmp/alphabet" >"$tmp/guest"
+	for ((j = 0; j < i % 4; j++)); do printf 'fva run: guest\000' >>"$tmp/guest"; done
+	cat "$tmp/guest" "$tmp/diagnostic" >"$tmp/raw"
+	"$copy/split-stderr" "$tmp/raw" "$tmp/actual-guest" "$tmp/actual-diagnostic"
+	cmp "$tmp/guest" "$tmp/actual-guest"
+	cmp "$tmp/diagnostic" "$tmp/actual-diagnostic"
+done
+printf 'SELF PASS framing-property-16 seed=161803\n'
+expect 0 positive-control
+mutate '(.cases[]|select(.id=="process-empty").expect.stdout.text)+="X"'
+expect 1 altered-byte
+mutate '(.cases[]|select(.id=="process-empty").expect.rc)=7'
+expect 1 wrong-rc
+mutate '.cases|=map(select(.id!="process-empty"))'
+expect 2 missing-case
+mutate '.cases += [.cases[0]]'
+expect 2 duplicate-case
+mutate '(.cases[]|select(.id=="process-empty").basis)="departure:unlisted"'
+expect 2 unclassified-case
+mv "$copy/programs/process.wat" "$tmp/process.wat"
+expect 2 missing-program
+mv "$tmp/process.wat" "$copy/programs/process.wat"
+mutate '(.cases[]|select(.id=="files-all").expect.tree[]|select(.path=="roots/one/keep.bin").bytes.hex)="ff"'
+expect 1 altered-file-byte files-all
+mutate '(.cases[]|select(.id=="files-all").expect.tree)|=map(select(.path!="roots/one/keep.bin"))'
+expect 1 missing-tree-entry files-all
+printf 'wasi-run self-test: 12/12 pass\n'

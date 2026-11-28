@@ -1,0 +1,8 @@
+d fopendir.dir
+d writeable
+f file
+f fopendir.dir/file-0
+f fopendir.dir/file-1
+f lseek.txt
+f pread.txt
+f writeable/.gitignore

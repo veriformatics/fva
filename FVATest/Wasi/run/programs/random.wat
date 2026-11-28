@@ -1,0 +1,5 @@
+(func (export "_start")
+  (call $ok (call $random (i32.const 1024) (i32.const 32)))
+  (call $emit (i32.const 1) (i32.const 1024) (i32.const 32))
+  (call $ok (call $random (i32.const 1056) (i32.const 32)))
+  (call $emit (i32.const 1) (i32.const 1056) (i32.const 32)))

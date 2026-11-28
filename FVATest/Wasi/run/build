@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# WAT-only recipe: pinned wasm-tools; no compiler/sysroot dependency.
+set -euo pipefail
+src=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$src/../../.." && pwd)
+tool=${WASM_TOOLS:-$root/.tools/bin/wasm-tools}
+out=${1:?Usage: build OUTDIR}
+mkdir -p "$out"
+for p in "$src"/programs/*.wat; do
+	name=${p##*/}
+	{
+		printf '(module\n'
+		cat "$src/common.wat" "$p"
+		printf ')\n'
+	} >"$out/$name"
+	"$tool" parse "$out/$name" -o "$out/${name%.wat}.wasm"
+done
+for p in "$src"/standalone/*.wat; do
+	name=${p##*/}
+	"$tool" parse "$p" -o "$out/${name%.wat}.wasm"
+done
+printf 'not a wasm module\n' >"$out/load-undecodable.wasm"
+(cd "$out" && sha256sum ./*.wasm) >"$out/sha256"

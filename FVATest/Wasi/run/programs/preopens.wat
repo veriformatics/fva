@@ -1,0 +1,11 @@
+(func (export "_start") (local $fd i32) (local $n i32)
+  (call $emit (i32.const 1) (i32.const 16399) (i32.const 4))
+  (local.set $fd (i32.const 3))
+  (block $done (loop $next
+    (br_if $done (call $prestat (local.get $fd) (i32.const 64)))
+    (local.set $n (i32.load (i32.const 68)))
+    (call $ok (call $prename (local.get $fd) (i32.const 1024) (local.get $n)))
+    (call $emit (i32.const 1) (i32.const 1024) (local.get $n))
+    (call $emit (i32.const 1) (i32.const 16403) (i32.const 1))
+    (local.set $fd (i32.add (local.get $fd) (i32.const 1)))
+    (br $next))))

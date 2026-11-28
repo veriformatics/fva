@@ -19,5 +19,6 @@ Commands:
             input file, and its proof by a verified checker.
   call      Write the claim and the proof of what one call of an exported function
             returns.
+  run       Run a WASI command on FVA's verified machine.
 
 Run "fva <command> --help" to see the arguments and options of a command.

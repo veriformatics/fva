@@ -689,4 +689,34 @@ if ! FVATest/Wasi/oracle/check-replay >"$tmp/wasi/check-replay.log" 2>&1; then
 	grep '^FAIL' "$tmp/wasi/check-replay.log" | tail -5
 	fail=1
 fi
+# U29b2 E4: the wasi-testsuite comparator (FVATest/Wasi/testsuite/check) on copies holding one
+# selected case through the real fva: the copy → rc 0; an expected stdout byte, exit status or file
+# hash changed, an expected capture missing, an unclassified manifest row, an expected dir without
+# its selected row → rc 1; a binary other than the pinned bytes → rc 2
+# the copies share this tree's corpus (their own fetch-corpus = a stub): fetch it first
+scripts/fetch-corpus >/dev/null || exit 2
+ts_case() { # label want-rc edit (shell run in the copy's testsuite dir)
+	local d=$tmp/ts-$1 t=FVATest/Wasi/testsuite id=c/fopen-with-access rc
+	mkdir -p "$d/$t/expected/c" "$d/scripts" "$d/.cache" &&
+		cp "$t/check" "$d/$t/" && cp -r "$t/expected/$id" "$d/$t/expected/c/" &&
+		awk -F'\t' -v i="$id" 'NR == 1 || $1 == i' "$t/manifest.tsv" >"$d/$t/manifest.tsv" &&
+		printf '#!/bin/sh\nexit 0\n' >"$d/scripts/fetch-corpus" && chmod +x "$d/scripts/fetch-corpus" &&
+		ln -s "$PWD/.cache/corpus" "$d/.cache/corpus" && (cd "$d/$t" && eval "$3") || exit 2
+	FVA=$PWD/.lake/build/bin/fva "$d/$t/check" >"$d.log" 2>&1
+	rc=$?
+	((rc == $2)) || {
+		echo "test-checks: wasi testsuite $1 → rc $rc, want $2"
+		tail -5 "$d.log"
+		fail=1
+	}
+}
+ts_case clean 0 true
+ts_case stdout 1 'printf x >>expected/c/fopen-with-access/stdout'
+ts_case exit 1 'echo 1 >expected/c/fopen-with-access/exit'
+ts_case file-hash 1 'sed -i "1s/^7/8/" expected/c/fopen-with-access/files'
+ts_case missing 1 'rm expected/c/fopen-with-access/layout'
+ts_case unclassified 1 'sed -i "2s/\tselected\t/\tmaybe\t/" manifest.tsv'
+ts_case orphan 1 'mkdir -p expected/rust/x && touch expected/rust/x/exit'
+# shellcheck disable=SC2016 # eval expands it in the copy
+ts_case sha 2 'sed -i "2s/\t[0-9a-f]\{64\}\t/\t$(printf %064d 0)\t/" manifest.tsv'
 exit "$fail"

@@ -11,6 +11,8 @@ mkdir -p "$dir/testsuite"
 ts=https://raw.githubusercontent.com/WebAssembly/testsuite/44f1503f98409fa3737437bf9449a37a5def4210
 lz4wasm=https://raw.githubusercontent.com/gorhill/lz4-wasm/8995cdef7b3adc4a4d2fc4fc86b84a86789ff858
 art=https://github.com/veriformatics/fva-artifacts/releases/download
+# U29b2 E4: wasi-testsuite prod/testsuite-base (prebuilt tests) — the selected cases + their fixtures
+wts=https://raw.githubusercontent.com/WebAssembly/wasi-testsuite/9d84631e427729802085c3d172d0a63cd360a1fa
 
 # destination url sha256
 files=(
@@ -120,11 +122,58 @@ files=(
 	"lz4-c.wasm $art/subject-builds-v1/lz4-c.wasm 8b73efb63f0467d9999d867007969b75826140dce9e5677bd0439dc6af384ac6"
 	"lz4-flex.wasm $art/subject-builds-v1/lz4-flex.wasm 1f115e3a5ddee865621f406e2abf545854218cb8dc632d759e998553031aa775"
 	"eh.wasm $art/subject-builds-v1/eh.wasm 4e2fe131b94743ec16e11c868d5d1dc0903956c8edfe1c2d3626c1fec7155292"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/clock_gettime-monotonic.wasm $wts/tests/c/testsuite/wasm32-wasip1/clock_gettime-monotonic.wasm 0c99910e7037352141a6871ef73c66945b8c2855f132505fb54c4060f74cdfff"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/clock_gettime-realtime.wasm $wts/tests/c/testsuite/wasm32-wasip1/clock_gettime-realtime.wasm f2e2b286b04c3758bb4b9bb535eeea0e366747524854b941e4b7c352e0575eac"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/fopen-with-access.wasm $wts/tests/c/testsuite/wasm32-wasip1/fopen-with-access.wasm d61b02227e7e03669bdd5851e92c54770f8949b5f80a942250bee8bb928ba5ea"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/fopen-with-access.json $wts/tests/c/testsuite/wasm32-wasip1/fopen-with-access.json ee3eb5f323581c2fec24aa18bbd06c318ad0009cb428e955111cb01412c82d8d"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/fopen-with-no-access.wasm $wts/tests/c/testsuite/wasm32-wasip1/fopen-with-no-access.wasm 957ab8d3ead289bc8ab4d732c3ff476847f3c7a4b6795c4ae4300725ba05b8ab"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/big_random_buf.wasm $wts/tests/rust/testsuite/wasm32-wasip1/big_random_buf.wasm 0eeac039904bd0d02cc2a595a391ed11f307b92a23654d7cd3953ef7a252bb0e"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/clock_time_get.wasm $wts/tests/rust/testsuite/wasm32-wasip1/clock_time_get.wasm 9051e4e62443156e561ed00928e8f8b51741c2f28da6ac1c542618369db20fd4"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/close_preopen.wasm $wts/tests/rust/testsuite/wasm32-wasip1/close_preopen.wasm ccdb5eb906c62021904c80d6f5aa68da064e053bd00c0408b34bdc77d4d79b83"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/close_preopen.json $wts/tests/rust/testsuite/wasm32-wasip1/close_preopen.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/dangling_fd.wasm $wts/tests/rust/testsuite/wasm32-wasip1/dangling_fd.wasm dd2cc51aa0d52c45d62bd1000b41e8aa2d518510ae9016569d815852ce8958b3"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/dangling_fd.json $wts/tests/rust/testsuite/wasm32-wasip1/dangling_fd.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/directory_seek.wasm $wts/tests/rust/testsuite/wasm32-wasip1/directory_seek.wasm 077daf182d15df17b6724680f3fa33b76456cdcc92a8a6385ba7c94091a8fc31"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/directory_seek.json $wts/tests/rust/testsuite/wasm32-wasip1/directory_seek.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/fd_flags_set.wasm $wts/tests/rust/testsuite/wasm32-wasip1/fd_flags_set.wasm 3013dfb0dc86a24c800ae4bc06558b799b47bae919d1d8ae14e7a50b46dda860"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/fd_flags_set.json $wts/tests/rust/testsuite/wasm32-wasip1/fd_flags_set.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/file_truncation.wasm $wts/tests/rust/testsuite/wasm32-wasip1/file_truncation.wasm 5909aee2773f70ec9e8d8139aa8cd4a81dbf4a7cf8cfc0b7654fc3b11e8df6ab"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/file_truncation.json $wts/tests/rust/testsuite/wasm32-wasip1/file_truncation.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/file_unbuffered_write.wasm $wts/tests/rust/testsuite/wasm32-wasip1/file_unbuffered_write.wasm e329789b42180a9396eecf4043d67f8c9b7f7b9d886712a2c10062e724e5d795"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/file_unbuffered_write.json $wts/tests/rust/testsuite/wasm32-wasip1/file_unbuffered_write.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/interesting_paths.wasm $wts/tests/rust/testsuite/wasm32-wasip1/interesting_paths.wasm 96e3f87a41380e1cfbab8698a1ff1f60b2136338d04e75ddf786bc38113f3726"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/interesting_paths.json $wts/tests/rust/testsuite/wasm32-wasip1/interesting_paths.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/isatty.wasm $wts/tests/rust/testsuite/wasm32-wasip1/isatty.wasm 3158b3ee9607c252c7a1315bd782c20db3ce62d9e4e9e5bfc66d4e1938980107"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/isatty.json $wts/tests/rust/testsuite/wasm32-wasip1/isatty.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/path_open_create_existing.wasm $wts/tests/rust/testsuite/wasm32-wasip1/path_open_create_existing.wasm fd4c9f923c44c8418785816e8151b846d52fbabcc1c3e8b4e5196024b873a3f6"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/path_open_create_existing.json $wts/tests/rust/testsuite/wasm32-wasip1/path_open_create_existing.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/path_open_dirfd_not_dir.wasm $wts/tests/rust/testsuite/wasm32-wasip1/path_open_dirfd_not_dir.wasm debe3855ba815e18a9d94135c8d1aa14fea15ee23f9fbec7997d67635c0cb599"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/path_open_dirfd_not_dir.json $wts/tests/rust/testsuite/wasm32-wasip1/path_open_dirfd_not_dir.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/path_open_missing.wasm $wts/tests/rust/testsuite/wasm32-wasip1/path_open_missing.wasm f184101f22f12a0773c123167650984ec89c38ab4c287b3325a81786db6edfb8"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/path_open_missing.json $wts/tests/rust/testsuite/wasm32-wasip1/path_open_missing.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/path_open_nonblock.wasm $wts/tests/rust/testsuite/wasm32-wasip1/path_open_nonblock.wasm 09ab3588e59eb46f57df68a388203ffff1456168bb43f1b22ad71e4bf88c51ba"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/path_open_nonblock.json $wts/tests/rust/testsuite/wasm32-wasip1/path_open_nonblock.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/path_open_preopen.wasm $wts/tests/rust/testsuite/wasm32-wasip1/path_open_preopen.wasm 7fc66e7d98ff4c9ff0b33bc3f94beb0df5e5b2cbf2381bfccea5cc37b646bffa"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/path_open_preopen.json $wts/tests/rust/testsuite/wasm32-wasip1/path_open_preopen.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/remove_directory_trailing_slashes.wasm $wts/tests/rust/testsuite/wasm32-wasip1/remove_directory_trailing_slashes.wasm 7958360c7b44ec0e00ad564c8c3748c07166d9e97791375b36ed4fc5bf1f2363"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/remove_directory_trailing_slashes.json $wts/tests/rust/testsuite/wasm32-wasip1/remove_directory_trailing_slashes.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/remove_nonempty_directory.wasm $wts/tests/rust/testsuite/wasm32-wasip1/remove_nonempty_directory.wasm f81efdcb63855c00c3f1f13e74b33fef3ae66e71062cf7548e1142176c368b68"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/remove_nonempty_directory.json $wts/tests/rust/testsuite/wasm32-wasip1/remove_nonempty_directory.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/unlink_file_trailing_slashes.wasm $wts/tests/rust/testsuite/wasm32-wasip1/unlink_file_trailing_slashes.wasm 56458bfa63cd385cd8490eeb7e3b3a0505ea9405bf4482eba62cd37a95ed96a4"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/unlink_file_trailing_slashes.json $wts/tests/rust/testsuite/wasm32-wasip1/unlink_file_trailing_slashes.json edde1b667229a18e8ed6cf5d1b6fe8f6a02a30094dc05dd47f3167894758b84b"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/file $wts/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/file 7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/fopendir.dir/file-0 $wts/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/fopendir.dir/file-0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/fopendir.dir/file-1 $wts/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/fopendir.dir/file-1 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/lseek.txt $wts/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/lseek.txt 924592b9b103f14f833faafb67f480691f01988aa457c0061769f58cd47311bc"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/pread.txt $wts/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/pread.txt f29a78e2b8fd00d8a58cf6ad12636eacd28bdc44cb6353ee31987eaeac60af66"
+	"wasi-testsuite/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/writeable/.gitignore $wts/tests/c/testsuite/wasm32-wasip1/fs-tests.dir/writeable/.gitignore 240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d"
+	"wasi-testsuite/tests/rust/testsuite/wasm32-wasip1/fs-tests.dir/.keep $wts/tests/rust/testsuite/wasm32-wasip1/fs-tests.dir/.keep e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 )
 
 for f in "${files[@]}"; do
 	read -r dest url sha <<<"$f"
 	out=$dir/$dest
+	mkdir -p "$(dirname "$out")"
 	if [[ ! -f $out ]] || ! echo "$sha  $out" | sha256sum -c --status; then
 		curl -fsSL --retry 3 -o "$out.part" "$url"
 		if ! echo "$sha  $out.part" | sha256sum -c --status; then

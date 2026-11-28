@@ -1,0 +1,9 @@
+# wasi-testsuite subset (U29b2 E4)
+
+`fva run` vs the official WASI preview1 tests (`docs/contracts/U29b-host.md` U29b2 Evidence).
+
+- Source = WebAssembly/wasi-testsuite `prod/testsuite-base` @ `9d84631e427729802085c3d172d0a63cd360a1fa`: upstream's prebuilt `tests/{c,rust}/testsuite/wasm32-wasip1/*.wasm` + their `.json` specs + fixture dirs (compiler + sysroot = upstream's build of that revision; FVA builds nothing). `scripts/fetch-corpus` fetches the selected binaries + fixtures into `.cache/corpus/wasi-testsuite/`, each file sha256-pinned.
+- `manifest.tsv` = every C + Rust test of that revision (60): id, binary sha256, `selected`/`excluded`, basis or reason. `select CHECKOUT` regenerates it from a full checkout: excluded = imports beyond the 20-call profile (the reason lists them, read from the binary — independent of FVA's result); 22 selected. A pin change = new checkout → `select` → `fetch-corpus` entries → `check --record wasmtime`.
+- Basis: `wasmtime` = `expected/<id>/` recorded from the pinned wasmtime (`scripts/fetch-tools`: 50.0.0) by `check --record wasmtime`; `departure:<E clause>` (`basis.tsv`: 2 rows, U29a's Rights departure) = FVA's capture (`check --record fva`), reviewed against that clause.
+- Run per case (both engines alike): a fresh copy of the fixture dir as guest `/` (`--dir fs::/`, the suite's wasmtime adapter's mapping), the spec's `env` + `args`, stdin `/dev/null`, 300 s cap. Compared: exit status, stdout, guest stderr (stderr before the last `fva run: `), every path + kind of the final tree, every file's sha256.
+- `check` = fva vs expected (`scripts/test-wasi-run`, fast + full gate); `check --oracle` adds wasmtime vs expected on every wasmtime-basis row (full gate). Missing, duplicate or unclassified manifest rows and expected dirs without a selected row fail (rc 1); a binary off its pin = rc 2. test-checks plants each.

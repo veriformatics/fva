@@ -1,0 +1,6 @@
+(func (export "_start")
+  (i64.store (i32.const 64) (i64.const -1))
+  (i64.store (i32.const 72) (i64.const -1))
+  (call $ok (call $clock (i32.const 0) (i64.const 1) (i32.const 64)))
+  (call $ok (call $clock (i32.const 1) (i64.const 1) (i32.const 72)))
+  (call $emit (i32.const 1) (i32.const 64) (i32.const 16)))

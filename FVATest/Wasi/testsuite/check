@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# U29b2 E4: the selected wasi-testsuite cases (manifest.tsv, pinned files from scripts/fetch-corpus)
+# through `fva run`, each on a fresh copy of its fixture directory (guest name `/`, as the suite's
+# wasmtime adapter gives it), compared with expected/<id>/: exit, stdout, guest stderr (before the
+# last `fva run: `), every path + kind + file sha256 of the final tree. A differing case keeps its
+# bundle (command, input hashes, captures, diffs) in .cache/wasi-testsuite/failed/<id>.<engine>/.
+#   check            fva run vs expected
+#   check --oracle   + wasmtime vs expected on every `wasmtime`-basis row
+#   check --record E rewrite expected/ from engine E (wasmtime | fva) for the rows of its basis
+# Exit: 0 pass, 1 a case differs or the manifest is incomplete, 2 setup.
+set -uo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$here/../../.." && pwd)
+corpus=$root/.cache/corpus/wasi-testsuite
+fva=${FVA:-$root/.lake/build/bin/fva}
+wasmtime=$root/.tools/bin/wasmtime
+oracle=0 record=
+case ${1:-} in
+'') ;;
+--oracle) oracle=1 ;;
+--record) record=${2:?engine} ;;
+*)
+	echo 'usage: FVATest/Wasi/testsuite/check [--oracle | --record wasmtime|fva]' >&2
+	exit 2
+	;;
+esac
+"$root/scripts/fetch-corpus" >/dev/null || exit 2
+tmp=$(mktemp -d)
+trap 'rm -rf -- "$tmp"' EXIT
+fail=0
+
+# manifest: one row per test id, every row classified, every selected row with expected captures
+ids=$(awk -F'\t' 'NR > 1 {print $1}' "$here/manifest.tsv")
+dups=$(sort <<<"$ids" | uniq -d)
+if [[ -n $dups ]]; then
+	echo "testsuite: duplicate manifest rows: $dups"
+	fail=1
+fi
+if awk -F'\t' 'NR > 1 && ($3 != "selected" && $3 != "excluded" || $4 == "") {bad = 1} END {exit !bad}' \
+	"$here/manifest.tsv"; then
+	echo "testsuite: a manifest row is unclassified"
+	fail=1
+fi
+shopt -s nullglob
+for d in "$here"/expected/*/*/; do
+	id=${d#"$here/expected/"}
+	id=${id%/}
+	if ! awk -F'\t' -v i="$id" '$1 == i && $3 == "selected" {f = 1} END {exit !f}' "$here/manifest.tsv"; then
+		echo "testsuite: expected/$id has no selected manifest row"
+		fail=1
+	fi
+done
+
+capture() { # engine wasm fixture-dir args-json out
+	local eng=$1 w=$2 fix=$3 spec=$4 out=$5 flags=() args=() e
+	mkdir -p "$out/fs"
+	sha256sum "$w" >"$out/input.sha256" || return 2
+	if [[ -n $fix ]]; then
+		cp -a "$fix/." "$out/fs/" || return 2
+		(cd "$out/fs" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0r sha256sum) >>"$out/input.sha256"
+		flags+=(--dir "$out/fs::/")
+	fi
+	if [[ -f $spec ]]; then
+		while IFS= read -r e; do flags+=(--env "$e"); done < <(jq -r '(.env // {}) | to_entries[] | "\(.key)=\(.value)"' "$spec")
+		while IFS= read -r e; do args+=("$e"); done < <(jq -r '(.args // [])[]' "$spec")
+	fi
+	if [[ $eng == fva ]]; then
+		printf '%q ' "$fva" run "$w" "${flags[@]}" -- "${args[@]}" >"$out/command"
+	else
+		printf '%q ' "$wasmtime" run "${flags[@]}" "$w" "${args[@]}" >"$out/command"
+	fi
+	case $eng in
+	wasmtime) (cd "$out" && timeout 300 "$wasmtime" run "${flags[@]}" "$w" "${args[@]}" </dev/null >stdout 2>stderr) ;;
+	fva) (cd "$out" && timeout 300 "$fva" run "$w" "${flags[@]}" -- "${args[@]}" </dev/null >stdout 2>stderr.all) ;;
+	esac
+	echo $? >"$out/exit"
+	if [[ $eng == fva ]]; then
+		# guest stderr = stderr up to the last `fva run: ` (contract U29b2, CLI facts)
+		perl -0777 -ne 'my $i = rindex($_, "fva run: "); print($i < 0 ? $_ : substr($_, 0, $i))' \
+			"$out/stderr.all" >"$out/stderr"
+	fi
+	(cd "$out/fs" && find . -mindepth 1 -printf '%y %P\n' | LC_ALL=C sort) >"$out/layout"
+	(cd "$out/fs" && find . -type f -printf '%P\0' | LC_ALL=C sort -z | xargs -0r sha256sum) >"$out/files"
+	return 0
+}
+
+n=0
+while IFS=$'\t' read -r id sha sel basis; do
+	[[ $sel == selected ]] || continue
+	lang=${id%%/*} name=${id#*/}
+	dir=$corpus/tests/$lang/testsuite/wasm32-wasip1
+	w=$dir/$name.wasm spec=$dir/$name.json fix=
+	if ! echo "$sha  $w" | sha256sum -c --status; then
+		echo "testsuite: $id: binary missing or not the pinned bytes"
+		exit 2
+	fi
+	if [[ -f $spec ]] && [[ $(jq -r '.root // empty' "$spec") != "" ]]; then
+		fix=$dir/$(jq -r '.root' "$spec")
+	fi
+	exp=$here/expected/$id
+	engines=(fva)
+	((oracle)) && [[ $basis == wasmtime ]] && engines+=(wasmtime)
+	if [[ -n $record ]]; then
+		[[ $record == wasmtime && $basis == wasmtime || $record == fva && $basis != wasmtime ]] || continue
+		capture "$record" "$w" "$fix" "$spec" "$tmp/$id.$record" || exit 2
+		mkdir -p "$exp"
+		cp "$tmp/$id.$record"/{exit,stdout,stderr,layout,files} "$exp/"
+		continue
+	fi
+	for eng in "${engines[@]}"; do
+		capture "$eng" "$w" "$fix" "$spec" "$tmp/$id.$eng" || exit 2
+		bad=0
+		for f in exit stdout stderr layout files; do
+			if ! cmp -s "$exp/$f" "$tmp/$id.$eng/$f"; then
+				echo "testsuite: $id ($eng): $f differs from expected/$id/$f"
+				diff <(head -c 4000 "$exp/$f") <(head -c 4000 "$tmp/$id.$eng/$f") | tee -a "$tmp/$id.$eng/diff" | head -6
+				bad=1
+			fi
+		done
+		if ((bad)); then
+			fail=1
+			keep=$root/.cache/wasi-testsuite/failed/${id//\//_}.$eng
+			rm -rf "$keep" && mkdir -p "$keep" && cp -a "$tmp/$id.$eng/." "$keep/" && echo "testsuite: bundle $keep"
+		fi
+	done
+	n=$((n + 1))
+done < <(awk 'NR > 1' "$here/manifest.tsv")
+[[ -n $record ]] && exit 0
+echo "testsuite: $n selected cases ($(awk -F'\t' 'NR > 1 && $3 == "excluded"' "$here/manifest.tsv" | wc -l) excluded)$( ((oracle)) && echo ', wasmtime replayed')"
+exit "$fail"

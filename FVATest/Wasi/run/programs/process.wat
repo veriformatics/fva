@@ -1,0 +1,15 @@
+(func (export "_start") (local $n i32)
+  (call $ok (call $args_sizes (i32.const 64) (i32.const 68)))
+  (call $ok (call $args (i32.const 256) (i32.const 1024)))
+  (call $emit (i32.const 1) (i32.const 16384) (i32.const 5))
+  (call $emit (i32.const 1) (i32.const 1024) (i32.load (i32.const 68)))
+  (call $ok (call $env_sizes (i32.const 64) (i32.const 68)))
+  (call $ok (call $env (i32.const 512) (i32.const 4096)))
+  (call $emit (i32.const 1) (i32.const 16389) (i32.const 4))
+  (call $emit (i32.const 1) (i32.const 4096) (i32.load (i32.const 68)))
+  (call $emit (i32.const 1) (i32.const 16393) (i32.const 6))
+  (loop $more
+    (local.set $n (call $input (i32.const 0) (i32.const 8192) (i32.const 4096)))
+    (if (local.get $n) (then
+      (call $emit (i32.const 1) (i32.const 8192) (local.get $n))
+      (br $more)))))

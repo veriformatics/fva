@@ -1,0 +1,23 @@
+Usage: fva run <file.wasm> [options] [-- <arguments>...]
+
+Run a WASI command on FVA's verified machine and its verified WASI host. The program
+gets the arguments after --, with the file name of the module as argument 0. FVA reads
+standard input and every --dir directory before the program starts, and writes the
+changed files back when the program stops. The clocks read 0. FVA supports the 20 WASI
+calls of its model. The module must export _start (no parameters, no results) and its
+memory, and must have no start function and no _initialize export.
+
+Options:
+  --dir HOST[::GUEST]   Give the program the directory HOST, under the name GUEST
+                        (default: HOST as written). You can give this option more
+                        than once. The directories must not overlap. FVA accepts
+                        regular files and directories only.
+  --env NAME=VALUE      Add an environment variable. You can give this option more
+                        than once; FVA keeps the order and duplicate names.
+  --random HEX          Give these bytes to every random_get call (cut or padded with
+                        zeros), in place of fresh random bytes.
+  --fuel N              Stop after N machine steps.
+
+Exit status: the program's exit status (statuses from 126 on are reported as 1), 0
+when _start returns, 134 when the program traps, 1 for an exception that no handler
+catches, 2 when FVA cannot run or finish the program (the message names the cause).

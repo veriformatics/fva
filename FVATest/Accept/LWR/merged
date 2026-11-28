@@ -1,7 +1,8 @@
 # Gate-merged acceptance checks (scripts/test-accept): `ID [HOST]`, each unit appending the checks
 # it turns green; red at bd00b00 = credited. Green there = controls of the planted cases, merged with
 # them: U25 function/global/memory/table/module-true, D30.memory-boundaries, D29.cpp-build +
-# D29.cpp-oracle (U28f plants: SDK pin, fingerprint, oracle; docs/contracts/U28f-cpp-subject.md).
+# D29.cpp-oracle (U28f plants: SDK pin, fingerprint, oracle; docs/contracts/U28f-cpp-subject.md),
+# D28.declared-imports + D28.oracle-* (wasmtime = the oracle of the D28.run-* captures).
 U25.function-false
 U25.function-true
 U25.global-false
@@ -44,3 +45,12 @@ D29.official-ref_as_non_null
 D29.official-local_init
 D29.official-source-pins
 D29.outcomes-validator
+D28.run-process-empty
+D28.run-process-values
+D28.run-files
+D28.run-exit7
+D28.declared-imports
+D28.oracle-process-empty
+D28.oracle-process-values
+D28.oracle-files
+D28.oracle-exit7

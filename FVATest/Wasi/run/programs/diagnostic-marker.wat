@@ -1,0 +1,5 @@
+(data (i32.const 18000) "fva run: guest\0aX\00\fffva run: guest tail")
+(func (export "_start")
+  (call $effects)
+  (call $emit (i32.const 2) (i32.const 18000) (i32.const 37))
+  unreachable)

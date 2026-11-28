@@ -7,11 +7,14 @@ import FVA.Tool.Explain
 import FVA.Tool.Certify
 import FVA.Tool.Init
 import FVA.Tool.Call
+import FVA.Tool.Run
 
 /-- CLI entry point. -/
 def main (args : List String) : IO UInt32 := do
   if let cmd :: rest := args then
-    if (rest.contains "--help" || rest.contains "-h") && (FVA.Cli.usage cmd).isSome then
+    -- `fva run`'s arguments after `--` belong to the program
+    let opts := if cmd == "run" then rest.takeWhile (· != "--") else rest
+    if (opts.contains "--help" || opts.contains "-h") && (FVA.Cli.usage cmd).isSome then
       IO.print (FVA.Cli.usage cmd).get!
       return 0
   match args with
@@ -45,6 +48,7 @@ def main (args : List String) : IO UInt32 := do
     return 0
   | "certify" :: rest => FVA.Tool.Certify.main rest
   | "call" :: rest => FVA.Tool.Call.main rest
+  | "run" :: rest => FVA.Tool.Run.main rest
   | "init" :: rest => do FVA.Tool.Init.main (← FVA.Tool.Trust.fvaRoot) rest
   | "difftest" :: rest => FVA.Tool.Difftest.main rest
   | "trust" :: rest => FVA.Tool.Trust.main rest

@@ -1,0 +1,359 @@
+#!/usr/bin/env bash
+# CLI IO differential corpus. `wasmtime` grades exact-basis + relational rows;
+# `fva` grades every row. Failure bundles retain commands, hashes and raw captures.
+set -uo pipefail
+src=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$src/../../.." && pwd)
+engine=${1:-}
+shift "$(($# > 0 ? 1 : 0))"
+selected=
+if (($# == 2)) && [[ $1 == --case ]]; then
+	selected=$2
+	shift 2
+fi
+if (($#)) || [[ $engine != wasmtime && $engine != fva ]]; then
+	printf 'Usage: %s wasmtime|fva [--case ID]\n' "$0" >&2
+	exit 2
+fi
+fail_setup() {
+	printf 'SETUP %s\n' "$*" >&2
+	exit 2
+}
+for tool in jq xxd sha256sum timeout cmp; do command -v "$tool" >/dev/null || fail_setup "missing $tool"; done
+if [[ $engine == wasmtime ]]; then
+	runner=${WASMTIME:-$root/.tools/bin/wasmtime}
+else
+	runner=${FVA:-$root/.lake/build/bin/fva}
+fi
+runner=$(readlink -f "$runner") || fail_setup 'cannot resolve runner'
+[[ -x $runner ]] || fail_setup "runner not executable: $runner"
+if [[ $engine == wasmtime ]]; then
+	version=$("$runner" --version) || fail_setup 'oracle version failed'
+	[[ $version == 'wasmtime 50.0.0 '* ]] || fail_setup "unpinned oracle: $version"
+fi
+cases=$src/cases.json
+# Inputs remain relative to the disposable fixture; no case can redirect the harness.
+jq -e --slurpfile ids "$src/case-ids.json" '
+  def path: type=="string" and length>0 and (startswith("/")|not)
+    and (split("/")|all(.!=".." and .!="")) and (contains("\u0000")|not);
+  def bytes: type=="object" and ((keys==["text"] and (.text|type=="string"))
+    or (keys==["hex"] and (.hex|type=="string" and test("^([0-9a-f]{2})*$"))));
+  def tree: type=="array" and (map(.path)|length== (unique|length))
+    and all(.path|path) and all(.kind=="d" or .kind=="f" or .kind=="p" or .kind=="l" or .kind=="h")
+    and all(.[]|select(.kind=="f");.bytes|bytes) and all(.[]|select(.kind=="h");.target|path);
+  def basis: . as $b | ["wasmtime","relational","departure:diagnostics",
+    "departure:filesystem-shape","departure:fixed-bytes-random","departure:frozen-clocks",
+    "departure:host-io-failure","departure:large-exit","departure:load-rejection",
+    "departure:nonunique-numeric-choice","departure:option-rejection",
+    "departure:out-of-profile-stop","departure:step-limit"] | index($b)!=null;
+  .version==1 and (.cases|type=="array" and length>0)
+  and ([.cases[].id]|sort)==($ids[0]|sort)
+  and ([.cases[].id]|length==(unique|length))
+  and all(.cases[];
+    (.id|test("^[a-z0-9-]+$")) and (.program|test("^[a-z0-9-]+$"))
+    and (.basis|basis) and (has("diag")|not) and ((.diagnostic//false)|type=="boolean")
+    and ((.diagnosticContains//[])|type=="array" and all(type=="string" and length>0 and (contains("\u0000")|not)))
+    and (((.diagnosticContains//[])|length)==0 or .diagnostic==true)
+    and (.rows|type=="array" and length>0)
+    and (.opts|type=="array" and all(type=="string" and (contains("\u0000")|not)))
+    and (.args|type=="array" and all(type=="string" and (contains("\u0000")|not)))
+    and (.stdin|bytes) and (.tree|tree) and (.expect.tree|tree)
+    and (.expect.stdout|bytes) and (.expect.stderr|bytes)
+    and (.expect.rc|type=="number" and .>=0 and .<256 and floor==.)
+    and ((.wasmName//"p.wasm")|path and (contains("/")|not)))
+  and ([.cases[].rows[]]|unique|sort)==(["A1","A2","D1","D2","D3","D4","X1","X2","X3","O1","O2","F1","F2","P1"]|sort)
+' "$cases" >/dev/null || fail_setup 'missing, duplicate, unclassified or malformed case'
+if [[ -n $selected ]]; then
+	jq -e --arg id "$selected" '.cases|any(.id==$id)' "$cases" >/dev/null || fail_setup "no case $selected"
+fi
+outbase=${FVA_RUN_OUT:-$root/.cache/wasi-run}
+mkdir -p "$outbase" || fail_setup 'cannot create output parent'
+run=$(mktemp -d "$outbase/$engine.XXXXXXXX") || fail_setup 'cannot create run directory'
+build=$run/build
+"$src/build" "$build" >"$run/build.log" 2>&1 || fail_setup "WAT build failed: $run/build.log"
+if ! cmp -s "$src/wasm.sha256" "$build/sha256"; then
+	diff -u "$src/wasm.sha256" "$build/sha256" >"$run/wasm.diff" || :
+	fail_setup "WAT/tool pin changed: $run/wasm.diff"
+fi
+
+bytes() {
+	local json=$1 target=$2
+	if jq -e 'has("hex")' <<<"$json" >/dev/null; then
+		jq -r '.hex' <<<"$json" | xxd -r -p >"$target"
+	else
+		jq -j '.text' <<<"$json" >"$target"
+	fi
+}
+jstring() {
+	local var=$1 filter=$2 json=$3
+	IFS= read -r -d '' "$var" < <(jq -j "($filter),\"\\u0000\"" <<<"$json")
+}
+prepare() {
+	local json=$1 dest=$2 item path kind target
+	mkdir -p "$dest" || return 2
+	while IFS= read -r item; do
+		jstring path '.path' "$item"
+		mkdir -p "$dest/$path" || return 2
+	done < <(jq -c '.[]|select(.kind=="d")' <<<"$json")
+	while IFS= read -r item; do
+		jstring path '.path' "$item"
+		kind=$(jq -r '.kind' <<<"$item")
+		case $kind in
+		f) bytes "$(jq -c '.bytes' <<<"$item")" "$dest/$path" || return 2 ;;
+		p) mkfifo "$dest/$path" || return 2 ;;
+		l)
+			jstring target '.target' "$item"
+			ln -s -- "$target" "$dest/$path" || return 2
+			;;
+		esac
+	done < <(jq -c '.[]|select(.kind!="d" and .kind!="h")' <<<"$json")
+	while IFS= read -r item; do
+		jstring path '.path' "$item"
+		jstring target '.target' "$item"
+		ln -- "$dest/$target" "$dest/$path" || return 2
+	done < <(jq -c '.[]|select(.kind=="h")' <<<"$json")
+}
+snapshot() {
+	local dir=$1 prefix=$2
+	(cd "$dir" && /usr/bin/find . -mindepth 1 -printf '%y %P\0' | LC_ALL=C sort -z) >"$prefix.layout" || return 2
+	(cd "$dir" && /usr/bin/find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum) >"$prefix.files" || return 2
+	(cd "$dir" && while IFS= read -r -d '' p; do
+		printf '%s\0' "$p"
+		readlink -z -- "$p" || exit 2
+	done < <(/usr/bin/find . -type l -print0 | LC_ALL=C sort -z)) >"$prefix.links" || return 2
+}
+split_stderr() {
+	local raw=$1 guest=$2 diag=$3
+	if [[ $engine == wasmtime ]]; then
+		cp "$raw" "$guest"
+		: >"$diag"
+		return
+	fi
+	"$src/split-stderr" "$raw" "$guest" "$diag"
+}
+compare_tree() {
+	local actual=$1 expected=$2 bundle=$3 p bad=0
+	snapshot "$actual" "$bundle/actual" || return 2
+	snapshot "$expected" "$bundle/expected" || return 2
+	for p in layout files links; do
+		if ! cmp -s "$bundle/actual.$p" "$bundle/expected.$p"; then
+			printf 'tree-%s differs\n' "$p" >>"$bundle/failures"
+			if [[ $p == layout || $p == links ]]; then
+				tr '\0' '\n' <"$bundle/expected.$p" >"$bundle/expected.$p.txt"
+				tr '\0' '\n' <"$bundle/actual.$p" >"$bundle/actual.$p.txt"
+				diff -u "$bundle/expected.$p.txt" "$bundle/actual.$p.txt" >"$bundle/$p.diff" || :
+			else
+				diff -u "$bundle/expected.$p" "$bundle/actual.$p" >"$bundle/$p.diff" || :
+			fi
+			bad=1
+		fi
+	done
+	# Hashes index failures; cmp is the byte-equality decision for every file.
+	while IFS= read -r -d '' p; do
+		if [[ ! -f $actual/$p ]] || ! cmp -s "$expected/$p" "$actual/$p"; then bad=1; fi
+	done < <(cd "$expected" && /usr/bin/find . -type f -printf '%P\0')
+	return "$bad"
+}
+record() {
+	local id=$1 b=$2 rc=$3 basis=$4
+	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$basis" "$rc" \
+		"$(sha256sum "$b/stdout" | cut -d' ' -f1)" \
+		"$(sha256sum "$b/stderr" | cut -d' ' -f1)" \
+		"$(sha256sum "$b/actual.layout" | cut -d' ' -f1)" \
+		"$(sha256sum "$b/actual.files" | cut -d' ' -f1)" >>"$run/captures.tsv"
+}
+identity() {
+	local item=$1 work=$2 target=$3 path inode
+	: >"$target"
+	while IFS= read -r path; do
+		jstring path '.' "$path"
+		inode=$(stat -c '%d:%i' -- "$work/$path") || return 2
+		jq -cn --arg p "$path" --arg i "$inode" '{path:$p,inode:$i}' >>"$target"
+	done < <(jq -c '.tree[] as $t | .expect.tree[] |
+    select(.path==$t.path and .kind==$t.kind and (.kind!="f" or .bytes==$t.bytes)) | .path' <<<"$item")
+}
+run_one() {
+	local item=$1 id basis program mode b work rc got bad=0 path perm name livepid pipefd chunk inode entry i required
+	local -a opts=() args=() cmd=() oracle_opts=()
+	id=$(jq -r '.id' <<<"$item")
+	basis=$(jq -r '.basis' <<<"$item")
+	program=$(jq -r '.program' <<<"$item")
+	mode=$(jq -r '.mode//"normal"' <<<"$item")
+	b=$run/$id
+	work=$b/work
+	mkdir -p "$b" || return 2
+	prepare "$(jq -c '.tree' <<<"$item")" "$work" || return 2
+	prepare "$(jq -c '.expect.tree' <<<"$item")" "$b/expected-tree" || return 2
+	snapshot "$work" "$b/input" || return 2
+	identity "$item" "$work" "$b/identity.before" || return 2
+	bytes "$(jq -c '.stdin' <<<"$item")" "$b/stdin" || return 2
+	mapfile -d '' -t opts < <(jq -j '.opts[]|.+"\u0000"' <<<"$item")
+	mapfile -d '' -t args < <(jq -j '.args[]|.+"\u0000"' <<<"$item")
+	jstring name '.wasmName//(.program+".wasm")' "$item"
+	[[ -f $build/$program.wasm ]] || return 2
+	if [[ $name != "$program.wasm" ]]; then cp "$build/$program.wasm" "$build/$name" || return 2; fi
+	if [[ $engine == wasmtime ]]; then
+		# clap needs --env=VALUE for option-like values; guest inputs stay identical.
+		for ((i = 0; i < ${#opts[@]}; i += 2)); do oracle_opts+=("${opts[i]}=${opts[i + 1]}"); done
+		cmd=("$runner" run "${oracle_opts[@]}" "$build/$name" "${args[@]}")
+	else
+		cmd=("$runner" run "$build/$name" "${opts[@]}")
+		if ! jq -e '.omitDelimiter//false' <<<"$item" >/dev/null; then cmd+=(--); fi
+		cmd+=("${args[@]}")
+	fi
+	{
+		printf 'cd %q && ' "$work"
+		printf '%q ' "${cmd[@]}"
+		printf '< %q\n' "$b/stdin"
+	} >"$b/command"
+	while IFS=$'\t' read -r path perm; do
+		[[ -n $path ]] && chmod "$perm" "$work/$path"
+	done < <(jq -r '.modes//[]|.[]|[.path,.mode]|@tsv' <<<"$item")
+	if [[ $id == read-file-failure && -r $work/roots/one/keep.bin ]]; then return 2; fi
+	if [[ $id == sync-create-failure && -w $work/roots/one ]]; then return 2; fi
+	: >"$b/stdout"
+	: >"$b/stderr.raw"
+	: >"$b/failures"
+	case $mode in
+	visibility)
+		# A blocked read observes the first chunk; the process must still be live.
+		coproc GUEST { cd "$work" && exec timeout 10 "${cmd[@]}" <"$b/stdin" 2>"$b/stderr.raw"; }
+		livepid=$GUEST_PID
+		pipefd=${GUEST[0]}
+		chunk=
+		if ! IFS= read -r -N 6 -t 5 -u "$pipefd" chunk; then
+			printf 'first chunk unavailable before deadline\n' >>"$b/failures"
+			bad=1
+		elif [[ $chunk != $'FIRST\n' ]] || ! kill -0 "$livepid" 2>/dev/null; then
+			printf 'first chunk wrong or process already ended\n' >>"$b/failures"
+			bad=1
+		fi
+		printf '%s' "$chunk" >"$b/stdout"
+		kill "$livepid" 2>/dev/null || :
+		wait "$livepid" 2>/dev/null
+		rc=$?
+		;;
+	stdout-full)
+		(cd "$work" && timeout 30 "${cmd[@]}" <"$b/stdin" >/dev/full 2>"$b/stderr.raw")
+		rc=$?
+		;;
+	stderr-full)
+		(cd "$work" && timeout 30 "${cmd[@]}" <"$b/stdin" >"$b/stdout" 2>/dev/full)
+		rc=$?
+		;;
+	stdin-directory)
+		(cd "$work" && timeout 30 "${cmd[@]}" <"$work/roots/one" >"$b/stdout" 2>"$b/stderr.raw")
+		rc=$?
+		;;
+	*)
+		(cd "$work" && timeout 30 "${cmd[@]}" <"$b/stdin" >"$b/stdout" 2>"$b/stderr.raw")
+		rc=$?
+		;;
+	esac
+	printf '%s\n' "$rc" >"$b/exit"
+	# Inspection/cleanup need access after deliberate permission failures. Modes are
+	# outside the comparison contract; path kinds and every file byte remain checked.
+	chmod -R u+rwX "$work" "$b/expected-tree" || return 2
+	split_stderr "$b/stderr.raw" "$b/stderr" "$b/diagnostics"
+	if [[ $mode == random ]]; then
+		got=$(wc -c <"$b/stdout")
+		if ((rc != 0 || got != 64)); then
+			printf 'random rc=%s bytes=%s, expected 0/64\n' "$rc" "$got" >>"$b/failures"
+			bad=1
+		elif cmp -s <(head -c 32 "$b/stdout") <(tail -c 32 "$b/stdout"); then
+			printf 'two 32-byte RNG calls equal (false-positive probability 2^-256)\n' >>"$b/failures"
+			bad=1
+		fi
+		[[ ! -s $b/stderr ]] || {
+			printf 'random guest stderr differs\n' >>"$b/failures"
+			bad=1
+		}
+	elif [[ $mode != visibility ]]; then
+		got=$(jq -r '.expect.rc' <<<"$item")
+		if ((rc != got)); then
+			printf 'exit actual=%s expected=%s\n' "$rc" "$got" >>"$b/failures"
+			bad=1
+		fi
+		for path in stdout stderr; do
+			bytes "$(jq -c ".expect.$path" <<<"$item")" "$b/expected.$path" || return 2
+			if ! cmp -s "$b/$path" "$b/expected.$path"; then
+				printf '%s bytes differ\n' "$path" >>"$b/failures"
+				xxd "$b/expected.$path" >"$b/expected.$path.hex"
+				xxd "$b/$path" >"$b/actual.$path.hex"
+				diff -u "$b/expected.$path.hex" "$b/actual.$path.hex" >"$b/$path.diff" || :
+				bad=1
+			fi
+		done
+	fi
+	if [[ $engine == fva ]] && jq -e '.diagnostic//false' <<<"$item" >/dev/null; then
+		if ! LC_ALL=C /usr/bin/grep -aq '^fva run: ' "$b/diagnostics"; then
+			printf 'missing diagnostic prefix\n' >>"$b/failures"
+			bad=1
+		fi
+		while IFS= read -r required; do
+			if ! LC_ALL=C /usr/bin/grep -aFq -- "$required" "$b/diagnostics"; then
+				printf 'missing diagnostic content %q\n' "$required" >>"$b/failures"
+				bad=1
+			fi
+		done < <(jq -r '.diagnosticContains//[]|.[]' <<<"$item")
+	fi
+	compare_tree "$work" "$b/expected-tree" "$b"
+	got=$?
+	if ((got == 2)); then return 2; elif ((got != 0)); then bad=1; fi
+	while IFS= read -r entry; do
+		jstring path '.path' "$entry"
+		inode=$(jq -r '.inode' <<<"$entry")
+		got=$(stat -c '%d:%i' -- "$work/$path" 2>/dev/null) || got=missing
+		if [[ $got != "$inode" ]]; then
+			printf 'untouched entry replaced: %q\n' "$path" >>"$b/failures"
+			bad=1
+		fi
+	done <"$b/identity.before"
+	if jq -e 'has("merged")' <<<"$item" >/dev/null; then
+		prepare "$(jq -c '.tree' <<<"$item")" "$b/merged-work" || return 2
+		(cd "$b/merged-work" && timeout 30 "${cmd[@]}" <"$b/stdin" >"$b/merged.raw" 2>&1)
+		got=$?
+		split_stderr "$b/merged.raw" "$b/merged" "$b/merged.diag"
+		bytes "$(jq -c '.merged' <<<"$item")" "$b/expected.merged"
+		if ((got != rc)) || ! cmp -s "$b/merged" "$b/expected.merged"; then
+			printf 'cross-stream write order differs\n' >>"$b/failures"
+			bad=1
+		fi
+	fi
+	record "$id" "$b" "$rc" "$basis"
+	if ((bad)); then
+		printf 'FAIL %s (%s), %s\n' "$id" "$basis" "$b"
+		return 1
+	fi
+	printf 'PASS %s (%s; rc=%s)\n' "$id" "$basis" "$rc"
+}
+passed=0 failed=0 excluded=0 setup=0
+: >"$run/captures.tsv"
+while IFS= read -r item; do
+	id=$(jq -r '.id' <<<"$item")
+	basis=$(jq -r '.basis' <<<"$item")
+	if [[ -n $selected && $id != "$selected" ]]; then continue; fi
+	if [[ $engine == wasmtime && $basis == departure:* ]]; then
+		printf 'DEPARTURE %s (%s; fva-only)\n' "$id" "$basis"
+		((excluded += 1))
+		continue
+	fi
+	run_one "$item"
+	rc=$?
+	case $rc in
+	0) ((passed += 1)) ;;
+	1) ((failed += 1)) ;;
+	*)
+		printf 'SETUP %s; bundle %s\n' "$id" "$run/$id" >&2
+		((setup += 1))
+		;;
+	esac
+done < <(jq -c '.cases[]' "$cases")
+printf 'wasi-run %s: %s pass / %s fail / %s setup / %s declared departures\n' "$engine" "$passed" "$failed" "$setup" "$excluded"
+printf 'captures: %s\n' "$run/captures.tsv"
+if ((setup)); then exit 2; fi
+if ((failed)); then exit 1; fi
+# The caller can persist oracle observations; expectations are never updated here.
+if [[ -n ${FVA_RUN_RECORD:-} ]]; then cp "$run/captures.tsv" "$FVA_RUN_RECORD" || exit 2; fi
+if [[ ${FVA_RUN_KEEP:-0} != 1 ]]; then rm -rf -- "$run"; fi
+exit 0

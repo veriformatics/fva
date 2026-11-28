@@ -1,0 +1,2 @@
+rust/path_open_preopen	departure:rights (preopen masks: FVA base + fd_datasync, fd_sync, path_filestat_set_size; inheriting + path_filestat_set_size — U29a contract, E's departures: Rights)
+rust/directory_seek	departure:rights (an opened directory's rights = as requested, fd_seek kept; wasmtime reports synthesized masks without it, the test asserts that and panics on FVA — U29a contract, E's departures: Rights)
