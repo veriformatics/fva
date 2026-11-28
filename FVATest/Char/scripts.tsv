@@ -96,3 +96,8 @@ local_init	execution	10	0	0	2	0	0	4	0	0	0
 type-canon	execution	2	0	0	2	0	0	0	0	0	0
 type-equivalence	execution	32	0	0	21	0	0	1	0	0	0
 type-rec	execution	6	0	21	2	1	0	4	0	16	0
+br_table	execution	186	0	0	1	0	0	24	0	0	0
+ref	execution	13	0	0	1	0	0	12	0	0	0
+ref_is_null	execution	22	0	0	2	0	0	2	0	0	0
+table-sub	execution	3	0	0	1	0	0	2	0	0	0
+unreached-invalid	execution	121	0	0	0	0	0	121	0	0	0

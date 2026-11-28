@@ -151,7 +151,12 @@ ref_as_non_null 7 0 0
 local_init 10 0 0
 type-canon 2 0 0
 type-equivalence 32 0 0
-type-rec 6 0 21"
+type-rec 6 0 21
+br_table 186 0 0
+ref 13 0 0
+ref_is_null 22 0 0
+table-sub 3 0 0
+unreached-invalid 121 0 0"
 coverage="differential address 4 0 0 0
 validation address 4 0 0 1 0 0 0
 differential align 25 44 0 0
@@ -172,6 +177,8 @@ differential br_on_non_null 3 1 0 0
 validation br_on_non_null 3 0 0 1 0 0 0
 differential br_on_null 3 1 0 0
 validation br_on_null 3 0 0 1 0 0 0
+differential br_table 1 24 0 0
+validation br_table 1 0 0 24 0 0 0
 differential bulk 13 0 0 0
 validation bulk 13 0 0 0 0 0 0
 differential call 1 18 0 0
@@ -278,10 +285,14 @@ differential names 4 0 0 0
 validation names 4 0 0 0 0 0 0
 differential nop 1 4 0 0
 validation nop 1 0 0 4 0 0 0
+differential ref 1 12 0 0
+validation ref 1 0 0 12 0 0 0
 differential ref_as_non_null 2 1 0 0
 validation ref_as_non_null 2 0 0 1 0 0 0
 differential ref_func 3 3 0 0
 validation ref_func 3 0 0 3 0 0 0
+differential ref_is_null 2 2 0 0
+validation ref_is_null 2 0 0 2 0 0 0
 differential return 1 20 0 0
 validation return 1 0 0 20 0 0 0
 differential return_call 3 14 0 0
@@ -304,6 +315,8 @@ differential switch 1 1 0 0
 validation switch 1 0 0 1 0 0 0
 differential table 17 16 0 0
 validation table 18 0 0 19 3 0 0
+differential table-sub 1 2 0 0
+validation table-sub 1 0 0 2 0 0 0
 differential table_copy 52 0 0 0
 validation table_copy 52 0 0 0 0 0 0
 differential table_fill 1 9 0 0
@@ -340,6 +353,8 @@ differential type-rec 3 4 16 0
 validation type-rec 2 1 0 4 0 16 0
 differential unreachable 1 0 0 0
 validation unreachable 1 0 0 0 0 0 0
+differential unreached-invalid 0 121 0 0
+validation unreached-invalid 0 0 0 121 0 0 0
 differential unreached-valid 3 0 0 0
 validation unreached-valid 3 0 0 0 0 0 0
 differential unwind 1 0 0 0

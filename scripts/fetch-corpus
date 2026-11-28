@@ -117,6 +117,12 @@ files=(
 	"testsuite/type-equivalence.wast $ts/type-equivalence.wast b2dfe2e2c165b23e82092129be1f3141f3f11680f30bd0c4923aed06919f5cff"
 	"testsuite/type-rec.wast $ts/type-rec.wast 490fcb220f3dea47f5c41bd1971bd5f89a849071f34aeeb32c0a1bc7c85779a4"
 	"testsuite/type-canon.wast $ts/type-canon.wast 51506c9b325f4943c627b5bf42fbafcf30db33fe20922360ed4641932cbbbaf4"
+	# P′ pins: the official scripts whose modules lie in P′ alone, pinned after U28e
+	"testsuite/br_table.wast $ts/br_table.wast 9a44bc44564b70bc92e84cea94f6e7d1d3df1725619fcbf5f1d6cf3340f793a1"
+	"testsuite/ref.wast $ts/ref.wast e88b1fa4593cb2fe89bfebba31ba85cec6ad141b444194a79f50265263429b4c"
+	"testsuite/ref_is_null.wast $ts/ref_is_null.wast 876a66f7cd8cce163d62a2e8c2c4023a9aaf83c0b502f01521c7e689ee11d94f"
+	"testsuite/table-sub.wast $ts/table-sub.wast e40ed421ae67bd38f30b4830155134ff330f3f3f85b0f307ecdd6cb1a0d4ffe5"
+	"testsuite/unreached-invalid.wast $ts/unreached-invalid.wast f4dcbd0b6f25195224e6d04f6da04590f18563c97e89bd26d9194d2e3c4b92cc"
 	"lz4-wasm-block-codec.wasm $lz4wasm/dist/lz4-block-codec.wasm 4bda6947a0498618552cba53ab3780745fd34cc1a0d84696e83a0547dcd68acf"
 	"edgeR_4.99.10.tgz $art/edger-4.99.10/edgeR_4.99.10.tgz 4ebda0a8d813ab02392a397f984fd61bff853a0a9e23e3dcd658e0d157f0fb93"
 	"lz4-c.wasm $art/subject-builds-v1/lz4-c.wasm 8b73efb63f0467d9999d867007969b75826140dce9e5677bd0439dc6af384ac6"

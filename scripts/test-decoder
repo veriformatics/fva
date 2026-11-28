@@ -369,6 +369,6 @@ roundtrips E6 "${pprime[@]}"
 same7=$same
 line="E6 boundary:"
 for k in $(printf '%s\n' "${!tally[@]}" | LC_ALL=C sort); do line+=" $k=${tally[$k]}"; done
-echo "$line; P′ round trips equal: $same7 (pinned 2878)"
-((same7 == 2878)) || bad=1
+echo "$line; P′ round trips equal: $same7 (pinned 3044)"
+((same7 == 3044)) || bad=1
 exit "$bad"
