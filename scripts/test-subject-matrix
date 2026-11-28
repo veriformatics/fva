@@ -43,6 +43,11 @@ for expected in "$d"/results/*.args; do
 	key=${expected##*/}
 	key=${key%.args}
 	printf '%s\n' "$args" >"$d/calls/$key.$BASHPID" || exit 2
+	if [[ -f $d/results/$key.sleep ]]; then
+		mkdir -p "$d/stamps" && date +%s%N >"$d/stamps/$key.start" || exit 2
+		sleep "$(<"$d/results/$key.sleep")"
+		date +%s%N >"$d/stamps/$key.end" || exit 2
+	fi
 	if [[ -f $d/results/$key.kill-wrapper ]]; then
 		kill -s KILL "$PPID" || exit 2
 		exit 0
@@ -62,7 +67,8 @@ run_case() { # name dir expected-rc diagnostic [verdict-line] [jobs]
 	# Keep a supervisor: an implementation that execs the stub must not let its PPID kill this battery.
 	(
 		cd "$d" || exit 2
-		FVA="$d/fva" FVA_SUBJECT_JOBS="$jobs" "$runner" <"$d/table" >"$d/out" 2>&1
+		FVA="$d/fva" FVA_SUBJECT_JOBS="$jobs" FVA_SUBJECT_MEM="${MEM:-}" FVA_SUBJECT_CPUS="${CPUS:-}" \
+			"$runner" <"$d/table" >"$d/out" 2>&1
 		rc=$?
 		exit "$rc"
 	)
@@ -153,6 +159,47 @@ printf 'fva trust: FAIL\n  [fixture] default planted failure\nRead these: 7 code
 	>"$d/results/Matrix.Certificate.default.log"
 run_case crash-and-failure "$d" 3 'Matrix.Program paranoid crashed, rc 139' \
 	'Matrix.Certificate default trust rc 1'
+
+# U35 per-row memory weights (`mem=D/P` GiB; CPU budget lifted to 16 so memory alone decides):
+# runs are admitted in table order (row 1 default, row 1 paranoid, row 2 …), so with the mode
+# weights 6/9 every consecutive pair needs 15 GiB. Heavy rows (8/8) under 15 GiB never overlap
+# (the mode weights would); light rows (1/1) under 4 GiB overlap (the mode weights exceed it: one
+# run at a time); no weights under 15 GiB overlap (the control the overlap check fires on); a row
+# over the whole budget still runs.
+weighted() { # case weights… → dir whose rows carry the weights, every run sleeping 1 s
+	local d
+	d=$(fresh "$1") || return 2
+	shift
+	awk -v w="$*" 'BEGIN {split(w, ws, " ")} {print $0 (ws[NR] == "-" ? "" : " " ws[NR])}' \
+		"$d/table" >"$d/table.w" && mv "$d/table.w" "$d/table" || return 2
+	for f in "$d"/results/*.args; do printf '1\n' >"${f%.args}.sleep" || return 2; done
+	printf '%s\n' "$d"
+}
+overlaps() { # dir → count of overlapping run pairs (stub stamps)
+	for f in "$1"/stamps/*.start; do printf '%s %s\n' "$(<"$f")" "$(<"${f%.start}.end")"; done |
+		awk '{s[NR] = $1; e[NR] = $2} END {for (i = 1; i <= NR; i++) for (j = i + 1; j <= NR; j++)
+			if (s[i] < e[j] && s[j] < e[i]) n++; print n + 0}'
+}
+overlap_case() { # name weights-a weights-b mem want(none|some)
+	local d n
+	d=$(weighted "$1" "$2" "$3") || exit 2
+	MEM=$4 CPUS=16 run_case "$1" "$d" 0 '' '' 4
+	n=$(overlaps "$d")
+	if [[ $5 == none ]]; then
+		((n == 0)) || bad "$1: $n overlapping run pairs, want 0"
+	else
+		((n > 0)) || bad "$1: no overlapping run pair, want some"
+	fi
+}
+overlap_case weights-heavy mem=8/8 mem=8/8 15 none
+overlap_case weights-light mem=1/1 mem=1/1 4 some
+overlap_case weights-control - - 15 some
+d=$(weighted weights-over-budget mem=50/50 -) || exit 2
+MEM=10 CPUS=16 run_case weights-over-budget "$d" 0 '' '' 4
+for w in mem=0/9 mem=x mem=6 mem=6/9/1; do
+	d=$(weighted "weights-malformed-${w//[^0-9a-z]/_}" "$w" -) || exit 2
+	MEM=10 run_case "weights-malformed $w" "$d" 2 'malformed row'
+done
 
 # D74 verdict reuse: the same closure runs no fva; an edited subject file reruns that subject
 # alone; a FAIL is never reused; a new fva binary or a failing pins check reruns everything; the

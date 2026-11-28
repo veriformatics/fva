@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # U22: every subject's `fva trust` in default and --paranoid mode (docs/contracts/U22-subject-matrix.md).
-# stdin = subjects table, one `root spec subject surface` per line (subject `-` = a certificate);
+# stdin = subjects table, one `root spec subject surface [mem=D/P]` per line (subject `-` = a
+# certificate; mem = the row's memory weights in GiB, default / paranoid, U35);
 # one result per (root, mode), checked fail-closed. rc 0 = all 2N runs PASS with the pinned surface,
 # 1 = a FAIL (a missing result included), 2 = setup error, 3 = an fva run died by a signal.
-# FVA = the fva binary; FVA_SUBJECT_JOBS caps concurrency.
+# FVA = the fva binary; FVA_SUBJECT_JOBS caps concurrency; FVA_SUBJECT_MEM + FVA_SUBJECT_CPUS = the
+# memory (GiB) + CPU budgets (default: MemAvailable capped by a cgroup v2 limit, nproc).
 # D74 verdict reuse (FVA_SUBJECT_CACHE = a directory, unset = none): a (root, mode) PASS is
 # reused only for an input closure byte-identical to the green run that recorded it: the fva
 # binary, this script + scripts/verdict-key's shared inputs (the toolchain's lean/lake/leanexport +
@@ -23,10 +25,11 @@ mapfile -t subjects < <(grep -v '^[[:space:]]*$')
 	echo "subject-matrix: empty subjects table"
 	exit 2
 }
-declare -A seen
+declare -A seen rowmem
 for s in "${subjects[@]}"; do
-	read -r root spec subject surface extra <<<"$s"
-	if [[ -z ${surface:-} || -n ${extra:-} || ! $surface =~ ^[0-9]+$ ]]; then
+	read -r root spec subject surface weight extra <<<"$s"
+	if [[ -z ${surface:-} || -n ${extra:-} || ! $surface =~ ^[0-9]+$ ]] ||
+		[[ -n ${weight:-} && ! $weight =~ ^mem=[1-9][0-9]*/[1-9][0-9]*$ ]]; then
 		echo "subject-matrix: malformed row: $s"
 		exit 2
 	fi
@@ -34,6 +37,7 @@ for s in "${subjects[@]}"; do
 		echo "subject-matrix: $root listed twice"
 		exit 2
 	}
+	[[ -z ${weight:-} ]] || rowmem[$root]=${weight#mem=}
 	seen[$root]=1
 done
 tmp=$(mktemp -d)
@@ -48,6 +52,7 @@ if [[ -r $cg/memory.max && $(<"$cg/memory.max") != max ]]; then
 	head=$((($(<"$cg/memory.max") - $(<"$cg/memory.current")) / 1073741824))
 	((head < mem)) && mem=$head
 fi
+mem=${FVA_SUBJECT_MEM:-$mem} cpus=${FVA_SUBJECT_CPUS:-$cpus}
 cap=${FVA_SUBJECT_JOBS:-$cpus}
 declare -A wcpu=([default]=2 [paranoid]=6) wmem=([default]=6 [paranoid]=9) jcpu=() jmem=()
 used_cpu=0 used_mem=0
@@ -106,7 +111,7 @@ reap() {
 }
 declare -A keys
 for s in "${subjects[@]}"; do
-	read -r root spec subject surface <<<"$s"
+	read -r root spec subject surface _ <<<"$s"
 	for mode in default paranoid; do
 		id=$root.$mode
 		if [[ -n $shared ]]; then
@@ -118,6 +123,10 @@ for s in "${subjects[@]}"; do
 			fi
 		fi
 		c=${wcpu[$mode]} m=${wmem[$mode]}
+		# a row's own weights (U35: measured peaks); an over-budget run starts alone
+		if [[ -n ${rowmem[$root]:-} ]]; then
+			if [[ $mode == default ]]; then m=${rowmem[$root]%/*}; else m=${rowmem[$root]#*/}; fi
+		fi
 		while ((${#jcpu[@]})) && ((${#jcpu[@]} >= cap || used_cpu + c > cpus || used_mem + m > mem)); do
 			reap
 		done
@@ -130,7 +139,7 @@ while ((${#jcpu[@]})); do reap; done
 
 fail=0 crash=0 results=0
 for s in "${subjects[@]}"; do
-	read -r root _ _ surface <<<"$s"
+	read -r root _ _ surface _ <<<"$s"
 	for mode in default paranoid; do
 		id=$root.$mode r=$tmp/$root.$mode
 		rc=$(cat "$r.rc" 2>/dev/null)

@@ -10,8 +10,9 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 declare -A groups=(
-	[lean]="build checks test char accept decoder numerics floatdiff spec p2exec p2valid wasi wasi-run difftest fuzz-replay lint mutation pins olean-pins base-manifest"
+	[lean]="build checks test char decoder numerics floatdiff spec p2exec p2valid wasi wasi-run difftest fuzz-replay lint mutation pins olean-pins base-manifest"
 	[trust]="build trust"
+	[accept]="build accept"
 	[init]="build init"
 	[subjects]="build subjects"
 	[static]="format-lean shellcheck shfmt spec-lint scope json notices actionlint zizmor gitleaks-tree gitleaks-history osv-scanner"

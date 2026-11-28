@@ -33,6 +33,12 @@ structure Kernel where
   /-- Run with the main thread's stack unlimited (`ulimit -s unlimited`). -/
   bigStack : Bool := false
 
+/-- The con kernels' worker threads (U35, `docs/contracts/U35-ci-envelope.md`): at the host's
+thread count each holds ≈ 8–9 GB on CppEH's export, and `fva trust` runs nanoda + con-leche +
+con-ron as one batch (21 GB when the peaks meet on a 16 GB runner); at 2 they hold 4.6 + 5.5 GB
+for +33 % / +42 % wall (1: half again, at +75 % / +82 %). -/
+def conJobs : Nat := 2
+
 /-- Every bundled kernel (Lake `Check.lean` `bundledKernels` + `leanchecker`). -/
 def kernels : List Kernel :=
   [{ name := "leanchecker", lineage := "lean", bin := "leanchecker",
@@ -49,8 +55,10 @@ def kernels : List Kernel :=
    -- a fixed stack, which FVA's own export overflows (the decoder proofs' term depth)
    { name := "nanoda", lineage := "nanoda", bin := "nanoda_bin", args := ["CONFIG"],
      bigStack := true },
-   { name := "con-leche", lineage := "con", bin := "con-leche", args := ["EXPORT"] },
-   { name := "con-ron", lineage := "con", bin := "con-ron", args := ["EXPORT"] }]
+   { name := "con-leche", lineage := "con", bin := "con-leche",
+     args := [s!"--jobs={conJobs}", "EXPORT"] },
+   { name := "con-ron", lineage := "con", bin := "con-ron",
+     args := [s!"--jobs={conJobs}", "EXPORT"] }]
 
 /-- The default run set: Lean's kernel + con-leche, whose default mode carries a machine-checked
 guarantee that no file declaring a theorem of `False` is accepted. -/
