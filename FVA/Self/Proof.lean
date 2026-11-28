@@ -9,6 +9,9 @@ import FVA.Proof.Cert.Compile
 import FVA.Proof.Valid.Validator
 import FVA.Proof.Valid.Complete
 import FVA.Proof.Valid.Corollary
+import FVA.Proof.Lib.Witness
+import FVA.Spec.Exec.System
+import FVA.Lifted
 
 /-! Proofs of the self package's claims, from the unit theorems. -/
 
@@ -56,5 +59,66 @@ theorem validateSound : ValidateSound := fun _ h => FVA.Wasm.Valid.validate_soun
 theorem validateComplete : ValidateComplete := fun _ h => FVA.Wasm.Valid.validate_complete h
 
 theorem neverStuck : NeverStuck := FVA.Wasm.Valid.neverStuck
+
+/-! Input-domain witnesses (U37): small concrete inputs; `fva trust` checks each against its
+claim's obligation. -/
+
+section Witnesses
+
+open FVA.Wasm FVA.Wasm.Exec FVA.Wasm.Num
+
+/-- A configuration with nothing left to run. -/
+private def doneC : Config := ⟨{}, ⟨[], {}⟩, []⟩
+
+private theorem fpInputs : ∃ F, F ∈ [f32fmt, f64fmt] ∧ ∃ z₁ z₂ : FVal, z₁.WF F ∧ z₂.WF F :=
+  ⟨f32fmt, by simp, .inf false, .inf false, trivial, trivial⟩
+
+@[fva_witness DecodeSound] theorem decodeSound_domain : fva_obligation% DecodeSound :=
+  ⟨Binary.preamble, {}, rfl⟩
+
+@[fva_witness DecodeComplete] theorem decodeComplete_domain : fva_obligation% DecodeComplete :=
+  ⟨Binary.preamble, {}, Decode.decode_sound rfl⟩
+
+@[fva_witness StepSound] theorem stepSound_domain : fva_obligation% StepSound :=
+  ⟨NoHost, { doneC with instrs := [.plain .nop] }, doneC, rfl⟩
+
+@[fva_witness RunSound] theorem runSound_domain : fva_obligation% RunSound :=
+  ⟨⟨NoHost, 1, doneC, doneC, rfl⟩, ⟨NoHost, 1, doneC, doneC, rfl⟩⟩
+
+@[fva_witness RunDetMust] theorem runDetMust_domain : fva_obligation% RunDetMust :=
+  ⟨NoHost, fun _ => True, 1, doneC, doneC, rfl, fun _ _ => trivial⟩
+
+@[fva_witness InstantiateSound] theorem instantiateSound_domain :
+    fva_obligation% InstantiateSound :=
+  ⟨NoHost, 1, {}, {}, {}, [], {}, .nil, rfl⟩
+
+@[fva_witness FaddSound] theorem faddSound_domain : fva_obligation% FaddSound := fpInputs
+
+@[fva_witness FmulSound] theorem fmulSound_domain : fva_obligation% FmulSound := fpInputs
+
+@[fva_witness FdivSound] theorem fdivSound_domain : fva_obligation% FdivSound := fpInputs
+
+@[fva_witness VerdictCorrect] theorem verdictCorrect_domain : fva_obligation% VerdictCorrect :=
+  ⟨default, trivial⟩
+
+/-- Empty input and output: both empty integer lists. -/
+@[fva_witness CertSortSound] theorem certSortSound_domain : fva_obligation% CertSortSound :=
+  ⟨⟨0, 0⟩, ⟨0, 0⟩, by decide +kernel⟩
+
+/-- `(x+1)` and a toy module computing it (the bytes of `FVATest/Certs/Compile/E1`). -/
+@[fva_witness CertCompileSound] theorem certCompileSound_domain :
+    fva_obligation% CertCompileSound :=
+  ⟨⟨wasm_bytes% "28782b31290a", 6⟩,
+    ⟨wasm_bytes% "0061736d0100000001060160017f017f03020100070501016600000a09010700200041016a0b",
+      38⟩, by decide +kernel⟩
+
+@[fva_witness ValidateSound] theorem validateSound_domain : fva_obligation% ValidateSound :=
+  ⟨{}, rfl⟩
+
+@[fva_witness ValidateComplete] theorem validateComplete_domain :
+    fva_obligation% ValidateComplete :=
+  ⟨{}, Valid.validate_sound rfl⟩
+
+end Witnesses
 
 end FVA.Self.Proof

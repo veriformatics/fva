@@ -1,6 +1,7 @@
 import FVATest.Examples.Rust.Spec
 import FVA.Proof.Lib.Instance
 import FVA.Proof.Lib.Arith
+import FVA.Proof.Lib.Witness
 
 /-! Proofs of the Rust example's claims. -/
 
@@ -105,5 +106,10 @@ theorem gcd_holds : gcd := by
     iterate 6 wasm_step1 [hf, Lifted.func1, hb, ieqz_eq_zero]
     show Must _ _ (gcdHead s inst a b _)
     exact gcd_loop H s inst _ a b _ rfl hb
+
+/-! Input-domain witnesses (U37): `fva trust` checks each against its claim's obligation. -/
+
+@[fva_witness gcd] theorem gcd_domain : fva_obligation% gcd := ⟨0, 0, trivial⟩
+@[fva_witness clamp] theorem clamp_domain : fva_obligation% clamp := ⟨0, 0, 0, trivial⟩
 
 end Examples.Rust

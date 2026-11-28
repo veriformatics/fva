@@ -1,5 +1,6 @@
 import FVATest.Examples.Mislabeled.Spec
 import FVA.Proof.Lib.Instance
+import FVA.Proof.Lib.Witness
 
 /-! Proof of the mislabeled claim: proven, yet not what its name and docstring say. -/
 
@@ -23,5 +24,9 @@ theorem clamp_holds : clamp := by
       some ⟨s, ⟨[], {}⟩, vals [.i32 x]⟩ := by
     simp [runDet, wasm_step, invokeConfig, hf, Lifted.func0]
   exact must_returned_of_runDet hr rfl
+
+/-! Input-domain witnesses (U37): `fva trust` checks each against its claim's obligation. -/
+
+@[fva_witness clamp] theorem clamp_domain : fva_obligation% clamp := ⟨0, 0, 0, trivial⟩
 
 end Examples.Mislabeled

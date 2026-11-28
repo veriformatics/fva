@@ -28,7 +28,7 @@ theorem ruleUnproven_nil (r : Report) : ruleUnproven r = [] ↔ ∀ c ∈ r.clai
   split <;> simp_all [List.isEmpty_iff]
 
 theorem ruleAxiom_nil (r : Report) : ruleAxiom r = [] ↔
-    ∀ c ∈ r.claims, ∀ p ∈ c.proofs, ∀ a ∈ p.axioms, a ∈ standardAxioms := by
+    ∀ c ∈ r.claims, ∀ p ∈ c.proofs ++ c.witnesses, ∀ a ∈ p.axioms, a ∈ standardAxioms := by
   simp only [ruleAxiom, List.flatMap_eq_nil_iff, List.map_eq_nil_iff, List.filter_eq_nil_iff,
     Bool.not_eq_true', List.contains_iff_mem, Bool.not_eq_false]
 
@@ -42,6 +42,12 @@ theorem ruleLayout_nil (r : Report) :
   simp only [ruleLayout, List.flatMap_eq_nil_iff]
   refine forall₂_congr fun c _ => ?_
   split <;> simp_all
+
+theorem ruleUnwitnessed_nil (r : Report) : ruleUnwitnessed r = [] ↔ ∀ c ∈ r.claims,
+    c.domain = .notRequired ∨ ((∃ s, c.domain = .required s) ∧ c.witnesses ≠ []) := by
+  simp only [ruleUnwitnessed, List.flatMap_eq_nil_iff]
+  refine forall₂_congr fun c _ => ?_
+  cases c.domain <;> simp [List.isEmpty_iff]
 
 theorem ruleOverride_nil (r : Report) : ruleOverride r = [] ↔ r.flags = [] := by
   simp [ruleOverride]
@@ -126,14 +132,14 @@ theorem ruleSurface_nil (r : Report) : ruleSurface r = [] ↔
 theorem issues_nil_iff (r : Report) : issues r = [] ↔ Pass r := by
   simp only [issues, List.flatten_eq_nil_iff, List.forall_mem_cons, List.mem_nil_iff,
     false_implies, implies_true, and_true, ruleBuild_nil, ruleClaims_nil, ruleUnproven_nil,
-    ruleAxiom_nil, ruleVacuous_nil, ruleLayout_nil, ruleOverride_nil, ruleSyntax_nil,
-    ruleSubject_nil, rulePrelude_nil, ruleOlean_nil, ruleLink_nil, ruleReplay_nil,
+    ruleAxiom_nil, ruleVacuous_nil, ruleLayout_nil, ruleUnwitnessed_nil, ruleOverride_nil,
+    ruleSyntax_nil, ruleSubject_nil, rulePrelude_nil, ruleOlean_nil, ruleLink_nil, ruleReplay_nil,
     ruleChecker_nil, ruleSurface_nil]
   constructor
-  · rintro ⟨hb, hc, hu, ha, hv, hl, hf, hs, hj, hp, ho, hk, hr, hch, hsu⟩
-    exact ⟨hb, hc, hu, ha, hv, hl, hf, hs, hj, hp, ho, hk, hr, hch, hsu⟩
-  · rintro ⟨hb, hc, hu, ha, hv, hl, hf, hs, hj, hp, ho, hk, hr, hch, hsu⟩
-    exact ⟨hb, hc, hu, ha, hv, hl, hf, hs, hj, hp, ho, hk, hr, hch, hsu⟩
+  · rintro ⟨hb, hc, hu, ha, hv, hl, hw, hf, hs, hj, hp, ho, hk, hr, hch, hsu⟩
+    exact ⟨hb, hc, hu, ha, hv, hl, hw, hf, hs, hj, hp, ho, hk, hr, hch, hsu⟩
+  · rintro ⟨hb, hc, hu, ha, hv, hl, hw, hf, hs, hj, hp, ho, hk, hr, hch, hsu⟩
+    exact ⟨hb, hc, hu, ha, hv, hl, hw, hf, hs, hj, hp, ho, hk, hr, hch, hsu⟩
 
 theorem verdict_pass_iff (r : Report) : verdict r = .pass ↔ Pass r := by
   rw [← issues_nil_iff]

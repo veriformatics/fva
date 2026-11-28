@@ -514,12 +514,14 @@ instance : FromJson Row where
              kind := (j.getObjValAs? String "kind").toOption.getD "returns" }
 
 /-- A claim's proof status from the trust report: issues naming the claim or its proofs, plus
-the project-wide ones (no claim named). -/
+the project-wide ones (no claim named). An `[unwitnessed]` issue belongs to the claim its detail
+opens with (FVA's own text: the printed input domain may name other claims). -/
 def proofStatus (issues : List (String × String)) (every own : List String) :
     Bool × List String × List String :=
-  let names (d : String) (ns : List String) := ns.any fun n => mentions d n
-  let mine := issues.filter (fun (_, d) => names d own) |>.map (·.2)
-  let shared := (issues.filter fun (_, d) => !names d every).map (·.1) |>.eraseDups
+  let hit (t d n : String) : Bool :=
+    if t == "unwitnessed" then d.startsWith (n ++ ": ") else mentions d n
+  let mine := issues.filter (fun (t, d) => own.any (hit t d ·)) |>.map (·.2)
+  let shared := (issues.filter fun (t, d) => !every.any (hit t d ·)).map (·.1) |>.eraseDups
   (mine.isEmpty && shared.isEmpty, mine, shared)
 where
   /-- `n` occurs in `d` as a whole name (not inside a longer dotted name). -/

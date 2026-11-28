@@ -3,6 +3,7 @@ import FVA.Proof.Lib.Instance
 import FVA.Proof.Lib.Arith
 import FVA.Proof.Lib.Mem
 import Mathlib.Data.BitVec
+import FVA.Proof.Lib.Witness
 
 /-! Proofs of the `mem.wasm` claims. -/
 
@@ -156,5 +157,11 @@ theorem arraySum_holds : arraySum := by
     have hl : 0 < xs.length := List.length_pos_iff.mpr hn
     exact sum_loop H _ inst _ p.toNat xs hm hw hfit' rfl (xs.length - 1) 0 p _ 0 (by omega)
       (by simp) (by simp; omega) (by simp)
+
+/-! Input-domain witnesses (U37): `fva trust` checks each against its claim's obligation. -/
+
+@[fva_witness arraySum] theorem arraySum_domain : fva_obligation% arraySum := ⟨0, [], by decide⟩
+@[fva_witness classify] theorem classify_domain : fva_obligation% classify := ⟨0, 0, trivial⟩
+@[fva_witness callScale] theorem callScale_domain : fva_obligation% callScale := ⟨0, trivial⟩
 
 end Examples.Mem

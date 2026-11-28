@@ -6,6 +6,7 @@ import FVA.Spec.Cert
 import FVA.Trust.Lines
 import FVA.Spec.ClaimAttr
 import FVA.Trust.Olean
+import FVA.Trust.Obligation
 import FVA.Json
 
 /-!
@@ -373,6 +374,19 @@ def collect (input : Input) :
   let mut claims := #[]
   let mut stmtRoots := #[]
   let mut proofNames := #[]
+  -- U37 (`docs/contracts/U37-witness.md`): domains unfold project + subject definitions;
+  -- candidates = every `@[fva_witness]` entry naming the claim, read from the `.olean`s
+  let inU (n : Name) : Bool := originOf n == .project || originOf n == .subject
+  let mut marks : Std.HashMap Name (Array Name) := {}
+  for i in [:env.header.moduleNames.size] do
+    for (w, c) in FVA.witnessAttr.ext.getModuleEntries env i do
+      marks := marks.insert c ((marks.getD c #[]).push w)
+  let skew := ([`FVA.Trust.Obligation, `FVA.Proof.Lib.Witness].filter fun m =>
+    env.header.moduleNames.contains m && orig.get? m != some .base).map (·.toString)
+  let skewNote := if skew.isEmpty then "" else
+    s!" (the project's {", ".intercalate skew} is not FVA's pinned source: rebuild with this fva)"
+  let pp (e : Expr) : CoreM String := do
+    return toString (← (withOptions (·.setBool `pp.funBinderTypes true) (Meta.ppExpr e)).run')
   let marked (n : Name) : Bool := FVA.claimAttr.hasTag env n
   let unmarked ← userNames.filterM fun n => return !marked n && !isThm n && (← isProp n)
   for c in userNames.filter fun n => isThm n || marked n do
@@ -386,8 +400,35 @@ def collect (input : Input) :
       proofNames := proofNames.push p
     let roots := if thm then ci.type.getUsedConstants else meaningDeps ci
     stmtRoots := stmtRoots ++ roots
+    -- an in-spec theorem already fails `[layout]`: no domain is derived from it
+    let ob ← if thm then pure .notRequired else (obligation inU c).run'
+    let mut ws := #[]
+    let mut rej := #[]
+    let domain ← match ob with
+      | .notRequired => pure Domain.notRequired
+      | .unavailable why => pure (Domain.unavailable why)
+      | .required e => pure (Domain.required (← pp e))
+    if let .required e := ob then
+      for w in marks.getD c #[] do
+        match env.find? w with
+        | some (.thmInfo t) =>
+          if modOf env w == some input.specModule then
+            rej := rej.push s!"{w}: declared inside the spec module{skewNote}"
+          else if !t.levelParams.isEmpty then
+            rej := rej.push s!"{w}: has universe parameters{skewNote}"
+          else if t.type.eqv e then
+            let ax ← collectAxioms w
+            ws := ws.push { name := w.toString, axioms := (ax.map (·.toString)).toList }
+            proofNames := proofNames.push w
+          else
+            let cand ← pp t.type
+            let obl ← pp e
+            rej := rej.push <|
+              s!"{w}: states another proposition: {cand} (obligation: {obl})" ++ skewNote
+        | _ => rej := rej.push s!"{w}: is not a theorem{skewNote}"
     claims := claims.push { name := c.toString, provenInSpec := thm, proofs := ps.toList,
-                            subjects := statementSubjects roots }
+                            subjects := statementSubjects roots, domain,
+                            witnesses := ws.toList, rejected := rej.toList }
   -- audited closure: everything outside core + Mathlib reachable from the claims + proofs
   let claimNames := (claims.map (·.name.toName))
   let audit := closure (claimNames ++ proofNames) fun c =>

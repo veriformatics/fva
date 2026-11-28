@@ -7,6 +7,9 @@ paths:
   - "FVA/Tool/Sandbox.lean"
   - "FVA/Self/**"
   - "FVATest/Trust.lean"
+  - "FVATest/Witness.lean"
+  - "FVA/Spec/ClaimAttr.lean"
+  - "FVA/Proof/Lib/Witness.lean"
   - "FVATest/Cheats/**"
   - "trust/**"
 ---
@@ -14,6 +17,7 @@ paths:
 # `fva trust` law (U7, `docs/contracts/U7-trust.md`)
 
 - Claims = the spec module's `@[fva_claim]` definitions (`FVA/Spec/ClaimAttr.lean`, imported by every lifted and blob module through `FVA.Lifted`) + any theorem there (`[layout]`); the tag is read from `.olean` entries (`TagAttribute.hasTag` works under `loadExts := false`, scoped extensions such as instances do not); unmarked `Prop` defs = `Report.unmarked`, listed, never a FAIL.
+- Witnesses (U37, `docs/contracts/U37-witness.md`): `@[fva_witness C]` = `FVA.witnessAttr` (parametric, its `.olean` entries read under `loadExts := false`); obligation = `FVA.Trust.Obligation.obligation` (glue) under the collector's file classifier (project + subject unfolded); accepted = a theorem outside the spec module, no level parameters, type `Expr.eqv` to the obligation (never defeq: every kernel then checks it against the obligation itself); accepted witnesses join the audit closure + the export roots (test-trust: WitnessOther's export, `FVA_TRUST_EXPORT=<file>`, carries the accepted one, not the rejected); `fva_obligation%` (`FVA/Proof/Lib/Witness.lean`) = the same function under the name classifier, so a module the two place apart rejects the witness (fail closed). Printed statements = Lean's raw form (no notation extension is loaded).
 - Verdict = `FVA.Trust.verdict` over a `Report`, proven `= .pass ↔ Pass r` (`FVA/Proof/Trust.lean`); `FVA/Spec/Trust.lean` = the reviewed-once rules, imports nothing (it enters every project's closure). A new rule = a `Pass` conjunct + a `rule*` function + its `_nil` lemma + a cheat that fires it.
 - Project code (Lake config, build, `lake env`, explain's `lake env lean`) + the exporter run in `FVA.Tool.Sandbox` (bwrap: `/` ro, home covered ro, no network, no nested user namespace (`--disable-userns` + `--unshare-user`; bwrap < 0.8 or setuid → `Mode.nested`, noted on stderr), writable = `.lake` dirs + the caller's temp dir; a manifest `packagesDir` outside the project = its git packages' directories bound read-only, D66); a new process that runs project code goes through it too, since an unsandboxed one hands the project the user's account.
 - `[syntax]` (U36, `docs/contracts/U36-review-commands.md`): constants (`isSyntaxExt` heads + `[init]`) in review + subject modules, and `listedTokens` over each review module's source (`FVA/Trust/Lines.lean`, the collector's builtin token table: Mathlib keywords read as identifiers of the same text); the lists = `FVA/Spec/Trust.lean` `commandTokens` + `registersCode` (reviewed); a toolchain or Mathlib pin bump reruns the R2 enumeration.

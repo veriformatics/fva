@@ -53,7 +53,11 @@ Override override
 OverridePartial override
 OverrideExtern override
 CertEditedOut link
-CertEditedIn link"
+CertEditedIn link
+Unwitnessed unwitnessed --subject FVATest.Cheats.Unwitnessed.Impl
+WitnessOther unwitnessed
+WitnessSorry axiom,replay
+WitnessLayout layout,unwitnessed"
 mapfile -t cheats < <(cut -d" " -f1 <<<"$pinned" | sort -u)
 # the cheat roots are no default target: build them by module name
 lake build fva FVA "${cheats[@]/#/FVATest.Cheats.}" >/dev/null || exit 2
@@ -64,8 +68,8 @@ lake --wfail build "${examples[@]/#/FVATest.Examples.}" FVATest.Examples.Mislabe
 fva=.lake/build/bin/fva
 fail=0
 log=$tmp/log
-if ! lake build FVATest.Trust FVATest.Explain >"$log" 2>&1; then
-	echo "test-trust: glue checks (FVATest.Trust, FVATest.Explain) failed"
+if ! lake build FVATest.Trust FVATest.Explain FVATest.Witness >"$log" 2>&1; then
+	echo "test-trust: glue checks (FVATest.Trust, FVATest.Explain, FVATest.Witness) failed"
 	grep '^error' "$log" | head -5
 	fail=1
 fi
@@ -158,6 +162,10 @@ trust_json() { # CHEAT → its `--json` report alone (notes on stderr dropped)
 }
 job json.Clean trust_json Clean
 job json.MetaCmd trust_json MetaCmd
+# U37 C7: the replayed export carries the accepted witness (a root list without witnesses
+# replays fewer declarations, which every kernel accepts)
+job json.WitnessOther env FVA_TRUST_EXPORT="$tmp/witness-export.ndjson" bash -c \
+	"$(declare -f trust_json); fva=$fva; trust_json WitnessOther"
 wait
 runs=$(find "$tmp" -maxdepth 1 -name '*.sec' | wc -l)
 slowest=$(for f in "$tmp"/*.sec; do printf '%s %s\n' "$(<"$f")" "$(basename "$f" .sec)"; done |
@@ -271,6 +279,37 @@ if (($(rc json.Clean) != 0)) || [[ $clean != none ]] || (($(rc json.MetaCmd) != 
 		'pinned rc 0 none, rc 1 [["run_cmd at line 7"]]'
 	fail=1
 fi
+# U37 C2/C3: a rejected candidate never counts; one accepted candidate suffices per claim.
+if (($(rc json.WitnessOther) != 1)) || ! jq -e '
+	# the expected propositions come from C1 + the fixture (W(needed) = ∃ n : Nat, n = Clean.Lifted.len,
+	# W(other) = ∃ n : Nat, n = 3), each slot anchored whole; raw (loadExts := false, U7 F1) or infix
+	def eq3: test("^(Exists fun \\(n : Nat\\) => Eq n 3|∃ (\\(n : Nat\\)|n), n = 3)$");
+	def eqLen: test("^(Exists fun \\(n : Nat\\) => Eq n Cheats\\.Clean\\.Lifted\\.len|∃ (\\(n : Nat\\)|n), n = Cheats\\.Clean\\.Lifted\\.len)$");
+	def rejected(w): capture("^Cheats\\.WitnessOther\\." + w + ": states another proposition: (?<c>.*) \\(obligation: (?<o>.*)\\)$");
+	.verdict == "fail" and ([.issues[].tag] == ["unwitnessed"]) and
+	(.issues[0].detail | contains("wrongClaim") and contains("states another proposition")) and
+	(.report.claims | length == 2 and
+		any(.[]; .name == "Cheats.WitnessOther.needed" and .domain.kind == "required" and
+			(.domain.statement | eqLen) and .witnesses == [] and
+			(.rejected | length == 1 and (.[0] | rejected("wrongClaim") | (.c | eq3) and (.o | eqLen)))) and
+		any(.[]; .name == "Cheats.WitnessOther.other" and .domain.kind == "required" and
+			(.domain.statement | eq3) and
+			[.witnesses[] | {name, axioms}] ==
+				[{name: "Cheats.WitnessOther.exactCandidate", axioms: []}] and
+			(.rejected | length == 1 and (.[0] | rejected("defeqCandidate") |
+				(.c | test("^Cheats\\.WitnessOther\\.otherDomain")) and (.o | eq3)))))
+' "$tmp/json.WitnessOther.log" >/dev/null 2>&1; then
+	echo "test-trust: --json witnesses → WitnessOther rc $(rc json.WitnessOther);" \
+		"pinned rc 1, needed rejected, other accepted + rejected"
+	jq -c '.report.claims[] | {name, domain, witnesses, rejected}' "$tmp/json.WitnessOther.log" 2>/dev/null
+	fail=1
+fi
+if ! grep -q '"exactCandidate"' "$tmp/witness-export.ndjson" 2>/dev/null ||
+	grep -q '"defeqCandidate"' "$tmp/witness-export.ndjson"; then
+	echo "test-trust: WitnessOther's export → the accepted witness exactCandidate is not replayed" \
+		"(or the rejected defeqCandidate is)"
+	fail=1
+fi
 ((fail)) || echo "test-trust: glue checks + self package + $n cheat runs + 2 usage cases +" \
-	"2 JSON reports checked"
+	"3 JSON reports checked"
 exit "$fail"

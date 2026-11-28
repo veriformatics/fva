@@ -8,6 +8,7 @@ import FVATest.ValidRun
 import FVATest.Valid
 import FVATest.Trust
 import FVATest.Explain
+import FVATest.Witness
 import FVATest.Props
 import FVATest.Profile
 import FVATest.BaseLines

@@ -8,3 +8,4 @@ import FVA.Proof.Lib.BlockAttr
 import FVA.Proof.Lib.BlockEval
 import FVA.Proof.Lib.BlockFacts
 import FVA.Proof.Lib.BlockNumeric
+import FVA.Proof.Lib.Witness

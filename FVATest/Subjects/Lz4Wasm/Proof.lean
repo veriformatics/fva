@@ -1,6 +1,7 @@
 import FVATest.Subjects.Lz4Wasm.Spec
 import FVA.Proof.Lib.Instance
 import FVATest.Subjects.Lz4.Parse
+import FVA.Proof.Lib.Witness
 
 /-! Proofs of the lz4-wasm counterexamples (contract U14 S2). The run facts close by kernel
 evaluation of the reference interpreter on the lifted bytes; each store/memory fact is a top-level
@@ -91,5 +92,11 @@ theorem decode_traps_valid_holds : Subjects.Lz4Wasm.decode_traps_valid := by
   refine ⟨3, by decide +kernel, ⟨_, _, rfl, rfl, ?_⟩, ?_⟩
   · refine .cons ?_ (.cons ?_ (.cons ?_ .nil)) <;> exact ⟨⟩
   · exact must_trapped_of_runDet_get (n := 200) decRunSome (by kernel_rfl) trivial
+
+/-! Input-domain witness (U37): `fva trust` checks it against the claim's obligation. -/
+
+@[fva_witness encode_breaks_r1] theorem encode_breaks_r1_domain :
+    fva_obligation% encode_breaks_r1 :=
+  ⟨[], trivial⟩
 
 end Subjects.Lz4Wasm

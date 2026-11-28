@@ -124,7 +124,21 @@ open FVA.Trust Lean
    "timeout: --canary-limit)"]
 #guard (ruleAxiom { (default : Report) with
     claims := [⟨"c", false, [⟨"p", ["propext", "Classical.choice", "Quot.sound", "sorryAx"]⟩],
-      ["S"]⟩] }).map (·.detail) == ["p (proof of c) depends on sorryAx"]
+      ["S"], .notRequired, [], []⟩] }).map (·.detail) == ["p (proof of c) depends on sorryAx"]
+-- U37: a witness resting on `sorryAx` is an `[axiom]` like a proof, named by its role
+#guard (ruleAxiom { (default : Report) with
+    claims := [⟨"c", false, [⟨"p", []⟩], ["S"], .required "D", [⟨"w", ["sorryAx"]⟩], []⟩] }).map
+  (·.detail) == ["w (witness of c) depends on sorryAx"]
+-- U37 C3: one issue per claim without an accepted witness (its rejected lines folded in) or
+-- without a derivable domain; a witnessed or domain-free claim none
+#guard (ruleUnwitnessed { (default : Report) with
+    claims := [⟨"c", false, [], [], .required "D", [], ["w: states another proposition: E"]⟩,
+      ⟨"d", false, [], [], .unavailable "bound", [], []⟩,
+      ⟨"e", false, [], [], .required "D", [⟨"x", []⟩], []⟩,
+      ⟨"f", false, [], [], .notRequired, [], []⟩] }).map (fun i => (i.tag, i.detail)) ==
+  [("unwitnessed", "c: input domain without a witness (prove it in a theorem marked " ++
+      "@[fva_witness c] typed fva_obligation% c): D; rejected w: states another proposition: E"),
+   ("unwitnessed", "d: domain unavailable: bound")]
 
 #guard (ruleOlean { (default : Report) with tampered := ["M: x"] }).map
   (fun i => (i.tag, i.detail)) == [("olean", "M: x")]

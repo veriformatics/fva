@@ -24,8 +24,17 @@ namespace FVA.Tool.Trust
 
 open Lean FVA.Trust
 
-deriving instance ToJson for Proof, Claim, Flag, ReviewModule, FVA.Trust.Term, LinkKind, Link,
-  Status, KernelRun, CanaryRun, Report, Issue, Verdict
+deriving instance ToJson for Proof
+
+/-- U37 C3 shape `{kind, statement|why}` (the derived one nests the constructor name). -/
+instance : ToJson Domain where
+  toJson
+    | .notRequired => Json.mkObj [("kind", "notRequired")]
+    | .required s => Json.mkObj [("kind", "required"), ("statement", s)]
+    | .unavailable w => Json.mkObj [("kind", "unavailable"), ("why", w)]
+
+deriving instance ToJson for Claim, Flag, ReviewModule, FVA.Trust.Term, LinkKind, Link, Status,
+  KernelRun, CanaryRun, Report, Issue, Verdict
 
 /-- Parsed options. -/
 structure Opts where
@@ -165,6 +174,13 @@ def render (r : Report) (v : Verdict) (is : List Issue) (times : List (String ×
       let how := ((attach.find? (·.1 == c.name)).map fun (_, k) => s!" ({k})").getD ""
       out := out ++ s!"  {clean c.name} — about {clean (", ".intercalate c.subjects)}{how}\n" ++
         s!"    proved by {clean ("; ".intercalate prfs)}\n"
+      match c.domain with
+      | .notRequired => pure ()
+      | .unavailable why => out := out ++ s!"    input domain: unavailable ({clean why})\n"
+      | .required s =>
+        out := out ++ s!"    input domain: {clean s}\n"
+        unless c.witnesses.isEmpty do
+          out := out ++ s!"    witnessed by {clean (", ".intercalate (c.witnesses.map (·.name)))}\n"
     unless r.unmarked.isEmpty do
       out := out ++ "\nProp definitions without @[fva_claim] (not claims: nothing proves them)\n"
       for n in r.unmarked do out := out ++ s!"  {clean n}\n"
@@ -238,7 +254,7 @@ def run (argv : List String) : IO UInt32 := do
   -- + each lifted module's `decode_eq`: the fact tying `module` to the bytes is replayed by every
   -- run-set kernel even when no proof uses it
   let decls := (r.claims.map (·.name.toName) ++ r.claims.flatMap fun c =>
-    c.proofs.map (·.name.toName)).toArray ++
+    (c.proofs ++ c.witnesses).map (·.name.toName)).toArray ++
     (liftedModules env).toArray.map (fun (_, ns) => ns ++ `decode_eq) ++
     fixedBundle.filter env.contains
   let run := kernels.filter fun k => o.paranoid || defaultKernels.contains k.name
@@ -253,6 +269,9 @@ def run (argv : List String) : IO UInt32 := do
         #["--setenv", "LEAN_PATH", leanPath])
     let rebuilt ← rebuildMismatches rebuild (← findSysroot) sandbox tmp o.limit
     let exportOk ← exportDecls rootMod decls exportPath sandbox
+    -- `FVA_TRUST_EXPORT=<file>`: a copy of the replayed export (test-trust reads its names)
+    if let some keep := ← IO.getEnv "FVA_TRUST_EXPORT" then
+      if exportOk then IO.FS.writeBinFile keep (← IO.FS.readBinFile exportPath)
     let mut replay := #[]
     let mut times := #[]
     if exportOk then

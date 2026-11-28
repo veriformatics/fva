@@ -1,4 +1,5 @@
 import FVATest.Subjects.WasiGc.Spec
+import FVA.Proof.Lib.Witness
 import FVA.Proof.Wasi.Canonical
 import FVA.Proof.Valid.Validator
 import FVA.Proof.Exec.Imports
@@ -86,5 +87,9 @@ theorem countsGC_proof : countsGC := by
     rw [hex]; exact run_exits
   exact launch_sysMust inst_eq start_export memory_export hrun
     (sysMust_exited he ⟨run.1, _, rfl, run_stdout⟩) c mem hl
+
+/-- The domain is inhabited (U37): the launch the claim's first conjunct proves. -/
+@[fva_witness countsGC] theorem countsGC_domain : fva_obligation% countsGC :=
+  countsGC_proof.1
 
 end Subjects.WasiGc

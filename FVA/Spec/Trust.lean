@@ -21,6 +21,17 @@ structure Proof where
   axioms : List String
 deriving Repr, Inhabited
 
+/-- A claim's input domain (contract U37 C1): what a witness of it proves. -/
+inductive Domain where
+  /-- No binder on any conclusion path of the claim: nothing to witness. -/
+  | notRequired
+  /-- The obligation, printed: per conclusion path, its binders + premises closed existentially;
+  the paths conjoined. -/
+  | required (statement : String)
+  /-- The obligation could not be derived (unfolding bound, universe parameters, kernel error). -/
+  | unavailable (why : String)
+deriving Repr, Inhabited
+
 /-- One claim: a Prop-valued definition of the spec module. -/
 structure Claim where
   /-- Claim constant. -/
@@ -31,6 +42,13 @@ structure Claim where
   proofs : List Proof
   /-- The subject modules its statement closure mentions. -/
   subjects : List String
+  /-- Its input domain. -/
+  domain : Domain
+  /-- Theorems outside the spec module marked `@[fva_witness]` for it whose statement is exactly
+  the obligation. -/
+  witnesses : List Proof
+  /-- Each other theorem marked `@[fva_witness]` for it, with the reason it is no witness. -/
+  rejected : List String
 deriving Repr, Inhabited
 
 /-- `implemented_by`, `extern`, `unsafe`, `partial` or `opaque` on a declaration outside Lean
@@ -212,9 +230,11 @@ structure Pass (r : Report) : Prop where
   build : r.built = true
   claims : r.claims ≠ []
   unproven : ∀ c ∈ r.claims, c.proofs ≠ []
-  axiom_ : ∀ c ∈ r.claims, ∀ p ∈ c.proofs, ∀ a ∈ p.axioms, a ∈ standardAxioms
+  axiom_ : ∀ c ∈ r.claims, ∀ p ∈ c.proofs ++ c.witnesses, ∀ a ∈ p.axioms, a ∈ standardAxioms
   vacuous : ∀ c ∈ r.claims, c.subjects ≠ []
   layout : ∀ c ∈ r.claims, c.provenInSpec = false
+  unwitnessed : ∀ c ∈ r.claims,
+    c.domain = .notRequired ∨ ((∃ s, c.domain = .required s) ∧ c.witnesses ≠ [])
   override : r.flags = []
   syntax_ : (∀ m ∈ r.reviewModules, m.syntaxExts = [] ∧ m.commands = []) ∧ r.subjectSyntax = []
   subject : r.subjectMeaning = []

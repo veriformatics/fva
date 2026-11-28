@@ -38,7 +38,7 @@ Run `fva help` to see the commands, and `fva <command> --help` to see the argume
        [.i32 (if x.slt lo then lo else if hi.slt x then hi else x)]
    ```
 
-4. Prove each claim in `MyProof/Proof.lean` (an agent does this; `AGENT.md` explains the method). Nobody needs to read this file.
+4. Prove each claim in `MyProof/Proof.lean` (an agent does this; `AGENT.md` explains the method). Nobody needs to read this file. A claim with inputs also needs a witness: a proof that at least one input meets all of the claim's conditions. Without a witness, `fva trust` fails the claim with `[unwitnessed]`. The reason is that a claim whose conditions no input meets is true of every program, so it says nothing.
 5. Check the result:
 
    ```sh

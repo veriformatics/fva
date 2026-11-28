@@ -68,11 +68,12 @@ def ruleUnproven (r : Report) : List Issue :=
   r.claims.flatMap fun c =>
     if c.proofs.isEmpty then [⟨"unproven", s!"{c.name} has no proof"⟩] else []
 
-/-- `[axiom]`. -/
+/-- `[axiom]`: proofs and witnesses. -/
 def ruleAxiom (r : Report) : List Issue :=
-  r.claims.flatMap fun c => c.proofs.flatMap fun p =>
+  r.claims.flatMap fun c => (c.proofs ++ c.witnesses).flatMap fun p =>
     (p.axioms.filter (!standardAxioms.contains ·)).map fun a =>
-      ⟨"axiom", s!"{p.name} (proof of {c.name}) depends on {a}"⟩
+      let role := if c.proofs.any (·.name == p.name) then "proof" else "witness"
+      ⟨"axiom", s!"{p.name} ({role} of {c.name}) depends on {a}"⟩
 
 /-- `[vacuous]`. -/
 def ruleVacuous (r : Report) : List Issue :=
@@ -83,6 +84,18 @@ def ruleVacuous (r : Report) : List Issue :=
 def ruleLayout (r : Report) : List Issue :=
   r.claims.flatMap fun c =>
     if c.provenInSpec then [⟨"layout", s!"{c.name} is proven inside the spec module"⟩] else []
+
+/-- `[unwitnessed]`: a claim whose input domain has no witness, then each rejected candidate. -/
+def ruleUnwitnessed (r : Report) : List Issue :=
+  r.claims.flatMap fun c => match c.domain with
+    | .notRequired => []
+    | .required s =>
+      if c.witnesses.isEmpty then
+        [⟨"unwitnessed", s!"{c.name}: input domain without a witness (prove it in a theorem " ++
+          s!"marked @[fva_witness {c.name}] typed fva_obligation% {c.name}): {s}" ++
+          String.join (c.rejected.map fun x => s!"; rejected {x}")⟩]
+      else []
+    | .unavailable why => [⟨"unwitnessed", s!"{c.name}: domain unavailable: {why}"⟩]
 
 /-- `[override]`. -/
 def ruleOverride (r : Report) : List Issue :=
@@ -163,8 +176,8 @@ def ruleSurface (r : Report) : List Issue := ruleSources r ++ ruleBudget r
 /-- Every violated rule, in tag order. -/
 def issues (r : Report) : List Issue :=
   [ruleBuild r, ruleClaims r, ruleUnproven r, ruleAxiom r, ruleVacuous r, ruleLayout r,
-   ruleOverride r, ruleSyntax r, ruleSubject r, rulePrelude r, ruleOlean r, ruleLink r,
-   ruleReplay r, ruleChecker r, ruleSurface r].flatten
+   ruleUnwitnessed r, ruleOverride r, ruleSyntax r, ruleSubject r, rulePrelude r, ruleOlean r,
+   ruleLink r, ruleReplay r, ruleChecker r, ruleSurface r].flatten
 
 /-- PASS iff no rule is violated. -/
 def verdict (r : Report) : Verdict := if (issues r).isEmpty then .pass else .fail

@@ -65,7 +65,9 @@ def specFile (lib : String) (lifted : Bool) : String :=
 def proofFile (lib : String) : String :=
   s!"import {lib}.Spec\nimport FVA.Proof.Lib\n\n" ++
   "/-! Proofs: one theorem per claim, typed by the claim constant (`theorem answer_holds :\n" ++
-  "answer := …`). Nobody reads this file; `fva trust` checks it. -/\n\n" ++
+  "answer := …`), and for a claim with inputs one witness of its input domain\n" ++
+  "(`@[fva_witness answer] theorem answer_domain : fva_obligation% answer := …`). Nobody reads\n" ++
+  "this file; `fva trust` checks it. -/\n\n" ++
   s!"namespace {lib}\n\nopen FVA.Wasm FVA.Wasm.Exec FVA.Wasm.Exec.Ref\n\nend {lib}\n"
 
 /-- Copy `src` (a file or a directory tree) to `dst`. -/
