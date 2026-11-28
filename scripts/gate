@@ -19,7 +19,7 @@ declare -A groups=(
 )
 # the subjects step = CI jobs subjects-1..N, each one shard of scripts/test-subjects (its map assigns
 # each subject directory); a run without a subjects-K group takes every shard in one step
-subject_shards=3
+subject_shards=4
 ci_groups() {
 	local g k
 	for g in "${!groups[@]}"; do

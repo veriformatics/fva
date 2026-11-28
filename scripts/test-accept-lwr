@@ -349,9 +349,20 @@ if selected CppEH || [[ $group == D29 ]]; then
 			cp "$work/Lifted.lean" "$cpp/.Lifted.lean.$$" && mv -f "$cpp/.Lifted.lean.$$" "$cpp/Lifted.lean"
 		}
 	else fail D29.cpp-lift "lift rc=$last_rc; needs U28a/U28f"; fi
+	# fva trust imports the built in-package root, never builds it (a cold CI accept job: rc 2
+	# `cannot import … (built?)`), so the proof root builds first, as scripts/test-subjects builds its
+	cpp_built=1
+	if [[ -f $cpp/Proof.lean && -f $cpp/Lifted.lean ]]; then
+		(cd "$root" && lake --wfail build FVATest.Subjects.CppEH.Proof) >"$work/cpp-proof-build.log" 2>&1 ||
+			cpp_built=0
+	fi
 	for mode in default paranoid; do
 		if [[ ! -f $cpp/Proof.lean || ! -f $cpp/Lifted.lean ]]; then
 			need "D29.cpp-trust-$mode" 'U27+U29b: SysMust under the declared WASI environment E; exact vocabulary pending'
+			continue
+		fi
+		if ((! cpp_built)); then
+			fail "D29.cpp-trust-$mode" "the proof root does not build: $(grep -m1 '^error' "$work/cpp-proof-build.log")"
 			continue
 		fi
 		opts=()

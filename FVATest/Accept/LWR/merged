@@ -54,3 +54,5 @@ D28.oracle-process-empty
 D28.oracle-process-values
 D28.oracle-files
 D28.oracle-exit7
+D29.cpp-trust-default
+D29.cpp-trust-paranoid

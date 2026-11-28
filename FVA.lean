@@ -94,3 +94,7 @@ import FVA.Spec.Trust
 import FVA.Trust.Verdict
 import FVA.Proof.Trust
 import FVA.Self
+import FVA.Proof.Exec.Oblivious
+import FVA.Proof.Exec.ObliviousRun
+import FVA.Proof.Exec.ObliviousStep
+import FVA.Proof.Exec.Seam

@@ -86,18 +86,23 @@ other import stops the run. The run checks 72 inputs: the eight bit patterns of 
 oracle and 64 inputs from a fixed seed. Each result must match the source contract. Each odd input
 must throw one exception and make one host call, and each even input must do neither.
 `scripts/test-subjects` builds the module, and a result off the contract fails the step. The
-executable WASI host of U29b replaces the stub.
+claim's proof runs on the executable WASI host of U29b; `Run` keeps the stub as a control.
 
-## Proof seam
+## System claim (U28g)
 
-`Spec.lean` records the provisional goal `r1 : ∀ x : BitVec 32, Returns …`, with no input
-restriction. The expected proof root is `FVATest.Subjects.CppEH.Proof`, with a theorem whose
-type is `Subjects.CppEH.r1`. The suite checks lift support and both default / paranoid trust.
-Lift and proof modules are absent on the pre-EH revision. Eight calls do not prove the goal.
+`Spec.lean` states `r1` (13 review lines; contract `docs/contracts/U28g-cpp-claim.md`). From one
+fixed process start, every launch of `eh` on any 32-bit input `x` returns exactly `x + 1` for an
+even `x` and `x` XOR `0xa5a5a5a5` for an odd `x`. The start has the argument `eh.wasm`, no
+environment, an empty stdin, no preopened directory and every clock at 0. The world is the
+reviewed WASI model restricted to the environment `E`, and memory growth that fits succeeds.
+`Proof.lean` proves `r1` (`r1_proof`, domain witness `r1_domain`), and `fva trust` passes in
+default and `--paranoid` mode. `Proof.lean` also proves `start_wf` and `eh_path`: on an odd input
+the run ends with exactly one exception instance in its store, on an even input with none.
+`Neg/Odd` and `Neg/Even` each change one result and fail at the kernel.
 
-## System claim pending U29a + U29b
+### Why a system claim
 
-The provisional `Returns` goal does not fit this SDK artifact. `FVA/Spec/CAbi.lean` defines
+A C-ABI `Returns` claim does not fit this SDK artifact. `FVA/Spec/CAbi.lean` defines
 `Instance m H s inst := Instantiated H m {} [] s inst`, explicitly for import-free modules.
 The artifact's seven imports already block this claim form.
 
@@ -113,13 +118,6 @@ same provider, input `1` reaches the infinite loop, timeout rc 124 after three s
 probe itself returns 0 when both observations hold. This is a characterization probe, not a
 gate that requires the host dependency to remain.
 
-The selected form is a system claim: `SysMust` under the declared WASI model and environment
-profile `E`, for every input. The claim must state the environment contents; a profile that
-excludes `LIBUNWIND_PRINT_APIS` can disable the logging branch without changing the runtime.
-The stock SDK runtime and this counterexample stay. U28f covers build, lift and EH execution;
-the all-input proof follows the WASI model and executable host.
-
-The formal statement stays pending U29a + U29b (U28g writes it). MAIN must supply the exact
-imported-module/system vocabulary before `Spec.lean` is rewritten blind. Its current `Returns`
-draft is false for the artifact and is explicitly non-binding, not a ready-to-prove acceptance
-claim. No public API, environment default, replacement runtime or stub is invented in its place.
+The claim is therefore `SysMust` under the declared WASI model and environment profile `E`, for
+every input. The stock SDK runtime and the counterexample above stay; no replacement runtime
+or stub enters the claim.

@@ -57,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [lean, trust, accept, init, subjects-1, subjects-2, subjects-3, static]
+        group: [lean, trust, accept, init, subjects-1, subjects-2, subjects-3, subjects-4, static]
     steps:
       # The runner image leaves ≈ 2 GB free once the Mathlib cache and the build are restored; the
       # init lane's fva init project (vendored FVA, hard-linked Mathlib, its own build) ran the

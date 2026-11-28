@@ -27,6 +27,15 @@ if [[ -z ${WASI_SDK_PATH:-} && ! -e .tools/wasi-sdk/.pin-34.0 ]] &&
 		exit 2
 	}
 fi
+# the checks that run fva trust (D29.cpp-trust-*; D28.bustools + D51.java-all-input once merged)
+# read the pinned canary files (FVA/Trust/Canary.lean: a missing file = undecided ⇒ FAIL), and a
+# CI accept job starts without them (test-trust + test-subjects fetch their own)
+if printf '%s\n' "${rows[@]}" | grep -Eq '^(D29\.cpp-trust-|D28\.bustools|D51\.java-all-input)'; then
+	scripts/fetch-canaries >&2 || {
+		echo "test-accept: scripts/fetch-canaries failed"
+		exit 2
+	}
+fi
 out=$(mktemp) || exit 2
 trap 'rm -f "$out"' EXIT
 for g in $(printf '%s\n' "${rows[@]}" | cut -d. -f1 | sort -u); do
