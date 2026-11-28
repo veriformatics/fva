@@ -226,6 +226,19 @@
       "places": [
         "FVATest/Subjects/CppEH/eh.wasm"
       ]
+    },
+    {
+      "id": "bustools-count-wasm",
+      "file": "FVATest/Subjects/Bustools/bustools-count.wasm",
+      "sha256": "c6ee7ee98d218707fbfbab0dd728643476dc85d5234b78b661a833dd87a95297",
+      "license": "BSD-2-Clause AND Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND MIT AND CC0-1.0",
+      "upstream": "https://github.com/BUStools/bustools",
+      "version": "d4d7a283dbe9d34d2106e9ba31e2566413be6a70",
+      "source": "FVATest/Subjects/Bustools/build + stubs.cpp (bustools d4d7a283 src/, wasi-sdk 34.0 release: llvm-project 895aa2c896ada719451be2e3673c83da8ddf1141, wasi-libc 2e6fb9d8ee0c)",
+      "url": "https://github.com/veriformatics/fva-artifacts/releases/download/subject-builds-v2/bustools-count.wasm",
+      "places": [
+        "FVATest/Subjects/Bustools/bustools-count.wasm"
+      ]
     }
   ],
   "archives": [

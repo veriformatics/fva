@@ -33,6 +33,7 @@ import FVA.Proof.Decode.Name
 import FVA.Proof.Decode.Instr
 import FVA.Proof.Decode.Items
 import FVA.Proof.Decode.Module
+import FVA.Proof.Decode.Chunk
 import FVA.Proof.Numerics.GridLemmas
 import FVA.Proof.Numerics.Grid
 import FVA.Proof.Numerics.Round

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# D28/U29c C4 (docs/contracts/U29c-bustools.md): the count-only bustools build on upstream test
+# tc0004 (bustools d4d7a283 test/test_cases/runAutoTests.txt: `fromtext -p tc0004.txt | count -o
+# tmp/tc0004output/ --hist -m --genecounts -e matrix.ec -g transcripts_to_genes.txt -t
+# transcripts.txt -`) as two fresh processes, fromtext's whole stdout = count's stdin, run by `fva
+# run` (FVA's verified machine: decode, validation, the 20 WASI imports bound, instantiation,
+# `_start`) and by the pinned wasmtime: per process exit status, stdout + stderr, and the output
+# directory, equal across engines; output.mtx = upstream's tc0004ExpResultsCount.txt under its
+# `diff -w -B`. Concrete-run evidence (D28's claim = U29f). Usage: preflight [WASM] (default: the
+# placed bustools-count.wasm). rc 0 = as pinned, 1 = a difference, 2 = setup.
+set -uo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$here/../../.." && pwd)
+wasm=$(realpath "${1:-$here/bustools-count.wasm}") || exit 2
+src=https://raw.githubusercontent.com/BUStools/bustools/d4d7a283dbe9d34d2106e9ba31e2566413be6a70
+files=(
+	"tc0004.txt d3ea2725075302df3cd06adca696f99176fe92da30550b39700692299cf00284"
+	"matrix.ec da0285fc8e4461c50f00e119521bc0e98f25f42a34ee7b70719c10c2954c07ef"
+	"transcripts.txt 21d01fce7b7b8806874a24243c0384005817280147c5a424e6da5ee564f44969"
+	"transcripts_to_genes.txt 4eb828c9e0a5802275cd1dca494b01f4c174343f8818ec17c749e3cfe405424d"
+	"tc0004ExpResultsCount.txt 701e5a26f7ec0891caf70c79550854e893aca58bf957e181489a2cc6c24a58dc"
+)
+fva=$root/.lake/build/bin/fva wasmtime=$root/.tools/bin/wasmtime
+[[ -x $fva && -x $wasmtime ]] || {
+	echo "preflight: needs the built fva + scripts/fetch-tools' wasmtime" >&2
+	exit 2
+}
+work=$(mktemp -d) || exit 2
+trap 'rm -rf "$work"' EXIT
+cache=$root/.cache/bench/bustools-d4d7a283
+mkdir -p "$cache" || exit 2
+for e in fva wasmtime; do mkdir -p "$work/$e/test/test_cases" "$work/$e/tmp" || exit 2; done
+for row in "${files[@]}"; do
+	read -r f sha <<<"$row"
+	c=$cache/test_test_cases_$f
+	if [[ ! -f $c || $(sha256sum "$c" | cut -d' ' -f1) != "$sha" ]]; then
+		if ! curl -fsSL --retry 3 -o "$c.part" "$src/test/test_cases/$f" || ! mv "$c.part" "$c"; then
+			echo "preflight: fetching $f failed" >&2
+			exit 2
+		fi
+	fi
+	if [[ $(sha256sum "$c" | cut -d' ' -f1) != "$sha" ]]; then
+		echo "preflight: $f does not match its pinned sha256" >&2
+		exit 2
+	fi
+	for e in fva wasmtime; do cp "$c" "$work/$e/test/test_cases/$f" || exit 2; done
+done
+# ENGINE NAME STDIN ARGS…: one process in $work/ENGINE (preopen . = the engine's own tree)
+run() {
+	local e=$1 n=$2 in=$3
+	shift 3
+	if [[ $e == fva ]]; then
+		(cd "$work/fva" && "$fva" run "$wasm" --dir . -- "$@" <"$in" >"../fva.$n.out" 2>"../fva.$n.err")
+	else
+		(cd "$work/wasmtime" && "$wasmtime" run --dir . "$wasm" "$@" <"$in" >"../wasmtime.$n.out" \
+			2>"../wasmtime.$n.err")
+	fi
+	echo $? >"$work/$e.$n.rc"
+}
+fail=0
+for e in fva wasmtime; do
+	run "$e" fromtext /dev/null fromtext -p ./test/test_cases/tc0004.txt
+	run "$e" count "$work/$e.fromtext.out" count -o ./tmp/tc0004output/ --hist -m --genecounts \
+		-e ./test/test_cases/matrix.ec -g ./test/test_cases/transcripts_to_genes.txt \
+		-t ./test/test_cases/transcripts.txt -
+done
+for n in fromtext count; do
+	for x in rc out err; do
+		cmp -s "$work/fva.$n.$x" "$work/wasmtime.$n.$x" || {
+			echo "preflight: $n $x differs: fva vs wasmtime"
+			fail=1
+		}
+	done
+	[[ $(cat "$work/fva.$n.rc") == 0 ]] || {
+		echo "preflight: $n exit status $(cat "$work/fva.$n.rc"), want 0"
+		fail=1
+	}
+done
+if ! diff -r "$work/fva/tmp" "$work/wasmtime/tmp" >/dev/null; then
+	echo "preflight: the output directories differ: fva vs wasmtime"
+	fail=1
+fi
+if ! diff -w -B "$work/fva/test/test_cases/tc0004ExpResultsCount.txt" \
+	"$work/fva/tmp/tc0004output/output.mtx" >/dev/null; then
+	echo "preflight: output.mtx differs from upstream's tc0004ExpResultsCount.txt (diff -w -B)"
+	fail=1
+fi
+((fail)) || echo "preflight: fromtext | count on tc0004: fva run = wasmtime, output.mtx = upstream's ($(wc -c <"$work/fva/tmp/tc0004output/output.mtx") B)"
+exit "$fail"

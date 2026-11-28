@@ -8,6 +8,7 @@ __pycache__/
 !FVATest/Examples/**/*.wasm
 !FVATest/Subjects/**/*.wasm
 !FVATest/Certs/**/*.wasm
+!FVATest/LiftChunks/*.wasm
 # local state
 .scratch/
 .cache/
@@ -30,6 +31,8 @@ FVATest/Subjects/GlmIround/glm-iround.wasm
 FVATest/Subjects/GlmIround/Lifted.lean
 FVATest/Subjects/CppEH/eh.wasm
 FVATest/Subjects/CppEH/Lifted.lean
+FVATest/Subjects/Bustools/bustools-count.wasm
+FVATest/Subjects/Bustools/Lifted.lean
 bench/subjects/wasm/lz4-c.wasm
 bench/subjects/wasm/lz4-flex.wasm
 bench/subjects/wasm-glm/glm-iround.wasm

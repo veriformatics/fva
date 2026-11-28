@@ -5,7 +5,7 @@ namespace FVA.Tool
 /-- `(path, sha256)` of every FVA library source but this file. -/
 def baseManifest : List (String × String) := [
   ("FVA.lean",
-    "05700d8e2e9806be40939f704110248cb945f252781e1e02b256ab89b436854a"),
+    "1bbc923d82ef644c27fb2d680eb97d90dbe1a0e683baeff289f4e4d6044d810d"),
   ("FVA/Cli.lean",
     "70dff788919d28b9a4c64d94c09bb755ae2c5d98c9d5a29baf8b53dad618fd7b"),
   ("FVA/Explain.lean",
@@ -56,6 +56,8 @@ def baseManifest : List (String × String) := [
     "90b20dd04516a1736adadbf6250d26bf25b2c43c0bc65ec7738d8fca5d34f858"),
   ("FVA/Proof/Cert/Sort.lean",
     "dbcfdb6930fdd36268d1c4a49df529fdc5fd44ad8ab4c2fa1c0d9379ffa641be"),
+  ("FVA/Proof/Decode/Chunk.lean",
+    "e5a18f57b6bbd08b177d04707afe9ebd0a63b22780ffd23a8904cd187fc93d29"),
   ("FVA/Proof/Decode/Instr.lean",
     "eebc97f752fc85288e82546cd4432bdb7ed41b9eba3e2a5acee6d8c807609c83"),
   ("FVA/Proof/Decode/Items.lean",
@@ -373,7 +375,7 @@ def baseManifest : List (String × String) := [
   ("FVA/Tool/Init.lean",
     "4241340a4499aa0a61271bd8e80de8ba98405e387f4b90e078cd0d3394049e6b"),
   ("FVA/Tool/Lift.lean",
-    "f815c915939c6f405a13f6b043cdaf56151e4914877df529487b25ff936e6e64"),
+    "f46ab5d8470ec3c7192172d7549feaf12fc201dac3c7fd493ec388042f0c59e8"),
   ("FVA/Tool/Pack.lean",
     "c0d7fea682c1b880d071b7d1094e6e7416c13f6027feb2c73f506d758fae915a"),
   ("FVA/Tool/Run.lean",

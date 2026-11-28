@@ -10,7 +10,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 declare -A groups=(
-	[lean]="build checks test char decoder numerics floatdiff spec p2exec p2valid wasi wasi-run difftest fuzz-replay lint mutation pins olean-pins base-manifest"
+	[lean]="build checks test char lift-chunks decoder numerics floatdiff spec p2exec p2valid wasi wasi-run difftest fuzz-replay lint mutation pins olean-pins base-manifest"
 	[trust]="build trust"
 	[accept]="build accept"
 	[init]="build init"
@@ -104,6 +104,8 @@ lean_lane() {
 	# characterization goldens (official-script outcomes, CLI help, lifts): beside the rest, once
 	# fvatest + fva are built
 	if ((fast)); then run char scripts/test-char --fast & else run char scripts/test-char & fi
+	# U29c: the chunked decode_eq on small fixtures at test policies + its kernel plants
+	run lift-chunks scripts/test-lift-chunks &
 	# the acceptance checks merged so far (FVATest/Accept/LWR/merged): full gate only
 	if ((! fast)); then run accept scripts/test-accept & fi
 	run decoder scripts/test-decoder

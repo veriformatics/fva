@@ -16,6 +16,8 @@ import FVATest.BaseLines
 /-- Runtime checks (no arguments): the lakefile version matches `FVA.version`; the fixed-seed
 property tests (`FVATest.Props`, D69).
 `reencode <in.wasm> <out.wasm>`: decode, then write the re-encoding (decoder differential, E2).
+`lift-chunked <in.wasm> <out.lean> <ns> <threshold> <target>`: `fva lift`'s file under a test
+chunking policy (U29c C2, `scripts/test-lift-chunks`).
 `numeric <script.json>…`: run numeric test scripts (U3 E1); prints `name pass fail skip`.
 `spec [--engine ref|machine] [--fuel N] <script.json>…`: run execution scripts on the optimized
 machine (default) or the reference stepper; prints `engine <name> fuel <n>`, then per script
@@ -36,6 +38,15 @@ def main : List String → IO UInt32
     | .error e =>
       IO.eprintln s!"fvatest reencode: {repr e}"
       return 1
+  | ["lift-chunked", src, dst, ns, t, b] => do
+    let bs ← IO.FS.readBinFile src
+    match FVA.Wasm.Decode.decode (FVA.Tool.packBytes bs) bs.size, t.toNat?, b.toNat? with
+    | .ok m, some t, some b =>
+      IO.FS.writeFile dst (FVA.Tool.Lift.file ns bs m src { threshold := t, target := b })
+      return 0
+    | _, _, _ =>
+      IO.eprintln "fvatest lift-chunked: an undecodable module or a non-numeric policy"
+      return 2
   | "validate" :: files => FVA.Test.ValidRun.run files
   | "classify" :: files => FVA.Test.Profile.run files
   | ["base-lines"] => FVA.Test.BaseLines.run

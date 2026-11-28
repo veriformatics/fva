@@ -223,16 +223,224 @@ def dataBytes (bs : List UInt8) : String :=
 def localRuns (ls : List (Nat × ValType)) : String :=
   list (ls.map fun (k, t) => s!"({k}, {valType t})")
 
+/-- When `decode_eq` is assembled from chunks (U29c, frozen after its measurements): one kernel
+evaluation of the decoder stops near 0.5 MB of code in a 16 GiB kernel, so a code section whose
+content exceeds `threshold` bytes is split into greedy chunks of whole entries (an entry = its
+size LEB + content), each at most `target` bytes or one larger entry alone. Boundaries follow
+from the bytes + policy alone, so a re-lift (`fva trust`) reproduces the file. -/
+structure Chunking where
+  /-- Code section content, in bytes, above which `decode_eq` is assembled from chunks. -/
+  threshold : Nat := 131072
+  /-- Entry bytes per chunk. -/
+  target : Nat := 32768
+
+/-- Byte `i` (`0` past the end: the walks below read a module that decoded). -/
+def byteAt (bs : ByteArray) (i : Nat) : Nat := (bs.data.getD i 0).toNat
+
+/-- The unsigned LEB128 at `o` (at most 5 bytes, as the decoder's `u32`): value and width. -/
+def leb (bs : ByteArray) (o : Nat) : Nat × Nat := Id.run do
+  let mut v := 0
+  for i in [0:5] do
+    let b := byteAt bs (o + i)
+    v := v + b % 128 * 128 ^ i
+    if b < 128 then return (v, i + 1)
+  return (v, 5)
+
+/-- A section: its id, the offset of its id byte, the width of its size LEB, its size. -/
+structure Sec where
+  id : Nat
+  off : Nat
+  w : Nat
+  size : Nat
+
+/-- The offset of a section's content. -/
+def Sec.start (s : Sec) : Nat := s.off + 1 + s.w
+
+/-- The offset past a section's end. -/
+def Sec.stop (s : Sec) : Nat := s.start + s.size
+
+/-- The sections after the 8-byte header, in file order. -/
+def sections (bs : ByteArray) : Array Sec := Id.run do
+  let mut o := 8
+  let mut out := #[]
+  for _ in [0:bs.size] do
+    if bs.size ≤ o then break
+    let (size, w) := leb bs (o + 1)
+    let s : Sec := { id := byteAt bs o, off := o, w, size }
+    out := out.push s
+    o := s.stop
+  return out
+
+/-- A code section's entries: file offset + bytes (size LEB + content) each. -/
+def codeEntries (bs : ByteArray) (s : Sec) : Array (Nat × Nat) := Id.run do
+  let (count, cw) := leb bs s.start
+  let mut o := s.start + cw
+  let mut out := #[]
+  for _ in [0:count] do
+    if s.stop ≤ o then break
+    let (k, w) := leb bs o
+    out := out.push (o, w + k)
+    o := o + w + k
+  return out
+
+/-- Consecutive code entries: the first one's index, their count, file offset and bytes. -/
+structure Chunk where
+  first : Nat
+  count : Nat
+  off : Nat
+  size : Nat
+
+/-- Greedy chunks: each takes entries while it stays within `target` bytes; an entry larger than
+`target` forms a chunk alone. -/
+def chunks (target : Nat) (es : Array (Nat × Nat)) : Array Chunk := Id.run do
+  let mut out := #[]
+  let mut cur : Option Chunk := none
+  let mut i := 0
+  for (o, k) in es do
+    match cur with
+    | some c =>
+      if c.size + k ≤ target then
+        cur := some { c with count := c.count + 1, size := c.size + k }
+      else
+        out := out.push c
+        cur := some { first := i, count := 1, off := o, size := k }
+    | none => cur := some { first := i, count := 1, off := o, size := k }
+    i := i + 1
+  if let some c := cur then out := out.push c
+  return out
+
+/-- The accumulator after section `id`, from the previous one `a` (`sectionInto`'s update, its
+value taken from the rendered module). -/
+def accAfter (m : Module) (id : Nat) (a codes : String) : String :=
+  let field (f : String) := s!"\{ {a} with m := \{ {a}.m with {f} := module.{f} } }"
+  match id with
+  | 1 => field "types" | 2 => field "imports" | 4 => field "tables" | 5 => field "mems"
+  | 13 => field "tags" | 6 => field "globals" | 7 => field "exports" | 8 => field "start"
+  | 9 => field "elems" | 11 => field "datas"
+  | 3 => s!"\{ {a} with typeIdxs := module.funcs.map Func.type }"
+  | 12 => s!"\{ {a} with dataCount := some {m.datas.length} }"
+  | _ => s!"\{ {a} with codes := {codes} }"
+
+/-- The chunked proof of `decode_eq`, when the code section exceeds `c.threshold` bytes: per
+chunk a numeral of its entry bytes + their decoding (`kernel_rfl`), stitched by
+`Chunk.two_chunks`; per section slot a `Chunk.slot_take`/`slot_skip` step whose facts the kernel
+checks on the input's suffixes `tailAt o`; then `Chunk.decode_of_steps`. -/
+def chunked (c : Chunking) (bs : ByteArray) (m : Module) : Option String := do
+  let secs := sections bs
+  let code ← secs.find? (·.id == 10)
+  guard (c.threshold < code.size)
+  let cs := chunks c.target (codeEntries bs code)
+  guard (!cs.isEmpty)
+  let entries (k : Chunk) := list ((List.range k.count).map fun i =>
+    s!"(func{k.first + i}.locals, func{k.first + i}.body)")
+  -- chunks 0…j packed in `two_chunks`' own shape, so each statement matches its proof
+  -- syntactically (the elaborator evaluates nothing)
+  let offs := cs.foldl (fun acc k => acc.push (acc.back?.getD 0 + k.size)) #[]
+  let packed (j : Nat) := " + ".intercalate ((List.range (j + 1)).map fun i =>
+    if i == 0 then "code0" else s!"code{i} <<< (8 * {offs[i - 1]!})")
+  let codesEqOf (j : Nat) := if j == 0 then "chunk0_eq" else s!"codes{j}_eq"
+  let joined (j : Nat) := " ++ ".intercalate ((List.range (j + 1)).map (s!"entries{·}"))
+  let mut out := s!"/-! `decode_eq` from {cs.size} chunks: the code section's {code.size} " ++
+    s!"bytes exceed {c.threshold}; chunks of at most {c.target} entry bytes. -/\n\n" ++
+    "/-- The input after its first `o` bytes. -/\n" ++
+    "noncomputable def tailAt (o : Nat) : Nat := Nat.shiftRight bytes (8 * o)\n\n" ++
+    "/-- The input's length after its first `o` bytes. -/\n" ++
+    "noncomputable def remAt (o : Nat) : Nat := len - o\n\n"
+  -- chunks, then their running concatenation
+  let mut count := 0
+  let mut size := 0
+  for (k, j) in cs.toList.zipIdx do
+    out := out ++ s!"/-- Code entries {k.first}–{k.first + k.count - 1}. -/\n" ++
+      s!"noncomputable def code{j} : Nat := " ++
+      s!"wasm_bytes% \"{toHex (bs.extract k.off (k.off + k.size))}\"\n\n" ++
+      s!"noncomputable def entries{j} : List (List (Nat × ValType) × Expr) :=\n" ++
+      s!"  {entries k}\n\n" ++
+      s!"theorem chunk{j}_eq : many code {k.count} code{j} {k.size} = .ok entries{j} 0 0 := " ++
+      "by kernel_rfl\n\n"
+    if j > 0 then
+      out := out ++ s!"theorem codes{j}_eq :\n    many code {count + k.count} ({packed j}) " ++
+        s!"{size + k.size} =\n      .ok ({joined j}) 0 0 :=\n" ++
+        s!"  Chunk.two_chunks (lo := {packed (j - 1)}) (hi := code{j}) (m := {size}) " ++
+        s!"(n := {k.size}) (a := {count}) (b := {k.count})\n" ++
+        s!"    (by kernel_rfl) (by kernel_rfl) {codesEqOf (j - 1)} chunk{j}_eq\n\n"
+    count := count + k.count
+    size := size + k.size
+  let last := cs.size - 1
+  let (total, cw) := leb bs code.start
+  let all := s!"({joined last})"
+  out := out ++ "/-- The code section's content: the entry count, then the entries. -/\n" ++
+    s!"noncomputable def codeSec : Nat := {packRange bs code.start (code.start + cw)} + " ++
+    s!"({packed last}) <<< (8 * {cw})\n\n" ++
+    s!"theorem codeVec_eq : vec code codeSec {code.size} = .ok {all} 0 0 :=\n" ++
+    s!"  Chunk.vec_of_count (v' := {packed last}) (n' := {size}) (c := {total}) " ++
+    s!"(by kernel_rfl) (by decide +kernel)\n    {codesEqOf last}\n\n" ++
+    "noncomputable def acc0 : Acc := {}\n\n"
+  -- the slot walk, as `slots` reads the input: customs, then the slot's section if present
+  let mut o := 8
+  let mut acc := 0
+  let mut steps : Array String := #[]
+  let mut ids := FVA.Wasm.Decode.slotIds
+  let mut rest := secs.toList.dropWhile (·.off < 8)
+  while true do
+    let rest' := rest.dropWhile (·.id == 0)
+    let o' := rest'.head?.map (·.off) |>.getD bs.size
+    match ids with
+    | [] => break
+    | id :: more =>
+      let v := s!"(v := tailAt {o}) (n := remAt {o}) (v' := tailAt {o'}) (n' := remAt {o'})"
+      match rest' with
+      | s :: rest'' =>
+        if s.id == id then
+          let a := s!"acc{acc}"
+          out := out ++ s!"noncomputable def acc{acc + 1} : Acc :=\n  {accAfter m id a all}\n\n"
+          let hs := if id == 10 then
+              s!"(Chunk.sub_of_leNat (v := tailAt {s.start}) (n := remAt {s.start}) " ++
+              s!"(r := tailAt {s.stop}) (by kernel_rfl) (Chunk.code_section codeVec_eq))"
+            else "(by kernel_rfl)"
+          steps := steps.push (s!"    _ = slots {more} acc{acc + 1} (tailAt {s.stop}) " ++
+            s!"(remAt {s.stop}) :=\n      Chunk.slot_take (id := {id}) (ids := {more}) " ++
+            s!"(a := {a}) (a' := acc{acc + 1}) {v} (w := tailAt {s.off + 1}) " ++
+            s!"(r := remAt {s.off + 1}) (s := {s.size}) (x := tailAt {s.start}) " ++
+            s!"(y := remAt {s.start}) (t := tailAt {s.stop})\n        (by kernel_rfl) " ++
+            s!"(by kernel_rfl) (by kernel_rfl) (by kernel_rfl) {hs}")
+          acc := acc + 1
+          o := s.stop
+          rest := rest''
+          ids := more
+          continue
+      | [] => pure ()
+      steps := steps.push (s!"    _ = slots {more} acc{acc} (tailAt {o'}) (remAt {o'}) :=\n" ++
+        s!"      Chunk.slot_skip (id := {id}) (ids := {more}) (a := acc{acc}) {v}\n" ++
+        "        (by kernel_rfl) (by kernel_rfl)")
+      o := o'
+      rest := rest'
+      ids := more
+  out := out ++ s!"theorem slots_eq : slots slotIds acc0 (tailAt 8) (remAt 8) = " ++
+    s!".ok acc{acc} 0 0 :=\n  calc\n" ++ "\n".intercalate steps.toList ++
+    s!"\n    _ = .ok acc{acc} 0 0 := by kernel_rfl\n\n" ++
+    "/-- The kernel checks the header, the slot walk and `finish`; each chunk's decoding " ++
+    "above. -/\n" ++
+    "theorem decode_eq : decode bytes len = .ok module :=\n" ++
+    "  Chunk.decode_of_steps (v₁ := tailAt 4) (n₁ := remAt 4) (by kernel_rfl) (by kernel_rfl)\n" ++
+    "    slots_eq (by kernel_rfl)\n\n"
+  return out
+
 /-- The whole `Lifted.lean` file for namespace `ns`. -/
-def file (ns : String) (bytes : ByteArray) (m : Module) (source : String := "") :
-    String := Id.run do
+def file (ns : String) (bytes : ByteArray) (m : Module) (source : String := "")
+    (chunking : Chunking := {}) : String := Id.run do
   let len := bytes.size
-  let mut out := "import FVA.Lifted\n\n" ++
+  let proof := chunked chunking bytes m
+  -- one import line either way: `scripts/check-format` finds the header on line 3
+  let mut out :=
+    (if proof.isSome then "import FVA.Proof.Decode.Chunk\n\n" else "import FVA.Lifted\n\n") ++
     s!"/-! Generated by `fva lift` from {len} bytes; `decode_eq` re-checks it. -/\n\n" ++
     "open FVA.Wasm FVA.Wasm.Decode\n\n" ++
     "set_option maxRecDepth 100000\nset_option linter.all false\n\n" ++
     s!"namespace {ns}\n\n" ++
     "/-- The artifact's bytes (hex in file order), packed little-endian. -/\n" ++
+    -- compiling a numeral costs time quadratic in its size (64 KB 7 s, 160 KB 39 s; bustools'
+    -- 627 KB: 9 min of a Lake build): a chunked module's runs read its file, so it stays uncompiled
+    (if proof.isSome then "noncomputable " else "") ++
     s!"def bytes : Nat := wasm_bytes% \"{toHex bytes}\"\n\n" ++
     s!"/-- The artifact's length in bytes. -/\ndef len : Nat := {len}\n\n" ++
     "/-- The artifact's path from the project root (`fva trust` compares its bytes). -/\n" ++
@@ -260,8 +468,8 @@ def file (ns : String) (bytes : ByteArray) (m : Module) (source : String := "") 
       app "Import.mk" [im.module.quote, im.name.quote, importDesc im.desc])},\n" ++
     s!"    exports := {list (m.exports.map fun ex =>
       app "Export.mk" [ex.name.quote, exportDesc ex.desc])} }\n\n" ++
-    "/-- The kernel evaluates the verified decoder on `bytes`. -/\n" ++
-    "theorem decode_eq : decode bytes len = .ok module := by kernel_rfl\n\n" ++
+    proof.getD ("/-- The kernel evaluates the verified decoder on `bytes`. -/\n" ++
+      "theorem decode_eq : decode bytes len = .ok module := by kernel_rfl\n\n") ++
     s!"end {ns}\n"
   return out
 

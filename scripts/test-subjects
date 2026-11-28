@@ -26,13 +26,22 @@ subjects=(
 	"FVATest.Subjects.WasiGc.Proof FVATest.Subjects.WasiGc.Spec FVATest.Subjects.WasiGc.Lifted 18"
 	"FVATest.Subjects.CppEH.Proof FVATest.Subjects.CppEH.Spec FVATest.Subjects.CppEH.Lifted 13 mem=10/15"
 )
+# rows whose fva trust replay runs on the schedule (Decisions D28 gate placement: bustools ≈ 25 min
+# per mode; per commit its root builds among the proof roots below): FVA_SUBJECT_SCHEDULED=1 adds
+# them (U29d's scheduled workflow; U29c's C2 evidence)
+scheduled=(
+	"FVATest.Subjects.Bustools.Proof FVATest.Subjects.Bustools.Spec FVATest.Subjects.Bustools.Lifted 10"
+)
+[[ ${FVA_SUBJECT_SCHEDULED:-} == 1 ]] && subjects+=("${scheduled[@]}")
 # proof-only modules (no claims yet): U19 checkpoint 1, the lz4 C extension loop proven by both
 # routes on the shipped -O2 bytes and on the -O1 perturbation; U20's spike statements (Short imports
 # Copy), the decoder's cutpoint statements (Seg), the model + its format proofs (ModelProof), the
 # memory-to-prefix adapters (Prefix, Match), R1-R3 from the cutpoint statements (Loop, Sim, Top)
 # + the cutpoint proofs (Cut/* by stepping, Eval/* by engine C, Eval.Accept = their frozen types),
 # the acceptance runs of Spec's R1-R3 (Accept) + its one-clause mutants refuted on
-# the shipped bytes (Refute/*); --wfail turns a `sorry` into a failure
+# the shipped bytes (Refute/*); the bustools link-only claim (U29c: its Lifted = the chunked
+# decode_eq, checked by Lean's kernel here; its fva trust replay, ≈ 25 min per mode, runs on the
+# schedule: Decisions D28 gate placement, U29d); --wfail turns a `sorry` into a failure
 proofs=(FVATest.Subjects.Lz4C.ExtDirect FVATest.Subjects.Lz4C.ExtRefine
 	FVATest.Subjects.Lz4C.O1.ExtDirect FVATest.Subjects.Lz4C.O1.ExtRefine FVATest.Subjects.Lz4C.Instance
 	FVATest.Subjects.Lz4C.Short FVATest.Subjects.Lz4C.ModelProof FVATest.Subjects.Lz4C.Prefix
@@ -41,7 +50,7 @@ proofs=(FVATest.Subjects.Lz4C.ExtDirect FVATest.Subjects.Lz4C.ExtRefine
 	FVATest.Subjects.Lz4C.Cut.ExtB FVATest.Subjects.Lz4C.Eval.Accept
 	FVATest.Subjects.Lz4C.Accept FVATest.Subjects.Lz4C.Refute.LastWrite
 	FVATest.Subjects.Lz4C.Refute.Length FVATest.Subjects.Lz4C.Refute.Nonnegative
-	FVATest.Subjects.GlmCall.Step)
+	FVATest.Subjects.GlmCall.Step FVATest.Subjects.Bustools.Proof)
 # the Neg roots are no default target; build them by module name, expecting failure
 negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
 	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same FVATest.Subjects.Tmm.Neg.Exact
@@ -52,6 +61,7 @@ negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
 # `block`) run in one shard; the map fails closed before any fetch (rc 2): a directory without a
 # shard or owning no check, a shard outside 1..N or holding no directory
 declare -A shard=(
+	[Bustools]=3
 	[CppEH]=4
 	[EdgerCpm]=1
 	[GlmCall]=2
@@ -62,7 +72,7 @@ declare -A shard=(
 	[WasiExit]=1
 	[WasiGc]=3
 )
-blocks=(CppEH GlmCall WasiExit WasiGc)
+blocks=(Bustools CppEH GlmCall WasiExit WasiGc)
 k=all n='' list=0
 while (($#)); do
 	case $1 in
@@ -139,7 +149,8 @@ if ! lake --wfail build fva >"$tmp/build" 2>&1; then
 	exit 2
 fi
 for lift in EdgerCpm/edgeR.so:EdgerCpm Lz4Wasm/lz4-block-codec.wasm:Lz4Wasm Lz4C/lz4-c.wasm:Lz4C \
-	Lz4C/O1/lz4-c-O1.wasm:Lz4C.O1 GlmIround/glm-iround.wasm:GlmIround CppEH/eh.wasm:CppEH; do
+	Lz4C/O1/lz4-c-O1.wasm:Lz4C.O1 GlmIround/glm-iround.wasm:GlmIround CppEH/eh.wasm:CppEH \
+	Bustools/bustools-count.wasm:Bustools; do
 	bin=FVATest/Subjects/${lift%%:*} ns=Subjects.${lift#*:}.Lifted
 	"$fva" lift "$bin" "$tmp/Lifted.lean" --ns "$ns" >/dev/null || exit 2
 	cmp -s "$tmp/Lifted.lean" "${bin%/*}/Lifted.lean" || cp "$tmp/Lifted.lean" "${bin%/*}/Lifted.lean" ||
@@ -198,6 +209,30 @@ if block WasiGc; then
 		>/dev/null || exit 2
 	if ! cmp -s "$tmp/WasiGc.lean" FVATest/Subjects/WasiGc/Lifted.lean; then
 		echo "test-subjects: FVATest/Subjects/WasiGc/Lifted.lean is not fva lift's output (regenerate it)"
+		fail=1
+	fi
+fi
+
+# U29c: the placed bustools-count.wasm = its build's output (C1: pinned sources + SDK, emitted bytes
+# checked) + the full-link preflight on it (C4: fva run = wasmtime on upstream tc0004, output.mtx =
+# upstream's); build/preflight rc 1 = a finding, anything else = setup
+if block Bustools; then
+	FVATest/Subjects/Bustools/build "$tmp/bustools-count.wasm" >"$tmp/bt-build.log" 2>&1
+	rc=$?
+	if ((rc != 0)); then
+		echo "test-subjects: FVATest/Subjects/Bustools/build → rc $rc"
+		tail -3 "$tmp/bt-build.log"
+		((rc == 1)) || exit 2
+		fail=1
+	elif ! cmp -s "$tmp/bustools-count.wasm" FVATest/Subjects/Bustools/bustools-count.wasm; then
+		echo "test-subjects: the placed bustools-count.wasm is not its build's output"
+		fail=1
+	fi
+	FVATest/Subjects/Bustools/preflight >"$tmp/bt-preflight.log" 2>&1
+	rc=$?
+	if ((rc != 0)); then
+		cat "$tmp/bt-preflight.log"
+		((rc == 1)) || exit 2
 		fail=1
 	fi
 fi

@@ -19,11 +19,15 @@ namespace FVA.Test.Fuzz
 
 open Lean
 
-/-- `fva lift`: decode, then render the lifted module. -/
+/-- `fva lift`: decode, then render the lifted module, monolithic and chunked (a test policy
+small inputs reach: the default threshold is 128 KiB of code). -/
 @[export fva_fuzz_lift]
 def lift (bs : ByteArray) : UInt32 :=
   match FVA.Wasm.Decode.decode (FVA.Tool.packBytes bs) bs.size with
-  | .ok m => if (FVA.Tool.Lift.file "Fuzz" bs m "fuzz.wasm").isEmpty then 1 else 0
+  | .ok m =>
+    if (FVA.Tool.Lift.file "Fuzz" bs m "fuzz.wasm").isEmpty ||
+        (FVA.Tool.Lift.file "Fuzz" bs m "fuzz.wasm" { threshold := 0, target := 64 }).isEmpty
+    then 1 else 0
   | .error _ => 1
 
 /-- `fva blob` (and `fva certify`, which writes its input and output files through it). -/

@@ -440,6 +440,37 @@ for planted in \
 		fail=1
 	fi
 done
+# fingerprint (U29c C1): the bustools subject's imports, exports, 17 aborting stubs, the unlinked
+# sort_orig + standard EH over `wasm-tools print`; the placed artifact passes, each planted print
+# text (re-encoded by `wasm-tools parse`) fails with rc 1
+d=$tmp/bt-fingerprint && mkdir -p "$d"
+btfp() { PATH=$PWD/.tools/bin:$PATH FVATest/Subjects/Bustools/fingerprint "$@" >/dev/null 2>&1; }
+if ! btfp FVATest/Subjects/Bustools/bustools-count.wasm; then
+	echo "test-checks: fingerprint failed the placed bustools subject"
+	fail=1
+fi
+.tools/bin/wasm-tools print FVATest/Subjects/Bustools/bustools-count.wasm >"$d/bt.wat"
+for planted in \
+	"undeclared import|/\"random_get\"/a\\  $imp" \
+	"import of another module|/\"random_get\"/a\\  (import \"env\" \"f\" (func))" \
+	"stub body|/(func \\\$\"bustools_capture(Bustools_opt&)\"/,/^  )/s/call \\\$abort/nop/" \
+	"legacy try|0,/^\\( *\\)try_table/s//\\1try\\n\\1end\\n\\1try_table/" \
+	"extra export|/(export \"memory\"/a\\  (export \"extra\" (memory 0))" \
+	"sort_orig linked|/(export \"memory\"/i\\  (func \$bustools_sort_orig)"; do
+	label=${planted%%|*}
+	if ! sed "${planted#*|}" "$d/bt.wat" >"$d/p.wat" ||
+		! .tools/bin/wasm-tools parse "$d/p.wat" -o "$d/p.wasm"; then
+		echo "test-checks: bustools fingerprint plant '$label' does not assemble"
+		fail=1
+		continue
+	fi
+	btfp "$d/p.wasm"
+	rc=$?
+	if ((rc != 1)); then
+		echo "test-checks: bustools fingerprint on a planted $label: rc $rc, want 1"
+		fail=1
+	fi
+done
 # make-base-manifest --check (U28a E8): a stale base-lines table fails, as a stale manifest does;
 # a stub fvatest prints the committed table, a stub lake runs `lake env`'s command
 d=$tmp/base && mkdir -p "$d/scripts" "$d/trust" "$d/.lake/build/bin" "$d/bin"
