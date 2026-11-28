@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# U29b3: build gc.wasm from gc.c with the pinned wasi-sdk 34.0 (direct WASI preview1 imports, its own
+# _start, no C library linked), then check its imports + exports.
+# Usage: build [OUT.wasm] (default: the committed gc.wasm). Exit: 0 built + checked, 1 the import or
+# export set differs, 2 setup (SDK missing or not the pinned one, compiler failure).
+set -uo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$here/../../.." && pwd)
+out=${1:-$here/gc.wasm}
+if [[ -n ${WASI_SDK_PATH:-} ]]; then
+	sdk=$WASI_SDK_PATH
+else
+	sdk=$root/.tools/wasi-sdk
+	if [[ ! -e $sdk/.pin-34.0 ]]; then
+		"$root/scripts/fetch-bench-tools" wasi-sdk >&2 || {
+			echo "build: fetching wasi-sdk 34.0 failed" >&2
+			exit 2
+		}
+	fi
+fi
+pinned='34.0
+wasi-libc: 2e6fb9d8ee0c
+llvm: 895aa2c896ad
+llvm-version: 23.1.0
+config: f992bcc08219'
+if [[ $(cat "$sdk/VERSION" 2>/dev/null) != "$pinned" ]]; then
+	echo "build: $sdk is not the pinned wasi-sdk 34.0 (its VERSION differs)" >&2
+	exit 2
+fi
+# wasm-ld writes the output's basename into the name section: build at the basename gc.wasm
+tmp=$(mktemp -d) && trap 'rm -rf "$tmp"' EXIT
+"$sdk/bin/clang" --target=wasm32-wasip1 -O2 -nostdlib -Wl,--no-entry -Wl,--export=_start \
+	-Wl,--strip-debug "$here/gc.c" -o "$tmp/gc.wasm" || exit 2
+want='import wasi_snapshot_preview1 path_open
+import wasi_snapshot_preview1 fd_read
+import wasi_snapshot_preview1 fd_write
+import wasi_snapshot_preview1 proc_exit
+export memory
+export _start'
+got=$("$root/.tools/bin/wasm-tools" print "$tmp/gc.wasm" |
+	sed -nE 's/^ *\(import "([^"]+)" "([^"]+)".*/import \1 \2/p; s/^ *\(export "([^"]+)".*/export \1/p') || exit 2
+if [[ $got != "$want" ]]; then
+	echo "build: gc.wasm imports/exports differ:" >&2
+	printf '%s\n' "$got" >&2
+	exit 1
+fi
+cp "$tmp/gc.wasm" "$out" && chmod 644 "$out"

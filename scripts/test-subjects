@@ -23,6 +23,7 @@ subjects=(
 	"FVATest.Subjects.EdgerCpm FVATest.Subjects.EdgerCpm.Spec FVATest.Subjects.EdgerCpm.Lifted 91"
 	"FVATest.Subjects.Lz4C.Proof FVATest.Subjects.Lz4C.Spec FVATest.Subjects.Lz4C.Lifted 76"
 	"FVATest.Subjects.WasiExit FVATest.Subjects.WasiExit.Spec FVATest.Subjects.WasiExit.Lifted 10"
+	"FVATest.Subjects.WasiGc.Proof FVATest.Subjects.WasiGc.Spec FVATest.Subjects.WasiGc.Lifted 18"
 )
 # proof-only modules (no claims yet): U19 checkpoint 1, the lz4 C extension loop proven by both
 # routes on the shipped -O2 bytes and on the -O1 perturbation; U20's spike statements (Short imports
@@ -43,7 +44,7 @@ proofs=(FVATest.Subjects.Lz4C.ExtDirect FVATest.Subjects.Lz4C.ExtRefine
 # the Neg roots are no default target; build them by module name, expecting failure
 negs=(FVATest.Subjects.Lz4Wasm.Neg.EndClause FVATest.Subjects.Lz4Wasm.Neg.Byte
 	FVATest.Subjects.GlmIround.Neg.Ret FVATest.Subjects.Tmm.Neg.Same FVATest.Subjects.Tmm.Neg.Exact
-	FVATest.Subjects.WasiExit.Neg.Exit7)
+	FVATest.Subjects.WasiExit.Neg.Exit7 FVATest.Subjects.WasiGc.Neg.Byte)
 
 # CI fan-out: each directory's rows, proof roots, negatives + own checks (`blocks`, guarded by
 # `block`) run in one shard; the map fails closed before any fetch (rc 2): a directory without a
@@ -57,8 +58,9 @@ declare -A shard=(
 	[Lz4C]=3
 	[Lz4Wasm]=3
 	[WasiExit]=1
+	[WasiGc]=3
 )
-blocks=(CppEH GlmCall WasiExit)
+blocks=(CppEH GlmCall WasiExit WasiGc)
 k=all n='' list=0
 while (($#)); do
 	case $1 in
@@ -171,6 +173,29 @@ if block WasiExit; then
 		>/dev/null || exit 2
 	if ! cmp -s "$tmp/WasiExit.lean" FVATest/Subjects/WasiExit/Lifted.lean; then
 		echo "test-subjects: FVATest/Subjects/WasiExit/Lifted.lean is not fva lift's output (regenerate it)"
+		fail=1
+	fi
+fi
+
+# U29b3: the GC subject's gc.wasm = its build's output (pinned wasi-sdk; FVA-written C, no C library),
+# its Lifted.lean = fva lift's output
+if block WasiGc; then
+	FVATest/Subjects/WasiGc/build "$tmp/gc.wasm" >"$tmp/gc-build.log" 2>&1
+	rc=$?
+	if ((rc != 0)); then
+		# build rc 1 = the import/export set differs (a finding), anything else = setup
+		echo "test-subjects: FVATest/Subjects/WasiGc/build → rc $rc"
+		tail -3 "$tmp/gc-build.log"
+		((rc == 1)) || exit 2
+		fail=1
+	elif ! cmp -s "$tmp/gc.wasm" FVATest/Subjects/WasiGc/gc.wasm; then
+		echo "test-subjects: FVATest/Subjects/WasiGc/gc.wasm is not its build's output"
+		fail=1
+	fi
+	"$fva" lift FVATest/Subjects/WasiGc/gc.wasm "$tmp/WasiGc.lean" --ns Subjects.WasiGc.Lifted \
+		>/dev/null || exit 2
+	if ! cmp -s "$tmp/WasiGc.lean" FVATest/Subjects/WasiGc/Lifted.lean; then
+		echo "test-subjects: FVATest/Subjects/WasiGc/Lifted.lean is not fva lift's output (regenerate it)"
 		fail=1
 	fi
 fi

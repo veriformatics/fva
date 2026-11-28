@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# U29b3: the GC claim recreated in a fresh `fva init` project from the shipped package + this
+# subject's sources (AGENT.md "WASI commands"): init with gc.wasm, the spec + proof under the
+# project's module names, build, then `fva trust` in default and --paranoid mode.
+# Usage: recipe DIR (DIR absent). Exit: 0 both PASS, 1 a build or trust run failed, 2 setup.
+set -uo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$here/../../.." && pwd)
+dir=${1:?usage: recipe DIR}
+[[ ! -e $dir ]] || {
+	echo "recipe: $dir exists" >&2
+	exit 2
+}
+fva=$root/.lake/build/bin/fva
+export PATH=$root/.tools/bin:$PATH
+# the trust runs check the pinned canaries (scripts/test-init fetches them the same way)
+"$root/scripts/fetch-canaries" >/dev/null || exit 2
+"$fva" init "$dir" --lib Gc --wasm "$here/gc.wasm" >/dev/null || exit 2
+for f in Spec Proof; do
+	sed 's/FVATest\.Subjects\.WasiGc/Gc/g; s/Subjects\.WasiGc/Gc/g' "$here/$f.lean" >"$dir/Gc/$f.lean" ||
+		exit 2
+done
+mkdir -p "$dir/.lake" "$dir/fva/.lake" || exit 2
+# hard links, not a symlink: the trust sandbox sees the project alone (scripts/test-init); a
+# linked worktree's .lake/packages may itself be a symlink, so link its target's files
+cp -al "$(readlink -f "$root/.lake/packages")" "$dir/.lake/packages" || exit 2
+cp -a "$root/.lake/build" "$dir/fva/.lake/build" || exit 2
+(cd "$dir" && lake build Gc.Proof) || exit 1
+rc=0
+for mode in default paranoid; do
+	args=(--spec-module Gc.Spec --root-module Gc.Proof --subject Gc.Lifted)
+	[[ $mode == default ]] || args+=(--paranoid)
+	(cd "$dir" && "$fva" trust . "${args[@]}") || rc=1
+done
+exit "$rc"
